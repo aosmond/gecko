@@ -221,14 +221,12 @@ public:
                             const wr::ExternalImageId& aKey);
 
 private:
-  ~SharedSurfacesAnimation();
 
   class ImageKeyData final : public SharedSurfacesChild::ImageKeyData
   {
   public:
     ImageKeyData(WebRenderLayerManager* aManager,
-                 const wr::ImageKey& aImageKey,
-                 gfx::SourceSurface* aParentSurface);
+                 const wr::ImageKey& aImageKey);
 
     ~ImageKeyData();
 
@@ -236,7 +234,14 @@ private:
     ImageKeyData& operator=(ImageKeyData&& aOther);
 
     std::deque<RefPtr<gfx::SourceSurface>> mPendingRelease;
+    bool mRecycling;
   };
+
+  ~SharedSurfacesAnimation();
+
+  void HoldSurfaceForRecycling(ImageKeyData& aEntry,
+                               gfx::SourceSurface* aParentSurface,
+                               gfx::SourceSurfaceSharedData* aSurface);
 
   AutoTArray<ImageKeyData, 1> mKeys;
   wr::ExternalImageId mId;
