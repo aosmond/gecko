@@ -294,21 +294,16 @@ void
 AnimationFrameDiscardingQueue::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                                                       const AddSizeOfCb& aCallback)
 {
-  mFirstFrame->AddSizeOfExcludingThis(aMallocSizeOf,
-    [&](AddSizeOfCbData& aMetadata) {
-      aMetadata.index = 1;
-      aCallback(aMetadata);
-    }
-  );
-
   size_t i = mGetIndex;
   for (const RefPtr<imgFrame>& frame : mDisplay) {
     ++i;
     if (mSize < i) {
-      // First frame again, we already covered it above.
-      MOZ_ASSERT(mFirstFrame.get() == frame.get());
-      i = 1;
-      continue;
+      i = 0;
+      // There may actually be two different first frames since we reinsert the
+      // regenerated first frame, even though we ignore it.
+      if (mFirstFrame.get() == frame.get()) {
+        continue;
+      }
     }
 
     frame->AddSizeOfExcludingThis(aMallocSizeOf,
@@ -318,6 +313,13 @@ AnimationFrameDiscardingQueue::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf
       }
     );
   }
+
+  mFirstFrame->AddSizeOfExcludingThis(aMallocSizeOf,
+    [&](AddSizeOfCbData& aMetadata) {
+      aMetadata.index = 1;
+      aCallback(aMetadata);
+    }
+  );
 }
 
 AnimationFrameRecyclingQueue::AnimationFrameRecyclingQueue(AnimationFrameRetainedBuffer&& aQueue)

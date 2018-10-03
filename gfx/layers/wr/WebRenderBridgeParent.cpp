@@ -478,7 +478,7 @@ WebRenderBridgeParent::UpdateResources(const nsTArray<OpUpdateResource>& aResour
   }
 
   if (scheduleRelease) {
-    aUpdates.Notify(wr::Checkpoint::FrameRendered, std::move(scheduleRelease));
+    aUpdates.Notify(wr::Checkpoint::FrameTexturesUpdated, std::move(scheduleRelease));
   }
   return true;
 }

@@ -401,7 +401,8 @@ public:
   bool IsDataSourceSurface() const {
     SurfaceType type = GetType();
     return type == SurfaceType::DATA ||
-           type == SurfaceType::DATA_SHARED;
+           type == SurfaceType::DATA_SHARED ||
+           type == SurfaceType::DATA_RECYCLING_SHARED;
   }
 
   /**
