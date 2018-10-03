@@ -7,6 +7,7 @@
 #ifndef MOZILLA_GFX_SHAREDSURFACESCHILD_H
 #define MOZILLA_GFX_SHAREDSURFACESCHILD_H
 
+#include <deque>
 #include <stdint.h>                     // for uint32_t, uint64_t
 #include "mozilla/Attributes.h"         // for override
 #include "mozilla/Maybe.h"              // for Maybe
@@ -216,10 +217,26 @@ public:
                      wr::IpcResourceUpdateQueue& aResources,
                      wr::ImageKey& aKey);
 
+  void ReleasePreviousFrame(WebRenderLayerManager* aManager,
+                            const wr::ExternalImageId& aKey);
+
 private:
   ~SharedSurfacesAnimation();
 
-  typedef SharedSurfacesChild::ImageKeyData ImageKeyData;
+  class ImageKeyData final : public SharedSurfacesChild::ImageKeyData
+  {
+  public:
+    ImageKeyData(WebRenderLayerManager* aManager,
+                 const wr::ImageKey& aImageKey,
+                 gfx::SourceSurface* aParentSurface);
+
+    ~ImageKeyData();
+
+    ImageKeyData(ImageKeyData&& aOther);
+    ImageKeyData& operator=(ImageKeyData&& aOther);
+
+    std::deque<RefPtr<gfx::SourceSurface>> mPendingRelease;
+  };
 
   AutoTArray<ImageKeyData, 1> mKeys;
   wr::ExternalImageId mId;
