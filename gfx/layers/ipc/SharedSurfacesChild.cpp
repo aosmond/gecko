@@ -467,6 +467,30 @@ SharedSurfacesChild::UpdateAnimation(ImageContainer* aContainer,
   return anim->SetCurrentFrame(aSurface, sharedSurface, aDirtyRect);
 }
 
+SharedSurfacesAnimation::ImageKeyData::ImageKeyData(WebRenderLayerManager* aManager,
+                                                    const wr::ImageKey& aImageKey,
+                                                    SourceSurface* aParentSurface)
+  : SharedSurfacesChild::ImageKeyData(aManager, aImageKey)
+{
+  mPendingRelease.push_back(aParentSurface);
+}
+
+SharedSurfacesAnimation::ImageKeyData::ImageKeyData(SharedSurfacesAnimation::ImageKeyData&& aOther)
+  : SharedSurfacesChild::ImageKeyData(std::move(aOther))
+  , mPendingRelease(std::move(aOther.mPendingRelease))
+{ }
+
+SharedSurfacesAnimation::ImageKeyData&
+SharedSurfacesAnimation::ImageKeyData::operator=(SharedSurfacesAnimation::ImageKeyData&& aOther)
+{
+  SharedSurfacesChild::ImageKeyData::operator=(std::move(aOther));
+  mPendingRelease = std::move(aOther.mPendingRelease);
+  return *this;
+}
+
+SharedSurfacesAnimation::ImageKeyData::~ImageKeyData()
+{ }
+
 SharedSurfacesAnimation::~SharedSurfacesAnimation()
 {
   MOZ_ASSERT(mKeys.IsEmpty());
@@ -557,7 +581,6 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
   // cost of duplicating image keys. In an ideal world, we would generate a
   // single key for the surface, and it would be usable on all of the
   // renderer instances. For now, we must allocate a key for each WR bridge.
-  wr::ImageKey key;
   bool found = false;
   auto i = mKeys.Length();
   while (i > 0) {
@@ -581,6 +604,7 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
         if (dirtyRect) {
           aResources.UpdateExternalImage(mId, entry.mImageKey,
                                          ViewAs<ImagePixel>(dirtyRect.ref()));
+          entry.mPendingRelease.push_back(aParentSurface);
         }
       }
 
@@ -591,12 +615,53 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
 
   if (!found) {
     aKey = aManager->WrBridge()->GetNextImageKey();
-    ImageKeyData data(aManager, aKey);
+    ImageKeyData data(aManager, aKey, aParentSurface);
     mKeys.AppendElement(std::move(data));
     aResources.AddExternalImage(mId, aKey);
   }
 
   return NS_OK;
+}
+
+void
+SharedSurfacesAnimation::ReleasePreviousFrame(WebRenderLayerManager* aManager,
+                                              const wr::ExternalImageId& aId)
+{
+  MOZ_ASSERT(aManager);
+
+  auto i = mKeys.Length();
+  while (i > 0) {
+    --i;
+    ImageKeyData& entry = mKeys[i];
+    if (entry.mManager->IsDestroyed()) {
+      mKeys.RemoveElementAt(i);
+    } else if (entry.mManager == aManager) {
+      size_t k;
+      for (k = 0; k < entry.mPendingRelease.size(); ++k) {
+        auto sharedSurface =
+          SharedSurfacesChild::Upcast(entry.mPendingRelease[k]);
+        MOZ_ASSERT(sharedSurface);
+
+        Maybe<wr::ExternalImageId> extId =
+          SharedSurfacesChild::GetExternalId(sharedSurface);
+        if (extId && extId.ref() == aId) {
+          break;
+        }
+      }
+
+      if (k == entry.mPendingRelease.size()) {
+        continue;
+      }
+
+      while (true) {
+        entry.mPendingRelease.pop_front();
+        if (k == 0) {
+          break;
+        }
+        --k;
+      }
+    }
+  }
 }
 
 } // namespace layers
