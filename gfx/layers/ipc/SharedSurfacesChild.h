@@ -193,6 +193,7 @@ public:
   { }
 
   void Destroy();
+  void DestroyFor(WebRenderLayerManager* aManager);
 
   /**
    * Set the animation to display the given frame.

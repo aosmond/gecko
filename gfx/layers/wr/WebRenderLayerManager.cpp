@@ -137,6 +137,11 @@ WebRenderLayerManager::DoDestroy(bool aIsSync)
     NS_DispatchToMainThread(task.forget());
   }
 
+  for (const auto& i : mAsyncAnimations) {
+    i.second->DestroyFor(this);
+  }
+  mAsyncAnimations.clear();
+
   // Forget the widget pointer in case we outlive our owning widget.
   mWidget = nullptr;
 }
@@ -751,6 +756,30 @@ WebRenderLayerManager::FlushAsyncResourceUpdates()
   }
 
   mAsyncResourceUpdates.reset();
+}
+
+void
+WebRenderLayerManager::RegisterAsyncAnimation(const wr::ImageKey& aKey,
+                                              SharedSurfacesAnimation* aAnimation)
+{
+  mAsyncAnimations.insert(std::make_pair(wr::AsUint64(aKey), aAnimation));
+}
+
+void
+WebRenderLayerManager::DeregisterAsyncAnimation(const wr::ImageKey& aKey)
+{
+  mAsyncAnimations.erase(wr::AsUint64(aKey));
+}
+
+void
+WebRenderLayerManager::WrReleasedImages(const nsTArray<wr::ExternalImageKeyPair>& aPairs)
+{
+  for (const auto& pair : aPairs) {
+    auto i = mAsyncAnimations.find(wr::AsUint64(pair.key));
+    if (i != mAsyncAnimations.end()) {
+      i->second->ReleasePreviousFrame(this, pair.id);
+    }
+  }
 }
 
 } // namespace layers

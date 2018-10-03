@@ -578,6 +578,9 @@ WebRenderBridgeChild::RecvWrUpdated(const wr::IdNamespace& aNewIdNamespace,
 mozilla::ipc::IPCResult
 WebRenderBridgeChild::RecvWrReleasedImages(nsTArray<wr::ExternalImageKeyPair>&& aPairs)
 {
+  if (mManager) {
+    mManager->WrReleasedImages(aPairs);
+  }
   return IPC_OK();
 }
 

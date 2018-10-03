@@ -512,8 +512,20 @@ SharedSurfacesAnimation::Destroy()
   }
 
   for (const auto& entry : mKeys) {
-    if (!entry.mManager->IsDestroyed()) {
-      entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
+  }
+}
+
+void
+SharedSurfacesAnimation::DestroyFor(WebRenderLayerManager* aManager)
+{
+  auto i = mKeys.Length();
+  while (i > 0) {
+    --i;
+    if (mKeys[i].mManager == aManager) {
+      mKeys.RemoveElementAt(i);
+      break;
     }
   }
 }
@@ -538,13 +550,9 @@ SharedSurfacesAnimation::SetCurrentFrame(SourceSurface* aParentSurface,
   while (i > 0) {
     --i;
     ImageKeyData& entry = mKeys[i];
-    if (entry.mManager->IsDestroyed()) {
-      mKeys.RemoveElementAt(i);
-      continue;
-    }
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
 
     entry.MergeDirtyRect(Some(aDirtyRect));
-
     Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
     if (dirtyRect) {
       auto& resourceUpdates = entry.mManager->AsyncResourceUpdates();
@@ -586,31 +594,33 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
   while (i > 0) {
     --i;
     ImageKeyData& entry = mKeys[i];
-    if (entry.mManager->IsDestroyed()) {
-      mKeys.RemoveElementAt(i);
-    } else if (entry.mManager == aManager) {
-      WebRenderBridgeChild* wrBridge = aManager->WrBridge();
-      MOZ_ASSERT(wrBridge);
-
-      // Even if the manager is the same, its underlying WebRenderBridgeChild
-      // can change state. If our namespace differs, then our old key has
-      // already been discarded.
-      bool ownsKey = wrBridge->GetNamespace() == entry.mImageKey.mNamespace;
-      if (!ownsKey) {
-        entry.mImageKey = wrBridge->GetNextImageKey();
-        aResources.AddExternalImage(mId, entry.mImageKey);
-      } else {
-        Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
-        if (dirtyRect) {
-          aResources.UpdateExternalImage(mId, entry.mImageKey,
-                                         ViewAs<ImagePixel>(dirtyRect.ref()));
-          entry.mPendingRelease.push_back(aParentSurface);
-        }
-      }
-
-      aKey = entry.mImageKey;
-      found = true;
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager != aManager) {
+      continue;
     }
+
+    WebRenderBridgeChild* wrBridge = aManager->WrBridge();
+    MOZ_ASSERT(wrBridge);
+
+    // Even if the manager is the same, its underlying WebRenderBridgeChild
+    // can change state. If our namespace differs, then our old key has
+    // already been discarded.
+    bool ownsKey = wrBridge->GetNamespace() == entry.mImageKey.mNamespace;
+    if (!ownsKey) {
+      entry.mImageKey = wrBridge->GetNextImageKey();
+      aResources.AddExternalImage(mId, entry.mImageKey);
+    } else {
+      Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
+      if (dirtyRect) {
+        aResources.UpdateExternalImage(mId, entry.mImageKey,
+                                       ViewAs<ImagePixel>(dirtyRect.ref()));
+        entry.mPendingRelease.push_back(aParentSurface);
+      }
+    }
+
+    aKey = entry.mImageKey;
+    found = true;
+    break;
   }
 
   if (!found) {
@@ -633,26 +643,25 @@ SharedSurfacesAnimation::ReleasePreviousFrame(WebRenderLayerManager* aManager,
   while (i > 0) {
     --i;
     ImageKeyData& entry = mKeys[i];
-    if (entry.mManager->IsDestroyed()) {
-      mKeys.RemoveElementAt(i);
-    } else if (entry.mManager == aManager) {
-      size_t k;
-      for (k = 0; k < entry.mPendingRelease.size(); ++k) {
-        auto sharedSurface =
-          SharedSurfacesChild::Upcast(entry.mPendingRelease[k]);
-        MOZ_ASSERT(sharedSurface);
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager != aManager) {
+      continue;
+    }
 
-        Maybe<wr::ExternalImageId> extId =
-          SharedSurfacesChild::GetExternalId(sharedSurface);
-        if (extId && extId.ref() == aId) {
-          break;
-        }
+    size_t k;
+    for (k = 0; k < entry.mPendingRelease.size(); ++k) {
+      auto sharedSurface =
+        SharedSurfacesChild::Upcast(entry.mPendingRelease[k]);
+      MOZ_ASSERT(sharedSurface);
+
+      Maybe<wr::ExternalImageId> extId =
+        SharedSurfacesChild::GetExternalId(sharedSurface);
+      if (extId && extId.ref() == aId) {
+        break;
       }
+    }
 
-      if (k == entry.mPendingRelease.size()) {
-        continue;
-      }
-
+    if (k < entry.mPendingRelease.size()) {
       while (true) {
         entry.mPendingRelease.pop_front();
         if (k == 0) {
@@ -661,6 +670,8 @@ SharedSurfacesAnimation::ReleasePreviousFrame(WebRenderLayerManager* aManager,
         --k;
       }
     }
+
+    break;
   }
 }
 
