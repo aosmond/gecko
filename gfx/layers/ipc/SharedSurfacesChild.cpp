@@ -468,16 +468,15 @@ SharedSurfacesChild::UpdateAnimation(ImageContainer* aContainer,
 }
 
 SharedSurfacesAnimation::ImageKeyData::ImageKeyData(WebRenderLayerManager* aManager,
-                                                    const wr::ImageKey& aImageKey,
-                                                    SourceSurface* aParentSurface)
+                                                    const wr::ImageKey& aImageKey)
   : SharedSurfacesChild::ImageKeyData(aManager, aImageKey)
-{
-  mPendingRelease.push_back(aParentSurface);
-}
+  , mRecycling(false)
+{ }
 
 SharedSurfacesAnimation::ImageKeyData::ImageKeyData(SharedSurfacesAnimation::ImageKeyData&& aOther)
   : SharedSurfacesChild::ImageKeyData(std::move(aOther))
   , mPendingRelease(std::move(aOther.mPendingRelease))
+  , mRecycling(aOther.mRecycling)
 { }
 
 SharedSurfacesAnimation::ImageKeyData&
@@ -485,6 +484,7 @@ SharedSurfacesAnimation::ImageKeyData::operator=(SharedSurfacesAnimation::ImageK
 {
   SharedSurfacesChild::ImageKeyData::operator=(std::move(aOther));
   mPendingRelease = std::move(aOther.mPendingRelease);
+  mRecycling = aOther.mRecycling;
   return *this;
 }
 
@@ -512,22 +512,30 @@ SharedSurfacesAnimation::Destroy()
   }
 
   for (const auto& entry : mKeys) {
-    MOZ_ASSERT(!entry.mManager->IsDestroyed());
-    entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
+    if (!entry.mManager->IsDestroyed()) {
+      if (entry.mRecycling) {
+        entry.mManager->DeregisterAsyncAnimation(entry.mImageKey);
+      }
+      entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
+    }
   }
 }
 
 void
-SharedSurfacesAnimation::DestroyFor(WebRenderLayerManager* aManager)
+SharedSurfacesAnimation::HoldSurfaceForRecycling(ImageKeyData& aEntry,
+                                                 SourceSurface* aParentSurface,
+                                                 SourceSurfaceSharedData* aSurface)
 {
-  auto i = mKeys.Length();
-  while (i > 0) {
-    --i;
-    if (mKeys[i].mManager == aManager) {
-      mKeys.RemoveElementAt(i);
-      break;
-    }
+  if (aParentSurface == static_cast<SourceSurface*>(aSurface)) {
+    return;
   }
+
+  if (!aEntry.mRecycling) {
+    aEntry.mManager->RegisterAsyncAnimation(aEntry.mImageKey, this);
+    aEntry.mRecycling = true;
+  }
+
+  aEntry.mPendingRelease.push_back(aParentSurface);
 }
 
 nsresult
@@ -550,11 +558,15 @@ SharedSurfacesAnimation::SetCurrentFrame(SourceSurface* aParentSurface,
   while (i > 0) {
     --i;
     ImageKeyData& entry = mKeys[i];
-    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager->IsDestroyed()) {
+      mKeys.RemoveElementAt(i);
+      continue;
+    }
 
     entry.MergeDirtyRect(Some(aDirtyRect));
     Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
     if (dirtyRect) {
+      HoldSurfaceForRecycling(entry, aParentSurface, aSurface);
       auto& resourceUpdates = entry.mManager->AsyncResourceUpdates();
       resourceUpdates.UpdateExternalImage(mId, entry.mImageKey,
                                           ViewAs<ImagePixel>(dirtyRect.ref()));
@@ -594,7 +606,11 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
   while (i > 0) {
     --i;
     ImageKeyData& entry = mKeys[i];
-    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager->IsDestroyed()) {
+      mKeys.RemoveElementAt(i);
+      continue;
+    }
+
     if (entry.mManager != aManager) {
       continue;
     }
@@ -608,14 +624,10 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
     bool ownsKey = wrBridge->GetNamespace() == entry.mImageKey.mNamespace;
     if (!ownsKey) {
       entry.mImageKey = wrBridge->GetNextImageKey();
+      HoldSurfaceForRecycling(entry, aParentSurface, aSurface);
       aResources.AddExternalImage(mId, entry.mImageKey);
     } else {
-      Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
-      if (dirtyRect) {
-        aResources.UpdateExternalImage(mId, entry.mImageKey,
-                                       ViewAs<ImagePixel>(dirtyRect.ref()));
-        entry.mPendingRelease.push_back(aParentSurface);
-      }
+      MOZ_ASSERT(entry.mDirtyRect.isNothing());
     }
 
     aKey = entry.mImageKey;
@@ -625,7 +637,8 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
 
   if (!found) {
     aKey = aManager->WrBridge()->GetNextImageKey();
-    ImageKeyData data(aManager, aKey, aParentSurface);
+    ImageKeyData data(aManager, aKey);
+    HoldSurfaceForRecycling(data, aParentSurface, aSurface);
     mKeys.AppendElement(std::move(data));
     aResources.AddExternalImage(mId, aKey);
   }
@@ -643,7 +656,11 @@ SharedSurfacesAnimation::ReleasePreviousFrame(WebRenderLayerManager* aManager,
   while (i > 0) {
     --i;
     ImageKeyData& entry = mKeys[i];
-    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager->IsDestroyed()) {
+      mKeys.RemoveElementAt(i);
+      continue;
+    }
+
     if (entry.mManager != aManager) {
       continue;
     }

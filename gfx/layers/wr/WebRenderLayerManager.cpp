@@ -137,9 +137,6 @@ WebRenderLayerManager::DoDestroy(bool aIsSync)
     NS_DispatchToMainThread(task.forget());
   }
 
-  for (const auto& i : mAsyncAnimations) {
-    i.second->DestroyFor(this);
-  }
   mAsyncAnimations.clear();
 
   // Forget the widget pointer in case we outlive our owning widget.
