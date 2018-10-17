@@ -244,7 +244,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
     auto it = cache.find(clip);
     MOZ_ASSERT(it != cache.end());
     clips.mScrollId = Some(it->second);
-  } else if (clip) {
+  } else if (clip || separateLeaf) {
     // If the clip's ASR is different, then we need to set the scroll id
     // explicitly to match the desired ASR.
     FrameMetrics::ViewID viewId = asr
