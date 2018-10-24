@@ -8,6 +8,7 @@
 #include "SharedSurfacesParent.h"
 #include "CompositorManagerChild.h"
 #include "mozilla/gfx/gfxVars.h"
+#include "mozilla/image/RecyclingSourceSurface.h"
 #include "mozilla/layers/SourceSurfaceSharedData.h"
 #include "mozilla/layers/WebRenderBridgeChild.h"
 #include "mozilla/layers/WebRenderLayerManager.h"
@@ -160,11 +161,18 @@ SharedSurfacesChild::SharedUserData::UpdateKey(WebRenderLayerManager* aManager,
 SharedSurfacesChild::Upcast(SourceSurface* aSurface)
 {
   MOZ_ASSERT(aSurface);
-  if (aSurface->GetType() != SurfaceType::DATA_SHARED) {
-    return nullptr;
+  switch (aSurface->GetType()) {
+    case SurfaceType::DATA_SHARED:
+      return static_cast<SourceSurfaceSharedData*>(aSurface);
+    case SurfaceType::DATA_RECYCLING_SHARED: {
+      auto recycleSurface =
+        static_cast<image::RecyclingSourceSurface*>(aSurface);
+      auto childSurface = recycleSurface->GetChildSurface();
+      return static_cast<SourceSurfaceSharedData*>(childSurface);
+    }
+    default:
+      return nullptr;
   }
-
-  return static_cast<SourceSurfaceSharedData*>(aSurface);
 }
 
 /* static */ void
@@ -519,6 +527,8 @@ SharedSurfacesAnimation::Destroy()
       entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
     }
   }
+
+  mKeys.Clear();
 }
 
 void
