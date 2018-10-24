@@ -16,9 +16,9 @@
 #include "nsStyleStructInlines.h"
 #include "UnitTransforms.h"
 
-#define CLIP_LOG(...)
+//#define CLIP_LOG(...)
 //#define CLIP_LOG(...) printf_stderr("CLIP: " __VA_ARGS__)
-//#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
+#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
 
 namespace mozilla {
 namespace layers {
@@ -155,13 +155,16 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
     // didn't have fixed descendants, which is stored as the "container ASR" on
     // the sticky item.
     asr = static_cast<nsDisplayStickyPosition*>(aItem)->GetContainerASR();
+  } else if (type == DisplayItemType::TYPE_FIXED_POSITION) {
+    asr = static_cast<nsDisplayFixedPosition*>(aItem)->GetContainerASR();
   }
 
   // In most cases we can combine the leaf of the clip chain with the clip rect
   // of the display item. This reduces the number of clip items, which avoids
   // some overhead further down the pipeline.
   bool separateLeaf = false;
-  if (clip && clip->mASR == asr && clip->mClip.GetRoundedRectCount() == 0) {
+  if (clip && clip->mASR == asr && clip->mClip.GetRoundedRectCount() == 0 &&
+      gfxPrefs::WebRenderOptimizeClips()) {
     if (type == DisplayItemType::TYPE_TEXT) {
       // Text with shadows interprets the text display item clip rect and
       // clips from the clip chain differently.
@@ -269,7 +272,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
   clips.Apply(mBuilder, auPerDevPixel);
   mItemClipStack.push(clips);
 
-  CLIP_LOG("done setup for %p\n", aItem);
+  CLIP_LOG("done setup for %p (separate leaf %d)\n", aItem, separateLeaf);
 }
 
 Maybe<wr::WrClipId>

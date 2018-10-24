@@ -926,6 +926,7 @@ pref("gfx.webrender.highlight-painted-layers", false);
 pref("gfx.webrender.blob-images", true);
 pref("gfx.webrender.blob.invalidation", true);
 pref("gfx.webrender.blob.paint-flashing", false);
+pref("gfx.webrender.optimize-clips", true);
 
 // WebRender debugging utilities.
 pref("gfx.webrender.debug.texture-cache", false);

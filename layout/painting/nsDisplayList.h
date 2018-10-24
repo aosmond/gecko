@@ -6483,6 +6483,8 @@ public:
     mozilla::layers::WebRenderLayerScrollData* aLayerData) override;
   void WriteDebugInfo(std::stringstream& aStream) override;
 
+  const ActiveScrolledRoot* GetContainerASR() const { return mContainerASR; }
+
 protected:
   // For background-attachment:fixed
   nsDisplayFixedPosition(nsDisplayListBuilder* aBuilder,
