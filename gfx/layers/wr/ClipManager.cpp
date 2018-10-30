@@ -16,9 +16,9 @@
 #include "nsStyleStructInlines.h"
 #include "UnitTransforms.h"
 
-#define CLIP_LOG(...)
+//#define CLIP_LOG(...)
 //#define CLIP_LOG(...) printf_stderr("CLIP: " __VA_ARGS__)
-//#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
+#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
 
 namespace mozilla {
 namespace layers {
@@ -33,6 +33,7 @@ void
 ClipManager::BeginBuild(WebRenderLayerManager* aManager,
                         wr::DisplayListBuilder& aBuilder)
 {
+  CLIP_LOG("Begin build\n");
   MOZ_ASSERT(!mManager);
   mManager = aManager;
   MOZ_ASSERT(!mBuilder);
@@ -46,6 +47,7 @@ ClipManager::BeginBuild(WebRenderLayerManager* aManager,
 void
 ClipManager::EndBuild()
 {
+  CLIP_LOG("End build\n");
   mBuilder = nullptr;
   mManager = nullptr;
   mCacheStack.pop();
@@ -57,13 +59,14 @@ ClipManager::EndBuild()
 void
 ClipManager::BeginList(const StackingContextHelper& aStackingContext)
 {
+  bool invalidate = false;
   if (aStackingContext.AffectsClipPositioning()) {
-    PushOverrideForASR(
+    invalidate = PushOverrideForASR(
         mItemClipStack.empty() ? nullptr : mItemClipStack.top().mASR,
         aStackingContext.ReferenceFrameId());
   }
 
-  ItemClips clips(nullptr, nullptr, false);
+  ItemClips clips(nullptr, nullptr, /* aSeparateLeaf */ false, invalidate);
   if (!mItemClipStack.empty()) {
     clips.CopyOutputsFrom(mItemClipStack.top());
   }
@@ -83,7 +86,7 @@ ClipManager::EndList(const StackingContextHelper& aStackingContext)
   }
 }
 
-void
+bool
 ClipManager::PushOverrideForASR(const ActiveScrolledRoot* aASR,
                                 const Maybe<wr::WrClipId>& aClipId)
 {
@@ -97,6 +100,27 @@ ClipManager::PushOverrideForASR(const ActiveScrolledRoot* aASR,
 
   // Start a new cache
   mCacheStack.emplace();
+
+  // Check if the currently applied clips are affected by the override.
+  const ItemClips& top = mItemClipStack.top();
+  if (top.mScrollId == scrollId) {
+    CLIP_LOG("applied clip scroll ID overridden\n");
+    return true;
+  }
+
+  for (const DisplayItemClipChain* chain = top.mChain; chain; chain = chain->mParent) {
+    FrameMetrics::ViewID viewId = chain->mASR
+        ? chain->mASR->GetViewId()
+        : FrameMetrics::NULL_SCROLL_ID;
+    Maybe<wr::WrClipId> chainScrollId =
+      mBuilder->GetScrollIdForDefinedScrollLayer(viewId);
+    if (chainScrollId == scrollId) {
+      CLIP_LOG("applied clip chain %p scroll ID overridden\n", chain);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void
@@ -139,7 +163,8 @@ void
 ClipManager::BeginItem(nsDisplayItem* aItem,
                        const StackingContextHelper& aStackingContext)
 {
-  CLIP_LOG("processing item %p\n", aItem);
+  CLIP_LOG("processing item %p (%s)\n",
+      aItem, DisplayItemTypeName(aItem->GetType()));
 
   const DisplayItemClipChain* clip = aItem->GetClipChain();
   const ActiveScrolledRoot* asr = aItem->GetActiveScrolledRoot();
@@ -405,10 +430,12 @@ ClipManager::~ClipManager()
 
 ClipManager::ItemClips::ItemClips(const ActiveScrolledRoot* aASR,
                                   const DisplayItemClipChain* aChain,
-                                  bool aSeparateLeaf)
+                                  bool aSeparateLeaf,
+                                  bool aInvalidate /* = false */)
   : mASR(aASR)
   , mChain(aChain)
   , mSeparateLeaf(aSeparateLeaf)
+  , mInvalidate(aInvalidate)
   , mApplied(false)
 {
 }
@@ -417,6 +444,7 @@ void
 ClipManager::ItemClips::Apply(wr::DisplayListBuilder* aBuilder,
                               int32_t aAppUnitsPerDevPixel)
 {
+  MOZ_ASSERT(!mInvalidate);
   MOZ_ASSERT(!mApplied);
   mApplied = true;
 
@@ -446,7 +474,8 @@ ClipManager::ItemClips::HasSameInputs(const ItemClips& aOther)
 {
   return mASR == aOther.mASR &&
          mChain == aOther.mChain &&
-         mSeparateLeaf == aOther.mSeparateLeaf;
+         mSeparateLeaf == aOther.mSeparateLeaf &&
+         mInvalidate == aOther.mInvalidate;
 }
 
 void

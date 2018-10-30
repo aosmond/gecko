@@ -65,7 +65,7 @@ public:
                  const StackingContextHelper& aStackingContext);
   ~ClipManager();
 
-  void PushOverrideForASR(const ActiveScrolledRoot* aASR,
+  bool PushOverrideForASR(const ActiveScrolledRoot* aASR,
                           const Maybe<wr::WrClipId>& aClipId);
   void PopOverrideForASR(const ActiveScrolledRoot* aASR);
 
@@ -126,7 +126,8 @@ private:
   struct ItemClips {
     ItemClips(const ActiveScrolledRoot* aASR,
               const DisplayItemClipChain* aChain,
-              bool aSeparateLeaf);
+              bool aSeparateLeaf,
+              bool aInvalidate = false);
 
     // These are the "inputs" - they come from the nsDisplayItem
     const ActiveScrolledRoot* mASR;
@@ -138,6 +139,7 @@ private:
     Maybe<wr::WrClipChainId> mClipChainId;
 
     // State tracking
+    bool mInvalidate;
     bool mApplied;
 
     void Apply(wr::DisplayListBuilder* aBuilder,
