@@ -58,7 +58,8 @@ public:
                   wr::DisplayListBuilder& aBuilder);
   void EndBuild();
 
-  void BeginList(const StackingContextHelper& aStackingContext);
+  void BeginList(nsDisplayItem* aItem,
+                 const StackingContextHelper& aStackingContext);
   void EndList(const StackingContextHelper& aStackingContext);
 
   void BeginItem(nsDisplayItem* aItem,
@@ -144,6 +145,7 @@ private:
                int32_t aAppUnitsPerDevPixel);
     void Unapply(wr::DisplayListBuilder* aBuilder);
     bool HasSameInputs(const ItemClips& aOther);
+    void CopyInputsFrom(const ItemClips& aOther);
     void CopyOutputsFrom(const ItemClips& aOther);
   };
 

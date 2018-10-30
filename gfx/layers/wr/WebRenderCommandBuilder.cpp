@@ -1186,7 +1186,7 @@ WebRenderCommandBuilder::DoGroupingForDisplayList(nsDisplayList* aList,
     return;
   }
 
-  mClipManager.BeginList(aSc);
+  mClipManager.BeginList(aWrappingItem, aSc);
   Grouper g(mClipManager);
   int32_t appUnitsPerDevPixel = aWrappingItem->Frame()->PresContext()->AppUnitsPerDevPixel();
   GP("DoGroupingForDisplayList\n");
@@ -1376,7 +1376,7 @@ WebRenderCommandBuilder::CreateWebRenderCommandsFromDisplayList(nsDisplayList* a
   }
 
   mDumpIndent++;
-  mClipManager.BeginList(aSc);
+  mClipManager.BeginList(aWrappingItem, aSc);
 
   bool apzEnabled = mManager->AsyncPanZoomEnabled();
 

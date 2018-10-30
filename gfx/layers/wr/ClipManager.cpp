@@ -16,9 +16,10 @@
 #include "nsStyleStructInlines.h"
 #include "UnitTransforms.h"
 
-#define CLIP_LOG(...)
+//#define CLIP_LOG(...)
 //#define CLIP_LOG(...) printf_stderr("CLIP: " __VA_ARGS__)
-//#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
+#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
+#define CLIP_LOG_CONT(...) if (XRE_IsContentProcess()) printf_stderr(__VA_ARGS__)
 
 namespace mozilla {
 namespace layers {
@@ -33,6 +34,8 @@ void
 ClipManager::BeginBuild(WebRenderLayerManager* aManager,
                         wr::DisplayListBuilder& aBuilder)
 {
+  static uint32_t total = 0;
+  CLIP_LOG("Begin build %u\n", ++total);
   MOZ_ASSERT(!mManager);
   mManager = aManager;
   MOZ_ASSERT(!mBuilder);
@@ -52,11 +55,14 @@ ClipManager::EndBuild()
   MOZ_ASSERT(mCacheStack.empty());
   MOZ_ASSERT(mASROverride.empty());
   MOZ_ASSERT(mItemClipStack.empty());
+  CLIP_LOG("End build\n");
 }
 
 void
-ClipManager::BeginList(const StackingContextHelper& aStackingContext)
+ClipManager::BeginList(nsDisplayItem* aItem,
+                       const StackingContextHelper& aStackingContext)
 {
+  CLIP_LOG("Begin list\n");
   if (aStackingContext.AffectsClipPositioning()) {
     PushOverrideForASR(
         mItemClipStack.empty() ? nullptr : mItemClipStack.top().mASR,
@@ -65,7 +71,35 @@ ClipManager::BeginList(const StackingContextHelper& aStackingContext)
 
   ItemClips clips(nullptr, nullptr, false);
   if (!mItemClipStack.empty()) {
-    clips.CopyOutputsFrom(mItemClipStack.top());
+    const auto& top = mItemClipStack.top();
+    clips.CopyOutputsFrom(top);
+    if (aStackingContext.AffectsClipPositioning()) {
+      MOZ_ASSERT(aItem);
+
+      // Zoom display items report their bounds etc using the parent
+      // document's APD because zoom items act as a conversion layer between
+      // the two different APDs.
+      int32_t auPerDevPixel;
+      if (aItem->GetType() == DisplayItemType::TYPE_ZOOM) {
+        auPerDevPixel = static_cast<nsDisplayZoom*>(aItem)->GetParentAppUnitsPerDevPixel();
+      } else {
+        auPerDevPixel = aItem->Frame()->PresContext()->AppUnitsPerDevPixel();
+      }
+
+      const DisplayItemClipChain* chain = top.mChain;
+      if (top.mSeparateLeaf) {
+        chain = chain->mParent;
+      }
+
+      auto scrollId = ClipIdAfterOverride(top.mScrollId);
+      auto clipChainId = DefineClipChain(chain, auPerDevPixel, aStackingContext);
+      if (scrollId != clips.mScrollId || clipChainId != top.mClipChainId) {
+        clips.CopyInputsFrom(top);
+        clips.mScrollId = scrollId;
+        clips.mClipChainId = clipChainId;
+        clips.Apply(mBuilder, auPerDevPixel);
+      }
+    }
   }
   mItemClipStack.push(clips);
 }
@@ -81,6 +115,7 @@ ClipManager::EndList(const StackingContextHelper& aStackingContext)
     PopOverrideForASR(
         mItemClipStack.empty() ? nullptr : mItemClipStack.top().mASR);
   }
+  CLIP_LOG("End list\n");
 }
 
 void
@@ -139,11 +174,12 @@ void
 ClipManager::BeginItem(nsDisplayItem* aItem,
                        const StackingContextHelper& aStackingContext)
 {
-  CLIP_LOG("processing item %p\n", aItem);
+  DisplayItemType type = aItem->GetType();
+  CLIP_LOG("processing item %p -- %s\n", aItem, DisplayItemTypeName(type));
 
   const DisplayItemClipChain* clip = aItem->GetClipChain();
+  const DisplayItemClipChain* clipChild = nullptr;
   const ActiveScrolledRoot* asr = aItem->GetActiveScrolledRoot();
-  DisplayItemType type = aItem->GetType();
   if (type == DisplayItemType::TYPE_STICKY_POSITION) {
     // For sticky position items, the ASR is computed differently depending
     // on whether the item has a fixed descendant or not. But for WebRender
@@ -167,6 +203,9 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
       // rect of a stacking context is not handled the same as normal display
       // items.
       separateLeaf = aItem->GetChildren() == nullptr;
+    }
+    if (separateLeaf) {
+      clipChild = clip;
     }
   }
 
@@ -261,7 +300,35 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
   clips.Apply(mBuilder, auPerDevPixel);
   mItemClipStack.push(clips);
 
-  CLIP_LOG("done setup for %p\n", aItem);
+  const DisplayItemClipChain* i = clipChild ? clipChild : clip;
+  if (!i) {
+    if (clips.mClipChainId) {
+      CLIP_LOG("\tclip chain id %lu\n", clips.mClipChainId->id);
+    } else {
+      CLIP_LOG("\tclip chain id <nil>\n");
+    }
+  }
+
+  while (i) {
+    LayoutDeviceIntRect rect = LayoutDeviceIntRect::FromAppUnitsToNearest(
+      i->mClip.GetClipRect(), auPerDevPixel);
+    CLIP_LOG("\tclip %p -- asr %p origin %d,%d size %dx%d",
+      i, i->mASR, rect.X(), rect.Y(), rect.Width(), rect.Height());
+    if (i == clip) {
+      if (clips.mClipChainId) {
+        CLIP_LOG_CONT(" clip chain id %lu", clips.mClipChainId->id);
+      } else {
+        CLIP_LOG_CONT(" clip chain id <nil>");
+      }
+    }
+    CLIP_LOG_CONT("\n");
+    i = i->mParent;
+  }
+  CLIP_LOG("done setup for %p -- asr %p", aItem, asr);
+  if (clips.mScrollId) {
+    CLIP_LOG_CONT(" scroll id %lu", clips.mScrollId->id);
+  }
+  CLIP_LOG_CONT("\n");
 }
 
 Maybe<wr::WrClipId>
@@ -444,9 +511,23 @@ ClipManager::ItemClips::Unapply(wr::DisplayListBuilder* aBuilder)
 bool
 ClipManager::ItemClips::HasSameInputs(const ItemClips& aOther)
 {
-  return mASR == aOther.mASR &&
-         mChain == aOther.mChain &&
-         mSeparateLeaf == aOther.mSeparateLeaf;
+  bool eq = mASR == aOther.mASR &&
+            mChain == aOther.mChain &&
+            mSeparateLeaf == aOther.mSeparateLeaf;
+  CLIP_LOG("\tcurrent asr %p clip %p separateLeaf %d\n",
+    mASR, mChain, mSeparateLeaf);
+  if (!eq) {
+    CLIP_LOG("\tother asr %p clip %p separateLeaf %d\n",
+      aOther.mASR, aOther.mChain, aOther.mSeparateLeaf);
+  }
+  return eq;
+}
+
+void
+ClipManager::ItemClips::CopyInputsFrom(const ItemClips& aOther)
+{
+  mASR = aOther.mASR;
+  mChain = aOther.mChain;
 }
 
 void
