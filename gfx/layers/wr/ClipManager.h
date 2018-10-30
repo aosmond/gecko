@@ -58,18 +58,25 @@ public:
                   wr::DisplayListBuilder& aBuilder);
   void EndBuild();
 
-  void BeginList(const StackingContextHelper& aStackingContext);
+  void BeginList(nsDisplayItem* aItem,
+                 const StackingContextHelper& aStackingContext);
   void EndList(const StackingContextHelper& aStackingContext);
 
   void BeginItem(nsDisplayItem* aItem,
                  const StackingContextHelper& aStackingContext);
   ~ClipManager();
 
-  void PushOverrideForASR(const ActiveScrolledRoot* aASR,
+  bool PushOverrideForASR(const ActiveScrolledRoot* aASR,
                           const Maybe<wr::WrClipId>& aClipId);
   void PopOverrideForASR(const ActiveScrolledRoot* aASR);
 
 private:
+  const ActiveScrolledRoot* GetItemASR(nsDisplayItem* aItem);
+  int32_t GetItemAppUnitsPerDevPixel(nsDisplayItem* aItem);
+  bool GetItemSeparateClipLeaf(nsDisplayItem* aItem,
+                               const DisplayItemClipChain* aChain,
+                               const ActiveScrolledRoot* aASR);
+
   Maybe<wr::WrClipId> ClipIdAfterOverride(const Maybe<wr::WrClipId>& aClipId);
 
   Maybe<wr::WrClipId>
@@ -126,7 +133,9 @@ private:
   struct ItemClips {
     ItemClips(const ActiveScrolledRoot* aASR,
               const DisplayItemClipChain* aChain,
-              bool aSeparateLeaf);
+              bool aSeparateLeaf,
+              bool aForList = false);
+    ItemClips(const ItemClips* aTop);
 
     // These are the "inputs" - they come from the nsDisplayItem
     const ActiveScrolledRoot* mASR;
@@ -139,6 +148,7 @@ private:
 
     // State tracking
     bool mApplied;
+    bool mForList;
 
     void Apply(wr::DisplayListBuilder* aBuilder,
                int32_t aAppUnitsPerDevPixel);
