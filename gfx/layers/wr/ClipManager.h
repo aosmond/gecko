@@ -58,7 +58,8 @@ public:
                   wr::DisplayListBuilder& aBuilder);
   void EndBuild();
 
-  void BeginList(const StackingContextHelper& aStackingContext);
+  void BeginList(nsDisplayItem* aItem,
+                 const StackingContextHelper& aStackingContext);
   void EndList(const StackingContextHelper& aStackingContext);
 
   void BeginItem(nsDisplayItem* aItem,
@@ -141,6 +142,7 @@ private:
     // State tracking
     bool mInvalidate;
     bool mApplied;
+    bool mForList;
 
     void Apply(wr::DisplayListBuilder* aBuilder,
                int32_t aAppUnitsPerDevPixel);
