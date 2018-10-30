@@ -246,8 +246,8 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
     MOZ_ASSERT(it != cache.end());
     clips.mScrollId = Some(it->second);
   } else if (clip) {
-#endif
   if (clip) {
+#endif
     // If the clip's ASR is different, then we need to set the scroll id
     // explicitly to match the desired ASR.
     FrameMetrics::ViewID viewId = asr
@@ -257,6 +257,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
         mBuilder->GetScrollIdForDefinedScrollLayer(viewId);
     MOZ_ASSERT(scrollId.isSome());
     clips.mScrollId = ClipIdAfterOverride(scrollId);
+#if 0
   } else {
     // If we don't have a clip at all, then we don't want to explicitly push
     // the ASR either, because as with the first clause of this if condition,
@@ -266,6 +267,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
     // XXX: there might be cases where things don't just "work out", in which
     // case we might need to do something smarter here.
   }
+#endif
 
   // Now that we have the scroll id and a clip id for the item, push it onto
   // the WR stack.
