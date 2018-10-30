@@ -225,6 +225,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
   // for it.
   clips.mClipChainId = DefineClipChain(clip, auPerDevPixel, aStackingContext);
 
+#if 0
   if (clip && clip->mASR == asr) {
     // If the clip's ASR is the same as the item's ASR, then we want to use
     // the clip as the "scrollframe" for the item, as WR will do the right thing
@@ -245,6 +246,8 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
     MOZ_ASSERT(it != cache.end());
     clips.mScrollId = Some(it->second);
   } else if (clip) {
+#endif
+  if (clip) {
     // If the clip's ASR is different, then we need to set the scroll id
     // explicitly to match the desired ASR.
     FrameMetrics::ViewID viewId = asr
