@@ -16,9 +16,9 @@
 #include "nsStyleStructInlines.h"
 #include "UnitTransforms.h"
 
-#define CLIP_LOG(...)
+//#define CLIP_LOG(...)
 //#define CLIP_LOG(...) printf_stderr("CLIP: " __VA_ARGS__)
-//#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
+#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
 
 namespace mozilla {
 namespace layers {
@@ -152,11 +152,14 @@ void
 ClipManager::BeginList(nsDisplayItem* aItem,
                        const StackingContextHelper& aStackingContext)
 {
-  bool invalidate = false;
+  bool invalidate;
   if (aStackingContext.AffectsClipPositioning()) {
     invalidate = PushOverrideForASR(
-        mItemClipStack.empty() ? nullptr : mItemClipStack.top().mASR,
+        mItemClipStack.empty() || mItemClipStack.top().mForList
+          ? nullptr : mItemClipStack.top().mASR,
         aStackingContext.ReferenceFrameId());
+  } else {
+    invalidate = false;
   }
 
   // We only need to invalidate if the override affects the current clip and
@@ -167,6 +170,9 @@ ClipManager::BeginList(nsDisplayItem* aItem,
     return;
   }
 
+#if 0
+  mItemClipStack.push(clips);
+#else
 #ifdef DEBUG
   // If we need to invalidate, that means there was already something on the
   // clip stack. It should match the given item since we would have already
@@ -194,14 +200,39 @@ ClipManager::BeginList(nsDisplayItem* aItem,
 
   // Define all the clips in the item's clip chain, and obtain a clip chain id
   // for it. All of the necessary scroll IDs should have been created already.
-  int32_t auPerDevPixel = GetItemAppUnitsPerDevPixel(aItem);
-  clips.mClipChainId = DefineClipChain(clip, auPerDevPixel, aStackingContext);
+  clips.mClipChainId = DefineClipChain(clip, clips.mAppUnitsPerDevPixel, *clips.mStackingContext);
   clips.mScrollId = GetItemClipsScrollLayer(clip, clips.mASR);
 
   // Now that we have the scroll id and a clip id for the item, push it onto
   // the WR stack.
-  clips.Apply(mBuilder, auPerDevPixel);
+  clips.Apply(mBuilder);
   mItemClipStack.push(clips);
+#endif
+}
+
+void
+ClipManager::ReapplyCurrentClips()
+{
+  MOZ_ASSERT(!mItemClipStack.empty());
+
+  auto& clips = mItemClipStack.top();
+  clips.Unapply(mBuilder);
+
+  // If the leaf of the clip chain is going to be merged with the display item's
+  // clip rect, then we should create a clip chain id from the leaf's parent.
+  const DisplayItemClipChain* clip = clips.mChain;
+  if (clips.mSeparateLeaf) {
+    clip = clip->mParent;
+  }
+
+  // Define all the clips in the item's clip chain, and obtain a clip chain id
+  // for it. All of the necessary scroll IDs should have been created already.
+  clips.mClipChainId = DefineClipChain(clip, clips.mAppUnitsPerDevPixel, *clips.mStackingContext);
+  clips.mScrollId = GetItemClipsScrollLayer(clip, clips.mASR);
+
+  // Now that we have the scroll id and a clip id for the item, push it onto
+  // the WR stack.
+  clips.Apply(mBuilder);
 }
 
 void
@@ -213,7 +244,8 @@ ClipManager::EndList(const StackingContextHelper& aStackingContext)
 
   if (aStackingContext.AffectsClipPositioning()) {
     PopOverrideForASR(
-        mItemClipStack.empty() ? nullptr : mItemClipStack.top().mASR);
+        mItemClipStack.empty() || mItemClipStack.top().mForList
+          ? nullptr : mItemClipStack.top().mASR);
   }
 }
 
@@ -227,7 +259,13 @@ ClipManager::PushOverrideForASR(const ActiveScrolledRoot* aASR,
   CLIP_LOG("Pushing override %zu -> %s\n", scrollId->id,
       aClipId ? Stringify(aClipId->id).c_str() : "(none)");
   auto it = mASROverride.insert({ *scrollId, std::stack<Maybe<wr::WrClipId>>() });
+  bool same = !it.first->second.empty() && it.first->second.top() == aClipId;
   it.first->second.push(aClipId);
+
+  if (same) {
+    //CLIP_LOG("Don't invalidate cache again %lu\n", mCacheStack.top().size());
+    //return false;
+  }
 
   // Start a new cache
   mCacheStack.emplace();
@@ -270,11 +308,15 @@ ClipManager::PopOverrideForASR(const ActiveScrolledRoot* aASR)
   auto it = mASROverride.find(*scrollId);
   MOZ_ASSERT(it != mASROverride.end());
   MOZ_ASSERT(!(it->second.empty()));
+  auto removed = it->second.top();
   CLIP_LOG("Popping override %zu -> %s\n", scrollId->id,
       it->second.top() ? Stringify(it->second.top()->id).c_str() : "(none)");
   it->second.pop();
   if (it->second.empty()) {
     mASROverride.erase(it);
+    //mCacheStack.pop();
+  } else if (removed != it->second.top()) {
+    //mCacheStack.pop();
   }
 }
 
@@ -305,7 +347,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
   const ActiveScrolledRoot* asr = GetItemASR(aItem);
   bool separateLeaf = GetItemSeparateClipLeaf(aItem, clip, asr);
 
-  ItemClips clips(asr, clip, separateLeaf);
+  ItemClips clips(&aStackingContext, asr, clip, separateLeaf);
   MOZ_ASSERT(!mItemClipStack.empty());
   if (clips.HasSameInputs(mItemClipStack.top())) {
     // Early-exit because if the clips are the same as aItem's previous sibling,
@@ -345,12 +387,13 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
   // Define all the clips in the item's clip chain, and obtain a clip chain id
   // for it.
   int32_t auPerDevPixel = GetItemAppUnitsPerDevPixel(aItem);
+  clips.mAppUnitsPerDevPixel = auPerDevPixel;
   clips.mClipChainId = DefineClipChain(clip, auPerDevPixel, aStackingContext);
   clips.mScrollId = GetItemClipsScrollLayer(clip, asr);
 
   // Now that we have the scroll id and a clip id for the item, push it onto
   // the WR stack.
-  clips.Apply(mBuilder, auPerDevPixel);
+  clips.Apply(mBuilder);
   mItemClipStack.push(clips);
 
   CLIP_LOG("done setup for %p\n", aItem);
@@ -499,42 +542,49 @@ ClipManager::~ClipManager()
   MOZ_ASSERT(mItemClipStack.empty());
 }
 
-ClipManager::ItemClips::ItemClips(const ActiveScrolledRoot* aASR,
+ClipManager::ItemClips::ItemClips(const StackingContextHelper* aSc,
+                                  const ActiveScrolledRoot* aASR,
                                   const DisplayItemClipChain* aChain,
-                                  bool aSeparateLeaf,
-                                  bool aForList /* = false */)
-  : mASR(aASR)
+                                  bool aSeparateLeaf)
+  : mStackingContext(aSc)
+  , mASR(aASR)
   , mChain(aChain)
   , mSeparateLeaf(aSeparateLeaf)
+  , mAppUnitsPerDevPixel(0)
   , mApplied(false)
-  , mForList(aForList)
+  , mForList(false)
 {
 }
 
 ClipManager::ItemClips::ItemClips(const ItemClips* aTop)
-  : mASR(aTop ? aTop->mASR : nullptr)
+  : mStackingContext(aTop ? aTop->mStackingContext : nullptr)
+  , mASR(aTop ? aTop->mASR : nullptr)
   , mChain(aTop ? aTop->mChain : nullptr)
   , mSeparateLeaf(aTop ? aTop->mSeparateLeaf : false)
+  , mAppUnitsPerDevPixel(aTop ? aTop->mAppUnitsPerDevPixel : 0)
+  , mScrollId(aTop ? aTop->mScrollId : Nothing())
+  , mClipChainId(aTop ? aTop->mClipChainId : Nothing())
   , mApplied(false)
   , mForList(true)
 {
-  if (aTop) {
-    CopyOutputsFrom(*aTop);
-  }
 }
 
 void
-ClipManager::ItemClips::Apply(wr::DisplayListBuilder* aBuilder,
-                              int32_t aAppUnitsPerDevPixel)
+ClipManager::ItemClips::Apply(wr::DisplayListBuilder* aBuilder)
 {
   MOZ_ASSERT(!mApplied);
+  MOZ_ASSERT(mAppUnitsPerDevPixel);
   mApplied = true;
+  CLIP_LOG("applying clips -- sc %p, chain %p, asr %p, aupdp %d, "
+           "separateLeaf %d\n, forList %d\n",
+           mStackingContext, mChain, mASR, mAppUnitsPerDevPixel,
+           mSeparateLeaf, mForList);
 
   Maybe<wr::LayoutRect> clipLeaf;
   if (mSeparateLeaf) {
     MOZ_ASSERT(mChain);
     clipLeaf.emplace(wr::ToRoundedLayoutRect(LayoutDeviceRect::FromAppUnits(
-      mChain->mClip.GetClipRect(), aAppUnitsPerDevPixel)));
+      mChain->mClip.GetClipRect(), mAppUnitsPerDevPixel)));
   }
 
   aBuilder->PushClipAndScrollInfo(mScrollId.ptrOr(nullptr),
@@ -561,14 +611,6 @@ ClipManager::ItemClips::HasSameInputs(const ItemClips& aOther)
   return mASR == aOther.mASR &&
          mChain == aOther.mChain &&
          mSeparateLeaf == aOther.mSeparateLeaf;
-}
-
-void
-ClipManager::ItemClips::CopyOutputsFrom(const ItemClips& aOther)
-{
-  mScrollId = aOther.mScrollId;
-  mClipChainId = aOther.mClipChainId;
-  mSeparateLeaf = aOther.mSeparateLeaf;
 }
 
 } // namespace layers

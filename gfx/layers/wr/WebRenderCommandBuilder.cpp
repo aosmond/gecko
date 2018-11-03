@@ -1546,7 +1546,9 @@ void
 WebRenderCommandBuilder::PushOverrideForASR(const ActiveScrolledRoot* aASR,
                                             const Maybe<wr::WrClipId>& aClipId)
 {
-  mClipManager.PushOverrideForASR(aASR, aClipId);
+  if (mClipManager.PushOverrideForASR(aASR, aClipId)) {
+    mClipManager.ReapplyCurrentClips();
+  }
 }
 
 void

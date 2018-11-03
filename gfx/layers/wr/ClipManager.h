@@ -69,6 +69,7 @@ public:
   bool PushOverrideForASR(const ActiveScrolledRoot* aASR,
                           const Maybe<wr::WrClipId>& aClipId);
   void PopOverrideForASR(const ActiveScrolledRoot* aASR);
+  void ReapplyCurrentClips();
 
 private:
   const ActiveScrolledRoot* GetItemASR(nsDisplayItem* aItem);
@@ -134,16 +135,18 @@ private:
 
   // This holds some clip state for a single nsDisplayItem
   struct ItemClips {
-    ItemClips(const ActiveScrolledRoot* aASR,
+    ItemClips(const StackingContextHelper* aSc,
+              const ActiveScrolledRoot* aASR,
               const DisplayItemClipChain* aChain,
-              bool aSeparateLeaf,
-              bool aForList = false);
+              bool aSeparateLeaf);
     explicit ItemClips(const ItemClips* aTop);
 
     // These are the "inputs" - they come from the nsDisplayItem
+    const StackingContextHelper* mStackingContext;
     const ActiveScrolledRoot* mASR;
     const DisplayItemClipChain* mChain;
     bool mSeparateLeaf;
+    int32_t mAppUnitsPerDevPixel;
 
     // These are the "outputs" - they are pushed to WR as needed
     Maybe<wr::WrClipId> mScrollId;
@@ -153,11 +156,9 @@ private:
     bool mApplied;
     bool mForList;
 
-    void Apply(wr::DisplayListBuilder* aBuilder,
-               int32_t aAppUnitsPerDevPixel);
+    void Apply(wr::DisplayListBuilder* aBuilder);
     void Unapply(wr::DisplayListBuilder* aBuilder);
     bool HasSameInputs(const ItemClips& aOther);
-    void CopyOutputsFrom(const ItemClips& aOther);
   };
 
   // A stack of ItemClips corresponding to the nsDisplayItem ancestry. Each
