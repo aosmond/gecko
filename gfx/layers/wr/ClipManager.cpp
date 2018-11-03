@@ -554,8 +554,8 @@ ClipManager::ItemClips::Unapply(wr::DisplayListBuilder* aBuilder)
 bool
 ClipManager::ItemClips::HasSameInputs(const ItemClips& aOther)
 {
-  if (aOther.mForList) {
-    return mASR == nullptr && mChain == nullptr;
+  if (aOther.mForList && !mASR && !mChain) {
+    return true;
   }
 
   return mASR == aOther.mASR &&
