@@ -120,6 +120,8 @@ WebRenderLayerManager::DoDestroy(bool aIsSync)
   // mActiveCompositorAnimationIds is empty that won't happen.
   mActiveCompositorAnimationIds.clear();
 
+  ClearAsyncAnimations();
+
   mWebRenderCommandBuilder.Destroy();
 
   if (mTransactionIdAllocator) {
@@ -581,6 +583,7 @@ WebRenderLayerManager::ClearCachedResources(Layer* aSubtree)
 void
 WebRenderLayerManager::WrUpdated()
 {
+  ClearAsyncAnimations();
   mWebRenderCommandBuilder.ClearCachedResources();
   DiscardLocalImages();
 
@@ -751,6 +754,39 @@ WebRenderLayerManager::FlushAsyncResourceUpdates()
   }
 
   mAsyncResourceUpdates.reset();
+}
+
+void
+WebRenderLayerManager::RegisterAsyncAnimation(const wr::ImageKey& aKey,
+                                              SharedSurfacesAnimation* aAnimation)
+{
+  mAsyncAnimations.insert(std::make_pair(wr::AsUint64(aKey), aAnimation));
+}
+
+void
+WebRenderLayerManager::DeregisterAsyncAnimation(const wr::ImageKey& aKey)
+{
+  mAsyncAnimations.erase(wr::AsUint64(aKey));
+}
+
+void
+WebRenderLayerManager::ClearAsyncAnimations()
+{
+  for (const auto& i : mAsyncAnimations) {
+    i.second->Invalidate(this);
+  }
+  mAsyncAnimations.clear();
+}
+
+void
+WebRenderLayerManager::WrReleasedImages(const nsTArray<wr::ExternalImageKeyPair>& aPairs)
+{
+  for (const auto& pair : aPairs) {
+    auto i = mAsyncAnimations.find(wr::AsUint64(pair.key));
+    if (i != mAsyncAnimations.end()) {
+      i->second->ReleasePreviousFrame(this, pair.id);
+    }
+  }
 }
 
 } // namespace layers
