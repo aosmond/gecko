@@ -17,6 +17,18 @@
 #include "nsTArray.h"                   // for AutoTArray
 
 namespace mozilla {
+namespace layers {
+class AnimationImageKeyData;
+} // namespace mozilla
+} // namespace layers
+
+template<>
+struct nsTArray_CopyChooser<mozilla::layers::AnimationImageKeyData>
+{
+  typedef nsTArray_CopyWithConstructors<mozilla::layers::AnimationImageKeyData> Type;
+};
+
+namespace mozilla {
 namespace gfx {
 class SourceSurfaceSharedData;
 } // namespace gfx
@@ -86,12 +98,6 @@ public:
                                   gfx::SourceSurface* aSurface,
                                   const gfx::IntRect& aDirtyRect);
 
-private:
-  SharedSurfacesChild() = delete;
-  ~SharedSurfacesChild() = delete;
-
-  friend class SharedSurfacesAnimation;
-
   class ImageKeyData {
   public:
     ImageKeyData(WebRenderLayerManager* aManager,
@@ -114,6 +120,12 @@ private:
     Maybe<gfx::IntRect> mDirtyRect;
     wr::ImageKey mImageKey;
   };
+
+private:
+  SharedSurfacesChild() = delete;
+  ~SharedSurfacesChild() = delete;
+
+  friend class SharedSurfacesAnimation;
 
   class SharedUserData final {
   public:
@@ -179,6 +191,21 @@ private:
   static gfx::UserDataKey sSharedKey;
 };
 
+class AnimationImageKeyData final : public SharedSurfacesChild::ImageKeyData
+{
+public:
+  AnimationImageKeyData(WebRenderLayerManager* aManager,
+               const wr::ImageKey& aImageKey);
+
+  ~AnimationImageKeyData();
+
+  AnimationImageKeyData(AnimationImageKeyData&& aOther);
+  AnimationImageKeyData& operator=(AnimationImageKeyData&& aOther);
+
+  AutoTArray<RefPtr<gfx::SourceSurface>, 2> mPendingRelease;
+  bool mRecycling;
+};
+
 /**
  * This helper class owns a single ImageKey which will map to different external
  * image IDs representing different frames in an animation.
@@ -224,9 +251,11 @@ public:
 private:
   ~SharedSurfacesAnimation();
 
-  typedef SharedSurfacesChild::ImageKeyData ImageKeyData;
+  void HoldSurfaceForRecycling(AnimationImageKeyData& aEntry,
+                               gfx::SourceSurface* aParentSurface,
+                               gfx::SourceSurfaceSharedData* aSurface);
 
-  AutoTArray<ImageKeyData, 1> mKeys;
+  AutoTArray<AnimationImageKeyData, 1> mKeys;
   wr::ExternalImageId mId;
 };
 
