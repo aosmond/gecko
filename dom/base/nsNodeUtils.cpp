@@ -542,6 +542,11 @@ nsNodeUtils::CloneAndAdopt(nsINode *aNode, bool aClone, bool aDeep,
         nsObjectLoadingContent* olc = static_cast<nsObjectLoadingContent*>(objectLoadingContent.get());
         olc->NotifyOwnerDocumentActivityChanged();
       }
+      nsCOMPtr<nsIImageLoadingContent> imageLoadingContent(do_QueryInterface(aNode));
+      if (imageLoadingContent) {
+        nsImageLoadingContent* ilc = static_cast<nsImageLoadingContent*>(imageLoadingContent.get());
+        ilc->NotifyOwnerDocumentActivityChanged();
+      }
     }
 
     if (oldDoc != newDoc && oldDoc->MayHaveDOMMutationObservers()) {

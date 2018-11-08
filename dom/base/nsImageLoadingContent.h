@@ -23,6 +23,7 @@
 #include "mozilla/ErrorResult.h"
 #include "nsIContentPolicy.h"
 #include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/dom/Promise.h"
 #include "mozilla/net/ReferrerPolicy.h"
 #include "nsAttrValue.h"
 
@@ -85,6 +86,12 @@ public:
    * Toggle whether or not to synchronously decode an image on draw.
    */
   void SetSyncDecodingHint(bool aHint);
+
+  /**
+   * Notify us that the document state has changed. Called by nsDocument so that
+   * we may reject any promises which require the document to be active.
+   */
+  void NotifyOwnerDocumentActivityChanged();
 
 protected:
   enum ImageLoadType {
@@ -238,6 +245,18 @@ protected:
   uint32_t NaturalWidth();
   uint32_t NaturalHeight();
 
+  /**
+   * Create a promise and queue a microtask which will ensure the current
+   * request (after any pending loads are applied) has requested a full decode.
+   * The promise is fulfilled once the request has a fully decoded surface is
+   * available for drawing, or an error condition occurrs (e.g. broken image,
+   * current request is updated, etc).
+   *
+   * https://html.spec.whatwg.org/multipage/embedded-content.html#dom-img-decode
+   */
+  already_AddRefed<mozilla::dom::Promise>
+  QueueDecodeAsync(mozilla::ErrorResult& aRv);
+
   enum class ImageDecodingType : uint8_t {
     Auto,
     Async,
@@ -248,6 +267,12 @@ protected:
   static const nsAttrValue::EnumTable* kDecodingTableDefault;
 
 private:
+  void DecodeAsync(RefPtr<mozilla::dom::Promise>&& aPromise,
+                   uint32_t aRequestGeneration);
+  void ResolveDecodePromises();
+  void RejectDecodePromises(nsresult aStatus);
+  void MaybeAgeRequestGeneration(nsIURI* aNewURI);
+
   /**
    * Struct used to manage the native image observers.
    */
@@ -493,12 +518,25 @@ private:
   nsTArray<RefPtr<ScriptedImageObserver>> mScriptedObservers;
 
   /**
+   * Promises created by QueueDecodeAsync that are still waiting to be
+   * fulfilled by the image being fully decoded.
+   */
+  nsTArray<RefPtr<mozilla::dom::Promise>> mDecodePromises;
+
+  /**
    * When mIsImageStateForced is true, this holds the ImageState that we'll
    * return in ImageState().
    */
   mozilla::EventStates mForcedImageState;
 
   mozilla::TimeStamp mMostRecentRequestChange;
+
+  /* An incrementing counter representing the current request generation;
+   * Each time mCurrentRequest is modified with a different URI, this will
+   * be incremented. Each QueueDecodeAsync call will cache the generation
+   * of the current request so that when it is processed, it knows if it
+   * should have rejected because the request changed. */
+  uint32_t mRequestGeneration;
 
   int16_t mImageBlockingStatus;
   bool mLoadingEnabled : 1;

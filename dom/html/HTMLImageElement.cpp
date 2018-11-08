@@ -6,6 +6,7 @@
 
 #include "mozilla/dom/HTMLImageElement.h"
 #include "mozilla/dom/HTMLImageElementBinding.h"
+#include "mozilla/dom/ElementInlines.h"
 #include "nsGkAtoms.h"
 #include "nsStyleConsts.h"
 #include "nsPresContext.h"
@@ -123,12 +124,15 @@ HTMLImageElement::HTMLImageElement(already_AddRefed<mozilla::dom::NodeInfo>&& aN
   , mInDocResponsiveContent(false)
   , mCurrentDensity(1.0)
 {
+  RegisterActivityObserver();
+
   // We start out broken
   AddStatesSilently(NS_EVENT_STATE_BROKEN);
 }
 
 HTMLImageElement::~HTMLImageElement()
 {
+  UnregisterActivityObserver();
   DestroyImageLoadingContent();
 }
 
@@ -226,6 +230,12 @@ void
 HTMLImageElement::GetDecoding(nsAString& aValue)
 {
   GetEnumAttr(nsGkAtoms::decoding, kDecodingTableDefault->tag, aValue);
+}
+
+already_AddRefed<Promise>
+HTMLImageElement::Decode(ErrorResult& aRv)
+{
+  return nsImageLoadingContent::QueueDecodeAsync(aRv);
 }
 
 bool

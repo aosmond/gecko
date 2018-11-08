@@ -9,6 +9,7 @@
 #include "mozilla/EventStates.h"
 
 #include "mozilla/dom/SVGImageElement.h"
+#include "mozilla/dom/ElementInlines.h"
 #include "mozilla/gfx/2D.h"
 #include "nsCOMPtr.h"
 #include "nsIURI.h"
@@ -58,12 +59,15 @@ NS_IMPL_ISUPPORTS_INHERITED(SVGImageElement, SVGImageElementBase,
 SVGImageElement::SVGImageElement(already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo)
   : SVGImageElementBase(std::move(aNodeInfo))
 {
+  RegisterActivityObserver();
+
   // We start out broken
   AddStatesSilently(NS_EVENT_STATE_BROKEN);
 }
 
 SVGImageElement::~SVGImageElement()
 {
+  UnregisterActivityObserver();
   DestroyImageLoadingContent();
 }
 
@@ -118,6 +122,12 @@ void
 SVGImageElement::GetDecoding(nsAString& aValue)
 {
   GetEnumAttr(nsGkAtoms::decoding, kDecodingTableDefault->tag, aValue);
+}
+
+already_AddRefed<Promise>
+SVGImageElement::Decode(ErrorResult& aRv)
+{
+  return nsImageLoadingContent::QueueDecodeAsync(aRv);
 }
 
 //----------------------------------------------------------------------
