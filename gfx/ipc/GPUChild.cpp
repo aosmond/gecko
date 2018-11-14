@@ -295,6 +295,11 @@ GPUChild::ActorDestroy(ActorDestroyReason aWhy)
 {
   if (aWhy == AbnormalShutdown) {
     if (mCrashReporter) {
+      nsAutoCString url;
+      if (CrashReporter::GetURL(url)) {
+        mCrashReporter->AddAnnotation(CrashReporter::Annotation::URL, url);
+      }
+
       mCrashReporter->GenerateCrashReport(OtherPid());
       mCrashReporter = nullptr;
     }

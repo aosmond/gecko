@@ -85,6 +85,7 @@ bool     GetCrashEventsDir(nsAString& aPath);
 bool     GetEnabled();
 bool     GetServerURL(nsACString& aServerURL);
 nsresult SetServerURL(const nsACString& aServerURL);
+bool     GetURL(nsACString& aURL);
 bool     GetMinidumpPath(nsAString& aPath);
 nsresult SetMinidumpPath(const nsAString& aPath);
 

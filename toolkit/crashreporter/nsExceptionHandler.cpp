@@ -2370,6 +2370,14 @@ nsresult SetServerURL(const nsACString& aServerURL)
   return AnnotateCrashReport(Annotation::ServerURL, aServerURL);
 }
 
+bool GetURL(nsACString& aURL)
+{
+  if (!gExceptionHandler)
+    return false;
+
+  return GetAnnotation(CrashReporter::Annotation::URL, aURL);
+}
+
 nsresult
 SetRestartArgs(int argc, char** argv)
 {
