@@ -294,13 +294,26 @@ void
 GPUChild::ActorDestroy(ActorDestroyReason aWhy)
 {
   if (aWhy == AbnormalShutdown) {
+    RefPtr<nsHashPropertyBag> props = new nsHashPropertyBag();
+    props->SetPropertyAsUint64(NS_LITERAL_STRING("childID"),
+                               mHost->GetProcessToken());
+
     if (mCrashReporter) {
+#if 0
       nsAutoCString url;
       if (CrashReporter::GetURL(url)) {
         mCrashReporter->AddAnnotation(CrashReporter::Annotation::URL, url);
       }
+#endif
 
       mCrashReporter->GenerateCrashReport(OtherPid());
+
+      nsAutoString dumpId;
+      if (mCrashReporter->HasMinidump()) {
+        dumpID = mCrashReporter->MinidumpID();
+      }
+
+      props->SetPropertyAsAString(NS_LITERAL_STRING("dumpID"), dumpID);
       mCrashReporter = nullptr;
     }
 
@@ -309,9 +322,8 @@ GPUChild::ActorDestroy(ActorDestroyReason aWhy)
 
     // Notify the Telemetry environment so that we can refresh and do a subsession split
     if (nsCOMPtr<nsIObserverService> obsvc = services::GetObserverService()) {
-      obsvc->NotifyObservers(nullptr, "compositor:process-aborted", nullptr);
+      obsvc->NotifyObservers((nsIPropertyBag2*) props, "compositor:process-aborted", nullptr);
     }
-
   }
 
   gfxVars::RemoveReceiver(this);

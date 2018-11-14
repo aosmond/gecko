@@ -87,6 +87,7 @@ var TabCrashHandler = {
     this.initialized = true;
 
     Services.obs.addObserver(this, "ipc:content-shutdown");
+    Services.obs.addObserver(this, "compositor:process-aborted");
     Services.obs.addObserver(this, "oop-frameloader-crashed");
 
     this.pageListener = new RemotePages("about:tabcrashed");
@@ -100,6 +101,50 @@ var TabCrashHandler = {
     this.pageListener.addMessageListener("restoreAll", this.receiveMessage.bind(this));
   },
 
+  handleChildProcessCrash(aChildID, aDumpID, aIsCompositor) {
+    if (!aDumpID) {
+      if (!aIsCompositor) {
+        Services.telemetry
+                .getHistogramById("FX_CONTENT_CRASH_DUMP_UNAVAILABLE")
+                .add(1);
+      }
+    } else if (AppConstants.MOZ_CRASHREPORTER) {
+      this.childMap.set(aChildID, aDumpID);
+    }
+
+    if (!this.flushCrashedBrowserQueue(aChildID)) {
+      this.unseenCrashedChildIDs.push(aChildID);
+      // The elements in unseenCrashedChildIDs will only be removed if
+      // the tab crash page is shown. However, ipc:content-shutdown might
+      // be fired for processes for which we'll never show the tab crash
+      // page - for example, the thumbnailing process. Another case to
+      // consider is if the user is configured to submit backlogged crash
+      // reports automatically, and a background tab crashes. In that case,
+      // we will never show the tab crash page, and never remove the element
+      // from the list.
+      //
+      // Instead of trying to account for all of those cases, we prevent
+      // this list from getting too large by putting a reasonable upper
+      // limit on how many childIDs we track. It's unlikely that this
+      // array would ever get so large as to be unwieldy (that'd be a lot
+      // or crashes!), but a leak is a leak.
+      if (this.unseenCrashedChildIDs.length > MAX_UNSEEN_CRASHED_CHILD_IDS) {
+        this.unseenCrashedChildIDs.shift();
+      }
+    }
+
+    // check for environment affecting crash reporting
+    let env = Cc["@mozilla.org/process/environment;1"]
+                .getService(Ci.nsIEnvironment);
+    let shutdown = env.exists("MOZ_CRASHREPORTER_SHUTDOWN");
+
+    if (shutdown && !aIsCompositor) {
+      dump("A content process crashed and MOZ_CRASHREPORTER_SHUTDOWN is " +
+           "set, shutting down\n");
+      Services.startup.quit(Ci.nsIAppStartup.eForceQuit);
+    }
+  },
+
   observe(aSubject, aTopic, aData) {
     switch (aTopic) {
       case "ipc:content-shutdown": {
@@ -111,47 +156,15 @@ var TabCrashHandler = {
 
         let childID = aSubject.get("childID");
         let dumpID = aSubject.get("dumpID");
+        this.handleChildProcessCrash(childID, dumpID, false);
+        break;
+      }
+      case "compositor:process-aborted": {
+        aSubject.QueryInterface(Ci.nsIPropertyBag2);
 
-        if (!dumpID) {
-          Services.telemetry
-                  .getHistogramById("FX_CONTENT_CRASH_DUMP_UNAVAILABLE")
-                  .add(1);
-        } else if (AppConstants.MOZ_CRASHREPORTER) {
-          this.childMap.set(childID, dumpID);
-        }
-
-        if (!this.flushCrashedBrowserQueue(childID)) {
-          this.unseenCrashedChildIDs.push(childID);
-          // The elements in unseenCrashedChildIDs will only be removed if
-          // the tab crash page is shown. However, ipc:content-shutdown might
-          // be fired for processes for which we'll never show the tab crash
-          // page - for example, the thumbnailing process. Another case to
-          // consider is if the user is configured to submit backlogged crash
-          // reports automatically, and a background tab crashes. In that case,
-          // we will never show the tab crash page, and never remove the element
-          // from the list.
-          //
-          // Instead of trying to account for all of those cases, we prevent
-          // this list from getting too large by putting a reasonable upper
-          // limit on how many childIDs we track. It's unlikely that this
-          // array would ever get so large as to be unwieldy (that'd be a lot
-          // or crashes!), but a leak is a leak.
-          if (this.unseenCrashedChildIDs.length > MAX_UNSEEN_CRASHED_CHILD_IDS) {
-            this.unseenCrashedChildIDs.shift();
-          }
-        }
-
-        // check for environment affecting crash reporting
-        let env = Cc["@mozilla.org/process/environment;1"]
-                    .getService(Ci.nsIEnvironment);
-        let shutdown = env.exists("MOZ_CRASHREPORTER_SHUTDOWN");
-
-        if (shutdown) {
-          dump("A content process crashed and MOZ_CRASHREPORTER_SHUTDOWN is " +
-               "set, shutting down\n");
-          Services.startup.quit(Ci.nsIAppStartup.eForceQuit);
-        }
-
+        let childID = "compositor" + aSubject.get("childID");
+        let dumpID = aSubject.get("dumpID");
+        this.handleChildProcessCrash(childID, dumpID, true);
         break;
       }
       case "oop-frameloader-crashed": {
