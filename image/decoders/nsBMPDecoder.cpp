@@ -481,6 +481,7 @@ nsBMPDecoder::ReadFileHeader(const char* aData, size_t aLength)
 
   bool signatureOk = aData[0] == 'B' && aData[1] == 'M';
   if (!signatureOk) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadFileHeader -- bad signature\n", this);
     return Transition::TerminateFailure();
   }
 
@@ -515,6 +516,7 @@ nsBMPDecoder::ReadInfoHeaderSize(const char* aData, size_t aLength)
                    (mH.mBIHSize >= InfoHeaderLength::OS2_V2_MIN &&
                     mH.mBIHSize <= InfoHeaderLength::OS2_V2_MAX);
   if (!bihSizeOk) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadInfoHeaderSize -- bad size %u\n", this, mH.mBIHSize);
     return Transition::TerminateFailure();
   }
   // ICO BMPs must have a WinBMPv3 header. nsICODecoder should have already
@@ -577,6 +579,7 @@ nsBMPDecoder::ReadInfoHeaderRest(const char* aData, size_t aLength)
   bool sizeOk = 0 <= mH.mWidth && mH.mWidth <= k64KWidth &&
                 mH.mHeight != INT_MIN;
   if (!sizeOk) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadInfoHeaderRest -- bad dim %dx%d\n", this, mH.mWidth, mH.mHeight);
     return Transition::TerminateFailure();
   }
 
@@ -595,6 +598,7 @@ nsBMPDecoder::ReadInfoHeaderRest(const char* aData, size_t aLength)
        mH.mBIHSize == InfoHeaderLength::WIN_V5) &&
       (mH.mBpp == 16 || mH.mBpp == 32));
   if (!bppCompressionOk) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadInfoHeaderRest -- bad compression %u, bpp %u, header %u\n", this, mH.mCompression, (uint32_t)mH.mBpp, mH.mBIHSize);
     return Transition::TerminateFailure();
   }
 
@@ -670,6 +674,7 @@ nsBMPDecoder::ReadBitfields(const char* aData, size_t aLength)
   // Post our size to the superclass.
   PostSize(mH.mWidth, AbsoluteHeight());
   if (HasError()) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadBitfields -- has error\n", this);
     return Transition::TerminateFailure();
   }
 
@@ -700,6 +705,7 @@ nsBMPDecoder::ReadBitfields(const char* aData, size_t aLength)
                               mMayHaveTransparency ? SurfaceFormat::B8G8R8A8
                                                    : SurfaceFormat::B8G8R8X8);
   if (NS_FAILED(rv)) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadBitfields -- no frame rv %X\n", this, rv);
     return Transition::TerminateFailure();
   }
   MOZ_ASSERT(mImageData, "Should have a buffer now");
@@ -712,6 +718,7 @@ nsBMPDecoder::ReadBitfields(const char* aData, size_t aLength)
                                  mImageData, mMayHaveTransparency,
                                  /* aFlipVertically = */ mH.mHeight >= 0);
     if (NS_FAILED(rv)) {
+      printf_stderr("[AO][%p] nsBMPDecoder::ReadBitfields -- no downscaler rv %X\n", this, rv);
       return Transition::TerminateFailure();
     }
   }
@@ -742,6 +749,7 @@ nsBMPDecoder::ReadColorTable(const char* aData, size_t aLength)
   // points into the middle of the color palette instead of past the end) and
   // we give up.
   if (mPreGapLength > mH.mDataOffset) {
+    printf_stderr("[AO][%p] nsBMPDecoder::ReadColorTable -- offset %u too small, gap length %u\n", this, mH.mDataOffset, mPreGapLength);
     return Transition::TerminateFailure();
   }
 

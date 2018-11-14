@@ -917,40 +917,44 @@ nsDataObj::GetDib(const nsACString& inFlavor,
     nsresult rv = imgTools->EncodeImage(image, NS_LITERAL_CSTRING(IMAGE_BMP),
                                         options, getter_AddRefs(inputStream));
     if (NS_FAILED(rv) || !inputStream) {
+      printf_stderr("[AO] nsDataObj::GetDib -- encoding failed, rv %X, inputStream %p\n", rv, inputStream.get());
       return E_FAIL;
     }
 
-    uint64_t size = 0;
-    rv = inputStream->Available(&size);
+    nsCOMPtr<imgIEncoder> encoder = do_QueryInterface(inputStream);
+    if (!encoder) {
+      printf_stderr("[AO] nsDataObj::GetDib -- no encoder from stream\n");
+      return E_FAIL;
+    }
+
+    uint32_t size = 0;
+    rv = encoder->GetImageBufferUsed(&size);
     if (NS_FAILED(rv) || size <= BFH_LENGTH) {
+      printf_stderr("[AO] nsDataObj::GetDib -- bad buffer, rv %X, size %u\n", rv, size);
       return E_FAIL;
     }
 
+    char *src = nullptr;
+    rv = encoder->GetImageBuffer(&src);
+    if (NS_FAILED(rv) || !src) {
+      printf_stderr("[AO] nsDataObj::GetDib -- no buffer, rv %X, src %p\n", rv, src);
+      return E_FAIL;
+    }
+
+    // We don't want the file header.
+    src += BFH_LENGTH;
     size -= BFH_LENGTH;
-    HGLOBAL glob = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE | GMEM_ZEROINIT,
-                                 size);
+
+    HGLOBAL glob = ::GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, size);
     if (!glob) {
+      DWORD err = ::GetLastError();
+      printf_stderr("[AO] nsDataObj::GetDib -- global alloc failed, size %u, err %X\n", size, err);
       return E_FAIL;
     }
 
-    // Read and discard the header the caller doesn't expect.
-    char buf[BFH_LENGTH];
-    uint32_t written = 0;
-    rv = inputStream->Read(buf, BFH_LENGTH, &written);
-    if (NS_FAILED(rv) || written != size) {
-      ::GlobalFree(glob);
-      return E_FAIL;
-    }
-
-    // Write the rest of the stream to the new buffer.
     char *dst = (char*) ::GlobalLock(glob);
-    written = 0;
-    rv = inputStream->Read(dst, size, &written);
+    ::CopyMemory(dst, src, size);
     ::GlobalUnlock(glob);
-    if (NS_FAILED(rv) || written != size) {
-      ::GlobalFree(glob);
-      return E_FAIL;
-    }
 
     aSTG.hGlobal = glob;
     aSTG.tymed = TYMED_HGLOBAL;
@@ -1553,12 +1557,14 @@ HRESULT nsDataObj::DropImage(FORMATETC& aFE, STGMEDIUM& aSTG)
                                NS_LITERAL_STRING("version=3"),
                                getter_AddRefs(inputStream));
     if (NS_FAILED(rv) || !inputStream) {
+      printf_stderr("[AO] nsDataObj::DropImage -- encoding failed, rv %X, inputStream %p\n", rv, inputStream.get());
       return E_FAIL;
     }
 
     uint64_t available = 0;
     rv = inputStream->Available(&available);
     if (NS_FAILED(rv)) {
+      printf_stderr("[AO] nsDataObj::DropImage -- available failed, rv %X, size %u\n", rv, (uint32_t)available);
       return E_FAIL;
     }
 
@@ -1566,6 +1572,7 @@ HRESULT nsDataObj::DropImage(FORMATETC& aFE, STGMEDIUM& aSTG)
     nsCOMPtr<nsIFile> dropFile;
     rv = NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(dropFile));
     if (!dropFile) {
+      printf_stderr("[AO] nsDataObj::DropImage -- get special directory failed, rv %X\n", rv);
       return E_FAIL;
     }
 
@@ -1579,6 +1586,7 @@ HRESULT nsDataObj::DropImage(FORMATETC& aFE, STGMEDIUM& aSTG)
     dropFile->AppendNative(filename);
     rv = dropFile->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 0660);
     if (NS_FAILED(rv)) { 
+      printf_stderr("[AO] nsDataObj::DropImage -- create unique failed, rv %X\n", rv);
       return E_FAIL;
     }
 
@@ -1591,12 +1599,14 @@ HRESULT nsDataObj::DropImage(FORMATETC& aFE, STGMEDIUM& aSTG)
     nsCOMPtr<nsIOutputStream> outStream;
     rv = NS_NewLocalFileOutputStream(getter_AddRefs(outStream), dropFile);
     if (NS_FAILED(rv)) { 
+      printf_stderr("[AO] nsDataObj::DropImage -- create output stream failed, rv %X\n", rv);
       return E_FAIL;
     }
 
     uint32_t written = 0;
     rv = outStream->WriteFrom(inputStream, available, &written);
     if (NS_FAILED(rv)) {
+      printf_stderr("[AO] nsDataObj::DropImage -- write failed, rv %X, size %u, written %u\n", rv, (uint32_t)available, written);
       return E_FAIL;
     }
 

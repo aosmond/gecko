@@ -484,6 +484,7 @@ nsresult nsClipboard::GetNativeDataOffClipboard(IDataObject * aDataObject, UINT 
                                                            NS_LITERAL_CSTRING(IMAGE_BMP_MS_CLIPBOARD),
                                                            getter_AddRefs(container));
                   if (NS_FAILED(result)) {
+                    printf_stderr("[AO] nsClipboard::GetNativeDataOffClipboard -- decode failed, rv %X\n", result);
                     break;
                   }
 
@@ -498,11 +499,13 @@ nsresult nsClipboard::GetNativeDataOffClipboard(IDataObject * aDataObject, UINT 
                   result = imgTools->EncodeImage(container, mimeType, EmptyString(),
                                                  getter_AddRefs(inputStream));
                   if (NS_FAILED(result)) {
+                    printf_stderr("[AO] nsClipboard::GetNativeDataOffClipboard -- encode failed, rv %X\n", result);
                     break;
                   }
 
                   if (!inputStream) {
                     result = NS_ERROR_FAILURE;
+                    printf_stderr("[AO] nsClipboard::GetNativeDataOffClipboard -- no input stream\n");
                     break;
                   }
 
