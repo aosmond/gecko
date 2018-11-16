@@ -17,7 +17,6 @@
 #include "nsMemory.h"
 #include "nsIStringStream.h"
 #include "nsIURL.h"
-#include "nsIOutputStream.h"
 #include "nsIPipe.h"
 #include "nsNetCID.h"
 #include "nsIFile.h"
@@ -29,6 +28,11 @@
 #include "nsContentSecurityManager.h"
 #include "nsContentUtils.h"
 #include "nsNetUtil.h"
+#include "nsThreadUtils.h"
+
+#include "Decoder.h"
+#include "IDecodingTask.h"
+#include "DecodePool.h"
 
 // we need windows.h to read out registry information...
 #include <windows.h>
@@ -38,6 +42,7 @@
 #include <wchar.h>
 
 using namespace mozilla;
+using namespace mozilla::image;
 
 struct ICONFILEHEADER {
   uint16_t ifhReserved;
@@ -59,6 +64,50 @@ struct ICONENTRY {
 // Match stock icons with names
 static SHSTOCKICONID GetStockIconIDForName(const nsACString& aStockName) {
   return aStockName.EqualsLiteral("uac-shield") ? SIID_SHIELD : SIID_INVALID;
+}
+
+class nsIconChannel::IconAsyncOpenTask final
+  : public IDecodingTask
+{
+public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(IconAsyncOpenTask, override)
+
+  IconAsyncOpenTask(nsIconChannel* aChannel,
+                    nsIEventTarget* aTarget,
+                    nsCOMPtr<nsIFile>&& aLocalFile,
+                    nsAutoString& aPath,
+                    UINT aInfoFlags)
+    : mChannel(aChannel)
+    , mTarget(aTarget)
+    , mLocalFile(std::move(aLocalFile))
+    , mPath(aPath)
+    , mInfoFlags(aInfoFlags)
+  { }
+
+  void Run() override;
+  bool ShouldPreferSyncRun() const override { return false; }
+  TaskPriority Priority() const override { return TaskPriority::eLow; }
+
+private:
+  ~IconAsyncOpenTask() override = default;
+
+  RefPtr<nsIconChannel> mChannel;
+  nsCOMPtr<nsIEventTarget> mTarget;
+  nsCOMPtr<nsIFile> mLocalFile;
+  nsAutoString mPath;
+  UINT mInfoFlags;
+};
+
+void
+nsIconChannel::IconAsyncOpenTask::Run()
+{
+  HICON hIcon = nullptr;
+  nsresult rv =
+    mChannel->GetHIconFromFile(mLocalFile, mPath, mInfoFlags, &hIcon);
+  nsCOMPtr<nsIRunnable> task = NewRunnableMethod<HICON, nsresult>(
+    "nsIconChannel::FinishAsyncOpen", mChannel,
+    &nsIconChannel::FinishAsyncOpen, hIcon, rv);
+  mTarget->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
 }
 
 // nsIconChannel methods
@@ -157,7 +206,13 @@ nsIconChannel::GetURI(nsIURI** aURI) {
 
 NS_IMETHODIMP
 nsIconChannel::Open(nsIInputStream** _retval) {
-  return MakeInputStream(_retval, false);
+  HICON hIcon = nullptr;
+  nsresult rv = GetHIcon(/* aNonBlocking */ false, &hIcon);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  return MakeInputStream(_retval, /* aNonBlocking */ false, hIcon);
 }
 
 NS_IMETHODIMP
@@ -195,6 +250,44 @@ nsresult nsIconChannel::ExtractIconInfoFromUrl(nsIFile** aLocalFile,
   return file->Clone(aLocalFile);
 }
 
+void
+nsIconChannel::OnAsyncError(nsresult aStatus)
+{
+  OnStartRequest(this, mListenerContext);
+  OnStopRequest(this, mListenerContext, aStatus);
+}
+
+void
+nsIconChannel::FinishAsyncOpen(HICON aIcon, nsresult aStatus)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (NS_FAILED(aStatus)) {
+    OnAsyncError(aStatus);
+    return;
+  }
+
+  nsCOMPtr<nsIInputStream> inStream;
+  nsresult rv = MakeInputStream(getter_AddRefs(inStream),
+                                /* aNonBlocking */ true,
+                                aIcon);
+  if (NS_FAILED(rv)) {
+    OnAsyncError(rv);
+    return;
+  }
+
+  rv = mPump->Init(inStream, 0, 0, false, mListenerTarget);
+  if (NS_FAILED(rv)) {
+    OnAsyncError(rv);
+    return;
+  }
+
+  rv = mPump->AsyncRead(this, mListenerContext);
+  if (NS_FAILED(rv)) {
+    OnAsyncError(rv);
+  }
+}
+
 NS_IMETHODIMP
 nsIconChannel::AsyncOpen(nsIStreamListener* aListener, nsISupports* ctxt) {
   MOZ_ASSERT(
@@ -205,35 +298,42 @@ nsIconChannel::AsyncOpen(nsIStreamListener* aListener, nsISupports* ctxt) {
            nsContentUtils::IsSystemPrincipal(mLoadInfo->LoadingPrincipal())),
       "security flags in loadInfo but asyncOpen2() not called");
 
-  nsCOMPtr<nsIInputStream> inStream;
-  nsresult rv = MakeInputStream(getter_AddRefs(inStream), true);
+  nsresult rv = EnsurePipeCreated(/* aIconSize */ 0, /* aNonBlocking */ true);
   if (NS_FAILED(rv)) {
     mCallbacks = nullptr;
     return rv;
   }
 
-  // Init our streampump
-  nsCOMPtr<nsIEventTarget> target = nsContentUtils::GetEventTargetByLoadInfo(
+  mListenerTarget = nsContentUtils::GetEventTargetByLoadInfo(
       mLoadInfo, mozilla::TaskCategory::Other);
-  rv = mPump->Init(inStream, 0, 0, false, target);
+  if (!mListenerTarget) {
+    mListenerTarget = do_GetMainThread();
+  }
+
+  // If we pass aNonBlocking as true, GetHIcon will always have dispatched
+  // upon success.
+  HICON hIcon = nullptr;
+  rv = GetHIcon(/* aNonBlocking */ true, &hIcon);
   if (NS_FAILED(rv)) {
     mCallbacks = nullptr;
+    mInputStream = nullptr;
+    mOutputStream = nullptr;
+    mListenerTarget = nullptr;
     return rv;
   }
 
-  rv = mPump->AsyncRead(this, ctxt);
-  if (NS_SUCCEEDED(rv)) {
-    // Store our real listener
-    mListener = aListener;
-    // Add ourself to the load group, if available
-    if (mLoadGroup) {
-      mLoadGroup->AddRequest(this, nullptr);
-    }
-  } else {
-    mCallbacks = nullptr;
+  // We shouldn't have the icon yet if it is non-blocking.
+  MOZ_ASSERT(!hIcon);
+
+  // Add ourself to the load group, if available
+  if (mLoadGroup) {
+    mLoadGroup->AddRequest(this, nullptr);
   }
 
-  return rv;
+  // Store our real listener
+  mListener = aListener;
+  mListenerContext = ctxt;
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -284,7 +384,7 @@ static UINT GetSizeInfoFlag(uint32_t aDesiredImageSize) {
   return (UINT)(aDesiredImageSize > 16 ? SHGFI_SHELLICONSIZE : SHGFI_SMALLICON);
 }
 
-nsresult nsIconChannel::GetHIconFromFile(HICON* hIcon) {
+nsresult nsIconChannel::GetHIconFromFile(bool aNonBlocking, HICON* hIcon) {
   nsCString contentType;
   nsCString fileExt;
   nsCOMPtr<nsIFile> localFile;  // file we want an icon for
@@ -295,7 +395,6 @@ nsresult nsIconChannel::GetHIconFromFile(HICON* hIcon) {
 
   // if the file exists, we are going to use it's real attributes...
   // otherwise we only want to use it for it's extension...
-  SHFILEINFOW sfi;
   UINT infoFlags = SHGFI_ICON;
 
   bool fileExists = false;
@@ -342,13 +441,32 @@ nsresult nsIconChannel::GetHIconFromFile(HICON* hIcon) {
     filePath = NS_LITERAL_STRING(".") + NS_ConvertUTF8toUTF16(defFileExt);
   }
 
+  if (aNonBlocking) {
+    RefPtr<IconAsyncOpenTask> task =
+      new IconAsyncOpenTask(this, mListenerTarget, std::move(localFile),
+                            filePath, infoFlags);
+    DecodePool::Singleton()->AsyncRun(task);
+    return NS_OK;
+  }
+
+  return GetHIconFromFile(localFile, filePath, infoFlags, hIcon);
+}
+
+nsresult
+nsIconChannel::GetHIconFromFile(nsIFile* aLocalFile,
+                                const nsAutoString& aPath,
+                                UINT aInfoFlags,
+                                HICON* hIcon)
+{
+  SHFILEINFOW sfi;
+
   // Is this the "Desktop" folder?
   DWORD shellResult =
-      GetSpecialFolderIcon(localFile, CSIDL_DESKTOP, &sfi, infoFlags);
+      GetSpecialFolderIcon(aLocalFile, CSIDL_DESKTOP, &sfi, aInfoFlags);
   if (!shellResult) {
     // Is this the "My Documents" folder?
     shellResult =
-        GetSpecialFolderIcon(localFile, CSIDL_PERSONAL, &sfi, infoFlags);
+        GetSpecialFolderIcon(aLocalFile, CSIDL_PERSONAL, &sfi, aInfoFlags);
   }
 
   // There are other "Special Folders" and Namespace entities that we
@@ -359,20 +477,20 @@ nsresult nsIconChannel::GetHIconFromFile(HICON* hIcon) {
 
   // Not a special folder, or something else failed above.
   if (!shellResult) {
-    shellResult = ::SHGetFileInfoW(filePath.get(), FILE_ATTRIBUTE_ARCHIVE, &sfi,
-                                   sizeof(sfi), infoFlags);
+    shellResult = ::SHGetFileInfoW(aPath.get(), FILE_ATTRIBUTE_ARCHIVE, &sfi,
+                                   sizeof(sfi), aInfoFlags);
   }
 
-  if (shellResult && sfi.hIcon) {
-    *hIcon = sfi.hIcon;
-  } else {
-    rv = NS_ERROR_NOT_AVAILABLE;
+  if (!shellResult || !sfi.hIcon) {
+    return NS_ERROR_NOT_AVAILABLE;
   }
 
-  return rv;
+  *hIcon = sfi.hIcon;
+  return NS_OK;
 }
 
-nsresult nsIconChannel::GetStockHIcon(nsIMozIconURI* aIconURI, HICON* hIcon) {
+nsresult nsIconChannel::GetStockHIcon(nsIMozIconURI* aIconURI,
+                                      bool aNonBlocking, HICON* hIcon) {
   nsresult rv = NS_OK;
 
   uint32_t desiredImageSize;
@@ -391,6 +509,14 @@ nsresult nsIconChannel::GetStockHIcon(nsIMozIconURI* aIconURI, HICON* hIcon) {
   SHSTOCKICONINFO sii = {0};
   sii.cbSize = sizeof(sii);
   HRESULT hr = SHGetStockIconInfo(stockIconID, infoFlags, &sii);
+
+  if (aNonBlocking) {
+    nsCOMPtr<nsIRunnable> task = NewRunnableMethod<HICON, nsresult>(
+      "nsIconChannel::FinishAsyncOpen", this,
+      &nsIconChannel::FinishAsyncOpen, sii.hIcon, rv);
+    mListenerTarget->Dispatch(task.forget(), NS_DISPATCH_NORMAL);
+    return NS_OK;
+  }
 
   if (SUCCEEDED(hr)) {
     *hIcon = sii.hIcon;
@@ -462,32 +588,45 @@ static BITMAPINFO* CreateBitmapInfo(BITMAPINFOHEADER* aHeader,
   return bmi;
 }
 
-nsresult nsIconChannel::MakeInputStream(nsIInputStream** _retval,
-                                        bool aNonBlocking) {
+nsresult nsIconChannel::EnsurePipeCreated(uint32_t aIconSize,
+                                          bool aNonBlocking) {
+  if (mInputStream || mOutputStream) {
+    return NS_OK;
+  }
+
+  return NS_NewPipe(getter_AddRefs(mInputStream),
+                    getter_AddRefs(mOutputStream),
+                    aIconSize,
+                    aIconSize > 0 ? aIconSize : UINT32_MAX,
+                    aNonBlocking);
+}
+
+nsresult nsIconChannel::GetHIcon(bool aNonBlocking, HICON *aIcon) {
   // Check whether the icon requested's a file icon or a stock icon
   nsresult rv = NS_ERROR_NOT_AVAILABLE;
 
   // GetDIBits does not exist on windows mobile.
-  HICON hIcon = nullptr;
-
   nsCOMPtr<nsIMozIconURI> iconURI(do_QueryInterface(mUrl, &rv));
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsAutoCString stockIcon;
   iconURI->GetStockIcon(stockIcon);
   if (!stockIcon.IsEmpty()) {
-    rv = GetStockHIcon(iconURI, &hIcon);
-  } else {
-    rv = GetHIconFromFile(&hIcon);
+    return GetStockHIcon(iconURI, aNonBlocking, aIcon);
   }
 
-  NS_ENSURE_SUCCESS(rv, rv);
+  return GetHIconFromFile(aNonBlocking, aIcon);
+}
 
-  if (hIcon) {
+nsresult nsIconChannel::MakeInputStream(nsIInputStream** _retval,
+                                        bool aNonBlocking, HICON aIcon) {
+  nsresult rv = NS_ERROR_FAILURE;
+
+  if (aIcon) {
     // we got a handle to an icon. Now we want to get a bitmap for the icon
     // using GetIconInfo....
     ICONINFO iconInfo;
-    if (GetIconInfo(hIcon, &iconInfo)) {
+    if (GetIconInfo(aIcon, &iconInfo)) {
       // we got the bitmaps, first find out their size
       HDC hDC = CreateCompatibleDC(nullptr);  // get a device context for
                                               // the screen.
@@ -568,16 +707,12 @@ nsresult nsIconChannel::MakeInputStream(nsIInputStream** _retval,
                 GetDIBits(hDC, iconInfo.hbmMask, 0, maskHeader.biHeight,
                           whereTo, maskInfo, DIB_RGB_COLORS)) {
               // Now, create a pipe and stuff our data into it
-              nsCOMPtr<nsIInputStream> inStream;
-              nsCOMPtr<nsIOutputStream> outStream;
-              rv = NS_NewPipe(getter_AddRefs(inStream),
-                              getter_AddRefs(outStream), iconSize, iconSize,
-                              aNonBlocking);
+              rv = EnsurePipeCreated(iconSize, aNonBlocking);
               if (NS_SUCCEEDED(rv)) {
                 uint32_t written;
-                rv = outStream->Write(buffer.get(), iconSize, &written);
+                rv = mOutputStream->Write(buffer.get(), iconSize, &written);
                 if (NS_SUCCEEDED(rv)) {
-                  NS_ADDREF(*_retval = inStream);
+                  NS_ADDREF(*_retval = mInputStream);
                 }
               }
 
@@ -592,13 +727,16 @@ nsresult nsIconChannel::MakeInputStream(nsIInputStream** _retval,
       DeleteObject(iconInfo.hbmColor);
       DeleteObject(iconInfo.hbmMask);
     }  // if we got icon info
-    DestroyIcon(hIcon);
+    DestroyIcon(aIcon);
   }  // if we got an hIcon
 
   // If we didn't make a stream, then fail.
   if (!*_retval && NS_SUCCEEDED(rv)) {
     rv = NS_ERROR_NOT_AVAILABLE;
   }
+
+  mInputStream = nullptr;
+  mOutputStream = nullptr;
   return rv;
 }
 
@@ -737,6 +875,8 @@ nsIconChannel::OnStopRequest(nsIRequest* aRequest, nsISupports* aContext,
 
   // Drop notification callbacks to prevent cycles.
   mCallbacks = nullptr;
+  mListenerContext = nullptr;
+  mListenerTarget = nullptr;
 
   return NS_OK;
 }
