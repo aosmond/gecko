@@ -126,12 +126,14 @@ private:
   struct ItemClips {
     ItemClips(const ActiveScrolledRoot* aASR,
               const DisplayItemClipChain* aChain,
-              bool aSeparateLeaf);
+              bool aSeparateLeaf,
+              bool aForList);
 
     // These are the "inputs" - they come from the nsDisplayItem
     const ActiveScrolledRoot* mASR;
     const DisplayItemClipChain* mChain;
     bool mSeparateLeaf;
+    bool mForList;
 
     // These are the "outputs" - they are pushed to WR as needed
     Maybe<wr::WrClipId> mScrollId;

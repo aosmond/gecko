@@ -16,9 +16,9 @@
 #include "nsStyleStructInlines.h"
 #include "UnitTransforms.h"
 
-#define CLIP_LOG(...)
+//#define CLIP_LOG(...)
 //#define CLIP_LOG(...) printf_stderr("CLIP: " __VA_ARGS__)
-//#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
+#define CLIP_LOG(...) if (XRE_IsContentProcess()) printf_stderr("CLIP: " __VA_ARGS__)
 
 namespace mozilla {
 namespace layers {
@@ -33,6 +33,7 @@ void
 ClipManager::BeginBuild(WebRenderLayerManager* aManager,
                         wr::DisplayListBuilder& aBuilder)
 {
+  CLIP_LOG("begin build\n");
   MOZ_ASSERT(!mManager);
   mManager = aManager;
   MOZ_ASSERT(!mBuilder);
@@ -46,6 +47,7 @@ ClipManager::BeginBuild(WebRenderLayerManager* aManager,
 void
 ClipManager::EndBuild()
 {
+  CLIP_LOG("end build\n");
   mBuilder = nullptr;
   mManager = nullptr;
   mCacheStack.pop();
@@ -57,13 +59,19 @@ ClipManager::EndBuild()
 void
 ClipManager::BeginList(const StackingContextHelper& aStackingContext)
 {
+  CLIP_LOG("start list %p, affects positioning %d, has ref frame id %d\n",
+           &aStackingContext,
+           aStackingContext.AffectsClipPositioning(),
+           aStackingContext.ReferenceFrameId().isSome());
   if (aStackingContext.AffectsClipPositioning()) {
     PushOverrideForASR(
         mItemClipStack.empty() ? nullptr : mItemClipStack.top().mASR,
         aStackingContext.ReferenceFrameId());
   }
 
-  ItemClips clips(nullptr, nullptr, false);
+  ItemClips clips(nullptr, nullptr,
+                  /* aSeparateLeaf */ false, false);
+                  //aStackingContext.AffectsClipPositioning());
   if (!mItemClipStack.empty()) {
     clips.CopyOutputsFrom(mItemClipStack.top());
   }
@@ -73,6 +81,7 @@ ClipManager::BeginList(const StackingContextHelper& aStackingContext)
 void
 ClipManager::EndList(const StackingContextHelper& aStackingContext)
 {
+  CLIP_LOG("end list %p\n", &aStackingContext);
   MOZ_ASSERT(!mItemClipStack.empty());
   mItemClipStack.top().Unapply(mBuilder);
   mItemClipStack.pop();
@@ -139,7 +148,7 @@ void
 ClipManager::BeginItem(nsDisplayItem* aItem,
                        const StackingContextHelper& aStackingContext)
 {
-  CLIP_LOG("processing item %p\n", aItem);
+  CLIP_LOG("processing item %p (%s)\n", aItem, aItem->Name());
 
   const DisplayItemClipChain* clip = aItem->GetClipChain();
   const ActiveScrolledRoot* asr = aItem->GetActiveScrolledRoot();
@@ -170,7 +179,7 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
     }
   }
 
-  ItemClips clips(asr, clip, separateLeaf);
+  ItemClips clips(asr, clip, separateLeaf, /* aForList */ false);
   MOZ_ASSERT(!mItemClipStack.empty());
   if (clips.HasSameInputs(mItemClipStack.top())) {
     // Early-exit because if the clips are the same as aItem's previous sibling,
@@ -187,6 +196,8 @@ ClipManager::BeginItem(nsDisplayItem* aItem,
   // pushing aItem's stuff.
   mItemClipStack.top().Unapply(mBuilder);
   mItemClipStack.pop();
+
+  CLIP_LOG("clip %p asr %p separate leaf %d\n", clip, asr, separateLeaf);
 
   // Zoom display items report their bounds etc using the parent document's
   // APD because zoom items act as a conversion layer between the two different
@@ -409,10 +420,12 @@ ClipManager::~ClipManager()
 
 ClipManager::ItemClips::ItemClips(const ActiveScrolledRoot* aASR,
                                   const DisplayItemClipChain* aChain,
-                                  bool aSeparateLeaf)
+                                  bool aSeparateLeaf,
+                                  bool aForList)
   : mASR(aASR)
   , mChain(aChain)
   , mSeparateLeaf(aSeparateLeaf)
+  , mForList(aForList)
   , mApplied(false)
 {
 }
@@ -450,7 +463,8 @@ ClipManager::ItemClips::HasSameInputs(const ItemClips& aOther)
 {
   return mASR == aOther.mASR &&
          mChain == aOther.mChain &&
-         mSeparateLeaf == aOther.mSeparateLeaf;
+         mSeparateLeaf == aOther.mSeparateLeaf &&
+         mForList == aOther.mForList;
 }
 
 void
