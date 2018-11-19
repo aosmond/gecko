@@ -1,0 +1,39 @@
+<html>
+<style type="text/css">
+.sized {
+  width: 100px;
+  height: 100px;
+}
+
+.absolute {
+  background-color: yellow;
+  position: absolute;
+  width: 90%;
+  height: 90%;
+  clip: rect(0px, 100px, 100px, 0px);
+}
+
+.fixed {
+  position: fixed;
+}
+
+.transform {
+  transform: matrix(1, 0, 0, 1, 0, 50);
+  position: relative;
+}
+
+.buggy_item {
+  background-color: blue;
+  position: relative;
+}
+</style>
+<body>
+<div class="absolute">
+<div class="sized fixed">
+<div class="sized transform">
+<div class="sized buggy_item"></div>
+</div>
+</div>
+</div>
+</body>
+</html>
