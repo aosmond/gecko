@@ -692,7 +692,7 @@ SharedSurfacesAnimation::Invalidate(WebRenderLayerManager* aManager)
   while (i > 0) {
     --i;
     AnimationImageKeyData& entry = mKeys[i];
-    if (entry.mManager == aManager) {
+    if (entry.mManager == aManager || entry.mManager->IsDestroyed()) {
       mKeys.RemoveElementAt(i);
     }
   }

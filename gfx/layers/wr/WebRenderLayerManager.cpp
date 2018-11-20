@@ -571,6 +571,7 @@ WebRenderLayerManager::ClearCachedResources(Layer* aSubtree)
 {
   WrBridge()->BeginClearCachedResources();
   mWebRenderCommandBuilder.ClearCachedResources();
+  ClearAsyncAnimations();
   DiscardImages();
   // Clear all active compositor animation ids.
   // When ClearCachedResources is called, all animations are removed
