@@ -507,10 +507,6 @@ SharedSurfacesAnimation::~SharedSurfacesAnimation()
 void
 SharedSurfacesAnimation::Destroy()
 {
-  if (mKeys.IsEmpty()) {
-    return;
-  }
-
   if (!NS_IsMainThread()) {
     nsCOMPtr<nsIRunnable> task =
       NewRunnableMethod("SharedSurfacesAnimation::Destroy",
@@ -519,13 +515,16 @@ SharedSurfacesAnimation::Destroy()
     return;
   }
 
+  if (mKeys.IsEmpty()) {
+    return;
+  }
+
   for (const auto& entry : mKeys) {
-    if (!entry.mManager->IsDestroyed()) {
-      if (entry.mRecycling) {
-        entry.mManager->DeregisterAsyncAnimation(entry.mImageKey);
-      }
-      entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mRecycling) {
+      entry.mManager->DeregisterAsyncAnimation(entry.mImageKey);
     }
+    entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
   }
 
   mKeys.Clear();
@@ -568,10 +567,7 @@ SharedSurfacesAnimation::SetCurrentFrame(SourceSurface* aParentSurface,
   while (i > 0) {
     --i;
     AnimationImageKeyData& entry = mKeys[i];
-    if (entry.mManager->IsDestroyed()) {
-      mKeys.RemoveElementAt(i);
-      continue;
-    }
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
 
     entry.MergeDirtyRect(Some(aDirtyRect));
     Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
@@ -616,9 +612,8 @@ SharedSurfacesAnimation::UpdateKey(SourceSurface* aParentSurface,
   while (i > 0) {
     --i;
     AnimationImageKeyData& entry = mKeys[i];
-    if (entry.mManager->IsDestroyed()) {
-      mKeys.RemoveElementAt(i);
-    } else if (entry.mManager == aManager) {
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager == aManager) {
       WebRenderBridgeChild* wrBridge = aManager->WrBridge();
       MOZ_ASSERT(wrBridge);
 
@@ -660,9 +655,8 @@ SharedSurfacesAnimation::ReleasePreviousFrame(WebRenderLayerManager* aManager,
   while (i > 0) {
     --i;
     AnimationImageKeyData& entry = mKeys[i];
-    if (entry.mManager->IsDestroyed()) {
-      mKeys.RemoveElementAt(i);
-    } else if (entry.mManager == aManager) {
+    MOZ_ASSERT(!entry.mManager->IsDestroyed());
+    if (entry.mManager == aManager) {
       size_t k;
       for (k = 0; k < entry.mPendingRelease.Length(); ++k) {
         auto sharedSurface =
@@ -692,8 +686,9 @@ SharedSurfacesAnimation::Invalidate(WebRenderLayerManager* aManager)
   while (i > 0) {
     --i;
     AnimationImageKeyData& entry = mKeys[i];
-    if (entry.mManager == aManager || entry.mManager->IsDestroyed()) {
+    if (entry.mManager == aManager) {
       mKeys.RemoveElementAt(i);
+      break;
     }
   }
 }
