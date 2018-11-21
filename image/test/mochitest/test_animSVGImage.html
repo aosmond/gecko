@@ -23,7 +23,6 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=610419
 /** Test for Bug 610419**/
 
 SimpleTest.requestFlakyTimeout("Pre-existing timeouts when converting from mochitest-chrome");
-SimpleTest.requestCompleteLog();
 SimpleTest.waitForExplicitFinish();
 
 const FAILURE_TIMEOUT = 120000; // Fail early after 120 seconds (2 minutes)
@@ -74,7 +73,7 @@ function myPoll() {
     ok(true, "Animated image looks correct, " +
              "at call #" + gPollCounter + " to myPoll");
 
-    if (++gSVGCurrentImage > gSVGImages.length) {
+    if (++gSVGCurrentImage >= gSVGImages.length) {
       cleanUpAndFinish();
     } else {
       loadNextImageAndPoll();
