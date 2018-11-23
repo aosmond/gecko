@@ -5,7 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ImageMemoryReporter.h"
+#include "ImageMemoryReporterTypes.h"
 #include "Image.h"
+#include "mozilla/SizeOfState.h"
 #include "mozilla/layers/SharedSurfacesParent.h"
 #include "nsIMemoryReporter.h"
 #include "nsISupportsImpl.h"
@@ -14,7 +16,38 @@ namespace mozilla {
 namespace image {
 
 ImageMemoryReporter::WebRenderReporter* ImageMemoryReporter::sWrReporter;
- 
+
+ImageMemoryCounter::ImageMemoryCounter(Image* aImage,
+                                       SizeOfState& aState,
+                                       bool aIsUsed)
+  : mIsUsed(aIsUsed)
+{
+  MOZ_ASSERT(aImage);
+
+  // Extract metadata about the image.
+  nsCOMPtr<nsIURI> imageURL(aImage->GetURI());
+  if (imageURL) {
+    imageURL->GetSpec(mURI);
+  }
+
+  int32_t width = 0;
+  int32_t height = 0;
+  aImage->GetWidth(&width);
+  aImage->GetHeight(&height);
+  mIntrinsicSize.SizeTo(width, height);
+
+  mType = aImage->GetType();
+
+  // Populate memory counters for source and decoded data.
+  mValues.SetSource(aImage->SizeOfSourceWithComputedFallback(aState));
+  aImage->CollectSizeOfSurfaces(mSurfaces, aState.mMallocSizeOf);
+
+  // Compute totals.
+  for (const SurfaceMemoryCounter& surfaceCounter : mSurfaces) {
+    mValues += surfaceCounter.Values();
+  }
+}
+
 class ImageMemoryReporter::WebRenderReporter final : public nsIMemoryReporter
 {
 public:

@@ -148,6 +148,7 @@ AnimationFrameRetainedBuffer::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
     frame->AddSizeOfExcludingThis(aMallocSizeOf,
       [&](AddSizeOfCbData& aMetadata) {
         aMetadata.index = i;
+        aMetadata.type = SurfaceMemoryCounterType::ANIMATED_RETAIN;
         aCallback(aMetadata);
       }
     );
@@ -296,6 +297,7 @@ AnimationFrameDiscardingQueue::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf
   mFirstFrame->AddSizeOfExcludingThis(aMallocSizeOf,
     [&](AddSizeOfCbData& aMetadata) {
       aMetadata.index = 1;
+      aMetadata.type = SurfaceMemoryCounterType::ANIMATED_RETAIN;
       aCallback(aMetadata);
     }
   );
@@ -316,6 +318,7 @@ AnimationFrameDiscardingQueue::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf
     frame->AddSizeOfExcludingThis(aMallocSizeOf,
       [&](AddSizeOfCbData& aMetadata) {
         aMetadata.index = i;
+        aMetadata.type = SurfaceMemoryCounterType::ANIMATED_DISCARD;
         aCallback(aMetadata);
       }
     );
@@ -343,6 +346,7 @@ AnimationFrameRecyclingQueue::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
       entry.mFrame->AddSizeOfExcludingThis(aMallocSizeOf,
         [&](AddSizeOfCbData& aMetadata) {
           aMetadata.index = 0; // Frame is not applicable
+          aMetadata.type = SurfaceMemoryCounterType::ANIMATED_RECYCLE;
           aCallback(aMetadata);
         }
       );

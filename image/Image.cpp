@@ -8,49 +8,12 @@
 #include "Layers.h"               // for LayerManager
 #include "nsRefreshDriver.h"
 #include "nsContentUtils.h"
-#include "mozilla/SizeOfState.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Tuple.h"        // for Tie
 #include "mozilla/layers/SharedSurfacesChild.h"
 
 namespace mozilla {
 namespace image {
-
-///////////////////////////////////////////////////////////////////////////////
-// Memory Reporting
-///////////////////////////////////////////////////////////////////////////////
-
-ImageMemoryCounter::ImageMemoryCounter(Image* aImage,
-                                       SizeOfState& aState,
-                                       bool aIsUsed)
-  : mIsUsed(aIsUsed)
-{
-  MOZ_ASSERT(aImage);
-
-  // Extract metadata about the image.
-  nsCOMPtr<nsIURI> imageURL(aImage->GetURI());
-  if (imageURL) {
-    imageURL->GetSpec(mURI);
-  }
-
-  int32_t width = 0;
-  int32_t height = 0;
-  aImage->GetWidth(&width);
-  aImage->GetHeight(&height);
-  mIntrinsicSize.SizeTo(width, height);
-
-  mType = aImage->GetType();
-
-  // Populate memory counters for source and decoded data.
-  mValues.SetSource(aImage->SizeOfSourceWithComputedFallback(aState));
-  aImage->CollectSizeOfSurfaces(mSurfaces, aState.mMallocSizeOf);
-
-  // Compute totals.
-  for (const SurfaceMemoryCounter& surfaceCounter : mSurfaces) {
-    mValues += surfaceCounter.Values();
-  }
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // Image Base Types

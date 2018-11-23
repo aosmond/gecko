@@ -350,70 +350,81 @@ private:
       ImageMemoryReporter::AppendSharedSurfacePrefix(surfacePathPrefix, counter,
                                                      aSharedSurfaces);
 
-      if (counter.Type() == SurfaceMemoryCounterType::NORMAL) {
-        PlaybackType playback = counter.Key().Playback();
-        if (playback == PlaybackType::eAnimated) {
-          if (gfxPrefs::ImageMemDebugReporting()) {
-            surfacePathPrefix.AppendPrintf(" (animation %4u)",
-                                           uint32_t(counter.Values().FrameIndex()));
-          } else {
-            surfacePathPrefix.AppendLiteral(" (animation)");
-          }
-        }
+      switch (counter.Type()) {
+        case SurfaceMemoryCounterType::NORMAL:
+          break;
+        case SurfaceMemoryCounterType::ANIMATED_RETAIN:
+          surfacePathPrefix.AppendLiteral(", retained animated frame");
+          break;
+        case SurfaceMemoryCounterType::ANIMATED_DISCARD:
+          surfacePathPrefix.AppendLiteral(", discarding animated frame");
+          break;
+        case SurfaceMemoryCounterType::ANIMATED_RECYCLE:
+          surfacePathPrefix.AppendLiteral(", recycling animated frame");
+          break;
+        case SurfaceMemoryCounterType::COMPOSITING:
+          surfacePathPrefix.AppendLiteral(", compositing frame");
+          break;
+        case SurfaceMemoryCounterType::COMPOSITING_PREV:
+          surfacePathPrefix.AppendLiteral(", compositing prev frame");
+          break;
+	default:
+          MOZ_ASSERT_UNREACHABLE("Unknown counter type");
+      }
 
-        if (counter.Key().Flags() != DefaultSurfaceFlags()) {
-          surfacePathPrefix.AppendLiteral(", flags:");
-          surfacePathPrefix.AppendInt(uint32_t(counter.Key().Flags()),
-                                      /* aRadix = */ 16);
-        }
+      PlaybackType playback = counter.Key().Playback();
+      if (playback == PlaybackType::eAnimated &&
+          gfxPrefs::ImageMemDebugReporting()) {
+        surfacePathPrefix.AppendPrintf(" (index %4u)",
+                                       uint32_t(counter.Values().FrameIndex()));
+      }
 
-        if (counter.Key().SVGContext()) {
-          const SVGImageContext& context = counter.Key().SVGContext().ref();
-          surfacePathPrefix.AppendLiteral(", svgContext:[ ");
-          if (context.GetViewportSize()) {
-            const CSSIntSize& size = context.GetViewportSize().ref();
-            surfacePathPrefix.AppendLiteral("viewport=(");
-            surfacePathPrefix.AppendInt(size.width);
-            surfacePathPrefix.AppendLiteral("x");
-            surfacePathPrefix.AppendInt(size.height);
-            surfacePathPrefix.AppendLiteral(") ");
-          }
-          if (context.GetPreserveAspectRatio()) {
-            nsAutoString aspect;
-            context.GetPreserveAspectRatio()->ToString(aspect);
-            surfacePathPrefix.AppendLiteral("preserveAspectRatio=(");
-            LossyAppendUTF16toASCII(aspect, surfacePathPrefix);
-            surfacePathPrefix.AppendLiteral(") ");
-          }
-          if (context.GetContextPaint()) {
-            const SVGEmbeddingContextPaint* paint = context.GetContextPaint();
-            surfacePathPrefix.AppendLiteral("contextPaint=(");
-            if (paint->GetFill()) {
-              surfacePathPrefix.AppendLiteral(" fill=");
-              surfacePathPrefix.AppendInt(paint->GetFill()->ToABGR(), 16);
-            }
-            if (paint->GetFillOpacity()) {
-              surfacePathPrefix.AppendLiteral(" fillOpa=");
-              surfacePathPrefix.AppendFloat(paint->GetFillOpacity());
-            }
-            if (paint->GetStroke()) {
-              surfacePathPrefix.AppendLiteral(" stroke=");
-              surfacePathPrefix.AppendInt(paint->GetStroke()->ToABGR(), 16);
-            }
-            if (paint->GetStrokeOpacity()) {
-              surfacePathPrefix.AppendLiteral(" strokeOpa=");
-              surfacePathPrefix.AppendFloat(paint->GetStrokeOpacity());
-            }
-            surfacePathPrefix.AppendLiteral(" ) ");
-          }
-          surfacePathPrefix.AppendLiteral("]");
+      if (counter.Key().Flags() != DefaultSurfaceFlags()) {
+        surfacePathPrefix.AppendLiteral(", flags:");
+        surfacePathPrefix.AppendInt(uint32_t(counter.Key().Flags()),
+                                    /* aRadix = */ 16);
+      }
+
+      if (counter.Key().SVGContext()) {
+        const SVGImageContext& context = counter.Key().SVGContext().ref();
+        surfacePathPrefix.AppendLiteral(", svgContext:[ ");
+        if (context.GetViewportSize()) {
+          const CSSIntSize& size = context.GetViewportSize().ref();
+          surfacePathPrefix.AppendLiteral("viewport=(");
+          surfacePathPrefix.AppendInt(size.width);
+          surfacePathPrefix.AppendLiteral("x");
+          surfacePathPrefix.AppendInt(size.height);
+          surfacePathPrefix.AppendLiteral(") ");
         }
-      } else if (counter.Type() == SurfaceMemoryCounterType::COMPOSITING) {
-        surfacePathPrefix.AppendLiteral(", compositing frame");
-      } else if (counter.Type() == SurfaceMemoryCounterType::COMPOSITING_PREV) {
-        surfacePathPrefix.AppendLiteral(", compositing prev frame");
-      } else {
-        MOZ_ASSERT_UNREACHABLE("Unknown counter type");
+        if (context.GetPreserveAspectRatio()) {
+          nsAutoString aspect;
+          context.GetPreserveAspectRatio()->ToString(aspect);
+          surfacePathPrefix.AppendLiteral("preserveAspectRatio=(");
+          LossyAppendUTF16toASCII(aspect, surfacePathPrefix);
+          surfacePathPrefix.AppendLiteral(") ");
+        }
+        if (context.GetContextPaint()) {
+          const SVGEmbeddingContextPaint* paint = context.GetContextPaint();
+          surfacePathPrefix.AppendLiteral("contextPaint=(");
+          if (paint->GetFill()) {
+            surfacePathPrefix.AppendLiteral(" fill=");
+            surfacePathPrefix.AppendInt(paint->GetFill()->ToABGR(), 16);
+          }
+          if (paint->GetFillOpacity()) {
+            surfacePathPrefix.AppendLiteral(" fillOpa=");
+            surfacePathPrefix.AppendFloat(paint->GetFillOpacity());
+          }
+          if (paint->GetStroke()) {
+            surfacePathPrefix.AppendLiteral(" stroke=");
+            surfacePathPrefix.AppendInt(paint->GetStroke()->ToABGR(), 16);
+          }
+          if (paint->GetStrokeOpacity()) {
+            surfacePathPrefix.AppendLiteral(" strokeOpa=");
+            surfacePathPrefix.AppendFloat(paint->GetStrokeOpacity());
+          }
+          surfacePathPrefix.AppendLiteral(" ) ");
+        }
+        surfacePathPrefix.AppendLiteral("]");
       }
 
       surfacePathPrefix.AppendLiteral(")/");

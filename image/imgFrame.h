@@ -7,6 +7,7 @@
 #ifndef mozilla_image_imgFrame_h
 #define mozilla_image_imgFrame_h
 
+#include "ImageMemoryReporterTypes.h" // for SurfaceMemoryCounterType
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Monitor.h"
@@ -221,6 +222,7 @@ public:
   struct AddSizeOfCbData {
     AddSizeOfCbData()
       : heap(0), nonHeap(0), handles(0), index(0), externalId(0)
+      , type(SurfaceMemoryCounterType::NORMAL)
     { }
 
     size_t heap;
@@ -228,6 +230,7 @@ public:
     size_t handles;
     size_t index;
     uint64_t externalId;
+    SurfaceMemoryCounterType type;
   };
 
   typedef std::function<void(AddSizeOfCbData& aMetadata)> AddSizeOfCb;

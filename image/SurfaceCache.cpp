@@ -201,7 +201,8 @@ public:
           SurfaceMemoryCounter counter(aCachedSurface->GetSurfaceKey(),
                                        aCachedSurface->IsLocked(),
                                        aCachedSurface->CannotSubstitute(),
-                                       aIsFactor2);
+                                       aIsFactor2,
+                                       aMetadata.type);
 
           counter.Values().SetDecodedHeap(aMetadata.heap);
           counter.Values().SetDecodedNonHeap(aMetadata.nonHeap);
