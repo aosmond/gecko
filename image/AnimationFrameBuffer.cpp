@@ -366,30 +366,11 @@ AnimationFrameRecyclingQueue::AdvanceInternal()
   MOZ_ASSERT(mDisplay.front());
 
   RefPtr<imgFrame>& front = mDisplay.front();
-
-  // The first frame should always have a dirty rect that matches the frame
-  // rect. As such, we should use mFirstFrameRefreshArea instead for recycle
-  // rect calculations.
-  MOZ_ASSERT_IF(mGetIndex == 1,
-                front->GetRect().IsEqualEdges(front->GetDirtyRect()));
-
-  RecycleEntry newEntry(mGetIndex == 1 ? mFirstFrameRefreshArea
-                                       : front->GetDirtyRect());
+  RecycleEntry newEntry(front->GetDirtyRect());
 
   // If we are allowed to recycle the frame, then we should save it before the
   // base class's AdvanceInternal discards it.
   if (front->ShouldRecycle()) {
-    // Calculate the recycle rect for the recycled frame. This is the cumulative
-    // dirty rect of all of the frames ahead of us to be displayed, and to be
-    // used for recycling. Or in other words, the dirty rect between the
-    // recycled frame and the decoded frame which reuses the buffer.
-    for (const RefPtr<imgFrame>& frame : mDisplay) {
-      newEntry.mRecycleRect = newEntry.mRecycleRect.Union(frame->GetDirtyRect());
-    }
-    for (const RecycleEntry& entry : mRecycle) {
-      newEntry.mRecycleRect = newEntry.mRecycleRect.Union(entry.mDirtyRect);
-    }
-
     newEntry.mFrame = std::move(front);
   }
 
@@ -436,16 +417,35 @@ AnimationFrameRecyclingQueue::RecycleFrame(gfx::IntRect& aRecycleRect)
     return RawAccessFrameRef();
   }
 
-  RawAccessFrameRef frame;
+  RawAccessFrameRef recycledFrame;
   if (mRecycle.front().mFrame) {
-    frame = mRecycle.front().mFrame->RawAccessRef();
-    if (frame) {
-      aRecycleRect = mRecycle.front().mRecycleRect;
+    recycledFrame = mRecycle.front().mFrame->RawAccessRef();
+    MOZ_ASSERT(recycledFrame);
+    mRecycle.pop_front();
+
+    // Calculate the recycle rect for the recycled frame. This is the cumulative
+    // dirty rect of all of the frames ahead of us to be displayed, and to be
+    // used for recycling. Or in other words, the dirty rect between the
+    // recycled frame and the decoded frame which reuses the buffer.
+    //
+    // If we are recreating the first frame, then we actually have already
+    // precomputed aggregate of the dirty rects as the first frame refresh area.
+    if (mInsertIndex == 0) {
+      aRecycleRect = mFirstFrameRefreshArea;
+    } else {
+      aRecycleRect.SetRect(0, 0, 0, 0);
+      for (const RefPtr<imgFrame>& frame : mDisplay) {
+        aRecycleRect = aRecycleRect.Union(frame->GetDirtyRect());
+      }
+      for (const RecycleEntry& entry : mRecycle) {
+        aRecycleRect = aRecycleRect.Union(entry.mDirtyRect);
+      }
     }
+  } else {
+    mRecycle.pop_front();
   }
 
-  mRecycle.pop_front();
-  return frame;
+  return recycledFrame;
 }
 
 bool
