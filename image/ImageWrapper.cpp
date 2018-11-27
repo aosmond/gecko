@@ -247,6 +247,12 @@ ImageWrapper::Draw(gfxContext* aContext,
                            aSamplingFilter, aSVGContext, aFlags, aOpacity);
 }
 
+nsIFrame*
+ImageWrapper::GetRootLayoutFrame()
+{
+  return nullptr;
+}
+
 NS_IMETHODIMP
 ImageWrapper::StartDecoding(uint32_t aFlags)
 {

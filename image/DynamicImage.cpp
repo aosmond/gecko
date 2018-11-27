@@ -280,6 +280,12 @@ DynamicImage::Draw(gfxContext* aContext,
   return ImgDrawResult::SUCCESS;
 }
 
+nsIFrame*
+DynamicImage::GetRootLayoutFrame()
+{
+  return nullptr;
+}
+
 NS_IMETHODIMP
 DynamicImage::StartDecoding(uint32_t aFlags)
 {

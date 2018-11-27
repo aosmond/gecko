@@ -753,6 +753,17 @@ VectorImage::WillDrawOpaqueNow()
 }
 
 //******************************************************************************
+nsIFrame*
+VectorImage::GetRootLayoutFrame()
+{
+  if (mError || !mIsFullyLoaded) {
+    return nullptr;
+  }
+
+  return mSVGDocumentWrapper->GetRootLayoutFrame();
+}
+
+//******************************************************************************
 NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 VectorImage::GetFrame(uint32_t aWhichFrame, uint32_t aFlags)
 {

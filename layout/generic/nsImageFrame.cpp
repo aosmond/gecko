@@ -1988,8 +1988,13 @@ nsImageFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
         }
       }
     } else {
-      aLists.Content()->AppendToTop(
-        MakeDisplayItem<nsDisplayImage>(aBuilder, this, mImage, mPrevImage));
+      nsIFrame* frame = mImage->GetRootLayoutFrame();
+      if (frame) {
+        frame->BuildDisplayList(aBuilder, aLists);
+      } else {
+        aLists.Content()->AppendToTop(
+          MakeDisplayItem<nsDisplayImage>(aBuilder, this, mImage, mPrevImage));
+      }
 
       // If we were previously displaying an icon, we're not anymore
       if (mDisplayingIcon) {
