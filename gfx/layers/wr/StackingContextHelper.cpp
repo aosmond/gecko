@@ -39,7 +39,7 @@ StackingContextHelper::StackingContextHelper(
   // Compute scale for fallback rendering. We don't try to guess a scale for 3d
   // transformed items
   gfx::Matrix transform2d;
-  if (aBoundTransform && aBoundTransform->CanDraw2D(&transform2d) &&
+  if (aBoundTransform && aBoundTransform->Is2D(&transform2d) &&
       !aPerspectivePtr && !aParentSC.mIsPreserve3D) {
     mInheritedTransform = transform2d * aParentSC.mInheritedTransform;
     mScale = mInheritedTransform.ScaleFactors(true);
