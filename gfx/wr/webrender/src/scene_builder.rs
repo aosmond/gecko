@@ -56,6 +56,7 @@ pub struct Transaction {
     pub set_root_pipeline: Option<PipelineId>,
     pub render_frame: bool,
     pub invalidate_rendered_frame: bool,
+    pub low_priority: bool,
 }
 
 impl Transaction {
@@ -90,6 +91,7 @@ pub struct BuiltTransaction {
     pub scene_build_end_time: u64,
     pub render_frame: bool,
     pub invalidate_rendered_frame: bool,
+    pub low_priority: bool,
 }
 
 pub struct DisplayListUpdate {
@@ -564,6 +566,7 @@ impl SceneBuilder {
             document_id: txn.document_id,
             render_frame: txn.render_frame,
             invalidate_rendered_frame: txn.invalidate_rendered_frame,
+            low_priority: txn.low_priority,
             built_scene,
             rasterized_blobs,
             resource_updates: replace(&mut txn.resource_updates, Vec::new()),

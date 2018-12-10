@@ -622,6 +622,7 @@ pub struct RenderBackend {
     sampler: Option<Box<AsyncPropertySampler + Send>>,
     size_of_op: Option<VoidPtrToSizeFn>,
     namespace_alloc_by_client: bool,
+    outstanding_low_priority_scene_requests: u32,
 }
 
 impl RenderBackend {
@@ -659,6 +660,7 @@ impl RenderBackend {
             sampler,
             size_of_op,
             namespace_alloc_by_client,
+            outstanding_low_priority_scene_requests: 0,
         }
     }
 
@@ -784,6 +786,10 @@ impl RenderBackend {
             while let Ok(msg) = self.scene_rx.try_recv() {
                 match msg {
                     SceneBuilderResult::Transaction(mut txn, result_tx) => {
+                        if txn.low_priority {
+                            assert!(self.outstanding_low_priority_scene_requests > 0);
+                            self.outstanding_low_priority_scene_requests -= 1;
+                        }
                         let has_built_scene = txn.built_scene.is_some();
                         if let Some(doc) = self.documents.get_mut(&txn.document_id) {
 
@@ -1114,6 +1120,7 @@ impl RenderBackend {
             set_root_pipeline: None,
             render_frame: transaction_msg.generate_frame,
             invalidate_rendered_frame: transaction_msg.invalidate_rendered_frame,
+            low_priority: transaction_msg.low_priority,
         });
 
         self.resource_cache.pre_scene_building_update(
@@ -1171,7 +1178,17 @@ impl RenderBackend {
             });
         }
 
-        let tx = if transaction_msg.low_priority {
+        // If there are outstanding low priority scene requests, then we know
+        // that they are producing blobs we may need after rebuilding the scene.
+        // If we ourselves are also updating the blobs, then we must reduce our
+        // priority accordingly so that the rasterizer state is consistent.
+        if txn.blob_rasterizer.is_some() && self.outstanding_low_priority_scene_requests > 0 {
+            println!("[AO] inverting priority");
+            txn.low_priority = true;
+        }
+
+        let tx = if txn.low_priority {
+            self.outstanding_low_priority_scene_requests += 1;
             &self.low_priority_scene_tx
         } else {
             &self.scene_tx
