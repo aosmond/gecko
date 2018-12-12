@@ -1,0 +1,25 @@
+<html reftest-zoom="1.1">
+<head>
+<style type="text/css">
+.parent {
+display: flex;
+transform: translate3d(0px, 0px, 0px);
+overflow: hidden;
+}
+
+.bg {
+transform: scale(1.05);
+}
+
+.bg_overlay {
+position: absolute;
+}
+</style>
+</head>
+<body>
+<div class="parent">
+<img src="green_200x200.png" class="bg"/>
+<img src="red_100x100.png" class="bg_overlay"/>
+</div>
+</body>
+</html>
