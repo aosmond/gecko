@@ -368,7 +368,7 @@ class ImageResource : public Image {
                                       uint32_t aFlags,
                                       layers::ImageContainer** aContainer);
 
-  void UpdateImageContainer(const Maybe<gfx::IntRect>& aDirtyRect);
+  bool UpdateImageContainer(const Maybe<gfx::IntRect>& aDirtyRect);
 
   void ReleaseImageContainer();
 
