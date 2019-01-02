@@ -2637,6 +2637,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(
         // but they still need the invalidation state bits cleared in order for
         // invalidation for CSS/SMIL animation to work properly.
         (document && document->IsBeingUsedAsImage())) {
+      printf_stderr("[AO] nsDisplayList::PaintRoot -- clear frame %p\n", frame);
       frame->ClearInvalidationStateBits();
     }
 
@@ -2740,6 +2741,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(
       // but they still need the invalidation state bits cleared in order for
       // invalidation for CSS/SMIL animation to work properly.
       (document && document->IsBeingUsedAsImage())) {
+    printf_stderr("[AO] nsDisplayList::PaintRoot -- clear frame %p\n", frame);
     frame->ClearInvalidationStateBits();
   }
 

@@ -81,7 +81,8 @@ class SVGRootRenderingObserver final : public SVGRenderingObserver {
       return;
     }
 
-    frame->ClearInvalidationStateBits();
+    printf_stderr("[AO] VectorImage::SVGRootRenderingObserver::ResumeHonoringInvalidations -- %p frame %p state %d\n", mVectorImage, frame, frame->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT));
+    //frame->ClearInvalidationStateBits();
   }
 
  protected:
@@ -108,6 +109,8 @@ class SVGRootRenderingObserver final : public SVGRenderingObserver {
 
       // Ignore further invalidations until we draw.
       mHonoringInvalidations = false;
+
+      printf_stderr("[AO] VectorImage::SVGRootRenderingObserver::OnRenderingChange -- %p frame %p state %d\n", mVectorImage, frame, frame->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT));
 
       mVectorImage->InvalidateObserversOnNextRefreshDriverTick();
     }
@@ -360,6 +363,19 @@ NS_IMPL_ISUPPORTS(VectorImage, imgIContainer, nsIStreamListener,
 //------------------------------------------------------------------------------
 // Constructor / Destructor
 
+static bool AoBreakDebug(nsIURI* aURI)
+{
+  if (aURI) {
+    nsAutoCString spec;
+    aURI->GetSpec(spec);
+    return spec.EqualsLiteral("https://cdn.shopify.com/s/files/1/0019/6404/8495/files/sheets_1.svg?827649965412058340");
+    //return spec.EqualsLiteral("https://cdn.shopify.com/s/files/1/0019/6404/8495/files/shoe_2.svg?1011647944042741597");
+    //return spec.EqualsLiteral("https://cdn.shopify.com/s/files/1/0019/6404/8495/files/lipstick_3.svg?14427250724213953691");
+  }
+
+  return false;
+}
+
 VectorImage::VectorImage(nsIURI* aURI /* = nullptr */)
     : ImageResource(aURI),  // invoke superclass's constructor
       mLockCount(0),
@@ -368,7 +384,12 @@ VectorImage::VectorImage(nsIURI* aURI /* = nullptr */)
       mIsFullyLoaded(false),
       mIsDrawing(false),
       mHaveAnimations(false),
-      mHasPendingInvalidation(false) {}
+      mHasPendingInvalidation(false)
+{
+  if (AoBreakDebug(aURI)) {
+    printf_stderr("[AO] VectorImage %p -- sheets\n", this);
+  }
+}
 
 VectorImage::~VectorImage() {
   CancelAllListeners();
@@ -1088,6 +1109,10 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
     bool& aWillCache) {
   MOZ_ASSERT(mIsDrawing);
 
+  if (AoBreakDebug(mURI)) {
+    printf_stderr("[AO] VectorImage::CreateSurface %p -- sheets\n", this);
+  }
+
   mSVGDocumentWrapper->UpdateViewportBounds(aParams.viewportSize);
   mSVGDocumentWrapper->FlushImageTransformInvalidation();
 
@@ -1125,10 +1150,12 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
 
   // Try to create an imgFrame, initializing the surface it contains by drawing
   // our gfxDrawable into it. (We use FILTER_NEAREST since we never scale here.)
+  printf_stderr("[AO] VectorImage::CreateSurface -- %p start\n", this);
   auto frame = MakeNotNull<RefPtr<imgFrame>>();
   nsresult rv = frame->InitWithDrawable(
       aSVGDrawable, aParams.size, SurfaceFormat::B8G8R8A8,
       SamplingFilter::POINT, aParams.flags, backend);
+  printf_stderr("[AO] VectorImage::CreateSurface -- %p end\n", this);
 
   // If we couldn't create the frame, it was probably because it would end
   // up way too big. Generally it also wouldn't fit in the cache, but the prefs
