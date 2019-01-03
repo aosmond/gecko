@@ -89,6 +89,13 @@ RasterImage::RasterImage(nsIURI* aURI /* = nullptr */)
       mPendingAnimation(false),
       mAnimationFinished(false),
       mWantFullDecode(false) {
+  if (aURI) {
+    nsAutoCString spec;
+    GetSpecTruncatedTo1k(spec);
+    printf_stderr("[AO] RasterImage::RasterImage %p -- %s\n", this, spec.get());
+  } else {
+    printf_stderr("[AO] RasterImage::RasterImage %p -- no uri\n", this);
+  }
 }
 
 //******************************************************************************
@@ -104,6 +111,7 @@ RasterImage::~RasterImage() {
 
   // Record Telemetry.
   Telemetry::Accumulate(Telemetry::IMAGE_DECODE_COUNT, mDecodeCount);
+  printf_stderr("[AO] RasterImage::~RasterImage %p\n", this);
 }
 
 nsresult RasterImage::Init(const char* aMimeType, uint32_t aFlags) {
@@ -1615,6 +1623,8 @@ void RasterImage::NotifyDecodeComplete(
     const IntRect& aInvalidRect, const Maybe<uint32_t>& aFrameCount,
     DecoderFlags aDecoderFlags, SurfaceFlags aSurfaceFlags) {
   MOZ_ASSERT(NS_IsMainThread());
+
+  printf_stderr("[AO] RasterImage::NotifyDecodeComplete %p\n", this);
 
   // If the decoder detected an error, log it to the error console.
   if (aStatus.mShouldReportError) {

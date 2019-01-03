@@ -575,7 +575,6 @@ VectorImage::RequestRefresh(const TimeStamp& aTime) {
   mSVGDocumentWrapper->TickRefreshDriver();
 
   if (mHasPendingInvalidation) {
-    mHasPendingInvalidation = false;
     SendInvalidationNotifications();
   }
 }
@@ -596,6 +595,8 @@ void VectorImage::SendInvalidationNotifications() {
   // we would miss the subsequent invalidations if we didn't send out the
   // notifications directly in |InvalidateObservers...|.
 
+  MOZ_ASSERT(mHasPendingInvalidation);
+  mHasPendingInvalidation = false;
   SurfaceCache::RemoveImage(ImageKey(this));
 
   if (UpdateImageContainer(Nothing())) {
@@ -1511,11 +1512,33 @@ VectorImage::OnDataAvailable(nsIRequest* aRequest, nsISupports* aCtxt,
 // Invalidation helper method
 
 void VectorImage::InvalidateObserversOnNextRefreshDriverTick() {
-  if (mHaveAnimations) {
-    mHasPendingInvalidation = true;
-  } else {
-    SendInvalidationNotifications();
+  if (mHasPendingInvalidation) {
+    return;
   }
+
+  mHasPendingInvalidation = true;
+
+  // Animated images can wait for the refresh tick since we are registered.
+  if (mHaveAnimations) {
+    return;
+  }
+
+  // Non-animated images won't get a notification from the refresh tick, so we
+  // should just send an invalidation outside the current execution context. We
+  // need to defer because the layout tree is in the middle of invalidation, and
+  // the tree state needs to be consistent.
+  nsCOMPtr<nsIEventTarget> eventTarget;
+  if (mProgressTracker) {
+    eventTarget = mProgressTracker->GetEventTarget();
+  } else {
+    eventTarget = do_GetMainThread();
+  }
+
+  RefPtr<VectorImage> self(this);
+  nsCOMPtr<nsIRunnable> ev(NS_NewRunnableFunction(
+      "VectorImage::SendInvalidationNotifications",
+      [=]() -> void { self->SendInvalidationNotifications(); }));
+  eventTarget->Dispatch(ev.forget(), NS_DISPATCH_NORMAL);
 }
 
 void VectorImage::PropagateUseCounters(Document* aParentDocument) {
