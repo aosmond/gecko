@@ -980,11 +980,15 @@ impl BrushSegment {
         frame_context: &FrameBuildingContext,
         frame_state: &mut FrameBuildingState,
         clip_data_store: &mut ClipDataStore,
+        is_chased: bool,
     ) -> ClipMaskKind {
         match clip_chain {
             Some(clip_chain) => {
                 if !clip_chain.needs_mask ||
-                   (!self.may_need_clip_mask && !clip_chain.has_non_local_clips) {
+                   !self.may_need_clip_mask && !clip_chain.has_non_local_clips {
+                    if is_chased {
+                        println!("\tsegment has clip chain but has no mask ({:?}) or does not need it (may {:?} non local {:?})", clip_chain.needs_mask, self.may_need_clip_mask, clip_chain.has_non_local_clips);
+                    }
                     return ClipMaskKind::None;
                 }
 
@@ -994,6 +998,7 @@ impl BrushSegment {
                     &pic_state.map_raster_to_world,
                     prim_bounding_rect,
                     frame_context.device_pixel_scale,
+                    is_chased,
                 ) {
                     Some(info) => info,
                     None => {
@@ -3268,6 +3273,7 @@ impl PrimitiveInstance {
                 frame_context,
                 frame_state,
                 &mut resources.clip_data_store,
+                self.is_chased(),
             );
             clip_mask_instances.push(clip_mask_kind);
         } else {
@@ -3305,6 +3311,7 @@ impl PrimitiveInstance {
                     frame_context,
                     frame_state,
                     &mut resources.clip_data_store,
+                    self.is_chased(),
                 );
                 clip_mask_instances.push(clip_mask_kind);
             }
@@ -3368,6 +3375,7 @@ impl PrimitiveInstance {
                 &pic_state.map_raster_to_world,
                 prim_info.clipped_world_rect,
                 frame_context.device_pixel_scale,
+                self.is_chased(),
             ) {
                 let clip_task = RenderTask::new_mask(
                     device_rect,
@@ -3401,6 +3409,7 @@ pub fn get_raster_rects(
     map_to_world: &SpaceMapper<RasterPixel, WorldPixel>,
     prim_bounding_rect: WorldRect,
     device_pixel_scale: DevicePixelScale,
+    is_chased: bool,
 ) -> Option<(DeviceIntRect, DeviceRect)> {
     let unclipped_raster_rect = map_to_raster.map(&pic_rect)?;
 
@@ -3424,9 +3433,18 @@ pub fn get_raster_rects(
 
     // Ensure that we won't try to allocate a zero-sized clip render task.
     if clipped.is_empty() {
+        if is_chased {
+            println!("\tsegment has empty clip");
+        }
         return None;
     }
 
+    if is_chased {
+        println!("\tsegment with clipped raster rect {:?} rounded {:?}", clipped, clipped.round());
+        println!("\tsegment with unclipped raster rect {:?}", unclipped);
+    }
+
+    //Some((clipped.round().to_i32(), unclipped))
     Some((clipped.to_i32(), unclipped))
 }
 

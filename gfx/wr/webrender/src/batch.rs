@@ -603,6 +603,12 @@ impl AlphaBatchBuilder {
         let transform_kind = transform_id.transform_kind();
         let prim_info = &ctx.scratch.prim_info[prim_instance.visibility_info.0 as usize];
         let bounding_rect = &prim_info.clip_chain.pic_clip_rect;
+        //let bounding_rect_rounded = prim_info.clip_chain.pic_clip_rect.round();
+        //let bounding_rect = &bounding_rect_rounded;
+
+        if prim_instance.is_chased() {
+            println!("\tbounding rect {:?}", bounding_rect);
+        }
 
         let z_id = z_generator.next();
 
@@ -661,7 +667,7 @@ impl AlphaBatchBuilder {
 
                 self.current_batch_list().push_single_instance(
                     batch_key,
-                    bounding_rect,
+                    &bounding_rect,
                     z_id,
                     PrimitiveInstanceData::from(instance),
                 );
@@ -733,7 +739,7 @@ impl AlphaBatchBuilder {
                     non_segmented_blend_mode,
                     prim_header_index,
                     clip_task_address,
-                    bounding_rect,
+                    &bounding_rect,
                     transform_kind,
                     render_tasks,
                     z_id,
@@ -836,7 +842,7 @@ impl AlphaBatchBuilder {
                         );
                         let batch = alpha_batch_list.set_params_and_get_batch(
                             key,
-                            bounding_rect,
+                            &bounding_rect,
                             z_id,
                         );
 
@@ -931,7 +937,7 @@ impl AlphaBatchBuilder {
 
                 self.current_batch_list().push_single_instance(
                     batch_key,
-                    bounding_rect,
+                    &bounding_rect,
                     z_id,
                     PrimitiveInstanceData::from(instance),
                 );
@@ -1114,7 +1120,7 @@ impl AlphaBatchBuilder {
                                         // caches the current batch if the key hasn't changed.
                                         let batch = self.current_batch_list().set_params_and_get_batch(
                                             key,
-                                            bounding_rect,
+                                            &bounding_rect,
                                             z_id,
                                         );
 
@@ -1204,7 +1210,7 @@ impl AlphaBatchBuilder {
 
                                         self.current_batch_list().push_single_instance(
                                             key,
-                                            bounding_rect,
+                                            &bounding_rect,
                                             z_id,
                                             PrimitiveInstanceData::from(instance),
                                         );
@@ -1292,14 +1298,14 @@ impl AlphaBatchBuilder {
 
                                         self.current_batch_list().push_single_instance(
                                             shadow_key,
-                                            bounding_rect,
+                                            &bounding_rect,
                                             z_id_shadow,
                                             PrimitiveInstanceData::from(shadow_instance),
                                         );
 
                                         self.current_batch_list().push_single_instance(
                                             content_key,
-                                            bounding_rect,
+                                            &bounding_rect,
                                             z_id_content,
                                             PrimitiveInstanceData::from(content_instance),
                                         );
@@ -1377,7 +1383,7 @@ impl AlphaBatchBuilder {
 
                                         self.current_batch_list().push_single_instance(
                                             key,
-                                            bounding_rect,
+                                            &bounding_rect,
                                             z_id,
                                             PrimitiveInstanceData::from(instance),
                                         );
@@ -1422,7 +1428,7 @@ impl AlphaBatchBuilder {
 
                                 self.current_batch_list().push_single_instance(
                                     key,
-                                    bounding_rect,
+                                    &bounding_rect,
                                     z_id,
                                     PrimitiveInstanceData::from(instance),
                                 );
@@ -1462,7 +1468,7 @@ impl AlphaBatchBuilder {
 
                                 self.current_batch_list().push_single_instance(
                                     key,
-                                    bounding_rect,
+                                    &bounding_rect,
                                     z_id,
                                     PrimitiveInstanceData::from(instance),
                                 );
@@ -1548,7 +1554,7 @@ impl AlphaBatchBuilder {
                     non_segmented_blend_mode,
                     prim_header_index,
                     clip_task_address,
-                    bounding_rect,
+                    &bounding_rect,
                     transform_kind,
                     render_tasks,
                     z_id,
@@ -1591,6 +1597,7 @@ impl AlphaBatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
+                    //local_clip_rect: prim_info.combined_local_clip_rect.round(),
                     task_address,
                     specific_prim_address: prim_cache_address,
                     clip_task_address,
@@ -1603,6 +1610,10 @@ impl AlphaBatchBuilder {
                     batch_params.prim_user_data,
                 );
 
+                if prim_instance.is_chased() {
+                    println!("\tbounding rect {:?}, local rect {:?}, local_clip_rect {:?}", bounding_rect, prim_header.local_rect, prim_header.local_clip_rect);
+                }
+
                 self.add_segmented_prim_to_batch(
                     segments,
                     opacity,
@@ -1611,7 +1622,7 @@ impl AlphaBatchBuilder {
                     non_segmented_blend_mode,
                     prim_header_index,
                     clip_task_address,
-                    bounding_rect,
+                    &bounding_rect,
                     transform_kind,
                     render_tasks,
                     z_id,
@@ -1719,7 +1730,7 @@ impl AlphaBatchBuilder {
                     non_segmented_blend_mode,
                     prim_header_index,
                     clip_task_address,
-                    bounding_rect,
+                    &bounding_rect,
                     transform_kind,
                     render_tasks,
                     z_id,
@@ -1857,7 +1868,7 @@ impl AlphaBatchBuilder {
                                 textures,
                                 prim_header_index,
                                 clip_task_address,
-                                bounding_rect,
+                                &bounding_rect,
                                 tile.edge_flags,
                                 uv_rect_address,
                                 z_id,
@@ -1937,7 +1948,7 @@ impl AlphaBatchBuilder {
                         &prim_data.stops_handle,
                         BrushBatchKind::LinearGradient,
                         specified_blend_mode,
-                        bounding_rect,
+                        &bounding_rect,
                         clip_task_address,
                         gpu_cache,
                         self.current_batch_list(),
@@ -2003,7 +2014,7 @@ impl AlphaBatchBuilder {
                         non_segmented_blend_mode,
                         prim_header_index,
                         clip_task_address,
-                        bounding_rect,
+                        &bounding_rect,
                         transform_kind,
                         render_tasks,
                         z_id,
@@ -2018,7 +2029,7 @@ impl AlphaBatchBuilder {
                         &prim_data.stops_handle,
                         BrushBatchKind::RadialGradient,
                         specified_blend_mode,
-                        bounding_rect,
+                        &bounding_rect,
                         clip_task_address,
                         gpu_cache,
                         self.current_batch_list(),

@@ -2409,6 +2409,7 @@ impl PicturePrimitive {
             &map_raster_to_world,
             clipped_prim_bounding_rect,
             frame_context.device_pixel_scale,
+            false,
         ) {
             Some(info) => info,
             None => return false,
