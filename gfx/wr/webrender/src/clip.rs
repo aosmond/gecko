@@ -553,7 +553,9 @@ impl ClipStore {
         clip_data_store: &mut ClipDataStore,
     ) -> Option<ClipChainInstance> {
         let mut local_clip_rect = local_prim_clip_rect;
-        println!("\t\tlocal clip rect {:?}", local_clip_rect);
+        if prim_instance.is_chased() {
+          println!("\t\tlocal clip rect {:?}", local_clip_rect);
+        }
 
         // Walk the clip chain to build local rects, and collect the
         // smallest possible local/device clip area.

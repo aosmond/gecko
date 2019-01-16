@@ -985,7 +985,7 @@ impl BrushSegment {
         match clip_chain {
             Some(clip_chain) => {
                 if !clip_chain.needs_mask ||
-                   !self.may_need_clip_mask && !clip_chain.has_non_local_clips {
+                   (!self.may_need_clip_mask && !clip_chain.has_non_local_clips) {
                     if is_chased {
                         println!("\tsegment has clip chain but has no mask ({:?}) or does not need it (may {:?} non local {:?})", clip_chain.needs_mask, self.may_need_clip_mask, clip_chain.has_non_local_clips);
                     }
