@@ -98,6 +98,24 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
         // So convert the snap offset back to local space.
         snap_offset = local_transform * snap_offset;
 #endif
+    } else if (transform.is_axis_aligned) {
+        // Transform from local space to device space.
+        float device_scale = task.common_data.device_pixel_scale / transform.m[3].w;
+        mat2 device_transform = mat2(transform.m) * device_scale;
+
+        // We should not snap in device space, but the transform is axis aligned, so
+        // make sure we are snapped in local space.
+        snap_offset = device_transform * (floor(text_offset + 0.5) - text_offset);
+
+        // Snap the glyph offset to a device pixel, using an appropriate bias depending
+        // on whether subpixel positioning is required.
+        snap_offset[0] += snap_bias[0];
+
+#ifndef WR_FEATURE_GLYPH_TRANSFORM
+        // If not using transformed subpixels, the glyph rect is actually in local space.
+        // So convert the snap offset back to local space.
+        snap_offset = inverse(device_transform) * snap_offset;
+#endif
     }
 
     // Actually translate the glyph rect to a device pixel using the snap offset.
