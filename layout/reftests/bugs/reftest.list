@@ -318,7 +318,7 @@ fuzzy-if(Android,0-3,0-50) fuzzy-if(skiaContent,0-1,0-133) == 273681-1.html 2736
 == 283686-2.html 283686-2-ref.html
 == 283686-3.html about:blank
 == 289384-1.xhtml 289384-ref.xhtml
-fails-if(webrender&&gtkWidget) random-if(d2d) fuzzy-if(webrender&&cocoaWidget,1-2,400-900) fuzzy-if(Android,0-8,0-1439) HTTP == 289480.html#top 289480-ref.html # basically-verbatim acid2 test, HTTP for a 404 page -- bug 578114 for the d2d failures
+random-if(d2d) fuzzy-if(webrender,1-3,408-1018) fuzzy-if(Android,0-8,0-1439) HTTP == 289480.html#top 289480-ref.html # basically-verbatim acid2 test, HTTP for a 404 page -- bug 578114 for the d2d failures
 == 290129-1.html 290129-1-ref.html
 == 291078-1.html 291078-1-ref.html
 == 291078-2.html 291078-2-ref.html
@@ -2002,7 +2002,7 @@ random-if(!winWidget) == 1273154-2.html 1273154-2-ref.html # depends on Windows 
 != 1276161-1a.html 1276161-1b.html
 == 1275411-1.html 1275411-1-ref.html
 == 1288255.html 1288255-ref.html
-fuzzy(0-8,0-1900) fails-if(webrender) == 1291528.html 1291528-ref.html
+fuzzy(0-8,0-1900) == 1291528.html 1291528-ref.html
 # Buttons in 2 pages have different position and the rendering result can be
 # different, but they should use the same button style and the background color
 # should be same.  |fuzzy()| here allows the difference in border, but not

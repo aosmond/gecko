@@ -1145,15 +1145,20 @@ void nsCSSGradientRenderer::BuildWebRenderDisplayItems(
   LayoutDeviceSize tileRepeat =
       LayoutDevicePixel::FromAppUnits(aRepeatSize, appUnitsPerDevPixel);
 
+  // Calculate the tile spacing, which is the repeat size minus the tile size
+  LayoutDeviceSize tileSpacing = tileRepeat - firstTileBounds.Size();
+
+  clipBounds.Round();
+  firstTileBounds.SetBox(NS_round(firstTileBounds.x),
+    NS_round(firstTileBounds.y), NS_round(firstTileBounds.XMost()),
+    NS_round(firstTileBounds.YMost()));
+
   // Calculate the bounds of the gradient display item, which starts at the
   // first tile and extends to the end of clip bounds
   LayoutDevicePoint tileToClip =
       clipBounds.BottomRight() - firstTileBounds.TopLeft();
   LayoutDeviceRect gradientBounds = LayoutDeviceRect(
       firstTileBounds.TopLeft(), LayoutDeviceSize(tileToClip.x, tileToClip.y));
-
-  // Calculate the tile spacing, which is the repeat size minus the tile size
-  LayoutDeviceSize tileSpacing = tileRepeat - firstTileBounds.Size();
 
   // srcTransform is used for scaling the gradient to match aSrc
   LayoutDeviceRect srcTransform = LayoutDeviceRect(
