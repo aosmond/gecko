@@ -1149,9 +1149,7 @@ void nsCSSGradientRenderer::BuildWebRenderDisplayItems(
   LayoutDeviceSize tileSpacing = tileRepeat - firstTileBounds.Size();
 
   clipBounds.Round();
-  firstTileBounds.SetBox(NS_round(firstTileBounds.x),
-    NS_round(firstTileBounds.y), NS_round(firstTileBounds.XMost()),
-    NS_round(firstTileBounds.YMost()));
+  firstTileBounds.RoundAwayFromZero();
 
   // Calculate the bounds of the gradient display item, which starts at the
   // first tile and extends to the end of clip bounds

@@ -479,14 +479,27 @@ struct BaseRect {
   // avoid pixel rounding errors.
   // Note that this is *not* rounding to nearest integer if the values are
   // negative. They are always rounding as floor(n + 0.5). See
-  // https://bugzilla.mozilla.org/show_bug.cgi?id=410748#c14 If you need similar
-  // method which is using NS_round(), you should create new
-  // |RoundAwayFromZero()| method.
+  // https://bugzilla.mozilla.org/show_bug.cgi?id=410748#c14
   void Round() {
     T x0 = static_cast<T>(std::floor(T(X()) + 0.5f));
     T y0 = static_cast<T>(std::floor(T(Y()) + 0.5f));
     T x1 = static_cast<T>(std::floor(T(XMost()) + 0.5f));
     T y1 = static_cast<T>(std::floor(T(YMost()) + 0.5f));
+
+    x = x0;
+    y = y0;
+
+    width = x1 - x0;
+    height = y1 - y0;
+  }
+
+  // Similar to Round, but rounds to the nearest integer even if the
+  // values are negative.
+  void RoundAwayFromZero() {
+    T x0 = static_cast<T>(NS_round(T(X())));
+    T y0 = static_cast<T>(NS_round(T(Y())));
+    T x1 = static_cast<T>(NS_round(T(XMost())));
+    T y1 = static_cast<T>(NS_round(T(YMost())));
 
     x = x0;
     y = y0;
