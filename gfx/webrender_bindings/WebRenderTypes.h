@@ -366,9 +366,7 @@ static inline wr::LayoutRect ToLayoutRect(
 
 static inline wr::LayoutRect ToRoundedLayoutRect(
     const mozilla::LayoutDeviceRect& aRect) {
-  auto rect = aRect;
-  rect.Round();
-  return wr::ToLayoutRect(rect);
+  return wr::ToLayoutRect(aRect);
 }
 
 static inline wr::LayoutRect IntersectLayoutRect(const wr::LayoutRect& aRect,
