@@ -387,6 +387,10 @@ impl TransformPaletteId {
             TransformedRectKind::Complex
         }
     }
+
+    pub fn transform_id(&self) -> u32 {
+        self.0 & 0x00ffffff
+    }
 }
 
 // The GPU data payload for a transform palette entry.

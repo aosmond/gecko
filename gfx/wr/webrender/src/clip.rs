@@ -591,6 +591,7 @@ impl ClipStore {
                     &mut self.clip_node_info,
                     clip_data_store,
                     clip_scroll_tree,
+                    prim_instance.is_chased(),
                 ) {
                     return None;
                 }
@@ -602,6 +603,14 @@ impl ClipStore {
         let local_bounding_rect = local_prim_rect.intersection(&local_clip_rect)?;
         let pic_clip_rect = prim_to_pic_mapper.map(&local_bounding_rect)?;
         let world_clip_rect = pic_to_world_mapper.map(&pic_clip_rect)?;
+        if prim_instance.is_chased() {
+            println!("\t\tlocal prim rect     {:?}", local_clip_rect);
+            println!("\t\tlocal bounding rect {:?}", local_bounding_rect);
+            println!("\t\tlocal to pic map    {:?}", prim_to_pic_mapper);
+            println!("\t\tpic to world map    {:?}", pic_to_world_mapper);
+            println!("\t\tpic clip rect       {:?}", pic_clip_rect);
+            println!("\t\tworld clip rect     {:?}", world_clip_rect);
+        }
 
         // Now, we've collected all the clip nodes that *potentially* affect this
         // primitive region, and reduced the size of the prim region as much as possible.
@@ -1281,6 +1290,7 @@ fn add_clip_node_to_current_chain(
     clip_node_info: &mut Vec<ClipNodeInfo>,
     clip_data_store: &ClipDataStore,
     clip_scroll_tree: &ClipScrollTree,
+    is_chased: bool,
 ) -> bool {
     let clip_node = &clip_data_store[node.handle];
     let clip_spatial_node = &clip_scroll_tree.spatial_nodes[node.spatial_node_index.0 as usize];
@@ -1291,6 +1301,15 @@ fn add_clip_node_to_current_chain(
     let conversion = if spatial_node_index == node.spatial_node_index {
         ClipSpaceConversion::Local
     } else if ref_spatial_node.coordinate_system_id == clip_spatial_node.coordinate_system_id {
+        if is_chased {
+            let ref_so = &ref_spatial_node.coordinate_system_relative_scale_offset;
+            let ref_so_inv = ref_so.inverse();
+            let clip_so = &clip_spatial_node.coordinate_system_relative_scale_offset;
+            println!("\t\t\tref scale offset     {:?}", ref_so);
+            println!("\t\t\tinv ref scale offset {:?}", ref_so_inv);
+            println!("\t\t\tclip scale offset    {:?}", clip_so);
+            println!("\t\t\tresult scale offset  {:?}", ref_so_inv.accumulate(clip_so));
+        }
         let scale_offset = ref_spatial_node.coordinate_system_relative_scale_offset
             .inverse()
             .accumulate(&clip_spatial_node.coordinate_system_relative_scale_offset);
@@ -1301,7 +1320,12 @@ fn add_clip_node_to_current_chain(
             ROOT_SPATIAL_NODE_INDEX,
         ) {
             None => return true,
-            Some(xf) => ClipSpaceConversion::Transform(xf.with_destination::<WorldPixel>()),
+            Some(xf) => {
+                if is_chased {
+                    println!("\t\t\ttransform {:?}", xf);
+                }
+                ClipSpaceConversion::Transform(xf.with_destination::<WorldPixel>())
+            }
         }
     };
 
@@ -1310,14 +1334,30 @@ fn add_clip_node_to_current_chain(
     if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
         match conversion {
             ClipSpaceConversion::Local => {
+                if is_chased {
+                    println!("\t\t\tintersect  {:?}", local_clip_rect);
+                    println!("\t\t\twith local {:?}", clip_rect);
+                }
+
                 *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
                     Some(rect) => rect,
                     None => return false,
                 };
             }
             ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
-                let clip_rect = scale_offset.map_rect(&clip_rect);
-                *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
+                let scaled_clip_rect = scale_offset.map_rect(&clip_rect);
+                if is_chased {
+                    println!("\t\t\tintersect  {:?}", local_clip_rect);
+                    println!("\t\t\twith clip  {:?}", clip_rect);
+                    println!("\t\t\twith local {:?}", scaled_clip_rect);
+                    if let Some(xf) = clip_scroll_tree.get_relative_transform(
+                        node.spatial_node_index,
+                        ROOT_SPATIAL_NODE_INDEX,
+                    ) {
+                        println!("\t\t\twith world {:?}", xf.to_2d().transform_rect(&clip_rect));
+                    }
+                }
+                *local_clip_rect = match local_clip_rect.intersection(&scaled_clip_rect) {
                     Some(rect) => rect,
                     None => return false,
                 };
@@ -1334,6 +1374,10 @@ fn add_clip_node_to_current_chain(
                 //           would be a worthwhile perf win.
             }
         }
+    }
+
+    if is_chased {
+        println!("\t\t\tintersected {:?}", local_clip_rect);
     }
 
     clip_node_info.push(ClipNodeInfo {

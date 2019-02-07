@@ -3430,6 +3430,13 @@ impl PrimitiveInstance {
             None => return,
         };
 
+        if self.is_chased() {
+            println!("\tunclipped device rect {:?}", unclipped);
+            println!("\tsnap offsets {:?}", prim_snap_offsets);
+            println!("\tmap pic to raster {:?}", pic_state.map_pic_to_raster);
+            println!("\tworld rect {:?}", prim_info.clipped_world_rect);
+        }
+
         self.build_segments_if_needed(
             &prim_info.clip_chain,
             frame_state,
