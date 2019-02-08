@@ -1829,4 +1829,8 @@ NS_IMETHODIMP GfxInfo::SpoofOSVersion(uint32_t aVersion) {
   return NS_OK;
 }
 
+NS_IMETHODIMP GfxInfo::FireTestProcess() {
+  return NS_OK;
+}
+
 #endif
