@@ -3553,14 +3553,13 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
 
   LayoutDeviceRect destRect =
       LayoutDeviceRect::FromAppUnits(mArea, appUnitsPerDevPixel);
-  destRect.Round();
   wr::LayoutRect dest = wr::ToLayoutRect(destRect);
 
   wr::LayoutRect clip = dest;
   if (!mClip.IsEmpty()) {
     LayoutDeviceRect clipRect =
         LayoutDeviceRect::FromAppUnits(mClip, appUnitsPerDevPixel);
-    clip = wr::ToRoundedLayoutRect(clipRect);
+    clip = wr::ToLayoutRect(clipRect);
   }
 
   ImgDrawResult drawResult = ImgDrawResult::SUCCESS;
