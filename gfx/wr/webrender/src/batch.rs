@@ -1573,7 +1573,7 @@ impl AlphaBatchBuilder {
                                     clip_task_address,
                                     segment_index: INVALID_SEGMENT_INDEX,
                                     edge_flags: EdgeAaSegmentMask::empty(),
-                                    brush_flags,
+                                    brush_flags: BrushFlags::SNAP_TO_PRIMITIVE | brush_flags,
                                     user_data: uv_rect_address,
                                 };
 
