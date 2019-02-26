@@ -44,6 +44,7 @@ void brush_vs(
     VertexInfo vi,
     int prim_address,
     RectWithSize local_rect,
+    RectWithSize local_clip_rect,
     RectWithSize segment_rect,
     ivec4 user_data,
     mat4 transform,

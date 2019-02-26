@@ -73,8 +73,17 @@ pub fn register_prim_chase_id(id: PrimitiveDebugId) {
     PRIM_CHASE_ID.store(id.0, Ordering::SeqCst);
 }
 
+#[cfg(debug_assertions)]
+pub fn register_prim_chase_all() {
+    PRIM_CHASE_ID.store(usize::MAX - 1, Ordering::SeqCst);
+}
+
 #[cfg(not(debug_assertions))]
 pub fn register_prim_chase_id(_: PrimitiveDebugId) {
+}
+
+#[cfg(not(debug_assertions))]
+pub fn register_prim_chase_all() {
 }
 
 const MIN_BRUSH_SPLIT_AREA: f32 = 256.0 * 256.0;
@@ -952,6 +961,7 @@ impl BrushSegment {
         unclipped: &DeviceRect,
         prim_snap_offsets: SnapOffsets,
         device_pixel_scale: DevicePixelScale,
+        is_chased: bool,
     ) -> ClipMaskKind {
         match clip_chain {
             Some(clip_chain) => {
@@ -985,6 +995,11 @@ impl BrushSegment {
                         return ClipMaskKind::Clipped;
                     }
                 };
+
+                if is_chased {
+                    println!("unclipped {:?} + bounding {:?} -> device_rect {:?}", unclipped, segment_world_rect, device_rect);
+                    println!("prim_snap_offsets {:?} -> snap_offsets {:?}", prim_snap_offsets, snap_offsets);
+                }
 
                 let clip_task = RenderTask::new_mask(
                     device_rect.to_i32(),
@@ -1455,7 +1470,8 @@ impl PrimitiveInstance {
 
     #[cfg(debug_assertions)]
     pub fn is_chased(&self) -> bool {
-        PRIM_CHASE_ID.load(Ordering::SeqCst) == self.id.0
+        let chased_id = PRIM_CHASE_ID.load(Ordering::SeqCst);
+        chased_id == self.id.0 || chased_id == usize::MAX - 1
     }
 
     #[cfg(not(debug_assertions))]
@@ -3305,6 +3321,7 @@ impl PrimitiveInstance {
                 unclipped,
                 prim_snap_offsets,
                 device_pixel_scale,
+                self.is_chased(),
             );
             clip_mask_instances.push(clip_mask_kind);
         } else {
@@ -3346,6 +3363,7 @@ impl PrimitiveInstance {
                     unclipped,
                     prim_snap_offsets,
                     device_pixel_scale,
+                    self.is_chased(),
                 );
                 clip_mask_instances.push(clip_mask_kind);
             }
@@ -3387,6 +3405,10 @@ impl PrimitiveInstance {
             Some(info) => info,
             None => return,
         };
+
+        if self.is_chased() {
+            println!("\t[{:?}] unclipped {:?} snap offsets {:?}", self.id.0, unclipped, prim_snap_offsets);
+        }
 
         self.build_segments_if_needed(
             &prim_info.clip_chain,
@@ -3432,6 +3454,11 @@ impl PrimitiveInstance {
                 prim_info.clipped_world_rect,
                 device_pixel_scale,
             ) {
+                if self.is_chased() {
+                    println!("unclipped {:?} + bounding {:?} -> device_rect {:?}", unclipped, prim_info.clipped_world_rect, device_rect);
+                    println!("prim_snap_offsets {:?} -> snap_offsets {:?}", prim_snap_offsets, snap_offsets);
+                }
+
                 let clip_task = RenderTask::new_mask(
                     device_rect,
                     prim_info.clip_chain.clips_range,

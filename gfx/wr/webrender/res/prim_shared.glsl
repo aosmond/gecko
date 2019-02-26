@@ -47,6 +47,18 @@ uniform HIGHP_SAMPLER_FLOAT isampler2D sPrimitiveHeadersI;
 // Instanced attributes
 in ivec4 aData;
 
+flat varying vec2 vVertexSnapOffset;
+flat varying vec2 vVertexSnapRectOrigin;
+flat varying vec2 vVertexSnapRectSize;
+flat varying vec2 vVertexClipRectOrigin;
+flat varying vec2 vVertexClipRectSize;
+flat varying vec2 vVertexVisibleRectOrigin;
+flat varying vec2 vVertexVisibleRectSize;
+flat varying vec2 vVertexTaskOrigin;
+flat varying vec2 vVertexTaskCommonOrigin;
+flat varying vec2 vVertexClampedLocalPos;
+flat varying vec2 vVertexClampedDevicePos;
+
 #define VECS_PER_PRIM_HEADER_F 2U
 #define VECS_PER_PRIM_HEADER_I 2U
 
@@ -119,6 +131,18 @@ VertexInfo write_vertex(RectWithSize instance_rect,
 
     // Convert the world positions to device pixel space.
     vec2 device_pos = world_pos.xy * task.device_pixel_scale;
+
+    vVertexSnapOffset = snap_offset;
+    vVertexVisibleRectOrigin = visible_rect.p0;
+    vVertexVisibleRectSize = visible_rect.size;
+    vVertexSnapRectOrigin = snap_rect.p0;
+    vVertexSnapRectSize = snap_rect.size;
+    vVertexClipRectOrigin = local_clip_rect.p0;
+    vVertexClipRectSize = local_clip_rect.size;
+    vVertexTaskOrigin = task.content_origin;
+    vVertexTaskCommonOrigin = task.common_data.task_rect.p0;
+    vVertexClampedLocalPos = clamped_local_pos;
+    vVertexClampedDevicePos = clamped_local_pos;
 
     // Apply offsets for the render task to get correct screen location.
     vec2 final_offset = snap_offset - task.content_origin + task.common_data.task_rect.p0;

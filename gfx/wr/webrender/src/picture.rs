@@ -2820,6 +2820,7 @@ impl PicturePrimitive {
                 if let PictureCompositeMode::Filter(FilterOp::DropShadow(..)) = raster_config.composite_mode {
                     gpu_cache.invalidate(&self.extra_gpu_data_handle);
                 }
+                println!("surface index {:?}, local rect {:?} replaced by {:?}", surface_index, self.local_rect, surface_rect);
                 self.local_rect = surface_rect;
             }
 

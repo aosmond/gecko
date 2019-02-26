@@ -36,6 +36,7 @@ pub enum ChasePrimitive {
     Nothing,
     Id(PrimitiveDebugId),
     LocalRect(LayoutRect),
+    All,
 }
 
 impl Default for ChasePrimitive {

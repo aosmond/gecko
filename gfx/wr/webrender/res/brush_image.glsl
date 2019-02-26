@@ -28,6 +28,8 @@ flat varying vec2 vTileRepeat;
 
 #ifdef WR_VERTEX_SHADER
 
+flat varying vec2 vBrushImageStretchSize;
+
 // Must match the AlphaType enum.
 #define BLEND_MODE_ALPHA            0
 #define BLEND_MODE_PREMUL_ALPHA     1
@@ -119,6 +121,7 @@ void brush_vs(
         max_uv - vec2(0.5)
     ) / texture_size.xyxy;
 
+    vBrushImageStretchSize = stretch_size;
     vec2 f = (vi.local_pos - local_rect.p0) / local_rect.size;
 
 #ifdef WR_FEATURE_ALPHA_PASS

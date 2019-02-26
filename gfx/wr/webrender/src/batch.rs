@@ -631,8 +631,11 @@ impl AlphaBatchBuilder {
         );
 
         if is_chased {
-            println!("\tbatch {:?} with clip {:?} and bound {:?}",
-                prim_rect, clip_task_address, bounding_rect);
+            println!("\t[{:?}] batch {:?} with clip {:?}",
+                prim_instance.id.0, prim_rect, clip_task_address);
+            println!("\tcombined local clip {:?} and bound {:?}",
+                prim_info.combined_local_clip_rect, bounding_rect);
+            println!("\ttransform {:?}", transforms.get_world_transform(SpatialNodeIndex(transform_id.0)));
         }
 
 

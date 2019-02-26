@@ -113,6 +113,8 @@ void main(void) {
     brush_vs(
         vi,
         ph.specific_prim_address,
+        //intersect_rects(ph.local_rect, ph.local_clip_rect),
+        //intersect_rects(segment_rect, ph.local_clip_rect),
         ph.local_rect,
         segment_rect,
         ivec4(ph.user_data, segment_user_data),
