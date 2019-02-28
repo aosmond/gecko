@@ -460,6 +460,7 @@ pub struct ClipChainInstance {
     // Combined clip rect in picture space (may
     // be more conservative that local_clip_rect).
     pub pic_clip_rect: PictureRect,
+    pub pic_prim_rect: PictureRect,
 }
 
 impl ClipChainInstance {
@@ -473,6 +474,7 @@ impl ClipChainInstance {
             has_non_local_clips: false,
             needs_mask: false,
             pic_clip_rect: PictureRect::zero(),
+            pic_prim_rect: PictureRect::zero(),
         }
     }
 }
@@ -609,6 +611,7 @@ impl ClipStore {
 
         let local_bounding_rect = local_prim_rect.intersection(&local_clip_rect)?;
         let pic_clip_rect = prim_to_pic_mapper.map(&local_bounding_rect)?;
+        let pic_prim_rect = prim_to_pic_mapper.map(&local_prim_rect)?;
         let world_clip_rect = pic_to_world_mapper.map(&pic_clip_rect)?;
 
         // Now, we've collected all the clip nodes that *potentially* affect this
@@ -706,6 +709,7 @@ impl ClipStore {
             has_non_local_clips,
             local_clip_rect,
             pic_clip_rect,
+            pic_prim_rect,
             needs_mask,
         })
     }

@@ -104,13 +104,14 @@ VertexInfo write_vertex(RectWithSize instance_rect,
 
     // Compute the visible rect to snap against. This ensures segments along the
     // edges are snapped consistently with other nearby primitives.
-    RectWithSize visible_rect = intersect_rects(local_clip_rect, snap_rect);
+    //RectWithSize visible_rect = intersect_rects(local_clip_rect, snap_rect);
 
     /// Compute the snapping offset.
     vec2 snap_offset = compute_snap_offset(
         clamped_local_pos,
         transform.m,
-        visible_rect,
+        snap_rect,
+        //visible_rect,
         task.device_pixel_scale
     );
 

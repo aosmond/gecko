@@ -3379,7 +3379,7 @@ impl PrimitiveInstance {
         let (unclipped, prim_snap_offsets) = match get_unclipped_device_rect(
             prim_context.spatial_node_index,
             root_spatial_node_index,
-            prim_info.clip_chain.pic_clip_rect,
+            prim_info.clip_chain.pic_prim_rect,
             &pic_state.map_pic_to_raster,
             device_pixel_scale,
             frame_context,
