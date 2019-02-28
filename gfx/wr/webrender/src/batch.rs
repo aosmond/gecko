@@ -1116,6 +1116,12 @@ impl AlphaBatchBuilder {
                                 if let Some(local_clip_rect) = local_clip_rect {
                                     // Step through each tile in the cache, and draw it with an image
                                     // brush primitive if visible.
+                                    if is_chased {
+                                        println!("\ttile clip {:?}", local_clip_rect);
+                                        for tile in &tile_cache.tiles {
+                                            println!("\ttile {:?}", tile.local_rect);
+                                        }
+                                    }
 
                                     let kind = BatchKind::Brush(
                                         BrushBatchKind::Image(ImageBufferKind::Texture2DArray)
@@ -1126,6 +1132,10 @@ impl AlphaBatchBuilder {
 
                                         // Get the local rect of the tile.
                                         let tile_rect = tile.local_rect;
+
+                                        if is_chased {
+                                            println!("\tdrawing tile {:?}", tile_rect);
+                                        }
 
                                         let tile_header = PrimitiveHeader {
                                             local_rect: tile_rect,
