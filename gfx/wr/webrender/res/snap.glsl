@@ -4,6 +4,11 @@
 
 #ifdef WR_VERTEX_SHADER
 
+flat varying vec4 vSnapWorldCorners;
+flat varying vec2 vSnapWorldOffset;
+flat varying vec2 vSnapLocalPos;
+flat varying vec2 vSnapWorldPos;
+
 vec4 compute_snap_positions(
     mat4 transform,
     RectWithSize snap_rect,
@@ -61,6 +66,13 @@ vec2 compute_snap_offset(vec2 local_pos,
         snap_rect,
         snap_positions
     );
+
+    vSnapWorldCorners = snap_positions;
+    vSnapWorldOffset = snap_offsets;
+    vSnapLocalPos = local_pos;
+
+    vec4 world_pos = transform * vec4(local_pos, 0.0, 1.0);
+    vSnapWorldPos = device_pixel_scale * world_pos.xy / world_pos.w;
 
     return snap_offsets;
 }
