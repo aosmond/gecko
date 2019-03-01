@@ -3374,12 +3374,21 @@ impl PrimitiveInstance {
             println!("\tupdating clip task with pic rect {:?}", prim_info.clip_chain.pic_clip_rect);
         }
 
+        /*
+        let pic_rect = if self.is_chased() {
+            prim_info.clip_chain.pic_prim_rect
+        } else {
+            prim_info.clip_chain.pic_clip_rect
+        };*/
+        let pic_rect = prim_info.clip_chain.pic_clip_rect;
+
         // Get the device space rect for the primitive if it was unclipped,
         // including any snap offsets applied to the corners.
         let (unclipped, prim_snap_offsets) = match get_unclipped_device_rect(
             prim_context.spatial_node_index,
             root_spatial_node_index,
-            prim_info.clip_chain.pic_clip_rect,
+            pic_rect,
+            pic_rect,
             &pic_state.map_pic_to_raster,
             device_pixel_scale,
             frame_context,
@@ -3388,6 +3397,27 @@ impl PrimitiveInstance {
             Some(info) => info,
             None => return,
         };
+
+        // Get the device space rect for the primitive if it was unclipped,
+        // including any snap offsets applied to the corners.
+        let (old_prim_unclipped, old_prim_snap_offsets) = match get_unclipped_device_rect(
+            prim_context.spatial_node_index,
+            root_spatial_node_index,
+            prim_info.clip_chain.pic_prim_rect,
+            prim_info.clip_chain.pic_prim_rect,
+            &pic_state.map_pic_to_raster,
+            device_pixel_scale,
+            frame_context,
+            frame_state,
+        ) {
+            Some(info) => info,
+            None => panic!("AO fail"),
+        };
+
+        if self.is_chased() {
+            println!("\tvisible:   unclipped {:?} snap offsets {:?}", unclipped, prim_snap_offsets);
+            println!("\tprimitive: unclipped {:?} snap offsets {:?}", old_prim_unclipped, old_prim_snap_offsets);
+        }
 
         self.build_segments_if_needed(
             &prim_info.clip_chain,
@@ -3503,6 +3533,7 @@ fn compute_snap_offset_impl(
 fn get_unclipped_device_rect(
     prim_spatial_node_index: SpatialNodeIndex,
     root_spatial_node_index: SpatialNodeIndex,
+    pic_clip_rect: PictureRect,
     prim_rect: PictureRect,
     map_to_raster: &SpaceMapper<PicturePixel, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
@@ -3526,15 +3557,15 @@ fn get_unclipped_device_rect(
     match transform_id.transform_kind() {
         TransformedRectKind::AxisAligned => {
             let top_left = compute_snap_offset_impl(
-                prim_rect.origin,
-                prim_rect,
+                pic_clip_rect.origin,
+                pic_clip_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
             );
 
             let bottom_right = compute_snap_offset_impl(
-                prim_rect.bottom_right(),
-                prim_rect,
+                pic_clip_rect.bottom_right(),
+                pic_clip_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
             );

@@ -633,6 +633,8 @@ impl AlphaBatchBuilder {
         if is_chased {
             println!("\tbatch {:?} with clip {:?} and bound {:?}",
                 prim_rect, clip_task_address, bounding_rect);
+            println!("\tkind {:?}", prim_instance.kind);
+            println!("\tlocation {:?}", render_tasks[task_id].location);
         }
 
 
@@ -975,6 +977,10 @@ impl AlphaBatchBuilder {
                     transform_id,
                 };
 
+                if is_chased {
+                    println!("\tcontext 3d {:?}", picture.context_3d);
+                }
+
                 match picture.context_3d {
                     // Convert all children of the 3D hierarchy root into batches.
                     Picture3DContext::In { root_data: Some(ref list), .. } => {
@@ -1079,6 +1085,10 @@ impl AlphaBatchBuilder {
                         } else {
                             BrushFlags::empty()
                         };
+
+                        if is_chased {
+                            println!("\tcomposite mode {:?}", raster_config.composite_mode);
+                        }
 
                         match raster_config.composite_mode {
                             PictureCompositeMode::TileCache { .. } => {
@@ -2770,6 +2780,7 @@ impl ClipBatcher {
         // and only for rectangles (not rounded etc), the world_device_rect is not conservative - we know
         // that there is no inner_rect, and the world_device_rect should be the real, axis-aligned clip rect.
         let mask_origin = mask_screen_rect.origin.to_f32().to_vector();
+        println!("mask origin: {:?}", mask_origin);
         let clip_list = self.get_batch_list(is_first_clip);
 
         for y in 0 .. y_tiles {
@@ -2837,6 +2848,7 @@ impl ClipBatcher {
         snap_offsets: SnapOffsets,
     ) {
         let mut is_first_clip = true;
+        println!("clip task snap offsets {:?}", snap_offsets);
 
         for i in 0 .. clip_node_range.count {
             let clip_instance = clip_store.get_instance_from_range(&clip_node_range, i);
