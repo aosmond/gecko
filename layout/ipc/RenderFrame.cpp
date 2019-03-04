@@ -283,7 +283,7 @@ bool nsDisplayRemote::CreateWebRenderCommands(
       mFrame->PresContext()->AppUnitsPerDevPixel());
   rect += mOffset;
 
-  aBuilder.PushIFrame(mozilla::wr::ToRoundedLayoutRect(rect),
+  aBuilder.PushIFrame(mozilla::wr::ToLayoutRect(rect),
                       !BackfaceIsHidden(), mozilla::wr::AsPipelineId(mLayersId),
                       /*ignoreMissingPipelines*/ true);
 
