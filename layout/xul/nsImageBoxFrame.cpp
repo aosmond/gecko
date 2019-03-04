@@ -400,7 +400,6 @@ ImgDrawResult nsImageBoxFrame::CreateWebRenderCommands(
   const int32_t appUnitsPerDevPixel = PresContext()->AppUnitsPerDevPixel();
   LayoutDeviceRect fillRect =
       LayoutDeviceRect::FromAppUnits(dest, appUnitsPerDevPixel);
-  fillRect.Round();
 
   Maybe<SVGImageContext> svgContext;
   gfx::IntSize decodeSize =
