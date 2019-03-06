@@ -364,7 +364,7 @@ static inline wr::LayoutPoint ToLayoutPoint(
 static inline wr::LayoutPoint ToRoundedLayoutPoint(
     const mozilla::LayoutDevicePoint& point) {
   mozilla::LayoutDevicePoint rounded = point;
-  rounded.Round();
+  //rounded.Round();
   return ToLayoutPoint(rounded);
 }
 
@@ -436,7 +436,7 @@ static inline wr::LayoutRect ToLayoutRect(
 static inline wr::LayoutRect ToRoundedLayoutRect(
     const mozilla::LayoutDeviceRect& aRect) {
   auto rect = aRect;
-  rect.Round();
+  //rect.Round();
   return wr::ToLayoutRect(rect);
 }
 
