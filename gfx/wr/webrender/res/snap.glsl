@@ -9,14 +9,6 @@ vec4 compute_snap_positions(
     RectWithSize snap_rect,
     float device_pixel_scale
 ) {
-    // Ensure that the snap rect is at *least* one device pixel in size.
-    // TODO(gw): It's not clear to me that this is "correct". Specifically,
-    //           how should it interact with sub-pixel snap rects when there
-    //           is a transform with scale present? But it does fix
-    //           the test cases we have in Servo that are failing without it
-    //           and seem better than not having this at all.
-    snap_rect.size = max(snap_rect.size, vec2(1.0 / device_pixel_scale));
-
     // Transform the snap corners to the world space.
     vec4 world_snap_p0 = transform * vec4(snap_rect.p0, 0.0, 1.0);
     vec4 world_snap_p1 = transform * vec4(snap_rect.p0 + snap_rect.size, 0.0, 1.0);
