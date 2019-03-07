@@ -1935,6 +1935,7 @@ impl PrimitiveStore {
                         &frame_context.clip_scroll_tree,
                         frame_state.gpu_cache,
                         frame_state.resource_cache,
+                        surface.raster_spatial_node_index,
                         surface.device_pixel_scale,
                         &frame_context.screen_world_rect,
                         &mut frame_state.data_stores.clip,
@@ -3135,12 +3136,12 @@ impl<'a> GpuDataRequest<'a> {
             local_clip_count += 1;
 
             let (local_clip_rect, radius, mode) = match clip_node.item {
-                ClipItem::RoundedRectangle(size, radii, clip_mode) => {
+                ClipItem::RoundedRectangle(_, radii, clip_mode) => {
                     rect_clips_only = false;
-                    (LayoutRect::new(clip_instance.local_pos, size), Some(radii), clip_mode)
+                    (clip_instance.snapped_rect.unwrap(), Some(radii), clip_mode)
                 }
-                ClipItem::Rectangle(size, mode) => {
-                    (LayoutRect::new(clip_instance.local_pos, size), None, mode)
+                ClipItem::Rectangle(_, mode) => {
+                    (clip_instance.snapped_rect.unwrap(), None, mode)
                 }
                 ClipItem::BoxShadow(ref info) => {
                     rect_clips_only = false;
@@ -3482,6 +3483,7 @@ impl PrimitiveInstance {
                         &frame_context.clip_scroll_tree,
                         frame_state.gpu_cache,
                         frame_state.resource_cache,
+                        root_spatial_node_index,
                         device_pixel_scale,
                         &dirty_world_rect,
                         &mut data_stores.clip,

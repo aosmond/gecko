@@ -996,14 +996,16 @@ impl TileCache {
             let root_clip_node = &frame_state
                 .data_stores
                 .clip[root_clip_chain_node.handle];
-            if let Some(clip_rect) = root_clip_node.item.get_local_clip_rect(root_clip_chain_node.local_pos) {
+            if let Some((clip_rect, ClipMode::Clip)) = root_clip_node.item.get_local_clip_rect(root_clip_chain_node.local_pos) {
                 self.map_local_to_world.set_target_spatial_node(
                     root_clip_chain_node.spatial_node_index,
                     frame_context.clip_scroll_tree,
                 );
 
                 if let Some(world_clip_rect) = self.map_local_to_world.map(&clip_rect) {
-                    self.root_clip_rect = world_clip_rect;
+                    // FIXME: what if the transform is not axis aligned
+                    let device_clip_rect = world_clip_rect * frame_context.global_device_pixel_scale;
+                    self.root_clip_rect = device_clip_rect.round() / frame_context.global_device_pixel_scale;
                 }
             }
         }
