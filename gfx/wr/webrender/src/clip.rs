@@ -586,6 +586,7 @@ impl ClipStore {
         clip_scroll_tree: &ClipScrollTree,
         gpu_cache: &mut GpuCache,
         resource_cache: &mut ResourceCache,
+        raster_spatial_node_index: SpatialNodeIndex,
         device_pixel_scale: DevicePixelScale,
         world_rect: &WorldRect,
         clip_data_store: &mut ClipDataStore,
@@ -611,6 +612,8 @@ impl ClipStore {
                     &mut self.clip_node_info,
                     clip_data_store,
                     clip_scroll_tree,
+                    raster_spatial_node_index,
+                    device_pixel_scale,
                 ) {
                     return None;
                 }
@@ -1326,10 +1329,13 @@ fn add_clip_node_to_current_chain(
     clip_node_info: &mut Vec<ClipNodeInfo>,
     clip_data_store: &ClipDataStore,
     clip_scroll_tree: &ClipScrollTree,
+    raster_spatial_node_index: SpatialNodeIndex,
+    device_pixel_scale: DevicePixelScale,
 ) -> bool {
     let clip_node = &clip_data_store[node.handle];
     let clip_spatial_node = &clip_scroll_tree.spatial_nodes[node.spatial_node_index.0 as usize];
     let ref_spatial_node = &clip_scroll_tree.spatial_nodes[spatial_node_index.0 as usize];
+    let raster_spatial_node = &clip_scroll_tree.spatial_nodes[raster_spatial_node_index.0 as usize];
 
     // Determine the most efficient way to convert between coordinate
     // systems of the primitive and clip node.
@@ -1353,13 +1359,37 @@ fn add_clip_node_to_current_chain(
     if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
         match conversion {
             ClipSpaceConversion::Local => {
-                *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
+                let snapped_clip_rect = if ref_spatial_node.coordinate_system_id == raster_spatial_node.coordinate_system_id {
+                    let scale_offset = raster_spatial_node.coordinate_system_relative_scale_offset
+                        .inverse()
+                        .accumulate(&ref_spatial_node.coordinate_system_relative_scale_offset);
+                    let world_rect = scale_offset.map_rect(&clip_rect);
+                    let device_rect = world_rect * device_pixel_scale;
+                    let snapped_world_rect = device_rect.round() / device_pixel_scale;
+                    scale_offset.inverse().map_rect(&snapped_world_rect)
+                } else {
+                    clip_rect
+                };
+
+                *local_clip_rect = match local_clip_rect.intersection(&snapped_clip_rect) {
                     Some(rect) => rect,
                     None => return false,
                 };
             }
             ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
-                let clip_rect = scale_offset.map_rect(&clip_rect);
+                let snapped_clip_rect = if ref_spatial_node.coordinate_system_id == raster_spatial_node.coordinate_system_id {
+                    let scale_offset = raster_spatial_node.coordinate_system_relative_scale_offset
+                        .inverse()
+                        .accumulate(&ref_spatial_node.coordinate_system_relative_scale_offset);
+                    let world_rect = scale_offset.map_rect(&clip_rect);
+                    let device_rect = world_rect * device_pixel_scale;
+                    let snapped_world_rect = device_rect.round() / device_pixel_scale;
+                    scale_offset.inverse().map_rect(&snapped_world_rect)
+                } else {
+                    clip_rect
+                };
+
+                let clip_rect = scale_offset.map_rect(&snapped_clip_rect);
                 *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
                     Some(rect) => rect,
                     None => return false,
