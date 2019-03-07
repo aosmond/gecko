@@ -225,6 +225,7 @@ pub struct ClipNodeInstance {
     pub flags: ClipNodeFlags,
     pub spatial_node_index: SpatialNodeIndex,
     pub local_pos: LayoutPoint,
+    pub snapped_rect: Option<LayoutRect>,
 
     pub visible_tiles: Option<Vec<VisibleMaskImageTile>>,
 }
@@ -260,6 +261,7 @@ struct ClipNodeInfo {
     conversion: ClipSpaceConversion,
     handle: ClipDataHandle,
     local_pos: LayoutPoint,
+    snapped_rect: Option<LayoutRect>,
     spatial_node_index: SpatialNodeIndex,
 }
 
@@ -311,7 +313,7 @@ impl ClipNodeInfo {
             if let Some(props) = resource_cache.get_image_properties(image) {
                 if let Some(tile_size) = props.tiling {
                     let mut mask_tiles = Vec::new();
-                    let mask_rect = LayoutRect::new(self.local_pos, size);
+                    let mask_rect = self.snapped_rect.unwrap();
 
                     let visible_rect = if repeat {
                         *clipped_rect
@@ -363,6 +365,7 @@ impl ClipNodeInfo {
             flags,
             spatial_node_index: self.spatial_node_index,
             local_pos: self.local_pos,
+            snapped_rect: self.snapped_rect,
             visible_tiles,
         }
     }
@@ -642,16 +645,16 @@ impl ClipStore {
             // See how this clip affects the prim region.
             let clip_result = match node_info.conversion {
                 ClipSpaceConversion::Local => {
-                    node.item.get_clip_result(node_info.local_pos, &local_bounding_rect)
+                    node.item.get_clip_result(&node_info.snapped_rect, &local_bounding_rect)
                 }
                 ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
                     has_non_local_clips = true;
-                    node.item.get_clip_result(node_info.local_pos, &scale_offset.unmap_rect(&local_bounding_rect))
+                    node.item.get_clip_result(&node_info.snapped_rect, &scale_offset.unmap_rect(&local_bounding_rect))
                 }
                 ClipSpaceConversion::Transform(ref transform) => {
                     has_non_local_clips = true;
                     node.item.get_clip_result_complex(
-                        node_info.local_pos,
+                        &node_info.snapped_rect,
                         transform,
                         &world_clip_rect,
                         world_rect,
@@ -1061,43 +1064,39 @@ impl ClipItem {
     // reduce the size of a primitive region. This is typically
     // used to eliminate redundant clips, and reduce the size of
     // any clip mask that eventually gets drawn.
-    pub fn get_local_clip_rect(&self, local_pos: LayoutPoint) -> Option<LayoutRect> {
+    pub fn get_local_clip_rect(&self, local_pos: LayoutPoint) -> Option<(LayoutRect, ClipMode)> {
         let size = match *self {
-            ClipItem::Rectangle(size, ClipMode::Clip) => Some(size),
-            ClipItem::Rectangle(_, ClipMode::ClipOut) => None,
-            ClipItem::RoundedRectangle(size, _, ClipMode::Clip) => Some(size),
-            ClipItem::RoundedRectangle(_, _, ClipMode::ClipOut) => None,
+            ClipItem::Rectangle(size, mode) => Some((size, mode)),
+            ClipItem::RoundedRectangle(size, _, mode) => Some((size, mode)),
             ClipItem::Image { repeat, size, .. } => {
                 if repeat {
-                    None
+                    // FIXME: works but technically incorrect
+                    Some((size, ClipMode::ClipOut))
                 } else {
-                    Some(size)
+                    Some((size, ClipMode::Clip))
                 }
             }
             ClipItem::BoxShadow(..) => None,
         };
 
-        size.map(|size| {
-            LayoutRect::new(local_pos, size)
+        size.map(|(size, mode)| {
+            (LayoutRect::new(local_pos, size), mode)
         })
     }
 
     fn get_clip_result_complex(
         &self,
-        local_pos: LayoutPoint,
+        clip_rect: &Option<LayoutRect>,
         transform: &LayoutToWorldTransform,
         prim_world_rect: &WorldRect,
         world_rect: &WorldRect,
     ) -> ClipResult {
-        let (clip_rect, inner_rect) = match *self {
-            ClipItem::Rectangle(size, ClipMode::Clip) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-                (clip_rect, Some(clip_rect))
+        let inner_rect = match *self {
+            ClipItem::Rectangle(_, ClipMode::Clip) => {
+                *clip_rect
             }
-            ClipItem::RoundedRectangle(size, ref radius, ClipMode::Clip) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-                let inner_clip_rect = extract_inner_rect_safe(&clip_rect, radius);
-                (clip_rect, inner_clip_rect)
+            ClipItem::RoundedRectangle(_, ref radius, ClipMode::Clip) => {
+                extract_inner_rect_safe(clip_rect.as_ref().unwrap(), radius)
             }
             ClipItem::Rectangle(_, ClipMode::ClipOut) |
             ClipItem::RoundedRectangle(_, _, ClipMode::ClipOut) |
@@ -1119,7 +1118,7 @@ impl ClipItem {
 
         let outer_clip_rect = match project_rect(
             transform,
-            &clip_rect,
+            clip_rect.as_ref().unwrap(),
             world_rect,
         ) {
             Some(outer_clip_rect) => outer_clip_rect,
@@ -1139,13 +1138,12 @@ impl ClipItem {
     // Check how a given clip source affects a local primitive region.
     fn get_clip_result(
         &self,
-        local_pos: LayoutPoint,
+        clip_rect: &Option<LayoutRect>,
         prim_rect: &LayoutRect,
     ) -> ClipResult {
         match *self {
-            ClipItem::Rectangle(size, ClipMode::Clip) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
+            ClipItem::Rectangle(_, ClipMode::Clip) => {
+                let clip_rect = clip_rect.unwrap();
                 if clip_rect.contains_rect(prim_rect) {
                     return ClipResult::Accept;
                 }
@@ -1159,9 +1157,8 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::Rectangle(size, ClipMode::ClipOut) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
+            ClipItem::Rectangle(_, ClipMode::ClipOut) => {
+                let clip_rect = clip_rect.unwrap();
                 if clip_rect.contains_rect(prim_rect) {
                     return ClipResult::Reject;
                 }
@@ -1175,13 +1172,12 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::RoundedRectangle(size, ref radius, ClipMode::Clip) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
+            ClipItem::RoundedRectangle(_, ref radius, ClipMode::Clip) => {
                 // TODO(gw): Consider caching this in the ClipNode
                 //           if it ever shows in profiles.
                 // TODO(gw): extract_inner_rect_safe is overly
                 //           conservative for this code!
+                let clip_rect = clip_rect.unwrap();
                 let inner_clip_rect = extract_inner_rect_safe(&clip_rect, radius);
                 if let Some(inner_clip_rect) = inner_clip_rect {
                     if inner_clip_rect.contains_rect(prim_rect) {
@@ -1198,13 +1194,12 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::RoundedRectangle(size, ref radius, ClipMode::ClipOut) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
+            ClipItem::RoundedRectangle(_, ref radius, ClipMode::ClipOut) => {
                 // TODO(gw): Consider caching this in the ClipNode
                 //           if it ever shows in profiles.
                 // TODO(gw): extract_inner_rect_safe is overly
                 //           conservative for this code!
+                let clip_rect = clip_rect.unwrap();
                 let inner_clip_rect = extract_inner_rect_safe(&clip_rect, radius);
                 if let Some(inner_clip_rect) = inner_clip_rect {
                     if inner_clip_rect.contains_rect(prim_rect) {
@@ -1221,12 +1216,11 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::Image { size, repeat, .. } => {
+            ClipItem::Image { repeat, .. } => {
                 if repeat {
                     ClipResult::Partial
                 } else {
-                    let mask_rect = LayoutRect::new(local_pos, size);
-                    match mask_rect.intersection(prim_rect) {
+                    match clip_rect.unwrap().intersection(prim_rect) {
                         Some(..) => {
                             ClipResult::Partial
                         }
@@ -1356,7 +1350,7 @@ fn add_clip_node_to_current_chain(
 
     // If we can convert spaces, try to reduce the size of the region
     // requested, and cache the conversion information for the next step.
-    if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
+    let snapped_clip_rect = if let Some((clip_rect, mode)) = clip_node.item.get_local_clip_rect(node.local_pos) {
         match conversion {
             ClipSpaceConversion::Local => {
                 let snapped_clip_rect = if ref_spatial_node.coordinate_system_id == raster_spatial_node.coordinate_system_id {
@@ -1371,10 +1365,14 @@ fn add_clip_node_to_current_chain(
                     clip_rect
                 };
 
-                *local_clip_rect = match local_clip_rect.intersection(&snapped_clip_rect) {
-                    Some(rect) => rect,
-                    None => return false,
-                };
+                if mode == ClipMode::Clip {
+                  *local_clip_rect = match local_clip_rect.intersection(&snapped_clip_rect) {
+                      Some(rect) => rect,
+                      None => return false,
+                  };
+                }
+
+                Some(snapped_clip_rect)
             }
             ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
                 let snapped_clip_rect = if ref_spatial_node.coordinate_system_id == raster_spatial_node.coordinate_system_id {
@@ -1389,11 +1387,15 @@ fn add_clip_node_to_current_chain(
                     clip_rect
                 };
 
-                let clip_rect = scale_offset.map_rect(&snapped_clip_rect);
-                *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
-                    Some(rect) => rect,
-                    None => return false,
-                };
+                if mode == ClipMode::Clip {
+                  let clip_rect = scale_offset.map_rect(&snapped_clip_rect);
+                  *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
+                      Some(rect) => rect,
+                      None => return false,
+                  };
+                }
+
+                Some(snapped_clip_rect)
             }
             ClipSpaceConversion::Transform(..) => {
                 // TODO(gw): In the future, we can reduce the size
@@ -1405,13 +1407,17 @@ fn add_clip_node_to_current_chain(
                 //           I have left this for now until we
                 //           find some good test cases where this
                 //           would be a worthwhile perf win.
+                Some(clip_rect)
             }
         }
-    }
+    } else {
+        None
+    };
 
     clip_node_info.push(ClipNodeInfo {
         conversion,
         local_pos: node.local_pos,
+        snapped_rect: snapped_clip_rect,
         handle: node.handle,
         spatial_node_index: node.spatial_node_index,
     });
