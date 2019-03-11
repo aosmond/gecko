@@ -302,7 +302,7 @@ pub struct PictureTask {
     pub uv_rect_handle: GpuCacheHandle,
     pub root_spatial_node_index: SpatialNodeIndex,
     uv_rect_kind: UvRectKind,
-    device_pixel_scale: DevicePixelScale,
+    pub device_pixel_scale: DevicePixelScale,
 }
 
 #[derive(Debug)]

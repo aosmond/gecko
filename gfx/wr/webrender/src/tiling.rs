@@ -444,6 +444,7 @@ impl RenderTarget for ColorRenderTarget {
                         prim_headers,
                         transforms,
                         pic_task.root_spatial_node_index,
+                        pic_task.device_pixel_scale,
                         z_generator,
                     );
 

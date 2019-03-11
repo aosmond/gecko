@@ -558,6 +558,7 @@ impl AlphaBatchBuilder {
         prim_headers: &mut PrimitiveHeaders,
         transforms: &mut TransformPalette,
         root_spatial_node_index: SpatialNodeIndex,
+        device_pixel_scale: DevicePixelScale,
         z_generator: &mut ZBufferIdGenerator,
     ) {
         let task_address = render_tasks.get_task_address(task_id);
@@ -575,6 +576,7 @@ impl AlphaBatchBuilder {
                 prim_headers,
                 transforms,
                 root_spatial_node_index,
+                device_pixel_scale,
                 z_generator,
             );
         }
@@ -596,6 +598,7 @@ impl AlphaBatchBuilder {
         prim_headers: &mut PrimitiveHeaders,
         transforms: &mut TransformPalette,
         root_spatial_node_index: SpatialNodeIndex,
+        device_pixel_scale: DevicePixelScale,
         z_generator: &mut ZBufferIdGenerator,
     ) {
         if prim_instance.visibility_info == PrimitiveVisibilityIndex::INVALID {
@@ -623,10 +626,31 @@ impl AlphaBatchBuilder {
         let z_id = z_generator.next();
 
         let prim_common_data = &ctx.data_stores.as_common_data(&prim_instance);
-        let prim_rect = LayoutRect::new(
+        let mut prim_rect = LayoutRect::new(
             prim_instance.prim_origin,
             prim_common_data.prim_size,
         );
+
+        let ref_spatial_node = &ctx.clip_scroll_tree.spatial_nodes[prim_instance.spatial_node_index.0 as usize];
+        let raster_spatial_node = &ctx.clip_scroll_tree.spatial_nodes[root_spatial_node_index.0 as usize];
+        if ref_spatial_node.coordinate_system_id == raster_spatial_node.coordinate_system_id {
+            let scale_offset = raster_spatial_node.coordinate_system_relative_scale_offset
+                .inverse()
+                .accumulate(&ref_spatial_node.coordinate_system_relative_scale_offset);
+            let world_rect = scale_offset.map_rect(&prim_rect);
+            let device_rect = world_rect * device_pixel_scale;
+            let snapped_device_rect = device_rect.round();
+            let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+            let snapped_prim_rect = scale_offset.inverse().map_rect(&snapped_world_rect);
+            if is_chased {
+                println!("\tsnapped local {:?} to {:?}", prim_rect, snapped_prim_rect);
+                println!("\t       device {:?} to {:?}", device_rect, snapped_device_rect);
+
+                let round_prim_rect = prim_rect.round();
+                println!("\told local {:?} device {:?}", round_prim_rect, scale_offset.map_rect(&round_prim_rect) * device_pixel_scale);
+            }
+            prim_rect = snapped_prim_rect;
+        };
 
         if is_chased {
             println!("\tbatch {:?} with bound {:?}", prim_rect, bounding_rect);
@@ -1120,6 +1144,7 @@ impl AlphaBatchBuilder {
                                         prim_headers,
                                         transforms,
                                         root_spatial_node_index,
+                                        device_pixel_scale,
                                         z_generator,
                                     );
 
@@ -1245,6 +1270,7 @@ impl AlphaBatchBuilder {
                                             prim_headers,
                                             transforms,
                                             root_spatial_node_index,
+                                            device_pixel_scale,
                                             z_generator,
                                         );
 
@@ -1635,6 +1661,7 @@ impl AlphaBatchBuilder {
                             prim_headers,
                             transforms,
                             root_spatial_node_index,
+                            device_pixel_scale,
                             z_generator,
                         );
                     }

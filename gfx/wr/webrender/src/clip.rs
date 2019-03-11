@@ -609,6 +609,19 @@ impl ClipStore {
             local_prim_clip_rect
         };
 
+        let local_prim_rect = if ref_spatial_node.coordinate_system_id == raster_spatial_node.coordinate_system_id {
+            let scale_offset = raster_spatial_node.coordinate_system_relative_scale_offset
+                .inverse()
+                .accumulate(&ref_spatial_node.coordinate_system_relative_scale_offset);
+            let world_rect = scale_offset.map_rect(&local_prim_rect);
+            let device_rect = world_rect * device_pixel_scale;
+            let snapped_device_rect = device_rect.round();
+            let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+            scale_offset.inverse().map_rect(&snapped_world_rect)
+        } else {
+            local_prim_rect
+        };
+
         // Walk the clip chain to build local rects, and collect the
         // smallest possible local/device clip area.
 
