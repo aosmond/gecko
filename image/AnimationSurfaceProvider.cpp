@@ -126,6 +126,64 @@ void AnimationSurfaceProvider::Advance(size_t aFrame) {
   }
 }
 
+RefreshResult AnimationSurfaceProvider::RequestRefresh(const TimeStamp& aTime) {
+  MutexAutoLock lock(mFramesMutex);
+
+  RefreshResult result;
+  if (mLoopRemainingCount == 0) {
+    result.mAnimationFinished = true;
+    return result;
+  }
+
+  // We must have the first frame available before we can consider advancing.
+  imgFrame* display = mFrames->DisplayedFrame();
+  if (!display) {
+    return result;
+  }
+
+  // If we have never advanced, or have gone backwards in time, reset the last
+  // advanced time to now.
+  if (mLastAdvanceTime.IsNull() || aTime < mLastAdvanceTime) {
+    mLastAdvanceTime = aTime;
+    result.mFrameAdvanced = true;
+    result.mDirtyRect = display->GetRect();
+  }
+
+  // FIXME: handle time durations greater than the total animation time
+  // if known
+
+  do {
+    // Bail if we haven't expired the current frame yet.
+    TimeDuration offset = TimeDuration::FromMilliseconds(
+        double(display->GetTimeout().AsMilliseconds()));
+    if (aTime - mLastAdvanceTime < offset) {
+      break;
+    }
+
+    // Bail if we don't have the next frame decoded yet.
+    imgFrame* next = mFrames->NextFrame();
+    if (!next) {
+      break;
+    }
+
+    // Advance to the next frame and accumulate the dirty rect.
+    mFrames->Advance();
+    MOZ_ASSERT(mFrames->DisplayedFrame() == next);
+    display = next;
+    result.mFrameAdvanced = true;
+    result.mDirtyRect = result.mDirtyRect.Union(display->GetDirtyRect());
+
+    // If this is our last iteration of the loop, break out early.
+    if (mLoopRemainingCount > 0 && mFrames->IsLastFrameDisplayed() &&
+        --mLoopRemainingCount == 0) {
+      result.mAnimationFinished = true;
+      break;
+    }
+  } while (true);
+
+  return result;
+}
+
 DrawableFrameRef AnimationSurfaceProvider::DrawableRef(size_t aFrame) {
   MutexAutoLock lock(mFramesMutex);
 

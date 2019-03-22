@@ -29,6 +29,31 @@ class CachedSurface;
 class DrawableSurface;
 
 /**
+ * RefreshResult is used to let callers know how the state of the animation
+ * changed during a call to FrameAnimator::RequestRefresh().
+ */
+struct RefreshResult {
+  RefreshResult() : mFrameAdvanced(false), mAnimationFinished(false) {}
+
+  /// Merges another RefreshResult's changes into this RefreshResult.
+  void Accumulate(const RefreshResult& aOther) {
+    mFrameAdvanced = mFrameAdvanced || aOther.mFrameAdvanced;
+    mAnimationFinished = mAnimationFinished || aOther.mAnimationFinished;
+    mDirtyRect = mDirtyRect.Union(aOther.mDirtyRect);
+  }
+
+  // The region of the image that has changed.
+  gfx::IntRect mDirtyRect;
+
+  // If true, we changed frames at least once. Note that, due to looping, we
+  // could still have ended up on the same frame!
+  bool mFrameAdvanced : 1;
+
+  // Whether the animation has finished playing.
+  bool mAnimationFinished : 1;
+};
+
+/**
  * An interface for objects which can either store a surface or dynamically
  * generate one.
  */
@@ -82,6 +107,10 @@ class ISurfaceProvider {
 
   virtual void Reset() {}
   virtual void Advance(size_t aFrame) {}
+
+  virtual RefreshResult RequestRefresh(const TimeStamp& aTime) {
+    return RefreshResult();
+  }
 
   /// @return the availability state of this ISurfaceProvider, which indicates
   /// whether DrawableRef() could successfully return a surface. Should only be

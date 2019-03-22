@@ -54,6 +54,7 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
                               const AddSizeOfCb& aCallback) override;
   void Reset() override;
   void Advance(size_t aFrame) override;
+  RefreshResult RequestRefresh(const TimeStamp& aTime) override;
 
  protected:
   DrawableFrameRef DrawableRef(size_t aFrame) override;
@@ -114,6 +115,9 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
 
   /// The frames of this animation, in order.
   UniquePtr<AnimationFrameBuffer> mFrames;
+
+  /// Time at which we advanced last.
+  TimeStamp mLastAdvanceTime;
 };
 
 }  // namespace image
