@@ -433,6 +433,7 @@ void Decoder::PostSize(int32_t aWidth, int32_t aHeight,
 void Decoder::PostHasTransparency() { mProgress |= FLAG_HAS_TRANSPARENCY; }
 
 void Decoder::PostIsAnimated(FrameTimeout aFirstFrameTimeout) {
+  MOZ_ASSERT(aFirstFrameTimeout != FrameTimeout::Forever());
   mProgress |= FLAG_IS_ANIMATED;
   mImageMetadata.SetHasAnimation();
   mImageMetadata.SetFirstFrameTimeout(aFirstFrameTimeout);

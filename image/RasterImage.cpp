@@ -788,13 +788,6 @@ nsresult RasterImage::StartAnimation() {
     return NS_OK;
   }
 
-  // Don't bother to animate if we're displaying the first frame forever.
-  if (mAnimationState->GetCurrentAnimationFrameIndex() == 0 &&
-      mAnimationState->FirstFrameTimeout() == FrameTimeout::Forever()) {
-    mAnimationFinished = true;
-    return NS_ERROR_ABORT;
-  }
-
   // We need to set the time that this initial frame was first displayed, as
   // this is used in AdvanceFrame().
   mAnimationState->InitAnimationFrameTimeIfNecessary();

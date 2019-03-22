@@ -362,7 +362,9 @@ LexerResult nsWebPDecoder::ReadHeader(WebPDemuxer* aDemuxer, bool aIsComplete) {
                          : LexerResult(Yield::NEED_MORE_DATA);
     }
 
-    PostIsAnimated(FrameTimeout::FromRawMilliseconds(iter.duration));
+    if (iter.duration > 0) {
+      PostIsAnimated(FrameTimeout::FromRawMilliseconds(iter.duration));
+    }
     WebPDemuxReleaseIterator(&iter);
   } else {
     // Single frames don't need a demuxer to be created.

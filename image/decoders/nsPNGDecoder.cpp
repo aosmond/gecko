@@ -660,8 +660,12 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
 #ifdef PNG_APNG_SUPPORTED
   bool isAnimated = png_get_valid(png_ptr, info_ptr, PNG_INFO_acTL);
   if (isAnimated) {
+    // Ignore animations where the first frame has an indefinite timeout.
     int32_t rawTimeout = GetNextFrameDelay(png_ptr, info_ptr);
-    decoder->PostIsAnimated(FrameTimeout::FromRawMilliseconds(rawTimeout));
+    isAnimated = rawTimeout > 0;
+    if (isAnimated) {
+      decoder->PostIsAnimated(FrameTimeout::FromRawMilliseconds(rawTimeout));
+    }
 
     if (decoder->Size() != decoder->OutputSize() &&
         !decoder->IsFirstFrameDecode()) {
