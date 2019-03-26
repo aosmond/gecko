@@ -380,6 +380,7 @@ impl FrameBuilder {
             self.root_pic_index,
             &mut self.prim_store.pictures,
             &frame_context,
+            transform_palette,
             gpu_cache,
             &self.clip_store,
             &data_stores.clip,
