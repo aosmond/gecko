@@ -1787,6 +1787,7 @@ pub struct SurfaceInfo {
     /// A local rect defining the size of this surface, in the
     /// coordinate system of the surface itself.
     pub rect: PictureRect,
+    pub snapping_rect: PictureRect,
     /// Helper structs for mapping local rects in different
     /// coordinate systems into the surface coordinates.
     pub map_local_to_surface: SpaceMapper<LayoutPixel, PicturePixel>,
@@ -1831,6 +1832,7 @@ impl SurfaceInfo {
 
         SurfaceInfo {
             rect: PictureRect::zero(),
+            snapping_rect: PictureRect::zero(),
             map_local_to_surface,
             surface: None,
             raster_spatial_node_index,
@@ -1957,6 +1959,7 @@ pub struct PrimitiveCluster {
     spatial_node_index: SpatialNodeIndex,
     /// Whether this cluster is visible when the position node is a backface.
     is_backface_visible: bool,
+    snapping_rect: LayoutRect,
     /// The bounding rect of the cluster, in the local space of the spatial node.
     /// This is used to quickly determine the overall bounding rect for a picture
     /// during the first picture traversal, which is needed for local scale
@@ -1974,6 +1977,7 @@ impl PrimitiveCluster {
         is_backface_visible: bool,
     ) -> Self {
         PrimitiveCluster {
+            snapping_rect: LayoutRect::zero(),
             bounding_rect: LayoutRect::zero(),
             spatial_node_index,
             is_backface_visible,
@@ -2119,6 +2123,7 @@ impl PrimitiveList {
                     .intersection(&prim_rect)
                     .unwrap_or(LayoutRect::zero());
 
+                cluster.snapping_rect = prim_rect;
                 cluster.bounding_rect = cluster.bounding_rect.union(&culling_rect);
             }
 
@@ -2197,6 +2202,7 @@ pub struct PicturePrimitive {
     /// The local rect of this picture. It is built
     /// dynamically during the first picture traversal.
     pub local_rect: LayoutRect,
+    pub snapping_rect: LayoutRect,
 
     /// Local clip rect for this picture.
     pub local_clip_rect: LayoutRect,
@@ -2311,6 +2317,7 @@ impl PicturePrimitive {
             requested_raster_space,
             spatial_node_index,
             local_rect: LayoutRect::zero(),
+            snapping_rect: LayoutRect::zero(),
             local_clip_rect,
             tile_cache,
             options,
@@ -2768,6 +2775,9 @@ impl PicturePrimitive {
             // which will allow the frame building code to skip most of the
             // current per-primitive culling code.
             cluster.is_visible = true;
+            if let Some(cluster_rect) = surface.map_local_to_surface.map(&cluster.snapping_rect) {
+                surface.snapping_rect = surface.snapping_rect.union(&cluster_rect);
+            }
             if let Some(cluster_rect) = surface.map_local_to_surface.map(&cluster.bounding_rect) {
                 surface.rect = surface.rect.union(&cluster_rect);
             }
@@ -2777,7 +2787,7 @@ impl PicturePrimitive {
         // rect into the parent surface coordinate space, and propagate that up
         // to the parent.
         if let Some(ref mut raster_config) = self.raster_config {
-            let mut surface_rect = {
+            let (mut surface_rect, snapping_rect) = {
                 let surface = state.current_surface_mut();
                 // Inflate the local bounding rect if required by the filter effect.
                 // This inflaction factor is to be applied to the surface itsefl.
@@ -2788,7 +2798,8 @@ impl PicturePrimitive {
                     _ => 0.0,
                 };
                 surface.rect = surface.rect.inflate(inflation_size, inflation_size);
-                surface.rect * TypedScale::new(1.0)
+                surface.snapping_rect = surface.snapping_rect.inflate(inflation_size, inflation_size);
+                (surface.rect * TypedScale::new(1.0), surface.snapping_rect * TypedScale::new(1.0))
             };
 
             // Pop this surface from the stack
@@ -2802,11 +2813,12 @@ impl PicturePrimitive {
             // TODO(gw): In future, if we support specifying a flag which gets the
             //           stretch size from the segment rect in the shaders, we can
             //           remove this invalidation here completely.
-            if self.local_rect != surface_rect {
+            if self.local_rect != surface_rect || self.snapping_rect != snapping_rect {
                 if let PictureCompositeMode::Filter(FilterOp::DropShadow(..)) = raster_config.composite_mode {
                     gpu_cache.invalidate(&self.extra_gpu_data_handle);
                 }
                 self.local_rect = surface_rect;
+                self.snapping_rect = snapping_rect;
             }
 
             // Check if any of the surfaces can't be rasterized in local space but want to.
@@ -2838,6 +2850,12 @@ impl PicturePrimitive {
                 .map(&surface_rect)
             {
                 parent_surface.rect = parent_surface.rect.union(&parent_surface_rect);
+            }
+            if let Some(parent_snapping_rect) = parent_surface
+                .map_local_to_surface
+                .map(&snapping_rect)
+            {
+                parent_surface.snapping_rect = parent_surface.snapping_rect.union(&parent_snapping_rect);
             }
         }
     }
