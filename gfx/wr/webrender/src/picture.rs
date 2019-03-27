@@ -22,6 +22,7 @@ use plane_split::{Clipper, Polygon, Splitter};
 use prim_store::{PictureIndex, PrimitiveInstance, SpaceMapper, PrimitiveInstanceKind};
 use prim_store::{get_raster_rects, PrimitiveScratchBuffer, VectorKey, PointKey};
 use prim_store::{OpacityBindingStorage, ImageInstanceStorage, OpacityBindingIndex, RectangleKey};
+use prim_store::{get_snapped_picture_rect};
 use print_tree::PrintTreePrinter;
 use render_backend::DataStores;
 use render_task::{ClearMode, RenderTask, RenderTaskCacheEntryHandle, TileBlit};
@@ -1620,6 +1621,7 @@ impl<'a> PictureUpdateState<'a> {
         pic_index: PictureIndex,
         picture_primitives: &mut [PicturePrimitive],
         frame_context: &FrameBuildingContext,
+        transform_palette: &mut TransformPalette,
         gpu_cache: &mut GpuCache,
         clip_store: &ClipStore,
         clip_data_store: &ClipDataStore,
@@ -1638,6 +1640,7 @@ impl<'a> PictureUpdateState<'a> {
             ClipChainId::NONE,
             picture_primitives,
             frame_context,
+            transform_palette,
             gpu_cache,
             clip_store,
             clip_data_store,
@@ -1707,6 +1710,7 @@ impl<'a> PictureUpdateState<'a> {
         clip_chain_id: ClipChainId,
         picture_primitives: &mut [PicturePrimitive],
         frame_context: &FrameBuildingContext,
+        transform_palette: &mut TransformPalette,
         gpu_cache: &mut GpuCache,
         clip_store: &ClipStore,
         clip_data_store: &ClipDataStore,
@@ -1724,6 +1728,7 @@ impl<'a> PictureUpdateState<'a> {
                     *clip_chain_id,
                     picture_primitives,
                     frame_context,
+                    transform_palette,
                     gpu_cache,
                     clip_store,
                     clip_data_store,
@@ -1734,6 +1739,7 @@ impl<'a> PictureUpdateState<'a> {
                 prim_list,
                 self,
                 frame_context,
+                transform_palette,
                 gpu_cache,
             );
         }
@@ -1791,6 +1797,7 @@ pub struct SurfaceInfo {
     /// Helper structs for mapping local rects in different
     /// coordinate systems into the surface coordinates.
     pub map_local_to_surface: SpaceMapper<LayoutPixel, PicturePixel>,
+    pub map_surface_to_raster: SpaceMapper<PicturePixel, RasterPixel>,
     /// Defines the positioning node for the surface itself,
     /// and the rasterization root for this surface.
     pub raster_spatial_node_index: SpatialNodeIndex,
@@ -1830,10 +1837,29 @@ impl SurfaceInfo {
             pic_bounds,
         );
 
+        let map_raster_to_world = SpaceMapper::new_with_target(
+            ROOT_SPATIAL_NODE_INDEX,
+            raster_spatial_node_index,
+            world_rect,
+            clip_scroll_tree,
+        );
+
+        let raster_bounds = map_raster_to_world
+            .unmap(&map_raster_to_world.bounds)
+            .unwrap_or(RasterRect::max_rect());
+
+        let map_surface_to_raster = SpaceMapper::new_with_target(
+            raster_spatial_node_index,
+            surface_spatial_node_index,
+            raster_bounds,
+            clip_scroll_tree,
+        );
+
         SurfaceInfo {
             rect: PictureRect::zero(),
             snapping_rect: PictureRect::zero(),
             map_local_to_surface,
+            map_surface_to_raster,
             surface: None,
             raster_spatial_node_index,
             surface_spatial_node_index,
@@ -1965,6 +1991,7 @@ pub struct PrimitiveCluster {
     /// during the first picture traversal, which is needed for local scale
     /// determination, and render task size calculations.
     bounding_rect: LayoutRect,
+    bounding_rects: Vec<LayoutRect>,
     /// This flag is set during the first pass picture traversal, depending on whether
     /// the cluster is visible or not. It's read during the second pass when primitives
     /// consult their owning clusters to see if the primitive itself is visible.
@@ -1979,6 +2006,7 @@ impl PrimitiveCluster {
         PrimitiveCluster {
             snapping_rect: LayoutRect::zero(),
             bounding_rect: LayoutRect::zero(),
+            bounding_rects: Vec::new(),
             spatial_node_index,
             is_backface_visible,
             is_visible: false,
@@ -2123,8 +2151,9 @@ impl PrimitiveList {
                     .intersection(&prim_rect)
                     .unwrap_or(LayoutRect::zero());
 
-                cluster.snapping_rect = prim_rect;
+                cluster.snapping_rect = cluster.snapping_rect.union(&prim_rect);
                 cluster.bounding_rect = cluster.bounding_rect.union(&culling_rect);
+                cluster.bounding_rects.push(culling_rect);
             }
 
             prim_instance.cluster_index = ClusterIndex(cluster_index as u16);
@@ -2716,6 +2745,7 @@ impl PicturePrimitive {
         prim_list: PrimitiveList,
         state: &mut PictureUpdateState,
         frame_context: &FrameBuildingContext,
+        transform_palette: &mut TransformPalette,
         gpu_cache: &mut GpuCache,
     ) {
         // Restore the pictures list used during recursion.
@@ -2775,11 +2805,33 @@ impl PicturePrimitive {
             // which will allow the frame building code to skip most of the
             // current per-primitive culling code.
             cluster.is_visible = true;
+
+            let mut snapped_bounding_rect = PictureRect::zero();
+            for unsnapped_visible_rect in &cluster.bounding_rects {
+                if let Some(unsnapped_rect) = surface.map_local_to_surface.map(&unsnapped_visible_rect) {
+                    if let Some(snapped_rect) = get_snapped_picture_rect(
+                        cluster.spatial_node_index,
+                        surface.raster_spatial_node_index,
+                        unsnapped_rect,
+                        &surface.map_surface_to_raster,
+                        surface.device_pixel_scale,
+                        frame_context,
+                        transform_palette) {
+                        snapped_bounding_rect = snapped_bounding_rect.union(&snapped_rect);
+                    }
+                }
+            }
+
             if let Some(cluster_rect) = surface.map_local_to_surface.map(&cluster.snapping_rect) {
                 surface.snapping_rect = surface.snapping_rect.union(&cluster_rect);
             }
             if let Some(cluster_rect) = surface.map_local_to_surface.map(&cluster.bounding_rect) {
-                surface.rect = surface.rect.union(&cluster_rect);
+                println!("unsnapped {:?} snapped {:?}", cluster_rect, snapped_bounding_rect);
+                if snapped_bounding_rect.is_empty() {
+                  surface.rect = surface.rect.union(&cluster_rect);
+                } else {
+                  surface.rect = surface.rect.union(&snapped_bounding_rect);
+                }
             }
         }
 

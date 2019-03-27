@@ -22,7 +22,7 @@ use frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, Pi
 use frame_builder::{PrimitiveContext, FrameVisibilityContext, FrameVisibilityState};
 use glyph_rasterizer::GlyphKey;
 use gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle, GpuDataRequest, ToGpuBlocks};
-use gpu_types::{BrushFlags, SnapOffsets};
+use gpu_types::{BrushFlags, SnapOffsets, TransformPalette};
 use image::{Repetition};
 use intern;
 use malloc_size_of::MallocSizeOf;
@@ -3613,6 +3613,58 @@ fn get_unclipped_device_rect(
         }
         TransformedRectKind::Complex => {
             Some((unclipped_device_rect, SnapOffsets::empty()))
+        }
+    }
+}
+
+pub fn get_snapped_picture_rect(
+    prim_spatial_node_index: SpatialNodeIndex,
+    root_spatial_node_index: SpatialNodeIndex,
+    prim_rect: PictureRect,
+    map_to_raster: &SpaceMapper<PicturePixel, RasterPixel>,
+    device_pixel_scale: DevicePixelScale,
+    frame_context: &FrameBuildingContext,
+    transform_palette: &mut TransformPalette,
+) -> Option<PictureRect> {
+    let transform_id = transform_palette.get_id(
+        prim_spatial_node_index,
+        root_spatial_node_index,
+        frame_context.clip_scroll_tree,
+    );
+
+    match transform_id.transform_kind() {
+        TransformedRectKind::AxisAligned => {
+            let unclipped_raster_rect = map_to_raster.map(&prim_rect)?;
+
+            let unclipped_device_rect = {
+                let world_rect = unclipped_raster_rect * TypedScale::new(1.0);
+                let device_rect = world_rect * device_pixel_scale;
+                device_rect
+            };
+
+            let top_left = unclipped_device_rect.origin + compute_snap_offset_impl(
+                prim_rect.origin,
+                prim_rect,
+                unclipped_device_rect.origin,
+                unclipped_device_rect.bottom_right(),
+            );
+
+            let bottom_right = unclipped_device_rect.bottom_right() + compute_snap_offset_impl(
+                prim_rect.bottom_right(),
+                prim_rect,
+                unclipped_device_rect.origin,
+                unclipped_device_rect.bottom_right(),
+            );
+
+            let snapped_device_rect = DeviceRect::new(top_left, DeviceSize::new(bottom_right.x - top_left.x, bottom_right.y - top_left.y));
+            println!("\tsnapped device {:?}", snapped_device_rect);
+            let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+            let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
+            let snapped_pic_rect = map_to_raster.unmap(&snapped_raster_rect)?;
+            Some(snapped_pic_rect)
+        }
+        TransformedRectKind::Complex => {
+            Some(prim_rect)
         }
     }
 }
