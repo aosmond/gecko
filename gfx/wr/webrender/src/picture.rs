@@ -1991,7 +1991,7 @@ pub struct PrimitiveCluster {
     /// during the first picture traversal, which is needed for local scale
     /// determination, and render task size calculations.
     bounding_rect: LayoutRect,
-    bounding_rects: Vec<LayoutRect>,
+    bounding_rects: Vec<(LayoutRect, LayoutRect)>,
     /// This flag is set during the first pass picture traversal, depending on whether
     /// the cluster is visible or not. It's read during the second pass when primitives
     /// consult their owning clusters to see if the primitive itself is visible.
@@ -2153,7 +2153,7 @@ impl PrimitiveList {
 
                 cluster.snapping_rect = cluster.snapping_rect.union(&prim_rect);
                 cluster.bounding_rect = cluster.bounding_rect.union(&culling_rect);
-                cluster.bounding_rects.push(culling_rect);
+                cluster.bounding_rects.push((prim_rect, prim_instance.local_clip_rect));
             }
 
             prim_instance.cluster_index = ClusterIndex(cluster_index as u16);
@@ -2833,17 +2833,20 @@ impl PicturePrimitive {
             cluster.is_visible = true;
 
             let mut snapped_bounding_rect = PictureRect::zero();
-            for unsnapped_visible_rect in &cluster.bounding_rects {
-                if let Some(unsnapped_rect) = surface.map_local_to_surface.map(&unsnapped_visible_rect) {
-                    if let Some(snapped_rect) = get_snapped_picture_rect(
-                        cluster.spatial_node_index,
-                        surface.raster_spatial_node_index,
-                        unsnapped_rect,
-                        &surface.map_surface_to_raster,
-                        surface.device_pixel_scale,
-                        frame_context,
-                        transform_palette) {
-                        snapped_bounding_rect = snapped_bounding_rect.union(&snapped_rect);
+            for (prim_rect, prim_clip_rect) in &cluster.bounding_rects {
+                if let Some(prim_pic_rect) = surface.map_local_to_surface.map(&prim_rect) {
+                    if let Some(prim_clip_pic_rect) = surface.map_local_to_surface.map(&prim_clip_rect) {
+                      if let Some(snapped_rect) = get_snapped_picture_rect(
+                          cluster.spatial_node_index,
+                          surface.raster_spatial_node_index,
+                          prim_pic_rect,
+                          prim_clip_pic_rect,
+                          &surface.map_surface_to_raster,
+                          surface.device_pixel_scale,
+                          frame_context,
+                          transform_palette) {
+                          snapped_bounding_rect = snapped_bounding_rect.union(&snapped_rect);
+                      }
                     }
                 }
             }

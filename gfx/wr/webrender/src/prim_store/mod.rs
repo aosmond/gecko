@@ -3708,6 +3708,7 @@ pub fn get_snapped_picture_rect(
     prim_spatial_node_index: SpatialNodeIndex,
     root_spatial_node_index: SpatialNodeIndex,
     prim_rect: PictureRect,
+    prim_clip_rect: PictureRect,
     map_to_raster: &SpaceMapper<PicturePixel, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
     frame_context: &FrameBuildingContext,
@@ -3721,7 +3722,8 @@ pub fn get_snapped_picture_rect(
 
     match transform_id.transform_kind() {
         TransformedRectKind::AxisAligned => {
-            let unclipped_raster_rect = map_to_raster.map(&prim_rect)?;
+            let visible_rect = prim_rect.intersection(&prim_clip_rect)?;
+            let unclipped_raster_rect = map_to_raster.map(&visible_rect)?;
 
             let unclipped_device_rect = {
                 let world_rect = unclipped_raster_rect * TypedScale::new(1.0);
@@ -3730,14 +3732,14 @@ pub fn get_snapped_picture_rect(
             };
 
             let top_left = unclipped_device_rect.origin + compute_snap_offset_impl(
-                prim_rect.origin,
+                visible_rect.origin,
                 prim_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
             );
 
             let bottom_right = unclipped_device_rect.bottom_right() + compute_snap_offset_impl(
-                prim_rect.bottom_right(),
+                visible_rect.bottom_right(),
                 prim_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
