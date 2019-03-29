@@ -10,11 +10,11 @@ use box_shadow::{BLUR_SAMPLE_SCALE, BoxShadowClipSource, BoxShadowCacheKey};
 use clip_scroll_tree::{CoordinateSystemId, ClipScrollTree, SpatialNodeIndex};
 use ellipse::Ellipse;
 use gpu_cache::{GpuCache, GpuCacheHandle, ToGpuBlocks};
-use gpu_types::{BoxShadowStretchMode};
+use gpu_types::{BoxShadowStretchMode, TransformPalette};
 use image::{self, Repetition};
 use intern;
 use prim_store::{ClipData, ImageMaskData, SpaceMapper, VisibleMaskImageTile};
-use prim_store::{PointKey, SizeKey, RectangleKey};
+use prim_store::{PointKey, SizeKey, RectangleKey, get_snapped_local_rect};
 use render_task::to_cache_size;
 use resource_cache::{ImageRequest, ResourceCache};
 use std::{cmp, u32};
@@ -575,6 +575,168 @@ impl ClipStore {
 
     // The main interface other code uses. Given a local primitive, positioning
     // information, and a clip chain id, build an optimized clip chain instance.
+    pub fn build_clip_chain_instance_snap(
+        &mut self,
+        clip_chains: &[ClipChainId],
+        local_prim_rect: LayoutRect,
+        local_prim_clip_rect: LayoutRect,
+        spatial_node_index: SpatialNodeIndex,
+        raster_spatial_node_index: SpatialNodeIndex,
+        prim_to_pic_mapper: &SpaceMapper<LayoutPixel, PicturePixel>,
+        pic_to_raster_mapper: &SpaceMapper<PicturePixel, RasterPixel>,
+        pic_to_world_mapper: &SpaceMapper<PicturePixel, WorldPixel>,
+        clip_scroll_tree: &ClipScrollTree,
+        gpu_cache: &mut GpuCache,
+        resource_cache: &mut ResourceCache,
+        transform_palette: &mut TransformPalette,
+        device_pixel_scale: DevicePixelScale,
+        world_rect: &WorldRect,
+        clip_data_store: &mut ClipDataStore,
+    ) -> Option<ClipChainInstance> {
+        let mut local_clip_rect = local_prim_clip_rect;
+
+        // Walk the clip chain to build local rects, and collect the
+        // smallest possible local/device clip area.
+
+        self.clip_node_info.clear();
+
+        for clip_chain_root in clip_chains {
+            let mut current_clip_chain_id = *clip_chain_root;
+
+            // for each clip chain node
+            while current_clip_chain_id != ClipChainId::NONE {
+                let clip_chain_node = &self.clip_chain_nodes[current_clip_chain_id.0 as usize];
+
+                if !add_clip_node_to_current_chain(
+                    clip_chain_node,
+                    spatial_node_index,
+                    &mut local_clip_rect,
+                    &mut self.clip_node_info,
+                    clip_data_store,
+                    clip_scroll_tree,
+                ) {
+                    return None;
+                }
+
+                current_clip_chain_id = clip_chain_node.parent_clip_chain_id;
+            }
+        }
+
+        let snapped_local_prim_rect = get_snapped_local_rect(
+            spatial_node_index,
+            raster_spatial_node_index,
+            local_prim_rect,
+            local_clip_rect,
+            prim_to_pic_mapper,
+            pic_to_raster_mapper,
+            device_pixel_scale,
+            clip_scroll_tree,
+            transform_palette,
+        )?;
+        let local_bounding_rect = snapped_local_prim_rect.intersection(&local_clip_rect)?;
+        let pic_clip_rect = prim_to_pic_mapper.map(&local_bounding_rect)?;
+        let world_clip_rect = pic_to_world_mapper.map(&pic_clip_rect)?;
+
+        // Now, we've collected all the clip nodes that *potentially* affect this
+        // primitive region, and reduced the size of the prim region as much as possible.
+
+        // Run through the clip nodes, and see which ones affect this prim region.
+
+        let first_clip_node_index = self.clip_node_instances.len() as u32;
+        let mut has_non_local_clips = false;
+        let mut needs_mask = false;
+
+        // For each potential clip node
+        for node_info in self.clip_node_info.drain(..) {
+            let node = &mut clip_data_store[node_info.handle];
+
+            // See how this clip affects the prim region.
+            let clip_result = match node_info.conversion {
+                ClipSpaceConversion::Local => {
+                    node.item.get_clip_result(node_info.local_pos, &local_bounding_rect)
+                }
+                ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
+                    has_non_local_clips = true;
+                    node.item.get_clip_result(node_info.local_pos, &scale_offset.unmap_rect(&local_bounding_rect))
+                }
+                ClipSpaceConversion::Transform(ref transform) => {
+                    has_non_local_clips = true;
+                    node.item.get_clip_result_complex(
+                        node_info.local_pos,
+                        transform,
+                        &world_clip_rect,
+                        world_rect,
+                    )
+                }
+            };
+
+            match clip_result {
+                ClipResult::Accept => {
+                    // Doesn't affect the primitive at all, so skip adding to list
+                }
+                ClipResult::Reject => {
+                    // Completely clips the supplied prim rect
+                    return None;
+                }
+                ClipResult::Partial => {
+                    // Needs a mask -> add to clip node indices
+
+                    // TODO(gw): Ensure this only runs once on each node per frame?
+                    node.update(
+                        gpu_cache,
+                        device_pixel_scale,
+                    );
+
+                    // Create the clip node instance for this clip node
+                    let instance = node_info.create_instance(
+                        node,
+                        &local_bounding_rect,
+                        gpu_cache,
+                        resource_cache,
+                        clip_scroll_tree,
+                    );
+
+                    // As a special case, a partial accept of a clip rect that is
+                    // in the same coordinate system as the primitive doesn't need
+                    // a clip mask. Instead, it can be handled by the primitive
+                    // vertex shader as part of the local clip rect. This is an
+                    // important optimization for reducing the number of clip
+                    // masks that are allocated on common pages.
+                    needs_mask |= match node.item {
+                        ClipItem::Rectangle(_, ClipMode::ClipOut) |
+                        ClipItem::RoundedRectangle(..) |
+                        ClipItem::Image { .. } |
+                        ClipItem::BoxShadow(..) => {
+                            true
+                        }
+
+                        ClipItem::Rectangle(_, ClipMode::Clip) => {
+                            !instance.flags.contains(ClipNodeFlags::SAME_COORD_SYSTEM)
+                        }
+                    };
+
+                    // Store this in the index buffer for this clip chain instance.
+                    self.clip_node_instances.push(instance);
+                }
+            }
+        }
+
+        // Get the range identifying the clip nodes in the index buffer.
+        let clips_range = ClipNodeRange {
+            first: first_clip_node_index,
+            count: self.clip_node_instances.len() as u32 - first_clip_node_index,
+        };
+
+        // Return a valid clip chain instance
+        Some(ClipChainInstance {
+            clips_range,
+            has_non_local_clips,
+            local_clip_rect,
+            pic_clip_rect,
+            needs_mask,
+        })
+    }
+
     pub fn build_clip_chain_instance(
         &mut self,
         clip_chains: &[ClipChainId],

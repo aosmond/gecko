@@ -2843,7 +2843,7 @@ impl PicturePrimitive {
                           prim_clip_pic_rect,
                           &surface.map_surface_to_raster,
                           surface.device_pixel_scale,
-                          frame_context,
+                          frame_context.clip_scroll_tree,
                           transform_palette) {
                           snapped_bounding_rect = snapped_bounding_rect.union(&snapped_rect);
                       }

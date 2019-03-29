@@ -1721,6 +1721,7 @@ impl PrimitiveStore {
         parent_surface_index: SurfaceIndex,
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
+        transform_palette: &mut TransformPalette,
     ) {
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
@@ -1820,6 +1821,7 @@ impl PrimitiveStore {
                         surface_index,
                         frame_context,
                         frame_state,
+                        transform_palette,
                     );
 
                     let pic = &self.pictures[pic_index.0];
@@ -1886,18 +1888,14 @@ impl PrimitiveStore {
                 // taken into account.
                 let inflation_factor = surface.inflation_factor;
                 let local_rect = prim_local_rect
-                    .inflate(inflation_factor, inflation_factor)
-                    .intersection(&prim_instance.local_clip_rect);
-                let local_rect = match local_rect {
-                    Some(local_rect) => local_rect,
-                    None => {
-                        if prim_instance.is_chased() {
-                            println!("\tculled for being out of the local clip rectangle: {:?}",
-                                prim_instance.local_clip_rect);
-                        }
-                        continue;
+                    .inflate(inflation_factor, inflation_factor);
+                if let None = local_rect.intersection(&prim_instance.local_clip_rect) {
+                    if prim_instance.is_chased() {
+                        println!("\tculled for being out of the local clip rectangle: {:?}",
+                            prim_instance.local_clip_rect);
                     }
-                };
+                    continue;
+                }
 
                 // Include the clip chain for this primitive in the current stack.
                 frame_state.clip_chain_stack.push_clip(prim_instance.clip_chain_id);
@@ -1925,16 +1923,19 @@ impl PrimitiveStore {
 
                 let clip_chain = frame_state
                     .clip_store
-                    .build_clip_chain_instance(
+                    .build_clip_chain_instance_snap(
                         frame_state.clip_chain_stack.current_clips(),
                         local_rect,
                         prim_instance.local_clip_rect,
                         prim_context.spatial_node_index,
+                        surface.raster_spatial_node_index,
                         &map_local_to_surface,
+                        &surface.map_surface_to_raster,
                         &map_surface_to_world,
                         &frame_context.clip_scroll_tree,
                         frame_state.gpu_cache,
                         frame_state.resource_cache,
+                        transform_palette,
                         surface.device_pixel_scale,
                         &frame_context.screen_world_rect,
                         &mut frame_state.data_stores.clip,
@@ -3711,13 +3712,13 @@ pub fn get_snapped_picture_rect(
     prim_clip_rect: PictureRect,
     map_to_raster: &SpaceMapper<PicturePixel, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
-    frame_context: &FrameBuildingContext,
+    clip_scroll_tree: &ClipScrollTree,
     transform_palette: &mut TransformPalette,
 ) -> Option<PictureRect> {
     let transform_id = transform_palette.get_id(
         prim_spatial_node_index,
         root_spatial_node_index,
-        frame_context.clip_scroll_tree,
+        clip_scroll_tree,
     );
 
     match transform_id.transform_kind() {
@@ -3756,6 +3757,31 @@ pub fn get_snapped_picture_rect(
             Some(prim_rect)
         }
     }
+}
+
+pub fn get_snapped_local_rect(
+    prim_spatial_node_index: SpatialNodeIndex,
+    root_spatial_node_index: SpatialNodeIndex,
+    prim_rect: LayoutRect,
+    prim_clip_rect: LayoutRect,
+    map_to_pic: &SpaceMapper<LayoutPixel, PicturePixel>,
+    map_to_raster: &SpaceMapper<PicturePixel, RasterPixel>,
+    device_pixel_scale: DevicePixelScale,
+    clip_scroll_tree: &ClipScrollTree,
+    transform_palette: &mut TransformPalette,
+) -> Option<LayoutRect> {
+    let prim_pic_rect = map_to_pic.map(&prim_rect)?;
+    let prim_clip_pic_rect = map_to_pic.map(&prim_clip_rect)?;
+    let snapped_prim_pic_rect = get_snapped_picture_rect(
+        prim_spatial_node_index,
+        root_spatial_node_index,
+        prim_pic_rect,
+        prim_clip_pic_rect,
+        map_to_raster,
+        device_pixel_scale,
+        clip_scroll_tree,
+        transform_palette)?;
+    map_to_pic.unmap(&snapped_prim_pic_rect)
 }
 
 /// Given an unclipped device rect, try to find a minimal device space

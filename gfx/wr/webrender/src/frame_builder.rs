@@ -415,6 +415,7 @@ impl FrameBuilder {
                 ROOT_SURFACE_INDEX,
                 &visibility_context,
                 &mut visibility_state,
+                transform_palette,
             );
         }
 
