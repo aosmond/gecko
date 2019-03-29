@@ -26,6 +26,11 @@ vec2 clamp_rect(vec2 pt, RectWithSize rect) {
 flat varying vec4 vClipMaskUvBounds;
 // XY and W are homogeneous coordinates, Z is the layer index
 varying vec4 vClipMaskUv;
+flat varying vec2 vClampedLocalPos;
+flat varying vec2 vUnclampedLocalPos;
+flat varying vec2 vDevicePos;
+flat varying vec2 vSnappedDevicePos;
+flat varying vec2 vSnapOffset;
 
 
 #ifdef WR_VERTEX_SHADER
@@ -126,6 +131,12 @@ VertexInfo write_vertex(RectWithSize instance_rect,
 
     // Convert the world positions to device pixel space.
     vec2 device_pos = world_pos.xy * task.device_pixel_scale;
+
+    vClampedLocalPos = clamped_local_pos;
+    vUnclampedLocalPos = local_pos;
+    vDevicePos = device_pos;
+    vSnappedDevicePos = device_pos + snap_offset;
+    vSnapOffset = snap_offset;
 
     // Apply offsets for the render task to get correct screen location.
     vec2 final_offset = snap_offset - task.content_origin + task.common_data.task_rect.p0;
