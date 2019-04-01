@@ -979,6 +979,12 @@ impl AlphaBatchBuilder {
                 let picture = &ctx.prim_store.pictures[pic_index.0];
                 let non_segmented_blend_mode = BlendMode::PremultipliedAlpha;
                 let prim_cache_address = gpu_cache.get_address(&ctx.globals.default_image_handle);
+                if is_chased {
+                    let is_segmented =
+                        segment_instance_index != SegmentInstanceIndex::INVALID &&
+                        segment_instance_index != SegmentInstanceIndex::UNUSED;
+                    println!("\tis_segmented {:?}", is_segmented);
+                }
 
                 let prim_header = PrimitiveHeader {
                     local_rect: picture.local_rect,
@@ -1974,10 +1980,17 @@ impl AlphaBatchBuilder {
 
                     debug_assert_ne!(image_instance.segment_instance_index, SegmentInstanceIndex::INVALID);
                     let (prim_cache_address, segments) = if image_instance.segment_instance_index == SegmentInstanceIndex::UNUSED {
+                        if is_chased {
+                            println!("\tis_segmented false (image)");
+                        }
                         (gpu_cache.get_address(&common_data.gpu_cache_handle), None)
                     } else {
                         let segment_instance = &ctx.scratch.segment_instances[image_instance.segment_instance_index];
                         let segments = Some(&ctx.scratch.segments[segment_instance.segments_range]);
+                        if is_chased {
+                            println!("\tis_segmented true (image)");
+                            println!("\tsegments {:?}", segments);
+                        }
                         (gpu_cache.get_address(&segment_instance.gpu_cache_handle), segments)
                     };
 
