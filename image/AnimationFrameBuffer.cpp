@@ -92,7 +92,7 @@ void AnimationFrameRetainedBuffer::AdvanceInternal() {
   }
 }
 
-imgFrame* AnimationFrameRetainedBuffer::Get(size_t aFrame, bool aForDisplay) {
+imgFrame* AnimationFrameRetainedBuffer::Get(size_t aFrame, bool aForDisplay) const {
   // We should not have asked for a frame if we never inserted.
   if (mFrames.IsEmpty()) {
     MOZ_ASSERT_UNREACHABLE("Calling Get() when we have no frames");
@@ -223,7 +223,7 @@ void AnimationFrameDiscardingQueue::AdvanceInternal() {
   }
 }
 
-imgFrame* AnimationFrameDiscardingQueue::Get(size_t aFrame, bool aForDisplay) {
+imgFrame* AnimationFrameDiscardingQueue::Get(size_t aFrame, bool aForDisplay) const {
   // The first frame is stored separately. If we only need the frame for
   // display purposes, we can return it right away. If we need it for advancing
   // the animation, we want to verify the recreated first frame is available

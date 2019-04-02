@@ -15,6 +15,7 @@
 #include "nsRect.h"
 #include "SurfaceCache.h"
 #include "gfxPrefs.h"
+#include "ISurfaceProvider.h"
 
 namespace mozilla {
 namespace image {
@@ -248,31 +249,6 @@ class AnimationState {
   //! Whether this image is currently discarded. Only set to true after the
   //! image has been decoded at least once.
   bool mDiscarded;
-};
-
-/**
- * RefreshResult is used to let callers know how the state of the animation
- * changed during a call to FrameAnimator::RequestRefresh().
- */
-struct RefreshResult {
-  RefreshResult() : mFrameAdvanced(false), mAnimationFinished(false) {}
-
-  /// Merges another RefreshResult's changes into this RefreshResult.
-  void Accumulate(const RefreshResult& aOther) {
-    mFrameAdvanced = mFrameAdvanced || aOther.mFrameAdvanced;
-    mAnimationFinished = mAnimationFinished || aOther.mAnimationFinished;
-    mDirtyRect = mDirtyRect.Union(aOther.mDirtyRect);
-  }
-
-  // The region of the image that has changed.
-  gfx::IntRect mDirtyRect;
-
-  // If true, we changed frames at least once. Note that, due to looping, we
-  // could still have ended up on the same frame!
-  bool mFrameAdvanced : 1;
-
-  // Whether the animation has finished playing.
-  bool mAnimationFinished : 1;
 };
 
 class FrameAnimator {

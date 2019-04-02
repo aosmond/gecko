@@ -118,6 +118,9 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
 
   /// Time at which we advanced last.
   TimeStamp mLastAdvanceTime;
+
+  /// Remaining loop iterations until the animation is complete. -1 is infinite.
+  int32_t mLoopRemainingCount;
 };
 
 }  // namespace image

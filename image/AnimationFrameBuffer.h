@@ -115,6 +115,33 @@ class AnimationFrameBuffer {
   size_t Displayed() const { return mGetIndex; }
 
   /**
+   * @returns True if the currently displayed frame is the last frame before
+   *          the animation needs to loop again.
+   */
+  bool IsLastFrameDisplayed() const {
+    return mSizeKnown && mGetIndex + 1 == mSize;
+  }
+
+  /**
+   * @returns The current frame we are displaying.
+   */
+  imgFrame* DisplayedFrame() const {
+    return Get(mGetIndex, /* aForDisplay */ true);
+  }
+
+  /**
+   * @returns The next frame we will display after advancing.
+   */
+  imgFrame* NextDisplayFrame() const {
+    size_t nextIndex = mGetIndex + 1;
+    if (nextIndex == mSize && mSizeKnown) {
+      nextIndex = 0;
+    }
+
+    return Get(nextIndex, /* aForDisplay */ true);
+  }
+
+  /**
    * @returns Outstanding frames desired from the decoder.
    */
   size_t PendingDecode() const { return mPending; }
@@ -171,6 +198,31 @@ class AnimationFrameBuffer {
   }
 
   /**
+   * Advance the currently displayed frame of the frame buffer. If it reaches
+   * the end, it will loop back to the beginning. It should not be called unless
+   * a call to GetNextDisplayFrame has returned a valid frame for the next frame
+   * index.
+   *
+   * As we advance, the number of frames we have buffered ahead of the current
+   * will shrink. Once that becomes too few, we will request a batch-sized set
+   * of frames to be decoded from the decoder.
+   *
+   * @returns True if the caller should restart the decoder.
+   */
+  bool Advance() {
+    MOZ_ASSERT(mAdvance == 0);
+    if (++mGetIndex == mSize && mSizeKnown) {
+      mGetIndex = 0;
+    }
+
+    bool hasPending = mPending > 0;
+    AdvanceInternal();
+    // Restart the decoder if we transitioned from no pending frames being
+    // decoded, to some pending frames to be decoded.
+    return !hasPending && mPending > 0;
+  }
+
+  /**
    * Inserts a frame into the frame buffer.
    *
    * Once we have a sufficient number of frames buffered relative to the
@@ -215,7 +267,7 @@ class AnimationFrameBuffer {
    *
    * @returns The frame, if available.
    */
-  virtual imgFrame* Get(size_t aFrame, bool aForDisplay) = 0;
+  virtual imgFrame* Get(size_t aFrame, bool aForDisplay) const = 0;
 
   /**
    * @returns True if the first frame of the animation (not of the queue) is
@@ -350,7 +402,7 @@ class AnimationFrameRetainedBuffer final : public AnimationFrameBuffer {
    */
   const nsTArray<RefPtr<imgFrame>>& Frames() const { return mFrames; }
 
-  imgFrame* Get(size_t aFrame, bool aForDisplay) override;
+  imgFrame* Get(size_t aFrame, bool aForDisplay) const override;
   bool IsFirstFrameFinished() const override;
   bool IsLastInsertedFrame(imgFrame* aFrame) const override;
   bool MarkComplete(const gfx::IntRect& aFirstFrameRefreshArea) override;
@@ -380,7 +432,7 @@ class AnimationFrameDiscardingQueue : public AnimationFrameBuffer {
  public:
   explicit AnimationFrameDiscardingQueue(AnimationFrameRetainedBuffer&& aQueue);
 
-  imgFrame* Get(size_t aFrame, bool aForDisplay) final;
+  imgFrame* Get(size_t aFrame, bool aForDisplay) const final;
   bool IsFirstFrameFinished() const final;
   bool IsLastInsertedFrame(imgFrame* aFrame) const final;
   bool MarkComplete(const gfx::IntRect& aFirstFrameRefreshArea) override;
