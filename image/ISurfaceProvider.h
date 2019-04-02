@@ -252,6 +252,15 @@ class MOZ_STACK_CLASS DrawableSurface final {
     mProvider->Advance(aFrame);
   }
 
+  RefreshResult RequestRefresh(const TimeStamp& aTime) {
+    if (!mProvider) {
+      MOZ_ASSERT_UNREACHABLE("Trying to refresh a static DrawableSurface?");
+      return RefreshResult();
+    }
+
+    return mProvider->RequestRefresh(aTime);
+  }
+
   bool IsFullyDecoded() const {
     if (!mProvider) {
       MOZ_ASSERT_UNREACHABLE(

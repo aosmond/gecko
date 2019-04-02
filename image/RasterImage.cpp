@@ -160,13 +160,15 @@ RasterImage::RequestRefresh(const TimeStamp& aTime) {
     return;
   }
 
-  RefreshResult res;
-  if (mAnimationState) {
-    MOZ_ASSERT(mFrameAnimator);
-    res = mFrameAnimator->RequestRefresh(*mAnimationState, aTime,
-                                         mAnimationFinished);
+  LookupResult result = SurfaceCache::Lookup(
+      ImageKey(this),
+      RasterSurfaceKey(mSize, DefaultSurfaceFlags(), PlaybackType::eAnimated),
+      /* aMarkUsed = */ true);
+  if (!result) {
+    return;
   }
 
+  RefreshResult res = result.Surface().RequestRefresh(aTime);
   if (res.mFrameAdvanced) {
 // Notify listeners that our frame has actually changed, but do this only
 // once for all frames that we've now passed (if AdvanceFrame() was called

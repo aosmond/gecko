@@ -140,7 +140,7 @@ RefreshResult AnimationSurfaceProvider::RequestRefresh(const TimeStamp& aTime) {
     MutexAutoLock lock(mFramesMutex);
 
     // We must have the first frame available before we can consider advancing.
-    imgFrame* display = mFrames->DisplayedFrame();
+    imgFrame* display = mFrames->CurrentFrame();
     if (!display) {
       return result;
     }
@@ -160,22 +160,25 @@ RefreshResult AnimationSurfaceProvider::RequestRefresh(const TimeStamp& aTime) {
       // Bail if we haven't expired the current frame yet.
       TimeDuration offset = TimeDuration::FromMilliseconds(
           double(display->GetTimeout().AsMilliseconds()));
-      if (aTime - mLastAdvanceTime < offset) {
+      TimeStamp frameEndTime = mLastAdvanceTime + offset;
+      if (frameEndTime + offset > aTime) {
         break;
       }
 
       // Bail if we don't have the next frame decoded yet.
-      imgFrame* next = mFrames->NextDisplayFrame();
+      imgFrame* next = mFrames->NextFrame();
       if (!next) {
+        mLastAdvanceTime = aTime;
         break;
       }
 
       // Advance to the next frame and accumulate the dirty rect.
       restartDecoder |= mFrames->Advance();
-      MOZ_ASSERT(mFrames->DisplayedFrame() == next);
+      MOZ_ASSERT(mFrames->CurrentFrame() == next);
       display = next;
       result.mFrameAdvanced = true;
       result.mDirtyRect = result.mDirtyRect.Union(display->GetDirtyRect());
+      mLastAdvanceTime = frameEndTime;
 
       // If this is our last iteration of the loop, break out early.
       if (mLoopRemainingCount > 0 && mFrames->IsLastFrameDisplayed() &&
@@ -201,7 +204,7 @@ DrawableFrameRef AnimationSurfaceProvider::DrawableRef(size_t aFrame) {
     return DrawableFrameRef();
   }
 
-  imgFrame* frame = mFrames->Get(aFrame, /* aForDisplay */ true);
+  imgFrame* frame = mFrames->Get(mFrames->Displayed(), /* aForDisplay */ true);
   if (!frame) {
     return DrawableFrameRef();
   }

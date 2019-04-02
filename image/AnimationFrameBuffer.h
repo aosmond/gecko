@@ -123,22 +123,22 @@ class AnimationFrameBuffer {
   }
 
   /**
-   * @returns The current frame we are displaying.
+   * @returns The current frame we have advanced to.
    */
-  imgFrame* DisplayedFrame() const {
-    return Get(mGetIndex, /* aForDisplay */ true);
+  imgFrame* CurrentFrame() const {
+    return Get(mGetIndex, /* aForDisplay */ false);
   }
 
   /**
    * @returns The next frame we will display after advancing.
    */
-  imgFrame* NextDisplayFrame() const {
+  imgFrame* NextFrame() const {
     size_t nextIndex = mGetIndex + 1;
     if (nextIndex == mSize && mSizeKnown) {
       nextIndex = 0;
     }
 
-    return Get(nextIndex, /* aForDisplay */ true);
+    return Get(nextIndex, /* aForDisplay */ false);
   }
 
   /**
