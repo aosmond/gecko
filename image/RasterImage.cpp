@@ -290,14 +290,8 @@ LookupResult RasterImage::LookupFrameInternal(const IntSize& aSize,
                                               uint32_t aFlags,
                                               PlaybackType aPlaybackType,
                                               bool aMarkUsed) {
-  if (mAnimationState && aPlaybackType == PlaybackType::eAnimated) {
-    MOZ_ASSERT(mFrameAnimator);
-    MOZ_ASSERT(ToSurfaceFlags(aFlags) == DefaultSurfaceFlags(),
-               "Can't composite frames with non-default surface flags");
-    return mFrameAnimator->GetCompositedFrame(*mAnimationState, aMarkUsed);
-  }
-
   SurfaceFlags surfaceFlags = ToSurfaceFlags(aFlags);
+  MOZ_ASSERT_IF(aPlaybackType == PlaybackType::eAnimated, surfaceFlags == DefaultSurfaceFlags());
 
   // We don't want any substitution for sync decodes, and substitution would be
   // illegal when high quality downscaling is disabled, so we use
@@ -305,14 +299,14 @@ LookupResult RasterImage::LookupFrameInternal(const IntSize& aSize,
   if ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
     return SurfaceCache::Lookup(
         ImageKey(this),
-        RasterSurfaceKey(aSize, surfaceFlags, PlaybackType::eStatic),
+        RasterSurfaceKey(aSize, surfaceFlags, aPlaybackType),
         aMarkUsed);
   }
 
   // We'll return the best match we can find to the requested frame.
   return SurfaceCache::LookupBestMatch(
       ImageKey(this),
-      RasterSurfaceKey(aSize, surfaceFlags, PlaybackType::eStatic), aMarkUsed);
+      RasterSurfaceKey(aSize, surfaceFlags, aPlaybackType), aMarkUsed);
 }
 
 LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
@@ -718,7 +712,6 @@ bool RasterImage::SetMetadata(const ImageMetadata& aMetadata,
   if (mHasSize && aMetadata.HasAnimation() && !mAnimationState) {
     // We're becoming animated, so initialize animation stuff.
     mAnimationState.emplace(mAnimationMode);
-    mFrameAnimator = MakeUnique<FrameAnimator>(this, mSize);
 
     if (!gfxPrefs::ImageMemAnimatedDiscardable()) {
       // We don't support discarding animated images (See bug 414259).
@@ -1531,7 +1524,6 @@ void RasterImage::DoError() {
     StopAnimation();
   }
   mAnimationState = Nothing();
-  mFrameAnimator = nullptr;
 
   // Release all locks.
   mLockCount = 0;

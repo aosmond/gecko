@@ -370,9 +370,6 @@ class RasterImage final : public ImageResource,
 
   nsCOMPtr<nsIProperties> mProperties;
 
-  /// If this image is animated, a FrameAnimator which manages its animation.
-  UniquePtr<FrameAnimator> mFrameAnimator;
-
   /// Animation timeline and other state for animation images.
   Maybe<AnimationState> mAnimationState;
 
