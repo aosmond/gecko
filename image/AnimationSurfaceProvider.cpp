@@ -62,10 +62,11 @@ void AnimationSurfaceProvider::DropImageReference() {
                                     mImage.forget());
 }
 
-void AnimationSurfaceProvider::Reset() {
+gfx::IntRect AnimationSurfaceProvider::Reset() {
   // We want to go back to the beginning.
   bool mayDiscard;
   bool restartDecoder = false;
+  gfx::IntRect dirtyRect;
 
   {
     MutexAutoLock lock(mFramesMutex);
@@ -76,6 +77,7 @@ void AnimationSurfaceProvider::Reset() {
     // decision inside the AnimationFrameBuffer::Reset method, but if we have
     // crossed the threshold, we need to hold onto the decoding mutex too. We
     // should avoid blocking the main thread on the decoder threads.
+    dirtyRect = mFrames->FirstFrameRefreshArea();
     mayDiscard = mFrames->MayDiscard();
     if (!mayDiscard) {
       restartDecoder = mFrames->Reset();
@@ -102,6 +104,7 @@ void AnimationSurfaceProvider::Reset() {
       MOZ_ASSERT(mDecoder);
 
       MutexAutoLock lock2(mFramesMutex);
+      dirtyRect = mFrames->FirstFrameRefreshArea();
       restartDecoder = mFrames->Reset();
     } else {
       MOZ_ASSERT(mFrames->HasRedecodeError());
@@ -111,6 +114,8 @@ void AnimationSurfaceProvider::Reset() {
   if (restartDecoder) {
     DecodePool::Singleton()->AsyncRun(this);
   }
+
+  return dirtyRect;
 }
 
 void AnimationSurfaceProvider::Advance(size_t aFrame) {
@@ -420,7 +425,7 @@ bool AnimationSurfaceProvider::CheckForNewFrameAtTerminalState() {
     }
 
     if (!frame || mFrames->IsLastInsertedFrame(frame)) {
-      return mFrames->MarkComplete(mDecoder->GetFirstFrameRefreshArea());
+      return mFrames->MarkComplete();
     }
 
     // Append the new frame to the list.
@@ -446,8 +451,7 @@ bool AnimationSurfaceProvider::CheckForNewFrameAtTerminalState() {
         break;
     }
 
-    continueDecoding =
-        mFrames->MarkComplete(mDecoder->GetFirstFrameRefreshArea());
+    continueDecoding = mFrames->MarkComplete();
 
     // We only want to handle the first frame if it is the first pass for the
     // animation decoder. The owning image will be cleared after that.

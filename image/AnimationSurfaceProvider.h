@@ -52,7 +52,7 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
   size_t LogicalSizeInBytes() const override;
   void AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                               const AddSizeOfCb& aCallback) override;
-  void Reset() override;
+  gfx::IntRect Reset() override;
   void Advance(size_t aFrame) override;
   RefreshResult RequestRefresh(const TimeStamp& aTime) override;
 

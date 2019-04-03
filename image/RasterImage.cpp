@@ -832,11 +832,18 @@ RasterImage::ResetAnimation() {
     StopAnimation();
   }
 
-  MOZ_ASSERT(mAnimationState, "Should have AnimationState");
-  MOZ_ASSERT(mFrameAnimator, "Should have FrameAnimator");
-  mFrameAnimator->ResetAnimation(*mAnimationState);
+  // Our surface provider is synchronized to our state, so we need to reset its
+  // state as well, if we still have one.
+  LookupResult result = SurfaceCache::Lookup(
+      ImageKey(this),
+      RasterSurfaceKey(mSize, DefaultSurfaceFlags(), PlaybackType::eAnimated),
+      /* aMarkUsed = */ false);
+  if (!result) {
+    return NS_OK;
+  }
 
-  NotifyProgress(NoProgress, mAnimationState->FirstFrameRefreshArea());
+  gfx::IntRect refreshArea = result.Surface().Reset();
+  NotifyProgress(NoProgress, refreshArea);
 
   // Start the animation again. It may not have been running before, if
   // mAnimationFinished was true before entering this function.

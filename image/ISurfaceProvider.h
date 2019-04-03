@@ -105,7 +105,7 @@ class ISurfaceProvider {
     ref->AddSizeOfExcludingThis(aMallocSizeOf, aCallback);
   }
 
-  virtual void Reset() {}
+  virtual gfx::IntRect Reset() { return gfx::IntRect(); }
   virtual void Advance(size_t aFrame) {}
 
   virtual RefreshResult RequestRefresh(const TimeStamp& aTime) {
@@ -234,13 +234,13 @@ class MOZ_STACK_CLASS DrawableSurface final {
     return mProvider->GetFrame(aFrame);
   }
 
-  void Reset() {
+  gfx::IntRect Reset() {
     if (!mProvider) {
       MOZ_ASSERT_UNREACHABLE("Trying to reset a static DrawableSurface?");
-      return;
+      return gfx::IntRect();
     }
 
-    mProvider->Reset();
+    return mProvider->Reset();
   }
 
   void Advance(size_t aFrame) {

@@ -135,20 +135,9 @@ static void VerifyMarkComplete(AnimationFrameBuffer& aQueue,
                                bool aExpectedContinue,
                                const IntRect& aRefreshArea = IntRect(0, 0, 1,
                                                                      1)) {
-  if (aQueue.IsRecycling() && !aQueue.SizeKnown()) {
-    const AnimationFrameRecyclingQueue& queue =
-        *static_cast<AnimationFrameRecyclingQueue*>(&aQueue);
-    EXPECT_EQ(queue.FirstFrame()->GetRect(), queue.FirstFrameRefreshArea());
-  }
-
-  bool keepDecoding = aQueue.MarkComplete(aRefreshArea);
+  bool keepDecoding = aQueue.MarkComplete();
   EXPECT_EQ(aExpectedContinue, keepDecoding);
-
-  if (aQueue.IsRecycling()) {
-    const AnimationFrameRecyclingQueue& queue =
-        *static_cast<AnimationFrameRecyclingQueue*>(&aQueue);
-    EXPECT_EQ(aRefreshArea, queue.FirstFrameRefreshArea());
-  }
+  EXPECT_EQ(aRefreshArea, aQueue.FirstFrameRefreshArea());
 }
 
 static void VerifyInsert(AnimationFrameBuffer& aQueue,
@@ -258,7 +247,7 @@ TEST_F(ImageAnimationFrameBuffer, FinishUnderBatchAndThreshold) {
 
     if (i == 4) {
       EXPECT_EQ(size_t(15), buffer.PendingDecode());
-      bool keepDecoding = buffer.MarkComplete(IntRect(0, 0, 1, 1));
+      bool keepDecoding = buffer.MarkComplete();
       EXPECT_FALSE(keepDecoding);
       EXPECT_TRUE(buffer.SizeKnown());
       EXPECT_EQ(size_t(0), buffer.PendingDecode());
@@ -332,7 +321,7 @@ TEST_F(ImageAnimationFrameBuffer, FinishMultipleBatchesUnderThreshold) {
   // Add the last frame.
   status = buffer.Insert(CreateEmptyFrame());
   EXPECT_EQ(status, AnimationFrameBuffer::InsertStatus::CONTINUE);
-  bool keepDecoding = buffer.MarkComplete(IntRect(0, 0, 1, 1));
+  bool keepDecoding = buffer.MarkComplete();
   EXPECT_FALSE(keepDecoding);
   EXPECT_TRUE(buffer.SizeKnown());
   EXPECT_EQ(size_t(0), buffer.PendingDecode());
@@ -653,7 +642,7 @@ TEST_F(ImageAnimationFrameBuffer, DiscardingTooFewFrames) {
   VerifyInsert(buffer, AnimationFrameBuffer::InsertStatus::YIELD);
 
   // Mark it as complete.
-  bool restartDecoder = buffer.MarkComplete(IntRect(0, 0, 1, 1));
+  bool restartDecoder = buffer.MarkComplete();
   EXPECT_FALSE(restartDecoder);
   EXPECT_FALSE(buffer.HasRedecodeError());
 
@@ -664,7 +653,7 @@ TEST_F(ImageAnimationFrameBuffer, DiscardingTooFewFrames) {
   VerifyInsertAndAdvance(buffer, 2, AnimationFrameBuffer::InsertStatus::YIELD);
 
   // When we mark it as complete, it should fail due to too few frames.
-  restartDecoder = buffer.MarkComplete(IntRect(0, 0, 1, 1));
+  restartDecoder = buffer.MarkComplete();
   EXPECT_TRUE(buffer.HasRedecodeError());
   EXPECT_EQ(size_t(0), buffer.PendingDecode());
   EXPECT_EQ(size_t(4), buffer.Size());
@@ -688,7 +677,7 @@ TEST_F(ImageAnimationFrameBuffer, DiscardingTooManyFrames) {
   VerifyInsert(buffer, AnimationFrameBuffer::InsertStatus::YIELD);
 
   // Mark it as complete.
-  bool restartDecoder = buffer.MarkComplete(IntRect(0, 0, 1, 1));
+  bool restartDecoder = buffer.MarkComplete();
   EXPECT_FALSE(restartDecoder);
   EXPECT_FALSE(buffer.HasRedecodeError());
 
@@ -863,7 +852,7 @@ TEST_F(ImageAnimationFrameBuffer, RecyclingRect) {
   status = buffer.Insert(std::move(frame));
   EXPECT_EQ(AnimationFrameBuffer::InsertStatus::YIELD, status);
 
-  bool continueDecoding = buffer.MarkComplete(IntRect(0, 0, 75, 50));
+  bool continueDecoding = buffer.MarkComplete();
   EXPECT_FALSE(continueDecoding);
 
   VerifyAdvance(buffer, 7, true);

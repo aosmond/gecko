@@ -158,6 +158,14 @@ class AnimationFrameBuffer {
   size_t Batch() const { return mBatch; }
 
   /**
+   * @returns Aggregrate dirty rect between the first frame and all frames
+   *          inserted thereafter.
+   */
+  const gfx::IntRect& FirstFrameRefreshArea() const {
+    return mFirstFrameRefreshArea;
+  }
+
+  /**
    * Resets the currently displayed frame of the frame buffer to the beginning.
    *
    * @returns True if the caller should restart the decoder.
@@ -240,6 +248,11 @@ class AnimationFrameBuffer {
     MOZ_ASSERT(mPending > 0);
     MOZ_ASSERT(aFrame);
 
+    if (mSize > 0) {
+      mFirstFrameRefreshArea.UnionRect(mFirstFrameRefreshArea,
+          aFrame->GetDirtyRect());
+    }
+
     --mPending;
     bool retain = InsertInternal(std::move(aFrame));
 
@@ -289,7 +302,7 @@ class AnimationFrameBuffer {
    *
    * @returns True if the decoder should decode another frame.
    */
-  virtual bool MarkComplete(const gfx::IntRect& aFirstFrameRefreshArea) = 0;
+  virtual bool MarkComplete() = 0;
 
   typedef ISurfaceProvider::AddSizeOfCbData AddSizeOfCbData;
   typedef ISurfaceProvider::AddSizeOfCb AddSizeOfCb;
@@ -367,6 +380,10 @@ class AnimationFrameBuffer {
 
   // True if this buffer is recycling frames.
   bool mRecycling;
+
+  /// The first frame refresh area. This is used instead of the dirty rect for
+  /// the last frame when transitioning back to the first frame.
+  gfx::IntRect mFirstFrameRefreshArea;
 };
 
 /**
@@ -405,7 +422,7 @@ class AnimationFrameRetainedBuffer final : public AnimationFrameBuffer {
   imgFrame* Get(size_t aFrame, bool aForDisplay) const override;
   bool IsFirstFrameFinished() const override;
   bool IsLastInsertedFrame(imgFrame* aFrame) const override;
-  bool MarkComplete(const gfx::IntRect& aFirstFrameRefreshArea) override;
+  bool MarkComplete() override;
   void AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                               const AddSizeOfCb& aCallback) override;
 
@@ -435,7 +452,7 @@ class AnimationFrameDiscardingQueue : public AnimationFrameBuffer {
   imgFrame* Get(size_t aFrame, bool aForDisplay) const final;
   bool IsFirstFrameFinished() const final;
   bool IsLastInsertedFrame(imgFrame* aFrame) const final;
-  bool MarkComplete(const gfx::IntRect& aFirstFrameRefreshArea) override;
+  bool MarkComplete() override;
   void AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                               const AddSizeOfCb& aCallback) override;
 
@@ -472,7 +489,7 @@ class AnimationFrameRecyclingQueue final
  public:
   explicit AnimationFrameRecyclingQueue(AnimationFrameRetainedBuffer&& aQueue);
 
-  bool MarkComplete(const gfx::IntRect& aFirstFrameRefreshArea) override;
+  bool MarkComplete() override;
   void AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                               const AddSizeOfCb& aCallback) override;
 
@@ -499,9 +516,6 @@ class AnimationFrameRecyclingQueue final
   };
 
   const std::deque<RecycleEntry>& Recycle() const { return mRecycle; }
-  const gfx::IntRect& FirstFrameRefreshArea() const {
-    return mFirstFrameRefreshArea;
-  }
 
  protected:
   void AdvanceInternal() override;
@@ -511,10 +525,6 @@ class AnimationFrameRecyclingQueue final
   /// frames. May contain up to mBatch frames, where the last frame in the queue
   /// is adjacent to the first frame in the mDisplay queue.
   std::deque<RecycleEntry> mRecycle;
-
-  /// The first frame refresh area. This is used instead of the dirty rect for
-  /// the last frame when transitioning back to the first frame.
-  gfx::IntRect mFirstFrameRefreshArea;
 
   /// Force recycled frames to use the first frame refresh area as their dirty
   /// rect. This is used when we are recycling frames from the end of an

@@ -56,8 +56,7 @@ bool AnimationFrameRetainedBuffer::ResetInternal() {
   return false;
 }
 
-bool AnimationFrameRetainedBuffer::MarkComplete(
-    const gfx::IntRect& aFirstFrameRefreshArea) {
+bool AnimationFrameRetainedBuffer::MarkComplete() {
   MOZ_ASSERT(!mSizeKnown);
   mSizeKnown = true;
   mPending = 0;
@@ -184,8 +183,7 @@ bool AnimationFrameDiscardingQueue::ResetInternal() {
   return restartDecoder;
 }
 
-bool AnimationFrameDiscardingQueue::MarkComplete(
-    const gfx::IntRect& aFirstFrameRefreshArea) {
+bool AnimationFrameDiscardingQueue::MarkComplete() {
   if (NS_WARN_IF(mInsertIndex != mSize)) {
     mRedecodeError = true;
     mPending = 0;
@@ -457,15 +455,14 @@ RawAccessFrameRef AnimationFrameRecyclingQueue::RecycleFrame(
   return recycledFrame;
 }
 
-bool AnimationFrameRecyclingQueue::MarkComplete(
-    const gfx::IntRect& aFirstFrameRefreshArea) {
-  bool continueDecoding =
-      AnimationFrameDiscardingQueue::MarkComplete(aFirstFrameRefreshArea);
+bool AnimationFrameRecyclingQueue::MarkComplete() {
+  bool continueDecoding = AnimationFrameDiscardingQueue::MarkComplete();
 
   // If we encounter a redecode error, just make the first frame refresh area to
   // be the full frame, because we don't really know what we can safely recycle.
-  mFirstFrameRefreshArea =
-      mRedecodeError ? mFirstFrame->GetRect() : aFirstFrameRefreshArea;
+  if (mRedecodeError) {
+    mFirstFrameRefreshArea = mFirstFrame->GetRect();
+  }
   return continueDecoding;
 }
 
