@@ -228,7 +228,8 @@ nsresult nsWebPDecoder::CreateFrame(const nsIntRect& aFrameRect) {
   }
 
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-      this, Size(), OutputSize(), aFrameRect, mFormat, animParams, pipeFlags);
+      this, Size(), OutputSize(), aFrameRect, mFormat, animParams, mTransform,
+      pipeFlags);
   if (!pipe) {
     MOZ_LOG(sWebPLog, LogLevel::Error,
             ("[this=%p] nsWebPDecoder::CreateFrame -- no pipe\n", this));
@@ -462,9 +463,6 @@ LexerResult nsWebPDecoder::ReadSingle(const uint8_t* aData, size_t aLength,
 
     for (int row = mLastRow; row < lastRow; row++) {
       uint8_t* src = rowStart + row * stride;
-      if (mTransform) {
-        qcms_transform_data(mTransform, src, src, width);
-      }
 
       WriteState result;
       if (mFormat == SurfaceFormat::B8G8R8A8) {
