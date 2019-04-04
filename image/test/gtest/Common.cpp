@@ -510,6 +510,11 @@ ImageTestCase GreenJPGTestCase() {
                        TEST_CASE_IS_FUZZY);
 }
 
+ImageTestCase LargeJPGTestCase() {
+  return ImageTestCase("large2.jpg", "image/jpeg", IntSize(3724, 2308),
+                       IntSize(20, 20), TEST_CASE_IGNORE_OUTPUT);
+}
+
 ImageTestCase GreenBMPTestCase() {
   return ImageTestCase("green.bmp", "image/bmp", IntSize(100, 100));
 }

@@ -80,6 +80,7 @@ TEST_HARNESS_FILES.gtest += [
     'green.webp',
     'invalid-truncated-metadata.bmp',
     'large.webp',
+    'large2.jpg',
     'no-frame-delay.gif',
     'rle4.bmp',
     'rle8.bmp',
