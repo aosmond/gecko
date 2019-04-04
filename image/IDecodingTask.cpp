@@ -167,6 +167,21 @@ void MetadataDecodingTask::Run() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// DownscaleDecodingTask implementation.
+///////////////////////////////////////////////////////////////////////////////
+
+DownscaleDecodingTask::DownscaleDecodingTask(NotNull<RasterImage*> aImage,
+                                            RawAccessFrameRef&& aSourceFrame,
+                                            const gfx::IntRect& aDestSize)
+    : mImage(aImage)
+    , mSourceFrame(std::move(aSourceFrame))
+    , mDestSize(aDestSize) {
+}
+
+void DownscaleDecodingTask::Run() {
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // AnonymousDecodingTask implementation.
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -360,7 +360,22 @@ LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
       requestedSize = result.SuggestedSize();
     }
 
-    bool ranSync = Decode(requestedSize, aFlags, aPlaybackType);
+    bool ranSync;
+    if (result.Type() == MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND && result &&
+        result->GetSize() == mSize) {
+      RawAccessFrameRef frame = result->RawAccessRef(/* aOnlyFinished */ true);
+      if (frame) {
+        // FIXME: downscaling task
+      } else {
+        // The frame already got optimized by a draw call. We can't downscale
+        // since we don't necessarily have the raw pixel data available anymore.
+        ranSync = Decode(requestedSize, aFlags, aPlaybackType);
+      }
+    } else {
+      // We either have no alternative surface available to downscale from, or
+      // it is not scaled at the native size.
+      ranSync = Decode(requestedSize, aFlags, aPlaybackType);
+    }
 
     // If we can or did sync decode, we should already have the frame.
     if (ranSync || syncDecode) {

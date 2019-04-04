@@ -91,6 +91,32 @@ class MetadataDecodingTask final : public IDecodingTask {
   NotNull<RefPtr<Decoder>> mDecoder;
 };
 
+class DownscaleDecodingTask final public IDecodingTask {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING_RECORDED(DownscaleDecodingTask, override)
+
+  explicit DownscaleDecodingTask(NotNull<RasterImage*> aImage,
+                                 RawAccessFrameRef&& aSourceFrame,
+                                 const gfx::IntRect& aDestSize);
+
+  void Run() override;
+
+  bool ShouldPreferSyncRun() const override { return false; }
+
+  TaskPriority Priority() const override { return TaskPriority::eLow; }
+
+ private:
+  virtual ~DownscaleDecodingTask() {}
+
+  NotNull<RefPtr<RasterImage>> mImage;
+
+  RawAccessFrameRef mSourceFrame;
+
+  RawAccessFrameRef mDestFrame;
+
+  gfx::IntRect mDestSize;
+};
+
 /**
  * An IDecodingTask implementation for anonymous decoders - that is, decoders
  * with no associated Image object.
