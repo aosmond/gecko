@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "gtest/gtest.h"
+#include "gtest/MozGTestBench.h"
 
 #include "Common.h"
 #include "AnimationSurfaceProvider.h"
@@ -983,3 +984,20 @@ TEST_F(ImageDecoders, MultipleSizesICOSingleChunk) {
     EXPECT_EQ(expectedSizes[i], nativeSizes[i]);
   }
 }
+
+class ImageDecodersPerf : public ::testing::Test {
+ protected:
+  AutoInitializeImageLib mInit;
+};
+
+MOZ_GTEST_BENCH_F(ImageDecodersPerf, JPGLargeSingleChunk, [this] {
+  //CheckDecoderSingleChunk(LargeJPGTestCase());
+  CheckDownscaleDuringDecode(LargeJPGTestCase());
+});
+
+/*
+TEST_F(ImageDecoders, JPGLargeSingleChunk) {
+  mozilla::GTestBench("ImageDecoders", "JPGLargeSingleChunk", [this] {
+    CheckDecoderSingleChunk(LargeJPGTestCase());
+  });
+}*/

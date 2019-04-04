@@ -420,6 +420,7 @@ ImageTestCase GreenICOTestCase();
 ImageTestCase GreenIconTestCase();
 ImageTestCase GreenWebPTestCase();
 
+ImageTestCase LargeJPGTestCase();
 ImageTestCase LargeWebPTestCase();
 ImageTestCase GreenWebPIccSrgbTestCase();
 
