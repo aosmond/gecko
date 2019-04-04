@@ -165,6 +165,7 @@ static bool gCMSRGBTransformFailed = false;
 static qcms_transform* gCMSRGBTransform = nullptr;
 static qcms_transform* gCMSInverseRGBTransform = nullptr;
 static qcms_transform* gCMSRGBATransform = nullptr;
+static qcms_transform* gCMSBGRATransform = nullptr;
 
 static bool gCMSInitialized = false;
 static eCMSMode gCMSMode = eCMSMode_Off;
@@ -2128,6 +2129,22 @@ qcms_transform* gfxPlatform::GetCMSRGBATransform() {
     gCMSRGBATransform =
         qcms_transform_create(inProfile, QCMS_DATA_RGBA_8, outProfile,
                               QCMS_DATA_RGBA_8, QCMS_INTENT_PERCEPTUAL);
+  }
+
+  return gCMSRGBATransform;
+}
+
+qcms_transform* gfxPlatform::GetCMSBGRATransform() {
+  if (!gCMSRGBATransform) {
+    qcms_profile *inProfile, *outProfile;
+    outProfile = GetCMSOutputProfile();
+    inProfile = GetCMSsRGBProfile();
+
+    if (!inProfile || !outProfile) return nullptr;
+
+    gCMSRGBATransform =
+        qcms_transform_create(inProfile, QCMS_DATA_BGRA_8, outProfile,
+                              QCMS_DATA_BGRA_8, QCMS_INTENT_PERCEPTUAL);
   }
 
   return gCMSRGBATransform;
