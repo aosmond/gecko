@@ -374,6 +374,27 @@ static void qcms_transform_data_gray_out_lut(qcms_transform *transform, unsigned
 	}
 }
 
+static void qcms_transform_data_gray_out_rgba_lut(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
+{
+	unsigned int i;
+	for (i = 0; i < length; i++) {
+		float out_device_r, out_device_g, out_device_b;
+		unsigned char device = *src++;
+
+		float linear = transform->input_gamma_table_gray[device];
+
+		out_device_r = lut_interp_linear(linear, transform->output_gamma_lut_r, transform->output_gamma_lut_r_length);
+		out_device_g = lut_interp_linear(linear, transform->output_gamma_lut_g, transform->output_gamma_lut_g_length);
+		out_device_b = lut_interp_linear(linear, transform->output_gamma_lut_b, transform->output_gamma_lut_b_length);
+
+		dest[OUTPUT_R_INDEX] = clamp_u8(out_device_r*255);
+		dest[OUTPUT_G_INDEX] = clamp_u8(out_device_g*255);
+		dest[OUTPUT_B_INDEX] = clamp_u8(out_device_b*255);
+		dest[OUTPUT_A_INDEX] = 0xFF;
+		dest += RGBA_OUTPUT_COMPONENTS;
+	}
+}
+
 /* Alpha is not corrected.
    A rationale for this is found in Alvy Ray's "Should Alpha Be Nonlinear If
    RGB Is?" Tech Memo 17 (December 14, 1998).
@@ -419,6 +440,26 @@ static void qcms_transform_data_gray_out_precache(qcms_transform *transform, uns
 		dest[OUTPUT_G_INDEX] = transform->output_table_g->data[gray];
 		dest[OUTPUT_B_INDEX] = transform->output_table_b->data[gray];
 		dest += RGB_OUTPUT_COMPONENTS;
+	}
+}
+
+static void qcms_transform_data_gray_out_rgba_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
+{
+	unsigned int i;
+	for (i = 0; i < length; i++) {
+		unsigned char device = *src++;
+		uint16_t gray;
+
+		float linear = transform->input_gamma_table_gray[device];
+
+		/* we could round here... */
+		gray = linear * PRECACHE_OUTPUT_MAX;
+
+		dest[OUTPUT_R_INDEX] = transform->output_table_r->data[gray];
+		dest[OUTPUT_G_INDEX] = transform->output_table_g->data[gray];
+		dest[OUTPUT_B_INDEX] = transform->output_table_b->data[gray];
+		dest[OUTPUT_A_INDEX] = 0xFF;
+		dest += RGBA_OUTPUT_COMPONENTS;
 	}
 }
 
@@ -1390,15 +1431,35 @@ qcms_transform* qcms_transform_create(
 
 		if (precache) {
 			if (in_type == QCMS_DATA_GRAY_8) {
-				transform->transform_fn = qcms_transform_data_gray_out_precache;
+				if (out_type == QCMS_DATA_RGBA_8) {
+					transform->transform_fn = qcms_transform_data_gray_out_rgba_precache;
+				} else {
+					transform->transform_fn = qcms_transform_data_gray_out_precache;
+				}
 			} else {
-				transform->transform_fn = qcms_transform_data_graya_out_precache;
+				if (out_type == QCMS_DATA_RGBA_8) {
+					transform->transform_fn = qcms_transform_data_graya_out_precache;
+				} else {
+					assert(0 && "input/output type combination");
+					qcms_transform_release(transform);
+					return NULL;
+				}
 			}
 		} else {
 			if (in_type == QCMS_DATA_GRAY_8) {
-				transform->transform_fn = qcms_transform_data_gray_out_lut;
+				if (out_type == QCMS_DATA_RGBA_8) {
+					transform->transform_fn = qcms_transform_data_gray_out_rgba_lut;
+				} else {
+					transform->transform_fn = qcms_transform_data_gray_out_lut;
+				}
 			} else {
-				transform->transform_fn = qcms_transform_data_graya_out_lut;
+				if (out_type == QCMS_DATA_RGBA_8) {
+					transform->transform_fn = qcms_transform_data_graya_out_lut;
+				} else {
+					assert(0 && "input/output type combination");
+					qcms_transform_release(transform);
+					return NULL;
+				}
 			}
 		}
 	} else {
