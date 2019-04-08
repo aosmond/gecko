@@ -55,6 +55,7 @@ struct DecoderFinalStatus final {
 
 struct DecoderTelemetry final {
   DecoderTelemetry(const Maybe<Telemetry::HistogramID>& aSpeedHistogram,
+                   const Maybe<int32_t>& aColorProfile,
                    size_t aBytesDecoded, uint32_t aChunkCount,
                    TimeDuration aDecodeTime)
       : mSpeedHistogram(aSpeedHistogram),
@@ -73,6 +74,9 @@ struct DecoderTelemetry final {
   /// The per-image-format telemetry ID for recording our decoder's speed, or
   /// Nothing() if we don't record speed telemetry for this kind of decoder.
   const Maybe<Telemetry::HistogramID> mSpeedHistogram;
+
+  /// The color profile's space attached to the image, if any.
+  const Maybe<int32_t> mColorSpace;
 
   /// The number of bytes of input our decoder processed.
   const size_t mBytesDecoded;
@@ -565,6 +569,9 @@ class Decoder {
 
   /// Color management transform to apply to image data.
   qcms_transform* mTransform;
+
+  /// The color profile's space attached to the image, if any.
+  Maybe<int32_t> mColorSpace;
 
   uint8_t* mImageData;  // Pointer to image data in BGRA/X
   uint32_t mImageDataLength;

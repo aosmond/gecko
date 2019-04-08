@@ -255,7 +255,7 @@ DecoderFinalStatus Decoder::FinalStatus() const {
 
 DecoderTelemetry Decoder::Telemetry() const {
   MOZ_ASSERT(mIterator);
-  return DecoderTelemetry(SpeedHistogram(),
+  return DecoderTelemetry(SpeedHistogram(), mColorSpace,
                           mIterator ? mIterator->ByteCount() : 0,
                           mIterator ? mIterator->ChunkCount() : 0, mDecodeTime);
 }

@@ -295,6 +295,7 @@ void nsWebPDecoder::ApplyColorProfile(const char* aProfile, size_t aLength) {
   }
 
   uint32_t profileSpace = qcms_profile_get_color_space(mInProfile);
+  mColorSpace.emplace(profileSpace);
   if (profileSpace != icSigRgbData) {
     // WebP doesn't produce grayscale data, this must be corrupt.
     MOZ_LOG(sWebPLog, LogLevel::Error,

@@ -1670,6 +1670,65 @@ void RasterImage::NotifyDecodeComplete(
                             aTelemetry.mChunkCount);
     }
 
+    uint32_t colorSpace = 0;
+    if (aTelemetry.mColorSpace) {
+      switch (*aTelemetry.mColorSpace) {
+        case icSigRgbData:
+          colorSpace = 1;
+          break;
+        case icSigGrayData:
+          colorSpace = 2;
+          break;
+        case icSigXYZData:
+          colorSpace = 3;
+          break;
+        case icSigLabData:
+          colorSpace = 4;
+          break;
+        case icSigLuvData:
+          colorSpace = 5;
+          break;
+        case icSigYCbCrData:
+          colorSpace = 6;
+          break;
+        case icSigYxyData:
+          colorSpace = 7;
+          break;
+        case icSigHsvData:
+          colorSpace = 8;
+          break;
+        case icSigHlsData:
+          colorSpace = 9;
+          break;
+        case icSigCmykData:
+          colorSpace = 10;
+          break;
+        case icSigCmyData:
+          colorSpace = 11;
+          break;
+        case icSig2colorData:
+        case icSig3colorData:
+        case icSig4colorData:
+        case icSig5colorData:
+        case icSig6colorData:
+        case icSig7colorData:
+        case icSig8colorData:
+        case icSig9colorData:
+        case icSig10colorData:
+        case icSig11colorData:
+        case icSig12colorData:
+        case icSig13colorData:
+        case icSig14colorData:
+        case icSig15colorData:
+          colorSpace = 12;
+          break;
+        default:
+          colorSpace = 13;
+          break;
+      }
+    }
+    Telemetry::Accumulate(Telemetry::IMAGE_COLOR_SPACE, colorSpace);
+
     if (aStatus.mFinished) {
       Telemetry::Accumulate(Telemetry::IMAGE_DECODE_TIME,
                             int32_t(aTelemetry.mDecodeTime.ToMicroseconds()));

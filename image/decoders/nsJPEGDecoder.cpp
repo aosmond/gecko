@@ -277,6 +277,7 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
         if ((mInProfile = GetICCProfile(mInfo)) != nullptr &&
             gfxPlatform::GetCMSOutputProfile()) {
           uint32_t profileSpace = qcms_profile_get_color_space(mInProfile);
+          mColorSpace.emplace(profileSpace);
 
 #ifdef DEBUG_tor
           fprintf(stderr, "JPEG profileSpace: 0x%08X\n", profileSpace);

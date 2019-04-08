@@ -45,6 +45,9 @@ class nsPNGDecoder : public Decoder {
     bool mIsInterlaced;
   };
 
+  qcms_profile* GetColorProfile(png_structp png_ptr, png_infop info_ptr,
+                                int color_type, uint32_t* intent);
+
   nsresult CreateFrame(const FrameInfo& aFrameInfo);
   void EndImageFrame();
 

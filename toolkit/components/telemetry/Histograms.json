@@ -1399,6 +1399,15 @@
     "kind": "boolean",
     "description": "Did the browser start after a successful shutdown"
   },
+  "IMAGE_COLOR_SPACE": {
+    "record_in_processes": ["main", "content"],
+    "expires_in_version": "70",
+    "alert_emails": ["aosmond@mozilla.com"],
+    "bug_numbers": [1255106],
+    "kind": "enumerated",
+    "n_values": 14,
+    "description": "Color space of ICC profile for an image"
+  },
   "IMAGE_DECODE_LATENCY_US": {
     "record_in_processes": ["main", "content"],
     "alert_emails": ["gfx-telemetry-alerts@mozilla.com"],
