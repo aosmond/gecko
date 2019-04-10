@@ -22,7 +22,7 @@ use frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, Pi
 use frame_builder::{FrameVisibilityContext, FrameVisibilityState};
 use glyph_rasterizer::GlyphKey;
 use gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle, GpuDataRequest, ToGpuBlocks};
-use gpu_types::{BrushFlags, SnapOffsets};
+use gpu_types::{BrushFlags, SnapOffsets, TransformPalette};
 use image::{Repetition};
 use intern;
 use malloc_size_of::MallocSizeOf;
@@ -1373,6 +1373,9 @@ pub struct PrimitiveVisibility {
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
+
+    /// The local rect snapped in raster space.
+    pub snapped_local_rect: LayoutRect,
 }
 
 #[derive(Clone, Debug)]
@@ -1725,6 +1728,7 @@ impl PrimitiveStore {
         parent_surface_index: SurfaceIndex,
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
+        transform_palette: &mut TransformPalette,
     ) {
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
@@ -1819,6 +1823,7 @@ impl PrimitiveStore {
                         surface_index,
                         frame_context,
                         frame_state,
+                        transform_palette,
                     );
 
                     let pic = &self.pictures[pic_index.0];
@@ -1846,13 +1851,27 @@ impl PrimitiveStore {
                 _ => {
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
 
-                    // TODO(aosmond): snap snap!
                     let prim_rect = LayoutRect::new(
                         prim_instance.prim_origin,
                         prim_data.prim_size,
                     );
 
-                    (false, prim_rect)
+                    let snapped_prim_rect = get_snapped_local_rect(
+                        prim_instance.spatial_node_index,
+                        surface.raster_spatial_node_index,
+                        prim_rect,
+                        surface.device_pixel_scale,
+                        frame_context,
+                        transform_palette,
+                    ).unwrap_or(prim_rect);
+
+                    if prim_instance.is_chased() {
+                        if prim_rect != snapped_prim_rect {
+                            println!("\tsnapped {:?} to {:?}", prim_rect, snapped_prim_rect);
+                        }
+                    }
+
+                    (false, snapped_prim_rect)
                 }
             };
 
@@ -1867,6 +1886,7 @@ impl PrimitiveStore {
                         clip_chain: ClipChainInstance::empty(),
                         clip_task_index: ClipTaskIndex::INVALID,
                         combined_local_clip_rect: LayoutRect::zero(),
+                        snapped_local_rect: LayoutRect::zero(),
                     }
                 );
 
@@ -2012,6 +2032,7 @@ impl PrimitiveStore {
                         clip_chain,
                         clip_task_index: ClipTaskIndex::INVALID,
                         combined_local_clip_rect,
+                        snapped_local_rect: prim_local_rect,
                     }
                 );
 
@@ -3651,6 +3672,33 @@ fn compute_snap_offset_impl(
     )
 }
 
+fn compute_snap_offset_local_impl(
+    reference_pos: LayoutPoint,
+    reference_rect: LayoutRect,
+    prim_top_left: DevicePoint,
+    prim_bottom_right: DevicePoint,
+) -> DeviceVector2D {
+    let normalized_snap_pos = LayoutPoint::new(
+        (reference_pos.x - reference_rect.origin.x) / reference_rect.size.width,
+        (reference_pos.y - reference_rect.origin.y) / reference_rect.size.height,
+    );
+
+    let top_left = DeviceVector2D::new(
+        (prim_top_left.x + 0.5).floor() - prim_top_left.x,
+        (prim_top_left.y + 0.5).floor() - prim_top_left.y,
+    );
+
+    let bottom_right = DeviceVector2D::new(
+        (prim_bottom_right.x + 0.5).floor() - prim_bottom_right.x,
+        (prim_bottom_right.y + 0.5).floor() - prim_bottom_right.y,
+    );
+
+    DeviceVector2D::new(
+        mix(top_left.x, bottom_right.x, normalized_snap_pos.x),
+        mix(top_left.y, bottom_right.y, normalized_snap_pos.y),
+    )
+}
+
 /// Retrieve the exact unsnapped device space rectangle for a primitive.
 /// If the transform is axis-aligned, compute the snapping offsets that
 /// the shaders will apply.
@@ -3799,6 +3847,63 @@ pub fn get_raster_rects(
     }
 
     Some((clipped.to_i32(), unclipped))
+}
+
+pub fn get_snapped_local_rect(
+    prim_spatial_node_index: SpatialNodeIndex,
+    raster_spatial_node_index: SpatialNodeIndex,
+    prim_rect: LayoutRect,
+    device_pixel_scale: DevicePixelScale,
+    frame_context: &FrameVisibilityContext,
+    transform_palette: &mut TransformPalette,
+) -> Option<LayoutRect> {
+    let transform_id = transform_palette.get_id(
+        prim_spatial_node_index,
+        raster_spatial_node_index,
+        frame_context.clip_scroll_tree,
+    );
+
+    match transform_id.transform_kind() {
+        TransformedRectKind::AxisAligned => {
+            let map_to_raster = SpaceMapper::new_with_target(
+                prim_spatial_node_index,
+                raster_spatial_node_index,
+                frame_context.screen_world_rect,
+                frame_context.clip_scroll_tree,
+            );
+
+            let unclipped_raster_rect = map_to_raster.map(&prim_rect)?;
+
+            let unclipped_device_rect = {
+                let world_rect = unclipped_raster_rect * TypedScale::new(1.0);
+                let device_rect = world_rect * device_pixel_scale;
+                device_rect
+            };
+
+            let top_left = unclipped_device_rect.origin + compute_snap_offset_local_impl(
+                prim_rect.origin,
+                prim_rect,
+                unclipped_device_rect.origin,
+                unclipped_device_rect.bottom_right(),
+            );
+
+            let bottom_right = unclipped_device_rect.bottom_right() + compute_snap_offset_local_impl(
+                prim_rect.bottom_right(),
+                prim_rect,
+                unclipped_device_rect.origin,
+                unclipped_device_rect.bottom_right(),
+            );
+
+            let snapped_device_rect = DeviceRect::new(top_left, DeviceSize::new(bottom_right.x - top_left.x, bottom_right.y - top_left.y));
+            let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+            let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
+            let snapped_pic_rect = map_to_raster.unmap(&snapped_raster_rect)?;
+            Some(snapped_pic_rect)
+        }
+        TransformedRectKind::Complex => {
+            Some(prim_rect)
+        }
+    }
 }
 
 /// Get the inline (horizontal) and block (vertical) sizes
