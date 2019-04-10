@@ -1734,7 +1734,6 @@ impl<'a> PictureUpdateState<'a> {
                 prim_list,
                 self,
                 frame_context,
-                gpu_cache,
             );
         }
     }
@@ -2195,8 +2194,16 @@ pub struct PicturePrimitive {
     pub spatial_node_index: SpatialNodeIndex,
 
     /// The local rect of this picture. It is built
-    /// dynamically during the first picture traversal.
+    /// dynamically when updating visibility. It takes
+    /// into account snapping in device space for its
+    /// children.
     pub local_rect: LayoutRect,
+
+    /// The local rect of this picture. It is built
+    /// dynamically during the first picture traversal. It
+    /// does not take into account snapping in device for
+    /// its children.
+    pub estimated_local_rect: LayoutRect,
 
     /// If false, this picture needs to (re)build segments
     /// if it supports segment rendering. This can occur
@@ -2225,6 +2232,7 @@ impl PicturePrimitive {
         pt.new_level(format!("{:?}", self_index));
         pt.add_item(format!("prim_count: {:?}", self.prim_list.prim_instances.len()));
         pt.add_item(format!("local_rect: {:?}", self.local_rect));
+        pt.add_item(format!("estimated_local_rect: {:?}", self.estimated_local_rect));
         if self.apply_local_clip_rect {
             pt.add_item(format!("local_clip_rect: {:?}", self.local_clip_rect));
         }
@@ -2336,6 +2344,7 @@ impl PicturePrimitive {
             requested_raster_space,
             spatial_node_index,
             local_rect: LayoutRect::zero(),
+            estimated_local_rect: LayoutRect::zero(),
             local_clip_rect,
             tile_cache,
             options,
@@ -2733,7 +2742,6 @@ impl PicturePrimitive {
         prim_list: PrimitiveList,
         state: &mut PictureUpdateState,
         frame_context: &FrameBuildingContext,
-        gpu_cache: &mut GpuCache,
     ) {
         // Restore the pictures list used during recursion.
         self.prim_list = prim_list;
@@ -2819,22 +2827,10 @@ impl PicturePrimitive {
             let surface_index = state.pop_surface();
             debug_assert_eq!(surface_index, raster_config.surface_index);
 
-            // If the local rect changed (due to transforms in child primitives) then
-            // invalidate the GPU cache location to re-upload the new local rect
-            // and stretch size. Drop shadow filters also depend on the local rect
-            // size for the extra GPU cache data handle.
-            // TODO(gw): In future, if we support specifying a flag which gets the
-            //           stretch size from the segment rect in the shaders, we can
-            //           remove this invalidation here completely.
-            if self.local_rect != surface_rect {
-                if let PictureCompositeMode::Filter(FilterOp::DropShadow(..)) = raster_config.composite_mode {
-                    gpu_cache.invalidate(&self.extra_gpu_data_handle);
-                }
-                // Invalidate any segments built for this picture, since the local
-                // rect has changed.
-                self.segments_are_valid = false;
-                self.local_rect = surface_rect;
-            }
+            // Snapping may change the local rect slightly, and as such should just be
+            // considered an estimated size for determining if we need raster roots and
+            // preparing the tile cache.
+            self.estimated_local_rect = surface_rect;
 
             // Check if any of the surfaces can't be rasterized in local space but want to.
             if raster_config.establishes_raster_root {
