@@ -10,6 +10,7 @@ use api::{LayoutPrimitiveInfo, PrimitiveKeyKind};
 use api::units::*;
 use border::{get_max_scale_for_border, build_border_instances};
 use border::BorderSegmentCacheKey;
+use box_shadow::{BLUR_SAMPLE_SCALE};
 use clip::{ClipStore};
 use clip_scroll_tree::{ROOT_SPATIAL_NODE_INDEX, ClipScrollTree, SpatialNodeIndex, VisibleFace};
 use clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, ClipItem};
@@ -1767,6 +1768,8 @@ impl PrimitiveStore {
             frame_context.clip_scroll_tree,
         );
 
+        let mut surface_rect = PictureRect::zero();
+
         for prim_instance in &mut prim_list.prim_instances {
             prim_instance.reset();
 
@@ -1839,6 +1842,19 @@ impl PrimitiveStore {
                         frame_state.clip_chain_stack.pop_clip();
                     }
 
+                    let mut visible_rect = pic.local_rect;
+
+                    // Drop shadows draw both a content and shadow rect, so need to expand the local
+                    // rect of any surfaces to be composited in parent surfaces correctly.
+                    if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(offset, ..)), .. }) = pic.raster_config {
+                        let shadow_rect = visible_rect.translate(&offset);
+                        visible_rect = visible_rect.union(&shadow_rect);
+                    }
+
+                    if let Some(rect) = map_local_to_surface.map(&visible_rect) {
+                       surface_rect = surface_rect.union(&rect);
+                    }
+
                     (pic.raster_config.is_none(), pic.local_rect)
                 }
                 _ => {
@@ -1848,6 +1864,13 @@ impl PrimitiveStore {
                         prim_instance.prim_origin,
                         prim_data.prim_size,
                     );
+
+                    let visible_rect = prim_instance.local_clip_rect
+                        .intersection(&prim_rect)
+                        .unwrap_or(LayoutRect::zero());
+                    if let Some(rect) = map_local_to_surface.map(&visible_rect) {
+                        surface_rect = surface_rect.union(&rect);
+                    }
 
                     (false, prim_rect)
                 }
@@ -2016,6 +2039,38 @@ impl PrimitiveStore {
         }
 
         let pic = &mut self.pictures[pic_index.0];
+
+        // If the local rect changed (due to transforms in child primitives) then
+        // invalidate the GPU cache location to re-upload the new local rect
+        // and stretch size. Drop shadow filters also depend on the local rect
+        // size for the extra GPU cache data handle.
+        // TODO(gw): In future, if we support specifying a flag which gets the
+        //           stretch size from the segment rect in the shaders, we can
+        //           remove this invalidation here completely.
+        if let Some(ref raster_config) = pic.raster_config {
+            // Inflate the local bounding rect if required by the filter effect.
+            // This inflaction factor is to be applied to the surface itsefl.
+            let inflation_size = match raster_config.composite_mode {
+                PictureCompositeMode::Filter(FilterOp::Blur(_)) => surface.inflation_factor,
+                PictureCompositeMode::Filter(FilterOp::DropShadow(_, blur_radius, _)) =>
+                    (blur_radius * BLUR_SAMPLE_SCALE).ceil(),
+                _ => 0.0,
+            };
+            surface_rect = surface_rect.inflate(inflation_size, inflation_size);
+        }
+
+        // Layout space for the picture is picture space from the
+        // perspective of its child primitives.
+        let pic_local_rect = surface_rect * TypedScale::new(1.0);
+        if pic.local_rect != pic_local_rect {
+            if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(..)), .. }) = pic.raster_config {
+                frame_state.gpu_cache.invalidate(&pic.extra_gpu_data_handle);
+            }
+            // Invalidate any segments built for this picture, since the local
+            // rect has changed.
+            pic.segments_are_valid = false;
+            pic.local_rect = pic_local_rect;
+        }
 
         if let Some(RasterConfig { composite_mode: PictureCompositeMode::TileCache { .. }, .. }) = pic.raster_config {
             let mut tile_cache = frame_state.tile_cache.take().unwrap();
