@@ -2194,8 +2194,11 @@ pub struct PicturePrimitive {
     /// composited into the parent picture.
     pub spatial_node_index: SpatialNodeIndex,
 
-    /// The local rect of this picture. It is built
+    /// The local rect of this picture. It is first built
     /// dynamically during the first picture traversal.
+    /// This is a conservative estimate of the local rect.
+    /// It is recalculated when updating visibility to
+    /// take into account snapping of its primitives.
     pub local_rect: LayoutRect,
 
     /// If false, this picture needs to (re)build segments
