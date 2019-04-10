@@ -1767,6 +1767,8 @@ impl PrimitiveStore {
             frame_context.clip_scroll_tree,
         );
 
+        let mut pic_local_rect = LayoutRect::zero();
+
         for prim_instance in &mut prim_list.prim_instances {
             prim_instance.reset();
 
@@ -1844,6 +1846,7 @@ impl PrimitiveStore {
                 _ => {
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
 
+                    // TODO(aosmond): snap snap!
                     let prim_rect = LayoutRect::new(
                         prim_instance.prim_origin,
                         prim_data.prim_size,
@@ -1852,6 +1855,8 @@ impl PrimitiveStore {
                     (false, prim_rect)
                 }
             };
+
+            pic_local_rect = pic_local_rect.union(&prim_local_rect);
 
             if is_passthrough {
                 let vis_index = PrimitiveVisibilityIndex(frame_state.scratch.prim_info.len() as u32);
@@ -2016,6 +2021,25 @@ impl PrimitiveStore {
         }
 
         let pic = &mut self.pictures[pic_index.0];
+
+        // If the local rect changed (due to transforms in child primitives) then
+        // invalidate the GPU cache location to re-upload the new local rect
+        // and stretch size. Drop shadow filters also depend on the local rect
+        // size for the extra GPU cache data handle.
+        // TODO(gw): In future, if we support specifying a flag which gets the
+        //           stretch size from the segment rect in the shaders, we can
+        //           remove this invalidation here completely.
+        if let Some(ref raster_config) = pic.raster_config {
+            if pic.local_rect != pic_local_rect {
+                if let PictureCompositeMode::Filter(FilterOp::DropShadow(..)) = raster_config.composite_mode {
+                    frame_state.gpu_cache.invalidate(&pic.extra_gpu_data_handle);
+                }
+                // Invalidate any segments built for this picture, since the local
+                // rect has changed.
+                pic.segments_are_valid = false;
+                pic.local_rect = pic_local_rect;
+            }
+        }
 
         if let Some(RasterConfig { composite_mode: PictureCompositeMode::TileCache { .. }, .. }) = pic.raster_config {
             let mut tile_cache = frame_state.tile_cache.take().unwrap();

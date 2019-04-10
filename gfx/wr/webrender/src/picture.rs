@@ -1734,7 +1734,6 @@ impl<'a> PictureUpdateState<'a> {
                 prim_list,
                 self,
                 frame_context,
-                gpu_cache,
             );
         }
     }
@@ -2194,11 +2193,8 @@ pub struct PicturePrimitive {
     /// composited into the parent picture.
     pub spatial_node_index: SpatialNodeIndex,
 
-    /// The local rect of this picture. It is first built
-    /// dynamically during the first picture traversal.
-    /// This is a conservative estimate of the local rect.
-    /// It is recalculated when updating visibility to
-    /// take into account snapping of its primitives.
+    /// The local rect of this picture. It is built
+    /// dynamically when updating visibility.
     pub local_rect: LayoutRect,
 
     /// If false, this picture needs to (re)build segments
@@ -2739,7 +2735,6 @@ impl PicturePrimitive {
         prim_list: PrimitiveList,
         state: &mut PictureUpdateState,
         frame_context: &FrameBuildingContext,
-        gpu_cache: &mut GpuCache,
     ) {
         // Restore the pictures list used during recursion.
         self.prim_list = prim_list;
@@ -2824,23 +2819,6 @@ impl PicturePrimitive {
             // Pop this surface from the stack
             let surface_index = state.pop_surface();
             debug_assert_eq!(surface_index, raster_config.surface_index);
-
-            // If the local rect changed (due to transforms in child primitives) then
-            // invalidate the GPU cache location to re-upload the new local rect
-            // and stretch size. Drop shadow filters also depend on the local rect
-            // size for the extra GPU cache data handle.
-            // TODO(gw): In future, if we support specifying a flag which gets the
-            //           stretch size from the segment rect in the shaders, we can
-            //           remove this invalidation here completely.
-            if self.local_rect != surface_rect {
-                if let PictureCompositeMode::Filter(FilterOp::DropShadow(..)) = raster_config.composite_mode {
-                    gpu_cache.invalidate(&self.extra_gpu_data_handle);
-                }
-                // Invalidate any segments built for this picture, since the local
-                // rect has changed.
-                self.segments_are_valid = false;
-                self.local_rect = surface_rect;
-            }
 
             // Check if any of the surfaces can't be rasterized in local space but want to.
             if raster_config.establishes_raster_root {
