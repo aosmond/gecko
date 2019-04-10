@@ -17,13 +17,13 @@ use clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, ClipIte
 use debug_colors;
 use debug_render::DebugItem;
 use display_list_flattener::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, TypedTransform3D, TypedRect, TypedScale, TypedSize2D};
+use euclid::{SideOffsets2D, TypedTransform3D, TypedRect, TypedScale, TypedSize2D, TypedPoint2D};
 use euclid::approxeq::ApproxEq;
 use frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use frame_builder::{FrameVisibilityContext, FrameVisibilityState};
 use glyph_rasterizer::GlyphKey;
 use gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle, GpuDataRequest, ToGpuBlocks};
-use gpu_types::{BrushFlags, SnapOffsets};
+use gpu_types::{BrushFlags, SnapOffsets, TransformPalette};
 use image::{Repetition};
 use intern;
 use malloc_size_of::MallocSizeOf;
@@ -1374,6 +1374,13 @@ pub struct PrimitiveVisibility {
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
+
+    /// The local rect snapped in raster space.
+    pub snapped_local_rect: LayoutRect,
+
+    pub snap_offsets: SnapOffsets,
+
+    pub shadow_snap_offsets: SnapOffsets,
 }
 
 #[derive(Clone, Debug)]
@@ -1726,6 +1733,7 @@ impl PrimitiveStore {
         parent_surface_index: SurfaceIndex,
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
+        transform_palette: &mut TransformPalette,
     ) {
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
@@ -1768,6 +1776,11 @@ impl PrimitiveStore {
             frame_context.clip_scroll_tree,
         );
 
+        let mut map_local_to_raster = SpaceMapper::new(
+            surface.raster_spatial_node_index,
+            RasterRect::max_rect(),
+        );
+
         let mut surface_rect = PictureRect::zero();
 
         for prim_instance in &mut prim_list.prim_instances {
@@ -1789,7 +1802,12 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
-            let (is_passthrough, prim_local_rect) = match prim_instance.kind {
+            map_local_to_raster.set_target_spatial_node(
+                prim_instance.spatial_node_index,
+                frame_context.clip_scroll_tree,
+            );
+
+            let (is_passthrough, prim_local_rect, snapped_prim_local_rect, snap_offsets, shadow_snap_offsets) = match prim_instance.kind {
                 PrimitiveInstanceKind::Picture { pic_index, .. } => {
                     let is_composite = {
                         let pic = &self.pictures[pic_index.0];
@@ -1820,6 +1838,7 @@ impl PrimitiveStore {
                         surface_index,
                         frame_context,
                         frame_state,
+                        transform_palette,
                     );
 
                     let pic = &self.pictures[pic_index.0];
@@ -1842,20 +1861,46 @@ impl PrimitiveStore {
                         frame_state.clip_chain_stack.pop_clip();
                     }
 
-                    let mut visible_rect = pic.local_rect;
+                    // Pictures are composed of primitives and other pictures. We already snap
+                    // all of the primitives in the raster space, and if that is also the
+                    // screen space, then pictures in general will also already be snapped.
+                    // When the picture has a blur or drop shadow effect, or rasterized in its
+                    // local space, then we may need to snap the picture itself.
+                    let (snapped_rect, snap_offsets) = if !pic.local_rect.is_empty() {
+                        get_snapped_rect(
+                            pic.local_rect,
+                            &map_local_to_raster,
+                            surface.device_pixel_scale,
+                            frame_context.clip_scroll_tree,
+                            transform_palette,
+                        ).unwrap_or((pic.local_rect, SnapOffsets::empty()))
+                    } else {
+                        (pic.local_rect, SnapOffsets::empty())
+                    };
 
-                    // Drop shadows draw both a content and shadow rect, so need to expand the local
-                    // rect of any surfaces to be composited in parent surfaces correctly.
-                    if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(offset, ..)), .. }) = pic.raster_config {
-                        let shadow_rect = visible_rect.translate(&offset);
-                        visible_rect = visible_rect.union(&shadow_rect);
-                    }
+                    let (visible_rect, shadow_snap_offsets) = if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(offset, ..)), .. }) = pic.raster_config {
+                        // If we have a drop shadow filter, we also need to include the shadow in
+                        // our local rect for the purpose of calculating the size of the picture.
+                        // This too will need to be snapped as well.
+                        let shadow_rect = pic.local_rect.translate(&offset);
+                        let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
+                            shadow_rect,
+                            &map_local_to_raster,
+                            surface.device_pixel_scale,
+                            frame_context.clip_scroll_tree,
+                            transform_palette,
+                        ).unwrap_or((shadow_rect, SnapOffsets::empty()));
+
+                        (snapped_rect.union(&snapped_shadow_rect), shadow_snap_offsets)
+                    } else {
+                        (snapped_rect, SnapOffsets::empty())
+                    };
 
                     if let Some(rect) = map_local_to_surface.map(&visible_rect) {
                        surface_rect = surface_rect.union(&rect);
                     }
 
-                    (pic.raster_config.is_none(), pic.local_rect)
+                    (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets)
                 }
                 _ => {
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
@@ -1865,14 +1910,28 @@ impl PrimitiveStore {
                         prim_data.prim_size,
                     );
 
+                    let (snapped_prim_rect, snap_offsets) = get_snapped_rect(
+                        prim_rect,
+                        &map_local_to_raster,
+                        surface.device_pixel_scale,
+                        frame_context.clip_scroll_tree,
+                        transform_palette,
+                    ).unwrap_or((prim_rect, SnapOffsets::empty()));
+
                     let visible_rect = prim_instance.local_clip_rect
-                        .intersection(&prim_rect)
+                        .intersection(&snapped_prim_rect)
                         .unwrap_or(LayoutRect::zero());
                     if let Some(rect) = map_local_to_surface.map(&visible_rect) {
                         surface_rect = surface_rect.union(&rect);
                     }
 
-                    (false, prim_rect)
+                    if prim_instance.is_chased() {
+                        if prim_rect != snapped_prim_rect {
+                            println!("\tsnapped {:?} to {:?}", prim_rect, snapped_prim_rect);
+                        }
+                    }
+
+                    (false, prim_rect, snapped_prim_rect, snap_offsets, SnapOffsets::empty())
                 }
             };
 
@@ -1885,6 +1944,9 @@ impl PrimitiveStore {
                         clip_chain: ClipChainInstance::empty(),
                         clip_task_index: ClipTaskIndex::INVALID,
                         combined_local_clip_rect: LayoutRect::zero(),
+                        snapped_local_rect: LayoutRect::zero(),
+                        snap_offsets: SnapOffsets::empty(),
+                        shadow_snap_offsets: SnapOffsets::empty(),
                     }
                 );
 
@@ -2030,6 +2092,9 @@ impl PrimitiveStore {
                         clip_chain,
                         clip_task_index: ClipTaskIndex::INVALID,
                         combined_local_clip_rect,
+                        snapped_local_rect: snapped_prim_local_rect,
+                        snap_offsets,
+                        shadow_snap_offsets,
                     }
                 );
 
@@ -3654,13 +3719,13 @@ fn mix(x: f32, y: f32, a: f32) -> f32 {
 /// Given a point within a local rectangle, and the device space corners
 /// of a snapped primitive, return the snap offsets. This *must* exactly
 /// match the logic in the GLSL compute_snap_offset_impl function.
-fn compute_snap_offset_impl(
-    reference_pos: PicturePoint,
-    reference_rect: PictureRect,
+fn compute_snap_offset_impl<PixelSpace>(
+    reference_pos: TypedPoint2D<f32, PixelSpace>,
+    reference_rect: TypedRect<f32, PixelSpace>,
     prim_top_left: DevicePoint,
     prim_bottom_right: DevicePoint,
 ) -> DeviceVector2D {
-    let normalized_snap_pos = PicturePoint::new(
+    let normalized_snap_pos = TypedPoint2D::<f32, PixelSpace>::new(
         (reference_pos.x - reference_rect.origin.x) / reference_rect.size.width,
         (reference_pos.y - reference_rect.origin.y) / reference_rect.size.height,
     );
@@ -3829,6 +3894,61 @@ pub fn get_raster_rects(
     }
 
     Some((clipped.to_i32(), unclipped))
+}
+
+pub fn get_snapped_rect<PixelSpace>(
+    prim_rect: TypedRect<f32, PixelSpace>,
+    map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
+    device_pixel_scale: DevicePixelScale,
+    clip_scroll_tree: &ClipScrollTree,
+    transform_palette: &mut TransformPalette,
+) -> Option<(TypedRect<f32, PixelSpace>, SnapOffsets)> where PixelSpace: fmt::Debug {
+    let transform_id = transform_palette.get_id(
+        map_to_raster.current_target_spatial_node_index,
+        map_to_raster.ref_spatial_node_index,
+        clip_scroll_tree,
+    );
+
+    match transform_id.transform_kind() {
+        TransformedRectKind::AxisAligned => {
+            let unclipped_raster_rect = map_to_raster.map(&prim_rect)?;
+
+            let unclipped_device_rect = {
+                let world_rect = unclipped_raster_rect * TypedScale::new(1.0);
+                let device_rect = world_rect * device_pixel_scale;
+                device_rect
+            };
+
+            let top_left_offset = compute_snap_offset_impl(
+                prim_rect.origin,
+                prim_rect,
+                unclipped_device_rect.origin,
+                unclipped_device_rect.bottom_right(),
+            );
+
+            let bottom_right_offset = compute_snap_offset_impl(
+                prim_rect.bottom_right(),
+                prim_rect,
+                unclipped_device_rect.origin,
+                unclipped_device_rect.bottom_right(),
+            );
+
+            let snap_offsets = SnapOffsets {
+                top_left: top_left_offset,
+                bottom_right: bottom_right_offset,
+            };
+
+            let top_left = unclipped_device_rect.origin + top_left_offset;
+            let bottom_right = unclipped_device_rect.bottom_right() + bottom_right_offset;
+
+            let snapped_device_rect = DeviceRect::new(top_left, DeviceSize::new(bottom_right.x - top_left.x, bottom_right.y - top_left.y));
+            let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+            let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
+            let snapped_pic_rect = map_to_raster.unmap(&snapped_raster_rect)?;
+            Some((snapped_pic_rect, snap_offsets))
+        }
+        TransformedRectKind::Complex => None,
+    }
 }
 
 /// Get the inline (horizontal) and block (vertical) sizes
