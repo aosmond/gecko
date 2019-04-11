@@ -1771,6 +1771,11 @@ impl PrimitiveStore {
             frame_context.clip_scroll_tree,
         );
 
+        let mut map_local_to_raster = SpaceMapper::new(
+            surface.raster_spatial_node_index,
+            RasterRect::max_rect(),
+        );
+
         let mut pic_local_rect = LayoutRect::zero();
 
         for prim_instance in &mut prim_list.prim_instances {
@@ -1849,6 +1854,11 @@ impl PrimitiveStore {
                     (pic.raster_config.is_none(), pic.local_rect)
                 }
                 _ => {
+                    map_local_to_raster.set_target_spatial_node(
+                        prim_instance.spatial_node_index,
+                        frame_context.clip_scroll_tree,
+                    );
+
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
 
                     let prim_rect = LayoutRect::new(
@@ -1860,8 +1870,9 @@ impl PrimitiveStore {
                         prim_instance.spatial_node_index,
                         surface.raster_spatial_node_index,
                         prim_rect,
+                        &map_local_to_raster,
                         surface.device_pixel_scale,
-                        frame_context,
+                        frame_context.clip_scroll_tree,
                         transform_palette,
                     ).unwrap_or(prim_rect);
 
@@ -1871,7 +1882,7 @@ impl PrimitiveStore {
                         }
                     }
 
-                    (false, snapped_prim_rect)
+                    (false, prim_rect)
                 }
             };
 
@@ -3853,25 +3864,19 @@ pub fn get_snapped_local_rect(
     prim_spatial_node_index: SpatialNodeIndex,
     raster_spatial_node_index: SpatialNodeIndex,
     prim_rect: LayoutRect,
+    map_to_raster: &SpaceMapper<LayoutPixel, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
-    frame_context: &FrameVisibilityContext,
+    clip_scroll_tree: &ClipScrollTree,
     transform_palette: &mut TransformPalette,
 ) -> Option<LayoutRect> {
     let transform_id = transform_palette.get_id(
         prim_spatial_node_index,
         raster_spatial_node_index,
-        frame_context.clip_scroll_tree,
+        clip_scroll_tree,
     );
 
     match transform_id.transform_kind() {
         TransformedRectKind::AxisAligned => {
-            let map_to_raster = SpaceMapper::new_with_target(
-                prim_spatial_node_index,
-                raster_spatial_node_index,
-                frame_context.screen_world_rect,
-                frame_context.clip_scroll_tree,
-            );
-
             let unclipped_raster_rect = map_to_raster.map(&prim_rect)?;
 
             let unclipped_device_rect = {
@@ -3898,6 +3903,9 @@ pub fn get_snapped_local_rect(
             let snapped_world_rect = snapped_device_rect / device_pixel_scale;
             let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
             let snapped_pic_rect = map_to_raster.unmap(&snapped_raster_rect)?;
+            if prim_rect != snapped_pic_rect {
+                println!("\tsnapped {:?} to {:?}", unclipped_device_rect, snapped_device_rect);
+            }
             Some(snapped_pic_rect)
         }
         TransformedRectKind::Complex => {
