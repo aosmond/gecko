@@ -72,7 +72,7 @@ void main(void) {
             ph.z,
             transform,
             pic_task,
-            ph.local_rect,
+            ph.snapped_local_rect,
             snap_to_primitive
         );
 

@@ -34,14 +34,12 @@ vec2 compute_snap_offset_impl(
     RectWithSize reference_rect,
     vec4 snap_positions
 ) {
-    /// World offsets applied to the corners of the snap rectangle.
-    vec4 snap_offsets = floor(snap_positions + 0.5) - snap_positions;
-
     /// Compute the position of this vertex inside the snap rectangle.
     vec2 normalized_snap_pos = (reference_pos - reference_rect.p0) / reference_rect.size;
 
+    /// FIXME: snap_positions should be delta between unsnapped and snapped rect
     /// Compute the actual world offset for this vertex needed to make it snap.
-    return mix(snap_offsets.xy, snap_offsets.zw, normalized_snap_pos);
+    return mix(snap_positions.xy, snap_positions.zw, normalized_snap_pos);
 }
 
 // Compute a snapping offset in world space (adjusted to pixel ratio),
