@@ -47,11 +47,12 @@ uniform HIGHP_SAMPLER_FLOAT isampler2D sPrimitiveHeadersI;
 // Instanced attributes
 in ivec4 aData;
 
-#define VECS_PER_PRIM_HEADER_F 2U
+#define VECS_PER_PRIM_HEADER_F 3U
 #define VECS_PER_PRIM_HEADER_I 2U
 
 struct PrimitiveHeader {
     RectWithSize local_rect;
+    RectWithSize snapped_local_rect;
     RectWithSize local_clip_rect;
     float z;
     int specific_prim_address;
@@ -65,8 +66,10 @@ PrimitiveHeader fetch_prim_header(int index) {
 
     ivec2 uv_f = get_fetch_uv(index, VECS_PER_PRIM_HEADER_F);
     vec4 local_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(0, 0));
-    vec4 local_clip_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(1, 0));
+    vec4 snapped_local_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(1, 0));
+    vec4 local_clip_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(2, 0));
     ph.local_rect = RectWithSize(local_rect.xy, local_rect.zw);
+    ph.snapped_local_rect = RectWithSize(snapped_local_rect.xy, snapped_local_rect.zw);
     ph.local_clip_rect = RectWithSize(local_clip_rect.xy, local_clip_rect.zw);
 
     ivec2 uv_i = get_fetch_uv(index, VECS_PER_PRIM_HEADER_I);

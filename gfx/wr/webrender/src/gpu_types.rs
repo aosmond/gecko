@@ -234,6 +234,7 @@ impl PrimitiveHeaders {
 
         self.headers_float.push(PrimitiveHeaderF {
             local_rect: prim_header.local_rect,
+            snapped_local_rect: prim_header.snapped_local_rect,
             local_clip_rect: prim_header.local_clip_rect,
         });
 
@@ -254,6 +255,7 @@ impl PrimitiveHeaders {
 #[derive(Debug)]
 pub struct PrimitiveHeader {
     pub local_rect: LayoutRect,
+    pub snapped_local_rect: LayoutRect,
     pub local_clip_rect: LayoutRect,
     pub task_address: RenderTaskAddress,
     pub specific_prim_address: GpuCacheAddress,
@@ -267,6 +269,7 @@ pub struct PrimitiveHeader {
 #[cfg_attr(feature = "replay", derive(Deserialize))]
 pub struct PrimitiveHeaderF {
     pub local_rect: LayoutRect,
+    pub snapped_local_rect: LayoutRect,
     pub local_clip_rect: LayoutRect,
 }
 

@@ -628,6 +628,8 @@ impl AlphaBatchBuilder {
             prim_common_data.prim_size,
         );
 
+        let snapped_prim_rect = prim_info.snapped_local_rect;
+
         if is_chased {
             println!("\tbatch {:?} with bound {:?}", prim_rect, bounding_rect);
         }
@@ -643,6 +645,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -717,6 +720,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -769,6 +773,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -936,6 +941,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -982,6 +988,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: picture.local_rect,
+                    snapped_local_rect: picture.local_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -1020,6 +1027,7 @@ impl AlphaBatchBuilder {
 
                             let prim_header = PrimitiveHeader {
                                 local_rect: pic.local_rect,
+                                snapped_local_rect: pic.local_rect,
                                 local_clip_rect: prim_info.combined_local_clip_rect,
                                 task_address,
                                 specific_prim_address: GpuCacheAddress::invalid(),
@@ -1151,6 +1159,7 @@ impl AlphaBatchBuilder {
 
                                         let prim_header = PrimitiveHeader {
                                             local_rect: tile_rect,
+                                            snapped_local_rect: tile_rect,
                                             local_clip_rect,
                                             task_address,
                                             specific_prim_address: prim_cache_address,
@@ -1354,6 +1363,7 @@ impl AlphaBatchBuilder {
 
                                         let shadow_prim_header = PrimitiveHeader {
                                             local_rect: shadow_rect,
+                                            snapped_local_rect: shadow_rect,
                                             specific_prim_address: shadow_prim_address,
                                             ..prim_header
                                         };
@@ -1614,6 +1624,7 @@ impl AlphaBatchBuilder {
 
                                 let prim_header = PrimitiveHeader {
                                     local_rect: picture.local_rect,
+                                    snapped_local_rect: picture.local_rect,
                                     local_clip_rect: prim_info.combined_local_clip_rect,
                                     task_address,
                                     specific_prim_address: prim_cache_address,
@@ -1699,6 +1710,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -1772,6 +1784,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -1879,6 +1892,7 @@ impl AlphaBatchBuilder {
 
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: prim_cache_address,
@@ -1983,6 +1997,7 @@ impl AlphaBatchBuilder {
 
                     let prim_header = PrimitiveHeader {
                         local_rect: prim_rect,
+                        snapped_local_rect: snapped_prim_rect,
                         local_clip_rect: prim_info.combined_local_clip_rect,
                         task_address,
                         specific_prim_address: prim_cache_address,
@@ -2027,7 +2042,8 @@ impl AlphaBatchBuilder {
                         gpu_blocks.push([-1.0, 0.0, 0.0, 0.0].into()); //stretch size
                         // negative first value makes the shader code ignore it and use the local size instead
                         for tile in chunk {
-                            let tile_rect = tile.local_rect.translate(&-prim_rect.origin.to_vector());
+                            // FIXME aosmond -- use snapped_prim_rect or prim_rect
+                            let tile_rect = tile.local_rect.translate(&-snapped_prim_rect.origin.to_vector());
                             gpu_blocks.push(tile_rect.into());
                             gpu_blocks.push(GpuBlockData::EMPTY);
                         }
@@ -2035,6 +2051,7 @@ impl AlphaBatchBuilder {
                         let gpu_handle = gpu_cache.push_per_frame_blocks(&gpu_blocks);
                         let prim_header = PrimitiveHeader {
                             local_rect: prim_rect,
+                            snapped_local_rect: snapped_prim_rect,
                             local_clip_rect: image_instance.tight_local_clip_rect,
                             task_address,
                             specific_prim_address: gpu_cache.get_address(&gpu_handle),
@@ -2080,6 +2097,7 @@ impl AlphaBatchBuilder {
 
                 let mut prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: GpuCacheAddress::invalid(),
@@ -2218,6 +2236,7 @@ impl AlphaBatchBuilder {
 
                 let mut prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
+                    snapped_local_rect: snapped_prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
                     task_address,
                     specific_prim_address: GpuCacheAddress::invalid(),
@@ -2491,6 +2510,7 @@ fn add_gradient_tiles(
         let prim_header = PrimitiveHeader {
             specific_prim_address: gpu_cache.get_address(&tile.handle),
             local_rect: tile.local_rect,
+            snapped_local_rect: tile.local_rect,
             local_clip_rect: tile.local_clip_rect,
             ..*base_prim_header
         };
