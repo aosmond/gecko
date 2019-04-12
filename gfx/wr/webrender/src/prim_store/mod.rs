@@ -1376,6 +1376,8 @@ pub struct PrimitiveVisibility {
 
     /// The local rect snapped in raster space.
     pub snapped_local_rect: LayoutRect,
+
+    pub snap_offsets: SnapOffsets,
 }
 
 #[derive(Clone, Debug)]
@@ -1797,7 +1799,7 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
-            let (is_passthrough, prim_local_rect) = match prim_instance.kind {
+            let (is_passthrough, prim_local_rect, snap_offsets) = match prim_instance.kind {
                 PrimitiveInstanceKind::Picture { pic_index, .. } => {
                     let is_composite = {
                         let pic = &self.pictures[pic_index.0];
@@ -1851,7 +1853,7 @@ impl PrimitiveStore {
                         frame_state.clip_chain_stack.pop_clip();
                     }
 
-                    (pic.raster_config.is_none(), pic.local_rect)
+                    (pic.raster_config.is_none(), pic.local_rect, SnapOffsets::empty())
                 }
                 _ => {
                     map_local_to_raster.set_target_spatial_node(
@@ -1866,7 +1868,7 @@ impl PrimitiveStore {
                         prim_data.prim_size,
                     );
 
-                    let snapped_prim_rect = get_snapped_local_rect(
+                    let (snapped_prim_rect, snap_offsets) = get_snapped_local_rect(
                         prim_instance.spatial_node_index,
                         surface.raster_spatial_node_index,
                         prim_rect,
@@ -1874,7 +1876,7 @@ impl PrimitiveStore {
                         surface.device_pixel_scale,
                         frame_context.clip_scroll_tree,
                         transform_palette,
-                    ).unwrap_or(prim_rect);
+                    ).unwrap_or((prim_rect, SnapOffsets::empty()));
 
                     if prim_instance.is_chased() {
                         if prim_rect != snapped_prim_rect {
@@ -1882,7 +1884,7 @@ impl PrimitiveStore {
                         }
                     }
 
-                    (false, snapped_prim_rect)
+                    (false, snapped_prim_rect, snap_offsets)
                 }
             };
 
@@ -1898,6 +1900,7 @@ impl PrimitiveStore {
                         clip_task_index: ClipTaskIndex::INVALID,
                         combined_local_clip_rect: LayoutRect::zero(),
                         snapped_local_rect: LayoutRect::zero(),
+                        snap_offsets: SnapOffsets::empty(),
                     }
                 );
 
@@ -2044,6 +2047,7 @@ impl PrimitiveStore {
                         clip_task_index: ClipTaskIndex::INVALID,
                         combined_local_clip_rect,
                         snapped_local_rect: prim_local_rect,
+                        snap_offsets,
                     }
                 );
 
@@ -3855,7 +3859,7 @@ pub fn get_snapped_local_rect(
     device_pixel_scale: DevicePixelScale,
     clip_scroll_tree: &ClipScrollTree,
     transform_palette: &mut TransformPalette,
-) -> Option<LayoutRect> {
+) -> Option<(LayoutRect, SnapOffsets)> {
     let transform_id = transform_palette.get_id(
         prim_spatial_node_index,
         raster_spatial_node_index,
@@ -3872,19 +3876,27 @@ pub fn get_snapped_local_rect(
                 device_rect
             };
 
-            let top_left = unclipped_device_rect.origin + compute_snap_offset_local_impl(
+            let top_left_offset = compute_snap_offset_local_impl(
                 prim_rect.origin,
                 prim_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
             );
 
-            let bottom_right = unclipped_device_rect.bottom_right() + compute_snap_offset_local_impl(
+            let bottom_right_offset = compute_snap_offset_local_impl(
                 prim_rect.bottom_right(),
                 prim_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
             );
+
+            let snap_offsets = SnapOffsets {
+                top_left: top_left_offset,
+                bottom_right: bottom_right_offset,
+            };
+
+            let top_left = unclipped_device_rect.origin + top_left_offset;
+            let bottom_right = unclipped_device_rect.bottom_right() + bottom_right_offset;
 
             let snapped_device_rect = DeviceRect::new(top_left, DeviceSize::new(bottom_right.x - top_left.x, bottom_right.y - top_left.y));
             let snapped_world_rect = snapped_device_rect / device_pixel_scale;
@@ -3893,11 +3905,10 @@ pub fn get_snapped_local_rect(
             if prim_rect != snapped_pic_rect {
                 println!("\tsnapped {:?} to {:?}", unclipped_device_rect, snapped_device_rect);
             }
-            Some(snapped_pic_rect)
+
+            Some((snapped_pic_rect, snap_offsets))
         }
-        TransformedRectKind::Complex => {
-            Some(prim_rect)
-        }
+        TransformedRectKind::Complex => None,
     }
 }
 
