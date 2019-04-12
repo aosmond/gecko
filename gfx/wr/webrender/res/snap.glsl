@@ -4,32 +4,10 @@
 
 #ifdef WR_VERTEX_SHADER
 
-vec4 compute_snap_positions(
-    mat4 transform,
-    RectWithSize snap_rect,
-    float device_pixel_scale
-) {
-    // Ensure that the snap rect is at *least* one device pixel in size.
-    // TODO(gw): It's not clear to me that this is "correct". Specifically,
-    //           how should it interact with sub-pixel snap rects when there
-    //           is a transform with scale present? But it does fix
-    //           the test cases we have in Servo that are failing without it
-    //           and seem better than not having this at all.
-    snap_rect.size = max(snap_rect.size, vec2(1.0 / device_pixel_scale));
-
-    // Transform the snap corners to the world space.
-    vec4 world_snap_p0 = transform * vec4(snap_rect.p0, 0.0, 1.0);
-    vec4 world_snap_p1 = transform * vec4(snap_rect.p0 + snap_rect.size, 0.0, 1.0);
-    // Snap bounds in world coordinates, adjusted for pixel ratio. XY = top left, ZW = bottom right
-    vec4 world_snap = device_pixel_scale * vec4(world_snap_p0.xy, world_snap_p1.xy) /
-                                           vec4(world_snap_p0.ww, world_snap_p1.ww);
-    return world_snap;
-}
-
 /// Given a point within a local rectangle, and the device space corners
 /// of a snapped primitive, return the snap offsets. This *must* exactly
 /// match the logic in the GLSL compute_snap_offset_impl function.
-vec2 compute_snap_offset_impl(
+vec2 compute_snap_offset(
     vec2 reference_pos,
     RectWithSize reference_rect,
     vec4 snap_positions
@@ -40,36 +18,6 @@ vec2 compute_snap_offset_impl(
     /// FIXME: snap_positions should be delta between unsnapped and snapped rect
     /// Compute the actual world offset for this vertex needed to make it snap.
     return mix(snap_positions.xy, snap_positions.zw, normalized_snap_pos);
-}
-
-// Compute a snapping offset in world space (adjusted to pixel ratio),
-// given local position on the transform and a snap rectangle.
-vec2 compute_snap_offset(vec2 local_pos,
-                         mat4 transform,
-                         RectWithSize snapped_rect,
-                         RectWithSize unsnapped_rect,
-                         float device_pixel_scale) {
-    vec4 snapped_positions = compute_snap_positions(
-        transform,
-        snapped_rect,
-        device_pixel_scale
-    );
-
-    vec4 unsnapped_positions = compute_snap_positions(
-        transform,
-        unsnapped_rect,
-        device_pixel_scale
-    );
-
-    vec4 snap_positions = snapped_positions - unsnapped_positions;
-
-    vec2 snap_offsets = compute_snap_offset_impl(
-        local_pos,
-        unsnapped_rect,
-        snap_positions
-    );
-
-    return snap_offsets;
 }
 
 #endif //WR_VERTEX_SHADER

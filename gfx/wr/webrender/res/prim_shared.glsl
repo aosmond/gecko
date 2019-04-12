@@ -52,8 +52,8 @@ in ivec4 aData;
 
 struct PrimitiveHeader {
     RectWithSize local_rect;
-    RectWithSize snapped_local_rect;
     RectWithSize local_clip_rect;
+    vec4 snap_offsets;
     float z;
     int specific_prim_address;
     int render_task_index;
@@ -66,10 +66,9 @@ PrimitiveHeader fetch_prim_header(int index) {
 
     ivec2 uv_f = get_fetch_uv(index, VECS_PER_PRIM_HEADER_F);
     vec4 local_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(0, 0));
-    vec4 snapped_local_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(1, 0));
-    vec4 local_clip_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(2, 0));
+    vec4 local_clip_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(1, 0));
+    ph.snap_offsets = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(2, 0));
     ph.local_rect = RectWithSize(local_rect.xy, local_rect.zw);
-    ph.snapped_local_rect = RectWithSize(snapped_local_rect.xy, snapped_local_rect.zw);
     ph.local_clip_rect = RectWithSize(local_clip_rect.xy, local_clip_rect.zw);
 
     ivec2 uv_i = get_fetch_uv(index, VECS_PER_PRIM_HEADER_I);
@@ -95,9 +94,8 @@ VertexInfo write_vertex(RectWithSize instance_rect,
                         float z,
                         Transform transform,
                         PictureTask task,
-                        RectWithSize snapped_rect,
-                        RectWithSize unsnapped_rect,
-                        bool snap_to_primitive) {
+                        RectWithSize snap_rect,
+                        vec4 snap_offsets) {
 
     // Select the corner of the local rect that we are processing.
     vec2 local_pos = instance_rect.p0 + instance_rect.size * aPosition.xy;
@@ -108,10 +106,8 @@ VertexInfo write_vertex(RectWithSize instance_rect,
     /// Compute the snapping offset.
     vec2 snap_offset = compute_snap_offset(
         clamped_local_pos,
-        transform.m,
-        snapped_rect,
-        unsnapped_rect,
-        task.device_pixel_scale
+        snap_rect,
+        snap_offsets
     );
 
     // Transform the current vertex to world space.

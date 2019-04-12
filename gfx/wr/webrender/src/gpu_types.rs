@@ -234,8 +234,8 @@ impl PrimitiveHeaders {
 
         self.headers_float.push(PrimitiveHeaderF {
             local_rect: prim_header.local_rect,
-            snapped_local_rect: prim_header.snapped_local_rect,
             local_clip_rect: prim_header.local_clip_rect,
+            snap_offsets: prim_header.snap_offsets,
         });
 
         self.headers_int.push(PrimitiveHeaderI {
@@ -255,8 +255,8 @@ impl PrimitiveHeaders {
 #[derive(Debug)]
 pub struct PrimitiveHeader {
     pub local_rect: LayoutRect,
-    pub snapped_local_rect: LayoutRect,
     pub local_clip_rect: LayoutRect,
+    pub snap_offsets: SnapOffsets,
     pub task_address: RenderTaskAddress,
     pub specific_prim_address: GpuCacheAddress,
     pub transform_id: TransformPaletteId,
@@ -269,8 +269,8 @@ pub struct PrimitiveHeader {
 #[cfg_attr(feature = "replay", derive(Deserialize))]
 pub struct PrimitiveHeaderF {
     pub local_rect: LayoutRect,
-    pub snapped_local_rect: LayoutRect,
     pub local_clip_rect: LayoutRect,
+    pub snap_offsets: SnapOffsets,
 }
 
 // i32 parts of a primitive header
