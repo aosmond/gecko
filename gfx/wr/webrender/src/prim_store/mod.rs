@@ -1889,7 +1889,7 @@ impl PrimitiveStore {
                         }
                     }
 
-                    (false, prim_rect, snapped_prim_rect, snap_offsets)
+                    (false, snapped_prim_rect, snapped_prim_rect, snap_offsets)
                 }
             };
 
@@ -2768,13 +2768,9 @@ impl PrimitiveStore {
                     // produce primitives that are partially covering the original image
                     // rect and we want to clip these extra parts out.
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        common_data.prim_size,
-                    );
                     let tight_clip_rect = prim_info
                         .combined_local_clip_rect
-                        .intersection(&prim_rect).unwrap();
+                        .intersection(&prim_info.snapped_local_rect).unwrap();
                     image_instance.tight_local_clip_rect = tight_clip_rect;
 
                     let visible_rect = compute_conservative_visible_rect(
@@ -2787,7 +2783,7 @@ impl PrimitiveStore {
                     let stride = image_data.stretch_size + image_data.tile_spacing;
 
                     let repetitions = ::image::repetitions(
-                        &prim_rect,
+                        &prim_info.snapped_local_rect,
                         &visible_rect,
                         stride,
                     );
@@ -2926,14 +2922,10 @@ impl PrimitiveStore {
 
                 if prim_data.tile_spacing != LayoutSize::zero() {
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        prim_data.common.prim_size,
-                    );
 
                     gradient.visible_tiles_range = decompose_repeated_primitive(
                         &prim_info.combined_local_clip_rect,
-                        &prim_rect,
+                        &prim_info.snapped_local_rect,
                         &prim_data.stretch_size,
                         &prim_data.tile_spacing,
                         frame_state,
@@ -2972,14 +2964,10 @@ impl PrimitiveStore {
 
                 if prim_data.tile_spacing != LayoutSize::zero() {
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        prim_data.common.prim_size,
-                    );
 
                     *visible_tiles_range = decompose_repeated_primitive(
                         &prim_info.combined_local_clip_rect,
-                        &prim_rect,
+                        &prim_info.snapped_local_rect,
                         &prim_data.stretch_size,
                         &prim_data.tile_spacing,
                         frame_state,
@@ -3267,6 +3255,7 @@ impl<'a> GpuDataRequest<'a> {
 impl PrimitiveInstance {
     fn build_segments_if_needed(
         &mut self,
+        prim_snapped_local_rect: &LayoutRect,
         prim_clip_chain: &ClipChainInstance,
         frame_state: &mut FrameBuildingState,
         prim_store: &mut PrimitiveStore,
@@ -3276,10 +3265,7 @@ impl PrimitiveInstance {
     ) {
         // Usually, the primitive rect can be found from information
         // in the instance and primitive template.
-        let mut prim_local_rect = LayoutRect::new(
-            self.prim_origin,
-            data_stores.as_common_data(self).prim_size,
-        );
+        let mut prim_local_rect = *prim_snapped_local_rect;
 
         let segment_instance_index = match self.kind {
             PrimitiveInstanceKind::Rectangle { ref mut segment_instance_index, .. } |
@@ -3515,8 +3501,8 @@ impl PrimitiveInstance {
                     .build_clip_chain_instance(
                         frame_state.clip_chain_stack.current_clips(),
                         segment.local_rect.translate(&LayoutVector2D::new(
-                            self.prim_origin.x,
-                            self.prim_origin.y,
+                            prim_info.snapped_local_rect.origin.x,
+                            prim_info.snapped_local_rect.origin.y,
                         )),
                         self.local_clip_rect,
                         self.spatial_node_index,
@@ -3584,6 +3570,7 @@ impl PrimitiveInstance {
         };
 
         self.build_segments_if_needed(
+            &prim_info.snapped_local_rect,
             &prim_info.clip_chain,
             frame_state,
             prim_store,
