@@ -3753,6 +3753,42 @@ fn compute_snap_offset_impl<PixelSpace>(
     )
 }
 
+pub fn recompute_snap_offsets<PixelSpace>(
+    local_rect: TypedRect<f32, PixelSpace>,
+    prim_rect: TypedRect<f32, PixelSpace>,
+    snap_offsets: SnapOffsets,
+) -> SnapOffsets
+{
+    if prim_rect.is_empty() || snap_offsets.is_empty() {
+        return SnapOffsets::empty();
+    }
+
+    let normalized_top_left = TypedPoint2D::<f32, PixelSpace>::new(
+        (local_rect.origin.x - prim_rect.origin.x) / prim_rect.size.width,
+        (local_rect.origin.y - prim_rect.origin.y) / prim_rect.size.height,
+    );
+
+    let normalized_bottom_right = TypedPoint2D::<f32, PixelSpace>::new(
+        (local_rect.origin.x + local_rect.size.width - prim_rect.origin.x) / prim_rect.size.width,
+        (local_rect.origin.y + local_rect.size.height - prim_rect.origin.y) / prim_rect.size.height,
+    );
+
+    let top_left = DeviceVector2D::new(
+        mix(snap_offsets.top_left.x, snap_offsets.bottom_right.x, normalized_top_left.x),
+        mix(snap_offsets.top_left.y, snap_offsets.bottom_right.y, normalized_top_left.y),
+    );
+
+    let bottom_right = DeviceVector2D::new(
+        mix(snap_offsets.top_left.x, snap_offsets.bottom_right.x, normalized_bottom_right.x),
+        mix(snap_offsets.top_left.y, snap_offsets.bottom_right.y, normalized_bottom_right.y),
+    );
+
+    SnapOffsets {
+        top_left,
+        bottom_right,
+    }
+}
+
 /// Retrieve the exact unsnapped device space rectangle for a primitive.
 /// If the transform is axis-aligned, compute the snapping offsets that
 /// the shaders will apply.
