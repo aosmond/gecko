@@ -46,17 +46,26 @@ vec2 compute_snap_offset_impl(
 // given local position on the transform and a snap rectangle.
 vec2 compute_snap_offset(vec2 local_pos,
                          mat4 transform,
-                         RectWithSize snap_rect,
+                         RectWithSize snapped_rect,
+                         RectWithSize unsnapped_rect,
                          float device_pixel_scale) {
-    vec4 snap_positions = compute_snap_positions(
+    vec4 snapped_positions = compute_snap_positions(
         transform,
-        snap_rect,
+        snapped_rect,
         device_pixel_scale
     );
 
+    vec4 unsnapped_positions = compute_snap_positions(
+        transform,
+        unsnapped_rect,
+        device_pixel_scale
+    );
+
+    vec4 snap_positions = snapped_positions - unsnapped_positions;
+
     vec2 snap_offsets = compute_snap_offset_impl(
         local_pos,
-        snap_rect,
+        unsnapped_rect,
         snap_positions
     );
 

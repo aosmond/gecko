@@ -95,7 +95,8 @@ VertexInfo write_vertex(RectWithSize instance_rect,
                         float z,
                         Transform transform,
                         PictureTask task,
-                        RectWithSize snap_rect,
+                        RectWithSize snapped_rect,
+                        RectWithSize unsnapped_rect,
                         bool snap_to_primitive) {
 
     // Select the corner of the local rect that we are processing.
@@ -108,7 +109,8 @@ VertexInfo write_vertex(RectWithSize instance_rect,
     vec2 snap_offset = compute_snap_offset(
         clamped_local_pos,
         transform.m,
-        snap_rect,
+        snapped_rect,
+        unsnapped_rect,
         task.device_pixel_scale
     );
 
