@@ -1368,9 +1368,9 @@ impl AlphaBatchBuilder {
 
                                         let shadow_rect = prim_header.local_rect.translate(&offset);
 
-                                        // FIXME(aosmond): snap offsets for shadow?
                                         let shadow_prim_header = PrimitiveHeader {
                                             local_rect: shadow_rect,
+                                            snap_offsets: prim_info.shadow_snap_offsets,
                                             specific_prim_address: shadow_prim_address,
                                             ..prim_header
                                         };
