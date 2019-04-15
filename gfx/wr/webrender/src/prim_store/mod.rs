@@ -1900,6 +1900,12 @@ impl PrimitiveStore {
                         (snapped_rect, SnapOffsets::empty())
                     };
 
+                    if prim_instance.is_chased() {
+                        if visible_rect != snapped_rect {
+                            println!("\tvisible {:?}", visible_rect);
+                        }
+                    }
+
                     if let Some(rect) = map_local_to_surface.map(&visible_rect) {
                        surface_rect = surface_rect.union(&rect);
                     }
@@ -1931,15 +1937,28 @@ impl PrimitiveStore {
                         surface_rect = surface_rect.union(&rect);
                     }
 
-                    if prim_instance.is_chased() {
-                        if prim_rect != snapped_prim_rect {
-                            println!("\tsnapped {:?} to {:?}", prim_rect, snapped_prim_rect);
-                        }
-                    }
-
                     (false, prim_rect, snapped_prim_rect, snap_offsets, SnapOffsets::empty())
                 }
             };
+
+            if prim_instance.is_chased() {
+                if prim_local_rect != snapped_prim_local_rect {
+                    println!("\t{:?} snapped to {:?}", prim_local_rect, snapped_prim_local_rect);
+                    let scale = TypedScale::new(1.0) * surface.device_pixel_scale;
+                    let device_rect = map_local_to_raster.map(&prim_local_rect).unwrap() * scale;
+                    let snapped_device_rect = map_local_to_raster.map(&snapped_prim_local_rect).unwrap() * scale;
+                    println!("\t{:?} snapped to {:?}", device_rect, snapped_device_rect);
+                    println!("\tprimitive {:?}", prim_instance.spatial_node_index);
+                    println!("\traster {:?}", surface.raster_spatial_node_index);
+                    println!("\tmapper {:?}", map_local_to_raster);
+                }
+                if !snap_offsets.is_empty() {
+                    println!("\t{:?}", snap_offsets);
+                }
+                if !shadow_snap_offsets.is_empty() {
+                    println!("\tshadow {:?}", shadow_snap_offsets);
+                }
+            }
 
             if is_passthrough {
                 let vis_index = PrimitiveVisibilityIndex(frame_state.scratch.prim_info.len() as u32);

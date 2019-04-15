@@ -633,6 +633,7 @@ impl AlphaBatchBuilder {
 
         if is_chased {
             println!("\tbatch {:?} with bound {:?}", prim_rect, bounding_rect);
+            println!("\tkind {:?}", prim_instance.kind);
         }
 
         match prim_instance.kind {
