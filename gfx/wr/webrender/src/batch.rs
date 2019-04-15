@@ -18,6 +18,7 @@ use picture::{Picture3DContext, PictureCompositeMode, PicturePrimitive, PictureS
 use prim_store::{DeferredResolve, EdgeAaSegmentMask, PrimitiveInstanceKind, PrimitiveVisibilityIndex};
 use prim_store::{VisibleGradientTile, PrimitiveInstance, PrimitiveOpacity, SegmentInstanceIndex};
 use prim_store::{BrushSegment, ClipMaskKind, ClipTaskIndex, VECS_PER_SEGMENT};
+use prim_store::{recompute_snap_offsets};
 use prim_store::image::ImageSource;
 use render_backend::DataStores;
 use render_task::{RenderTaskAddress, RenderTaskId, RenderTaskTree, TileBlit};
@@ -1144,13 +1145,25 @@ impl AlphaBatchBuilder {
                                         BrushBatchKind::Image(ImageBufferKind::Texture2DArray)
                                     );
 
+                                    if !prim_rect.is_empty() {
+                                        println!("picture tile cache prim {:?} offsets {:?}", prim_rect, snap_offsets);
+                                    }
                                     for tile_index in &tile_cache.tiles_to_draw {
                                         let tile = &tile_cache.tiles[tile_index.0];
 
                                         // Get the local rect of the tile.
                                         let tile_rect = tile.local_rect;
 
-                                        // FIXME(aosmond): snap offsets for tile?
+                                        // Adjust the snap offsets for the tile.
+                                        let snap_offsets = recompute_snap_offsets(
+                                            tile_rect,
+                                            prim_rect,
+                                            snap_offsets,
+                                        );
+                                        if !prim_rect.is_empty() {
+                                            println!("\ttile {:?} offsets {:?}", tile_rect, snap_offsets);
+                                        }
+
                                         let prim_header = PrimitiveHeader {
                                             local_rect: tile_rect,
                                             local_clip_rect,
@@ -2036,7 +2049,7 @@ impl AlphaBatchBuilder {
                         gpu_blocks.push([-1.0, 0.0, 0.0, 0.0].into()); //stretch size
                         // negative first value makes the shader code ignore it and use the local size instead
                         for tile in chunk {
-                            // FIXME(aosmond): what origin to use here
+                            // FIXME(aosmond): what snap offsets to use here
                             let tile_rect = tile.local_rect.translate(&-prim_rect.origin.to_vector());
                             gpu_blocks.push(tile_rect.into());
                             gpu_blocks.push(GpuBlockData::EMPTY);
@@ -2500,12 +2513,25 @@ fn add_gradient_tiles(
 
     let user_data = [stops_handle.as_int(gpu_cache), 0, 0, 0];
 
+    if !base_prim_header.local_rect.is_empty() {
+        println!("gradient prim {:?} offsets {:?}", base_prim_header.local_rect, base_prim_header.snap_offsets);
+    }
     for tile in visible_tiles {
-        // FIXME(aosmond): should the offsets be replaced here?
+        // Adjust the snap offsets for the tile.
+        let snap_offsets = recompute_snap_offsets(
+            tile.local_rect,
+            base_prim_header.local_rect,
+            base_prim_header.snap_offsets,
+        );
+        if !base_prim_header.local_rect.is_empty() {
+            println!("\ttile {:?} offsets {:?}", tile.local_rect, snap_offsets);
+        }
+
         let prim_header = PrimitiveHeader {
             specific_prim_address: gpu_cache.get_address(&tile.handle),
             local_rect: tile.local_rect,
             local_clip_rect: tile.local_clip_rect,
+            snap_offsets,
             ..*base_prim_header
         };
         let prim_header_index = prim_headers.push(&prim_header, z_id, user_data);
