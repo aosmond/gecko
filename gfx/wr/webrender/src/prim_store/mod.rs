@@ -1734,7 +1734,7 @@ impl PrimitiveStore {
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
         transform_palette: &mut TransformPalette,
-    ) {
+    ) -> Option<PictureRect> {
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
 
@@ -1833,7 +1833,7 @@ impl PrimitiveStore {
                         frame_state.clip_chain_stack.push_clip(prim_instance.clip_chain_id);
                     }
 
-                    self.update_visibility(
+                    let pic_surface_rect = self.update_visibility(
                         pic_index,
                         surface_index,
                         frame_context,
@@ -1861,6 +1861,12 @@ impl PrimitiveStore {
                         frame_state.clip_chain_stack.pop_clip();
                     }
 
+                    if pic.raster_config.is_none() {
+                        if let Some(ref rect) = pic_surface_rect {
+                            surface_rect = surface_rect.union(rect);
+                        }
+                        (pic.raster_config.is_none(), LayoutRect::zero(), LayoutRect::zero(), SnapOffsets::empty(), SnapOffsets::empty())
+                    } else {
                     // Pictures are composed of primitives and other pictures. We already snap
                     // all of the primitives in the raster space, and if that is also the
                     // screen space, then pictures in general will also already be snapped.
@@ -1901,6 +1907,7 @@ impl PrimitiveStore {
                     }
 
                     (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets)
+                    }
                 }
                 _ => {
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
@@ -2104,6 +2111,7 @@ impl PrimitiveStore {
         }
 
         let pic = &mut self.pictures[pic_index.0];
+        pic.prim_list = prim_list;
 
         // If the local rect changed (due to transforms in child primitives) then
         // invalidate the GPU cache location to re-upload the new local rect
@@ -2122,36 +2130,45 @@ impl PrimitiveStore {
                 _ => 0.0,
             };
             surface_rect = surface_rect.inflate(inflation_size, inflation_size);
-        }
 
-        // Layout space for the picture is picture space from the
-        // perspective of its child primitives.
-        let pic_local_rect = surface_rect * TypedScale::new(1.0);
-        if pic.local_rect != pic_local_rect {
-            if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(..)), .. }) = pic.raster_config {
-                frame_state.gpu_cache.invalidate(&pic.extra_gpu_data_handle);
+            // Layout space for the picture is picture space from the
+            // perspective of its child primitives.
+            let pic_local_rect = surface_rect * TypedScale::new(1.0);
+            if pic.local_rect != pic_local_rect {
+                if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(..)), .. }) = pic.raster_config {
+                    frame_state.gpu_cache.invalidate(&pic.extra_gpu_data_handle);
+                }
+                // Invalidate any segments built for this picture, since the local
+                // rect has changed.
+                pic.segments_are_valid = false;
+                pic.local_rect = pic_local_rect;
             }
-            // Invalidate any segments built for this picture, since the local
-            // rect has changed.
-            pic.segments_are_valid = false;
-            pic.local_rect = pic_local_rect;
-        }
 
-        if let Some(RasterConfig { composite_mode: PictureCompositeMode::TileCache { .. }, .. }) = pic.raster_config {
-            let mut tile_cache = frame_state.tile_cache.take().unwrap();
+            if let PictureCompositeMode::TileCache { .. } = raster_config.composite_mode {
+                let mut tile_cache = frame_state.tile_cache.take().unwrap();
 
-            // Build the dirty region(s) for this tile cache.
-            pic.local_clip_rect = tile_cache.post_update(
-                frame_state.resource_cache,
-                frame_state.gpu_cache,
-                frame_context,
-                frame_state.scratch,
+                // Build the dirty region(s) for this tile cache.
+                pic.local_clip_rect = tile_cache.post_update(
+                    frame_state.resource_cache,
+                    frame_state.gpu_cache,
+                    frame_context,
+                    frame_state.scratch,
+                );
+
+                pic.tile_cache = Some(tile_cache);
+            }
+
+            None
+        } else {
+            let parent_surface = &frame_context.surfaces[parent_surface_index.0 as usize];
+            let map_surface_to_parent_surface = SpaceMapper::new_with_target(
+                parent_surface.surface_spatial_node_index,
+                surface.surface_spatial_node_index,
+                PictureRect::max_rect(),
+                frame_context.clip_scroll_tree,
             );
-
-            pic.tile_cache = Some(tile_cache);
+            map_surface_to_parent_surface.map(&surface_rect)
         }
-
-        pic.prim_list = prim_list;
     }
 
     pub fn get_opacity_binding(
