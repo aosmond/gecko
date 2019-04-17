@@ -2131,7 +2131,7 @@ impl PrimitiveStore {
         // TODO(gw): In future, if we support specifying a flag which gets the
         //           stretch size from the segment rect in the shaders, we can
         //           remove this invalidation here completely.
-        if let Some(ref raster_config) = pic.raster_config {
+        let pic_local_rect = if let Some(ref raster_config) = pic.raster_config {
             // Inflate the local bounding rect if required by the filter effect.
             // This inflaction factor is to be applied to the surface itsefl.
             let inflation_size = match raster_config.composite_mode {
@@ -2140,12 +2140,16 @@ impl PrimitiveStore {
                     (blur_radius * BLUR_SAMPLE_SCALE).ceil(),
                 _ => 0.0,
             };
-            surface_rect = surface_rect.inflate(inflation_size, inflation_size);
-        }
+            surface_rect.inflate(inflation_size, inflation_size) * TypedScale::new(1.0)
+        } else {
+            // FIXME: We would not have set the pic's local rect in the original code and instead
+            // just grew the surface size for it to be eventually set on the owning parent picture.
+            // We need to set it though so the parent can consume it. This should be well explained.
+            map_local_to_surface.unmap(&surface_rect).unwrap_or(surface_rect * TypedScale::new(1.0))
+        };
 
         // Layout space for the picture is picture space from the
         // perspective of its child primitives.
-        let pic_local_rect = surface_rect * TypedScale::new(1.0);
         if pic.local_rect != pic_local_rect {
             if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(..)), .. }) = pic.raster_config {
                 frame_state.gpu_cache.invalidate(&pic.extra_gpu_data_handle);
