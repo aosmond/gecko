@@ -1734,7 +1734,7 @@ impl PrimitiveStore {
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
         transform_palette: &mut TransformPalette,
-    ) -> PictureRect {
+    ) -> Option<PictureRect> {
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
 
@@ -1861,29 +1861,34 @@ impl PrimitiveStore {
                         frame_state.clip_chain_stack.pop_clip();
                     }
 
+                    if pic.raster_config.is_none() {
+                        if let Some(ref rect) = pic_surface_rect {
+                            surface_rect = surface_rect.union(rect);
+                        }
+                        (pic.raster_config.is_none(), LayoutRect::zero(), LayoutRect::zero(), SnapOffsets::empty(), SnapOffsets::empty())
+                    } else {
                     // Pictures are composed of primitives and other pictures. We already snap
                     // all of the primitives in the raster space, and if that is also the
                     // screen space, then pictures in general will also already be snapped.
                     // When the picture has a blur or drop shadow effect, or rasterized in its
                     // local space, then we may need to snap the picture itself.
-                    let pic_surface_local_rect = pic_surface_rect * TypedScale::new(1.0);
-                    let (snapped_rect, snap_offsets) = if !pic_surface_local_rect.is_empty() {
+                    let (snapped_rect, snap_offsets) = if !pic.local_rect.is_empty() {
                         get_snapped_rect(
-                            pic_surface_local_rect,
+                            pic.local_rect,
                             &map_local_to_raster,
                             surface.device_pixel_scale,
                             frame_context.clip_scroll_tree,
                             transform_palette,
-                        ).unwrap_or((pic_surface_local_rect, SnapOffsets::empty()))
+                        ).unwrap_or((pic.local_rect, SnapOffsets::empty()))
                     } else {
-                        (pic_surface_local_rect, SnapOffsets::empty())
+                        (pic.local_rect, SnapOffsets::empty())
                     };
 
                     let (visible_rect, shadow_snap_offsets) = if let Some(RasterConfig { composite_mode: PictureCompositeMode::Filter(FilterOp::DropShadow(offset, ..)), .. }) = pic.raster_config {
                         // If we have a drop shadow filter, we also need to include the shadow in
                         // our local rect for the purpose of calculating the size of the picture.
                         // This too will need to be snapped as well.
-                        let shadow_rect = pic_surface_local_rect.translate(&offset);
+                        let shadow_rect = pic.local_rect.translate(&offset);
                         let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
                             shadow_rect,
                             &map_local_to_raster,
@@ -1908,6 +1913,7 @@ impl PrimitiveStore {
                     }
 
                     (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets)
+                    }
                 }
                 _ => {
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
@@ -2124,6 +2130,7 @@ impl PrimitiveStore {
         }
 
         let pic = &mut self.pictures[pic_index.0];
+        pic.prim_list = prim_list;
 
         // If the local rect changed (due to transforms in child primitives) then
         // invalidate the GPU cache location to re-upload the new local rect
@@ -2155,24 +2162,32 @@ impl PrimitiveStore {
                 pic.segments_are_valid = false;
                 pic.local_rect = pic_local_rect;
             }
-        }
 
-        if let Some(RasterConfig { composite_mode: PictureCompositeMode::TileCache { .. }, .. }) = pic.raster_config {
-            let mut tile_cache = frame_state.tile_cache.take().unwrap();
+            if let PictureCompositeMode::TileCache { .. } = raster_config.composite_mode {
+                let mut tile_cache = frame_state.tile_cache.take().unwrap();
 
-            // Build the dirty region(s) for this tile cache.
-            pic.local_clip_rect = tile_cache.post_update(
-                frame_state.resource_cache,
-                frame_state.gpu_cache,
-                frame_context,
-                frame_state.scratch,
+                // Build the dirty region(s) for this tile cache.
+                pic.local_clip_rect = tile_cache.post_update(
+                    frame_state.resource_cache,
+                    frame_state.gpu_cache,
+                    frame_context,
+                    frame_state.scratch,
+                );
+
+                pic.tile_cache = Some(tile_cache);
+            }
+
+            None
+        } else {
+            let parent_surface = &frame_context.surfaces[parent_surface_index.0 as usize];
+            let map_surface_to_parent_surface = SpaceMapper::new_with_target(
+                parent_surface.surface_spatial_node_index,
+                surface.surface_spatial_node_index,
+                PictureRect::max_rect(),
+                frame_context.clip_scroll_tree,
             );
-
-            pic.tile_cache = Some(tile_cache);
+            map_surface_to_parent_surface.map(&surface_rect)
         }
-
-        pic.prim_list = prim_list;
-        surface_rect
     }
 
     pub fn get_opacity_binding(
