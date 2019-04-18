@@ -17,7 +17,7 @@ use clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, ClipIte
 use debug_colors;
 use debug_render::DebugItem;
 use display_list_flattener::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, TypedTransform3D, TypedRect, TypedScale, TypedSize2D};
+use euclid::{SideOffsets2D, TypedTransform3D, TypedRect, TypedScale, TypedSize2D, TypedPoint2D};
 use euclid::approxeq::ApproxEq;
 use frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use frame_builder::{FrameVisibilityContext, FrameVisibilityState};
@@ -1867,9 +1867,7 @@ impl PrimitiveStore {
                     // When the picture has a blur or drop shadow effect, or rasterized in its
                     // local space, then we may need to snap the picture itself.
                     let (snapped_rect, snap_offsets) = if !pic.local_rect.is_empty() {
-                        get_snapped_local_rect(
-                            prim_instance.spatial_node_index,
-                            surface.raster_spatial_node_index,
+                        get_snapped_rect(
                             pic.local_rect,
                             &map_local_to_raster,
                             surface.device_pixel_scale,
@@ -1885,9 +1883,7 @@ impl PrimitiveStore {
                         // our local rect for the purpose of calculating the size of the picture.
                         // This too will need to be snapped as well.
                         let shadow_rect = pic.local_rect.translate(&offset);
-                        let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_local_rect(
-                            prim_instance.spatial_node_index,
-                            surface.raster_spatial_node_index,
+                        let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
                             shadow_rect,
                             &map_local_to_raster,
                             surface.device_pixel_scale,
@@ -1920,9 +1916,7 @@ impl PrimitiveStore {
                         prim_data.prim_size,
                     );
 
-                    let (snapped_prim_rect, snap_offsets) = get_snapped_local_rect(
-                        prim_instance.spatial_node_index,
-                        surface.raster_spatial_node_index,
+                    let (snapped_prim_rect, snap_offsets) = get_snapped_rect(
                         prim_rect,
                         &map_local_to_raster,
                         surface.device_pixel_scale,
@@ -3744,13 +3738,13 @@ fn mix(x: f32, y: f32, a: f32) -> f32 {
 /// Given a point within a local rectangle, and the device space corners
 /// of a snapped primitive, return the snap offsets. This *must* exactly
 /// match the logic in the GLSL compute_snap_offset_impl function.
-fn compute_snap_offset_impl(
-    reference_pos: PicturePoint,
-    reference_rect: PictureRect,
+fn compute_snap_offset_impl<PixelSpace>(
+    reference_pos: TypedPoint2D<f32, PixelSpace>,
+    reference_rect: TypedRect<f32, PixelSpace>,
     prim_top_left: DevicePoint,
     prim_bottom_right: DevicePoint,
 ) -> DeviceVector2D {
-    let normalized_snap_pos = PicturePoint::new(
+    let normalized_snap_pos = TypedPoint2D::<f32, PixelSpace>::new(
         (reference_pos.x - reference_rect.origin.x) / reference_rect.size.width,
         (reference_pos.y - reference_rect.origin.y) / reference_rect.size.height,
     );
@@ -3771,36 +3765,9 @@ fn compute_snap_offset_impl(
     )
 }
 
-fn compute_snap_offset_local_impl(
-    reference_pos: LayoutPoint,
-    reference_rect: LayoutRect,
-    prim_top_left: DevicePoint,
-    prim_bottom_right: DevicePoint,
-) -> DeviceVector2D {
-    let normalized_snap_pos = LayoutPoint::new(
-        (reference_pos.x - reference_rect.origin.x) / reference_rect.size.width,
-        (reference_pos.y - reference_rect.origin.y) / reference_rect.size.height,
-    );
-
-    let top_left = DeviceVector2D::new(
-        (prim_top_left.x + 0.5).floor() - prim_top_left.x,
-        (prim_top_left.y + 0.5).floor() - prim_top_left.y,
-    );
-
-    let bottom_right = DeviceVector2D::new(
-        (prim_bottom_right.x + 0.5).floor() - prim_bottom_right.x,
-        (prim_bottom_right.y + 0.5).floor() - prim_bottom_right.y,
-    );
-
-    DeviceVector2D::new(
-        mix(top_left.x, bottom_right.x, normalized_snap_pos.x),
-        mix(top_left.y, bottom_right.y, normalized_snap_pos.y),
-    )
-}
-
-pub fn recompute_snap_offsets(
-    local_rect: LayoutRect,
-    prim_rect: LayoutRect,
+pub fn recompute_snap_offsets<PixelSpace>(
+    local_rect: TypedRect<f32, PixelSpace>,
+    prim_rect: TypedRect<f32, PixelSpace>,
     snap_offsets: SnapOffsets,
 ) -> SnapOffsets
 {
@@ -3808,12 +3775,12 @@ pub fn recompute_snap_offsets(
         return SnapOffsets::empty();
     }
 
-    let normalized_top_left = LayoutPoint::new(
+    let normalized_top_left = TypedPoint2D::<f32, PixelSpace>::new(
         (local_rect.origin.x - prim_rect.origin.x) / prim_rect.size.width,
         (local_rect.origin.y - prim_rect.origin.y) / prim_rect.size.height,
     );
 
-    let normalized_bottom_right = LayoutPoint::new(
+    let normalized_bottom_right = TypedPoint2D::<f32, PixelSpace>::new(
         (local_rect.origin.x + local_rect.size.width - prim_rect.origin.x) / prim_rect.size.width,
         (local_rect.origin.y + local_rect.size.height - prim_rect.origin.y) / prim_rect.size.height,
     );
@@ -3984,18 +3951,16 @@ pub fn get_raster_rects(
     Some((clipped.to_i32(), unclipped))
 }
 
-pub fn get_snapped_local_rect(
-    prim_spatial_node_index: SpatialNodeIndex,
-    raster_spatial_node_index: SpatialNodeIndex,
-    prim_rect: LayoutRect,
-    map_to_raster: &SpaceMapper<LayoutPixel, RasterPixel>,
+pub fn get_snapped_rect<PixelSpace>(
+    prim_rect: TypedRect<f32, PixelSpace>,
+    map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
     clip_scroll_tree: &ClipScrollTree,
     transform_palette: &mut TransformPalette,
-) -> Option<(LayoutRect, SnapOffsets)> {
+) -> Option<(TypedRect<f32, PixelSpace>, SnapOffsets)> where PixelSpace: fmt::Debug {
     let transform_id = transform_palette.get_id(
-        prim_spatial_node_index,
-        raster_spatial_node_index,
+        map_to_raster.current_target_spatial_node_index,
+        map_to_raster.ref_spatial_node_index,
         clip_scroll_tree,
     );
 
@@ -4009,14 +3974,14 @@ pub fn get_snapped_local_rect(
                 device_rect
             };
 
-            let top_left_offset = compute_snap_offset_local_impl(
+            let top_left_offset = compute_snap_offset_impl(
                 prim_rect.origin,
                 prim_rect,
                 unclipped_device_rect.origin,
                 unclipped_device_rect.bottom_right(),
             );
 
-            let bottom_right_offset = compute_snap_offset_local_impl(
+            let bottom_right_offset = compute_snap_offset_impl(
                 prim_rect.bottom_right(),
                 prim_rect,
                 unclipped_device_rect.origin,
