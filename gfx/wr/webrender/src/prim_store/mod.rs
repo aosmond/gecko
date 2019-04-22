@@ -942,11 +942,15 @@ impl BrushSegment {
         unclipped: &DeviceRect,
         prim_snap_offsets: SnapOffsets,
         device_pixel_scale: DevicePixelScale,
+        is_chased: bool,
     ) -> ClipMaskKind {
         match clip_chain {
             Some(clip_chain) => {
                 if !clip_chain.needs_mask ||
                    (!self.may_need_clip_mask && !clip_chain.has_non_local_clips) {
+                    if is_chased {
+                        println!("clip_chain.needs_mask={} .has_non_local_clips={}, may_need_clip_mask={}", clip_chain.needs_mask, clip_chain.has_non_local_clips, self.may_need_clip_mask);
+                    }
                     return ClipMaskKind::None;
                 }
 
@@ -975,6 +979,11 @@ impl BrushSegment {
                         return ClipMaskKind::Clipped;
                     }
                 };
+
+                if is_chased {
+                    println!("\tmask {:?} -> {:?}", device_rect, device_rect.to_i32());
+                    println!("\t     {:?}", snap_offsets);
+                }
 
                 let clip_task = RenderTask::new_mask(
                     device_rect.to_i32(),
@@ -3568,6 +3577,9 @@ impl PrimitiveInstance {
         // If there are no segments, early out to avoid setting a valid
         // clip task instance location below.
         if segments.is_empty() {
+            if self.is_chased() {
+                println!("\tno segments, skip clip task creation");
+            }
             return true;
         }
 
@@ -3581,6 +3593,9 @@ impl PrimitiveInstance {
         // instance that was built for the main primitive. This is a
         // significant optimization for the common case.
         if segments.len() == 1 {
+            if self.is_chased() {
+                println!("\t1 segment, reusing clip chain instance");
+            }
             let clip_mask_kind = segments[0].update_clip_task(
                 Some(&prim_info.clip_chain),
                 prim_info.clipped_world_rect,
@@ -3593,9 +3608,13 @@ impl PrimitiveInstance {
                 unclipped,
                 prim_snap_offsets,
                 device_pixel_scale,
+                self.is_chased(),
             );
             clip_mask_instances.push(clip_mask_kind);
         } else {
+            if self.is_chased() {
+                println!("\t{} segments, reusing clip chain instance", segments.len());
+            }
             let dirty_world_rect = frame_state.current_dirty_region().combined.world_rect;
 
             for segment in segments {
@@ -3634,6 +3653,7 @@ impl PrimitiveInstance {
                     unclipped,
                     prim_snap_offsets,
                     device_pixel_scale,
+                    self.is_chased(),
                 );
                 clip_mask_instances.push(clip_mask_kind);
             }
@@ -3702,6 +3722,7 @@ impl PrimitiveInstance {
             device_pixel_scale,
         ) {
             if self.is_chased() {
+                println!("\tunclipped {:?} {:?}", unclipped, prim_snap_offsets);
                 println!("\tsegment tasks have been created for clipping");
             }
             return;
@@ -3734,6 +3755,7 @@ impl PrimitiveInstance {
 
                 let clip_task_id = frame_state.render_tasks.add(clip_task);
                 if self.is_chased() {
+                    println!("\tunclipped {:?} {:?}", unclipped, prim_snap_offsets);
                     println!("\tcreated task {:?} with device rect {:?}",
                         clip_task_id, device_rect);
                 }
