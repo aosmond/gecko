@@ -1816,7 +1816,7 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
-            let (is_passthrough, prim_local_rect, snapped_prim_local_rect, snap_offsets, shadow_snap_offsets, update_surface_rect) = match prim_instance.kind {
+            let (is_passthrough, prim_local_rect, mut snapped_prim_local_rect, mut snap_offsets, shadow_snap_offsets, update_surface_rect) = match prim_instance.kind {
                 PrimitiveInstanceKind::Picture { pic_index, .. } => {
                     let is_composite = {
                         let pic = &self.pictures[pic_index.0];
@@ -1932,15 +1932,7 @@ impl PrimitiveStore {
                         prim_data.prim_size,
                     );
 
-                    let (snapped_prim_rect, snap_offsets) = get_snapped_rect(
-                        prim_rect,
-                        &map_local_to_raster,
-                        surface.device_pixel_scale,
-                        frame_context.clip_scroll_tree,
-                        transform_palette,
-                    ).unwrap_or((prim_rect, SnapOffsets::empty()));
-
-                    (false, prim_rect, snapped_prim_rect, snap_offsets, SnapOffsets::empty(), true)
+                    (false, prim_rect, prim_rect, SnapOffsets::empty(), SnapOffsets::empty(), true)
                 }
             };
 
@@ -2079,18 +2071,18 @@ impl PrimitiveStore {
                         .intersection(&prim_local_rect)
                         .unwrap_or(LayoutRect::zero());
 
-                    let visible_snap_offsets = recompute_snap_offsets(
-                        visible_rect,
-                        prim_local_rect,
-                        snap_offsets,
-                    );
-
-                    let snapped_visible_rect = apply_snap_offsets(
+                    let snapped_visible_rect = if let Some((rect, offsets)) = get_snapped_rect(
                         visible_rect,
                         &map_local_to_raster,
                         surface.device_pixel_scale,
-                        visible_snap_offsets,
-                    ).unwrap_or(visible_rect);
+                        frame_context.clip_scroll_tree,
+                        transform_palette,
+                    ) {
+                        snap_offsets = offsets;
+                        rect
+                    } else {
+                        visible_rect
+                    };
 
                     if let Some(rect) = map_local_to_surface.map(&snapped_visible_rect) {
                         surface_rect = surface_rect.union(&rect);
