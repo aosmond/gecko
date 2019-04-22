@@ -1816,7 +1816,7 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
-            let (is_passthrough, prim_local_rect, snapped_prim_local_rect, snap_offsets, shadow_snap_offsets) = match prim_instance.kind {
+            let (is_passthrough, prim_local_rect, snapped_prim_local_rect, snap_offsets, shadow_snap_offsets, update_surface_rect) = match prim_instance.kind {
                 PrimitiveInstanceKind::Picture { pic_index, .. } => {
                     let is_composite = {
                         let pic = &self.pictures[pic_index.0];
@@ -1874,7 +1874,7 @@ impl PrimitiveStore {
                         if let Some(ref rect) = pic_surface_rect {
                             surface_rect = surface_rect.union(rect);
                         }
-                        (pic.raster_config.is_none(), LayoutRect::zero(), LayoutRect::zero(), SnapOffsets::empty(), SnapOffsets::empty())
+                        (pic.raster_config.is_none(), LayoutRect::zero(), LayoutRect::zero(), SnapOffsets::empty(), SnapOffsets::empty(), false)
                     } else {
                     // Pictures are composed of primitives and other pictures. We already snap
                     // all of the primitives in the raster space, and if that is also the
@@ -1921,7 +1921,7 @@ impl PrimitiveStore {
                        surface_rect = surface_rect.union(&rect);
                     }
 
-                    (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets)
+                    (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets, false)
                     }
                 }
                 _ => {
@@ -1940,14 +1940,7 @@ impl PrimitiveStore {
                         transform_palette,
                     ).unwrap_or((prim_rect, SnapOffsets::empty()));
 
-                    let visible_rect = prim_instance.local_clip_rect
-                        .intersection(&snapped_prim_rect)
-                        .unwrap_or(LayoutRect::zero());
-                    if let Some(rect) = map_local_to_surface.map(&visible_rect) {
-                        surface_rect = surface_rect.union(&rect);
-                    }
-
-                    (false, prim_rect, snapped_prim_rect, snap_offsets, SnapOffsets::empty())
+                    (false, prim_rect, snapped_prim_rect, snap_offsets, SnapOffsets::empty(), true)
                 }
             };
 
@@ -2080,6 +2073,29 @@ impl PrimitiveStore {
                 } else {
                     prim_instance.local_clip_rect
                 };
+
+                if update_surface_rect {
+                    let visible_rect = combined_local_clip_rect
+                        .intersection(&prim_local_rect)
+                        .unwrap_or(LayoutRect::zero());
+
+                    let visible_snap_offsets = recompute_snap_offsets(
+                        visible_rect,
+                        prim_local_rect,
+                        snap_offsets,
+                    );
+
+                    let snapped_visible_rect = apply_snap_offsets(
+                        visible_rect,
+                        &map_local_to_raster,
+                        surface.device_pixel_scale,
+                        visible_snap_offsets,
+                    ).unwrap_or(visible_rect);
+
+                    if let Some(rect) = map_local_to_surface.map(&snapped_visible_rect) {
+                        surface_rect = surface_rect.union(&rect);
+                    }
+                }
 
                 // Check if the clip bounding rect (in pic space) is visible on screen
                 // This includes both the prim bounding rect + local prim clip rect!
@@ -3838,6 +3854,29 @@ pub fn recompute_snap_offsets<PixelSpace>(
         top_left,
         bottom_right,
     }
+}
+
+pub fn apply_snap_offsets<PixelSpace>(
+    local_rect: TypedRect<f32, PixelSpace>,
+    map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
+    device_pixel_scale: DevicePixelScale,
+    snap_offsets: SnapOffsets,
+) -> Option<TypedRect<f32, PixelSpace>> where PixelSpace: fmt::Debug {
+    if local_rect.is_empty() || snap_offsets.is_empty() {
+        return None;
+    }
+
+    let raster_rect = map_to_raster.map(&local_rect)?;
+    let world_rect = raster_rect * TypedScale::new(1.0);
+    let device_rect = world_rect * device_pixel_scale;
+
+    let top_left = device_rect.origin + snap_offsets.top_left;
+    let bottom_right = device_rect.bottom_right() + snap_offsets.bottom_right;
+
+    let snapped_device_rect = DeviceRect::new(top_left, DeviceSize::new(bottom_right.x - top_left.x, bottom_right.y - top_left.y));
+    let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+    let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
+    map_to_raster.unmap(&snapped_raster_rect)
 }
 
 /// Retrieve the exact unsnapped device space rectangle for a primitive.
