@@ -1807,7 +1807,7 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
-            let (is_passthrough, prim_local_rect, snapped_prim_local_rect, snap_offsets, shadow_snap_offsets) = match prim_instance.kind {
+            let (is_passthrough, prim_local_rect, mut snapped_prim_local_rect, mut snap_offsets, shadow_snap_offsets, update_surface_rect) = match prim_instance.kind {
                 PrimitiveInstanceKind::Picture { pic_index, .. } => {
                     let is_composite = {
                         let pic = &self.pictures[pic_index.0];
@@ -1865,7 +1865,7 @@ impl PrimitiveStore {
                         if let Some(ref rect) = pic_surface_rect {
                             surface_rect = surface_rect.union(rect);
                         }
-                        (pic.raster_config.is_none(), LayoutRect::zero(), LayoutRect::zero(), SnapOffsets::empty(), SnapOffsets::empty())
+                        (pic.raster_config.is_none(), LayoutRect::zero(), LayoutRect::zero(), SnapOffsets::empty(), SnapOffsets::empty(), false)
                     } else {
                     // Pictures are composed of primitives and other pictures. We already snap
                     // all of the primitives in the raster space, and if that is also the
@@ -1906,7 +1906,7 @@ impl PrimitiveStore {
                        surface_rect = surface_rect.union(&rect);
                     }
 
-                    (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets)
+                    (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets, false)
                     }
                 }
                 _ => {
@@ -1917,28 +1917,7 @@ impl PrimitiveStore {
                         prim_data.prim_size,
                     );
 
-                    let (snapped_prim_rect, snap_offsets) = get_snapped_rect(
-                        prim_rect,
-                        &map_local_to_raster,
-                        surface.device_pixel_scale,
-                        frame_context.clip_scroll_tree,
-                        transform_palette,
-                    ).unwrap_or((prim_rect, SnapOffsets::empty()));
-
-                    let visible_rect = prim_instance.local_clip_rect
-                        .intersection(&snapped_prim_rect)
-                        .unwrap_or(LayoutRect::zero());
-                    if let Some(rect) = map_local_to_surface.map(&visible_rect) {
-                        surface_rect = surface_rect.union(&rect);
-                    }
-
-                    if prim_instance.is_chased() {
-                        if prim_rect != snapped_prim_rect {
-                            println!("\tsnapped {:?} to {:?}", prim_rect, snapped_prim_rect);
-                        }
-                    }
-
-                    (false, prim_rect, snapped_prim_rect, snap_offsets, SnapOffsets::empty())
+                    (false, prim_rect, prim_rect, SnapOffsets::empty(), SnapOffsets::empty(), true)
                 }
             };
 
@@ -2052,6 +2031,29 @@ impl PrimitiveStore {
                 } else {
                     prim_instance.local_clip_rect
                 };
+
+                if update_surface_rect {
+                    let visible_rect = combined_local_clip_rect
+                        .intersection(&prim_local_rect)
+                        .unwrap_or(LayoutRect::zero());
+
+                    let snapped_visible_rect = if let Some((rect, offsets)) = get_snapped_rect(
+                        visible_rect,
+                        &map_local_to_raster,
+                        surface.device_pixel_scale,
+                        frame_context.clip_scroll_tree,
+                        transform_palette,
+                    ) {
+                        snap_offsets = offsets;
+                        rect
+                    } else {
+                        visible_rect
+                    };
+
+                    if let Some(rect) = map_local_to_surface.map(&snapped_visible_rect) {
+                        surface_rect = surface_rect.union(&rect);
+                    }
+                }
 
                 // Check if the clip bounding rect (in pic space) is visible on screen
                 // This includes both the prim bounding rect + local prim clip rect!
