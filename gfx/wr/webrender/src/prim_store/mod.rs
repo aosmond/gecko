@@ -3847,7 +3847,7 @@ pub fn recompute_snap_offsets<PixelSpace>(
         bottom_right,
     }
 }
-
+/*
 pub fn apply_snap_offsets<PixelSpace>(
     local_rect: TypedRect<f32, PixelSpace>,
     map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
@@ -3869,7 +3869,7 @@ pub fn apply_snap_offsets<PixelSpace>(
     let snapped_world_rect = snapped_device_rect / device_pixel_scale;
     let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
     map_to_raster.unmap(&snapped_raster_rect)
-}
+}*/
 
 /// Retrieve the exact unsnapped device space rectangle for a primitive.
 /// If the transform is axis-aligned, compute the snapping offsets that
