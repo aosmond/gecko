@@ -1743,9 +1743,12 @@ impl PrimitiveStore {
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
         transform_palette: &mut TransformPalette,
+        depth: usize,
     ) -> Option<PictureRect> {
+        let prefix = std::iter::repeat('\t').take(depth).collect::<String>();
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
+            println!("{}pic{} spatial {}", prefix, pic_index.0, pic.spatial_node_index.0);
 
             let prim_list = mem::replace(&mut pic.prim_list, PrimitiveList::empty());
             let surface_index = match pic.raster_config {
@@ -1773,6 +1776,7 @@ impl PrimitiveStore {
         };
 
         let surface = &frame_context.surfaces[surface_index.0 as usize];
+        println!("{}surf{} spatial {} raster spatial {}", prefix, surface_index.0, surface.surface_spatial_node_index.0, surface.raster_spatial_node_index.0);
 
         let mut map_local_to_surface = surface
             .map_local_to_surface
@@ -1848,6 +1852,7 @@ impl PrimitiveStore {
                         frame_context,
                         frame_state,
                         transform_palette,
+                        depth + 1,
                     );
 
                     let pic = &self.pictures[pic_index.0];
@@ -1918,7 +1923,8 @@ impl PrimitiveStore {
                     }
 
                     if let Some(rect) = map_local_to_surface.map(&visible_rect) {
-                       surface_rect = surface_rect.union(&rect);
+                        println!("{}pic{} clus{} {:?} mapped {:?}", prefix, pic_index.0, prim_instance.cluster_index.0, visible_rect, rect);
+                        surface_rect = surface_rect.union(&rect);
                     }
 
                     (pic.raster_config.is_none(), pic.local_rect, snapped_rect, snap_offsets, shadow_snap_offsets, false)
@@ -2085,6 +2091,7 @@ impl PrimitiveStore {
                     };
 
                     if let Some(rect) = map_local_to_surface.map(&snapped_visible_rect) {
+                        println!("{}prim clus{} {:?} mapped {:?}", prefix, prim_instance.cluster_index.0, snapped_visible_rect, rect);
                         surface_rect = surface_rect.union(&rect);
                     }
                 }
@@ -2180,6 +2187,17 @@ impl PrimitiveStore {
                 pic.local_rect = pic_local_rect;
             }
 
+        //if pic.local_rect != pic.estimated_rect {
+            println!("{}pic{} local {:?} estimated {:?}", prefix, pic_index.0, pic.local_rect, pic.estimated_rect);
+
+            map_local_to_surface.set_target_spatial_node(
+                pic.spatial_node_index,
+                frame_context.clip_scroll_tree,
+            );
+            let local_surf_rect = map_local_to_surface.unmap(&surface_rect).unwrap_or(LayoutRect::zero());
+            //let local_surf_rect = map_local_to_surface.unmap(&surface_rect).unwrap_or(LayoutRect::zero());
+            println!("{}pic{} surf to local {:?}", prefix, pic_index.0, local_surf_rect);
+        //}
             if let PictureCompositeMode::TileCache { .. } = raster_config.composite_mode {
                 let mut tile_cache = frame_state.tile_cache.take().unwrap();
 
@@ -2189,6 +2207,7 @@ impl PrimitiveStore {
                     frame_state.gpu_cache,
                     frame_context,
                     frame_state.scratch,
+                    depth,
                 );
 
                 pic.tile_cache = Some(tile_cache);

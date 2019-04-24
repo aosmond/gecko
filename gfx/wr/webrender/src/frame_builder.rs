@@ -398,6 +398,7 @@ impl FrameBuilder {
                 &visibility_context,
                 &mut visibility_state,
                 transform_palette,
+                0,
             );
         }
 

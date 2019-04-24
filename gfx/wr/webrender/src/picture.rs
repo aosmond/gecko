@@ -1377,7 +1377,9 @@ impl TileCache {
         gpu_cache: &mut GpuCache,
         frame_context: &FrameVisibilityContext,
         scratch: &mut PrimitiveScratchBuffer,
+        depth: usize,
     ) -> LayoutRect {
+        let prefix = std::iter::repeat('\t').take(depth).collect::<String>();
         self.dirty_region.clear();
         self.pending_blits.clear();
 
@@ -1565,6 +1567,7 @@ impl TileCache {
                 }
 
                 // This tile should be considered as part of the dirty rect calculations.
+                println!("{}tile{} dirty; local {:?} world {:?}", prefix, i, tile.local_rect, tile.world_rect);
                 tile.consider_for_dirty_rect = true;
             }
         }
@@ -1641,6 +1644,7 @@ impl<'a> PictureUpdateState<'a> {
             gpu_cache,
             clip_store,
             clip_data_store,
+            0,
         );
 
         if !state.are_raster_roots_assigned {
@@ -1710,6 +1714,7 @@ impl<'a> PictureUpdateState<'a> {
         gpu_cache: &mut GpuCache,
         clip_store: &ClipStore,
         clip_data_store: &ClipDataStore,
+        depth: usize,
     ) {
         if let Some(prim_list) = picture_primitives[pic_index.0].pre_update(
             clip_chain_id,
@@ -1727,6 +1732,7 @@ impl<'a> PictureUpdateState<'a> {
                     gpu_cache,
                     clip_store,
                     clip_data_store,
+                    depth + 1,
                 );
             }
 
@@ -1734,6 +1740,7 @@ impl<'a> PictureUpdateState<'a> {
                 prim_list,
                 self,
                 frame_context,
+                depth,
             );
         }
     }
@@ -2119,6 +2126,7 @@ impl PrimitiveList {
                     .unwrap_or(LayoutRect::zero());
 
                 cluster.bounding_rect = cluster.bounding_rect.union(&culling_rect);
+                println!("clus{} {:?} union {:?}", cluster_index, culling_rect, cluster.bounding_rect);
             }
 
             prim_instance.cluster_index = ClusterIndex(cluster_index as u16);
@@ -2196,6 +2204,8 @@ pub struct PicturePrimitive {
     /// The local rect of this picture. It is built
     /// dynamically when updating visibility.
     pub local_rect: LayoutRect,
+
+    pub estimated_rect: LayoutRect,
 
     /// If false, this picture needs to (re)build segments
     /// if it supports segment rendering. This can occur
@@ -2335,6 +2345,7 @@ impl PicturePrimitive {
             requested_raster_space,
             spatial_node_index,
             local_rect: LayoutRect::zero(),
+            estimated_rect: LayoutRect::zero(),
             local_clip_rect,
             tile_cache,
             options,
@@ -2732,14 +2743,16 @@ impl PicturePrimitive {
         prim_list: PrimitiveList,
         state: &mut PictureUpdateState,
         frame_context: &FrameBuildingContext,
+        depth: usize,
     ) {
+        let prefix = std::iter::repeat('\t').take(depth).collect::<String>();
         // Restore the pictures list used during recursion.
         self.prim_list = prim_list;
 
         // Pop the state information about this picture.
         state.pop_picture();
 
-        for cluster in &mut self.prim_list.clusters {
+        for (i, cluster) in self.prim_list.clusters.iter_mut().enumerate() {
             // Skip the cluster if backface culled.
             if !cluster.is_backface_visible {
                 let containing_block_index = match self.context_3d {
@@ -2791,6 +2804,7 @@ impl PicturePrimitive {
             // current per-primitive culling code.
             cluster.is_visible = true;
             if let Some(cluster_rect) = surface.map_local_to_surface.map(&cluster.bounding_rect) {
+                println!("{}clus{} {:?} mapped {:?}", prefix, i, cluster.bounding_rect, cluster_rect);
                 surface.rect = surface.rect.union(&cluster_rect);
             }
         }
@@ -2816,6 +2830,11 @@ impl PicturePrimitive {
             // Pop this surface from the stack
             let surface_index = state.pop_surface();
             debug_assert_eq!(surface_index, raster_config.surface_index);
+
+            if self.estimated_rect != surface_rect {
+                self.estimated_rect = surface_rect;
+            }
+            println!("{}surf{} complete {:?}", prefix, surface_index.0, surface_rect);
 
             // Check if any of the surfaces can't be rasterized in local space but want to.
             if raster_config.establishes_raster_root {
@@ -2845,9 +2864,11 @@ impl PicturePrimitive {
                 .map_local_to_surface
                 .map(&surface_rect)
             {
+                println!("{}surf{} {:?} union parent {:?}", prefix, surface_index.0, surface_rect, parent_surface_rect);
                 parent_surface.rect = parent_surface.rect.union(&parent_surface_rect);
             }
         }
+        println!("{}surf complete", prefix);
     }
 
     pub fn prepare_for_render(
