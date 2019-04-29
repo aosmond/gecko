@@ -23,7 +23,7 @@ use frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, Pi
 use frame_builder::{FrameVisibilityContext, FrameVisibilityState};
 use glyph_rasterizer::GlyphKey;
 use gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle, GpuDataRequest, ToGpuBlocks};
-use gpu_types::{BrushFlags, SnapOffsets, TransformPalette};
+use gpu_types::{BrushFlags, SnapOffsets};
 use image::{Repetition};
 use intern;
 use malloc_size_of::MallocSizeOf;
@@ -50,7 +50,7 @@ use std::{cmp, fmt, hash, ops, u32, usize, mem};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use storage;
 use texture_cache::TEXTURE_REGION_DIMENSIONS;
-use util::{ScaleOffset, MatrixHelpers, MaxRect, Recycler, TransformedRectKind};
+use util::{ScaleOffset, MatrixHelpers, MaxRect, Recycler};
 use util::{pack_as_float, project_rect, raster_rect_to_device_pixels};
 use util::{scale_factors, clamp_to_scale_factor};
 use internal_types::LayoutPrimitiveInfo;
@@ -1739,7 +1739,6 @@ impl PrimitiveStore {
         parent_surface_index: SurfaceIndex,
         frame_context: &FrameVisibilityContext,
         frame_state: &mut FrameVisibilityState,
-        transform_palette: &mut TransformPalette,
     ) -> Option<PictureRect> {
         let (mut prim_list, surface_index, apply_local_clip_rect) = {
             let pic = &mut self.pictures[pic_index.0];
@@ -1844,7 +1843,6 @@ impl PrimitiveStore {
                         surface_index,
                         frame_context,
                         frame_state,
-                        transform_palette,
                     );
 
                     let pic = &self.pictures[pic_index.0];
@@ -2051,8 +2049,6 @@ impl PrimitiveStore {
                     visible_rect,
                     &map_local_to_raster,
                     surface.device_pixel_scale,
-                    frame_context.clip_scroll_tree,
-                    transform_palette,
                 ).unwrap_or((visible_rect, SnapOffsets::empty()));
 
                 let (combined_visible_rect, shadow_snap_offsets) = if !prim_shadow_rect.is_empty() {
@@ -2060,8 +2056,6 @@ impl PrimitiveStore {
                         prim_shadow_rect,
                         &map_local_to_raster,
                         surface.device_pixel_scale,
-                        frame_context.clip_scroll_tree,
-                        transform_palette,
                     ).unwrap_or((prim_shadow_rect, SnapOffsets::empty()));
 
                     (snapped_visible_rect.union(&snapped_shadow_rect), shadow_snap_offsets)
@@ -3910,54 +3904,51 @@ pub fn get_snapped_rect<PixelSpace>(
     prim_rect: TypedRect<f32, PixelSpace>,
     map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
-    clip_scroll_tree: &ClipScrollTree,
-    transform_palette: &mut TransformPalette,
 ) -> Option<(TypedRect<f32, PixelSpace>, SnapOffsets)> where PixelSpace: fmt::Debug {
-    let transform_id = transform_palette.get_id(
-        map_to_raster.current_target_spatial_node_index,
-        map_to_raster.ref_spatial_node_index,
-        clip_scroll_tree,
-    );
+    let is_axis_aligned = match map_to_raster.kind {
+        CoordinateSpaceMapping::Local |
+        CoordinateSpaceMapping::ScaleOffset(..) => true,
+        CoordinateSpaceMapping::Transform(ref transform) => transform.preserves_2d_axis_alignment(),
+    };
 
-    match transform_id.transform_kind() {
-        TransformedRectKind::AxisAligned => {
-            let raster_rect = map_to_raster.map(&prim_rect)?;
+    if is_axis_aligned {
+       let raster_rect = map_to_raster.map(&prim_rect)?;
 
-            let device_rect = {
-                let world_rect = raster_rect * TypedScale::new(1.0);
-                world_rect * device_pixel_scale
-            };
+       let device_rect = {
+            let world_rect = raster_rect * TypedScale::new(1.0);
+            world_rect * device_pixel_scale
+        };
 
-            let top_left = compute_snap_offset_impl(
-                prim_rect.origin,
-                prim_rect,
-                device_rect.origin,
-                device_rect.bottom_right(),
-            );
+        let top_left = compute_snap_offset_impl(
+            prim_rect.origin,
+            prim_rect,
+            device_rect.origin,
+            device_rect.bottom_right(),
+        );
 
-            let bottom_right = compute_snap_offset_impl(
-                prim_rect.bottom_right(),
-                prim_rect,
-                device_rect.origin,
-                device_rect.bottom_right(),
-            );
+        let bottom_right = compute_snap_offset_impl(
+            prim_rect.bottom_right(),
+            prim_rect,
+            device_rect.origin,
+            device_rect.bottom_right(),
+        );
 
-            let snap_offsets = SnapOffsets {
-                top_left,
-                bottom_right,
-            };
+        let snap_offsets = SnapOffsets {
+            top_left,
+            bottom_right,
+        };
 
-            let snapped_device_rect = DeviceRect::new(
-                device_rect.origin + top_left,
-                device_rect.size + (bottom_right - top_left).to_size()
-            );
+        let snapped_device_rect = DeviceRect::new(
+            device_rect.origin + top_left,
+            device_rect.size + (bottom_right - top_left).to_size()
+        );
 
-            let snapped_world_rect = snapped_device_rect / device_pixel_scale;
-            let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
-            let snapped_prim_rect = map_to_raster.unmap(&snapped_raster_rect)?;
-            Some((snapped_prim_rect, snap_offsets))
-        }
-        TransformedRectKind::Complex => None,
+        let snapped_world_rect = snapped_device_rect / device_pixel_scale;
+        let snapped_raster_rect = snapped_world_rect * TypedScale::new(1.0);
+        let snapped_prim_rect = map_to_raster.unmap(&snapped_raster_rect)?;
+        Some((snapped_prim_rect, snap_offsets))
+    } else {
+        None
     }
 }
 
