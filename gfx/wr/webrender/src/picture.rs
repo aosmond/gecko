@@ -852,11 +852,18 @@ impl TileCache {
             });
         }
 
-        // Map the picture rect to world space and work out the tiles that we need
-        // in order to ensure the screen is covered.
-        let pic_world_rect = world_mapper
-            .map(&pic_rect)
-            .expect("bug: unable to map picture rect to world");
+        // Map the picture rect to world and device space and work out the tiles
+        // that we need in order to ensure the screen is covered. We haven't done
+        // any snapping yet, so we need to round out in device space to ensure we
+        // cover all pixels the picture may touch.
+        let pic_device_rect = {
+            let unsnapped_world_rect = world_mapper
+                .map(&pic_rect)
+                .expect("bug: unable to map picture rect to world");
+            (unsnapped_world_rect * frame_context.global_device_pixel_scale)
+                .round_out()
+        };
+        let pic_world_rect = pic_device_rect / frame_context.global_device_pixel_scale;
 
         // If the bounding rect of the picture to cache doesn't intersect with
         // the visible world rect at all, just take the screen world rect as
@@ -886,7 +893,6 @@ impl TileCache {
         // given the world reference point constraint.
         let device_ref_point = world_ref_point * frame_context.global_device_pixel_scale;
         let device_world_rect = frame_context.screen_world_rect * frame_context.global_device_pixel_scale;
-        let pic_device_rect = pic_world_rect * frame_context.global_device_pixel_scale;
         let needed_device_rect = pic_device_rect
             .intersection(&device_world_rect)
             .unwrap_or(device_world_rect);
