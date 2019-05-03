@@ -71,6 +71,11 @@ class ShutdownObserver : public nsIObserver {
       GfxDriverInfo::sDeviceVendors[i] = nullptr;
     }
 
+    for (uint32_t i = 0; i < DriverVendorMax; i++) {
+      delete GfxDriverInfo::sDriverVendors[i];
+      GfxDriverInfo::sDriverVendors[i] = nullptr;
+    }
+
     GfxInfoBase::sShutdownOccurred = true;
 
     return NS_OK;
