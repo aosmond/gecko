@@ -26,6 +26,7 @@
 #include "nscore.h"
 #include <fcntl.h>
 #include "stdint.h"
+#include <libgen.h>
 
 #ifdef __SUNPRO_CC
 #  include <stdio.h>
@@ -187,6 +188,43 @@ static int get_egl_status(char* buf, int bufsize) {
   eglTerminate(dpy);
   dlclose(libegl);
   return length;
+}
+
+void open_dm_config(char* out_dm, int out_dm_size) {
+  *out_dm = '\0';
+
+  // Debian/Ubuntu based distros just have the path to the display manager
+  // stored in the given file.
+  char buf[LINE_MAX];
+  FILE* fp = fopen("/etc/X11/default-display-manager", "r");
+  if (fp) {
+    if (fgets(buf, sizeof(buf), fp)) {
+      char* bin = basename(buf);
+      strncpy(out_dm, bin, out_dm_size);
+      out_dm[out_dm_size - 1] = '\0';
+    }
+    fclose(fp);
+    return;
+  }
+
+  // Red Hat and OpenSUSE based distros have a more complex configuration
+  // file and we need to scan for the DISPLAYMANAGER entry.
+  fp = fopen("/etc/sysconfig/desktop", "r");
+  if (!fp) {
+    fp = fopen("/etc/sysconfig/displaymanager", "r");
+  }
+
+  if (fp) {
+    while (fgets(buf, sizeof(buf), fp)) {
+      if (strncmp(buf, "DISPLAYMANAGER=", 15) == 0) {
+        char* bin = basename(&buf[15]);
+        strncpy(out_dm, bin, out_dm_size);
+        out_dm[out_dm_size - 1] = '\0';
+        break;
+      }
+    }
+    fclose(fp);
+  }
 }
 
 void glxtest() {
@@ -384,6 +422,13 @@ void glxtest() {
     if (length >= bufsize) {
       fatal_error("GL strings length too large for buffer size");
     }
+  }
+
+  // Attempt to detect the display manager.
+  char path[PATH_MAX];
+  open_dm_config(path, sizeof(path));
+  if (path[0] && strcmp(path, ".") != 0) {
+    length += snprintf(buf + length, bufsize, "DM\n%s\n", path);
   }
 
   ///// Finally write data to the pipe

@@ -19,6 +19,14 @@
 
 #include "GfxInfoX11.h"
 
+#ifdef MOZ_X11
+#  include <gdk/gdkx.h>
+#endif /* MOZ_X11 */
+
+#ifdef MOZ_WAYLAND
+#  include <gdk/gdkwayland.h>
+#endif /* MOZ_WAYLAND */
+
 #ifdef DEBUG
 bool fire_glxtest_process();
 #endif
@@ -113,6 +121,7 @@ void GfxInfo::GetData() {
   nsCString glRenderer;
   nsCString glVersion;
   nsCString textureFromPixmap;
+  nsCString displayManager;
 
   // Available if GLX_MESA_query_renderer is supported.
   nsCString mesaVendor;
@@ -148,6 +157,8 @@ void GfxInfo::GetData() {
         stringToFill = &mAdapterRAM;
       else if (!strcmp(line, "DRI_DRIVER"))
         stringToFill = &driDriver;
+      else if (!strcmp(line, "DM"))
+        stringToFill = &displayManager;
     }
   }
 
@@ -269,9 +280,11 @@ void GfxInfo::GetData() {
     }
   } else if (glVendor.EqualsLiteral("NVIDIA Corporation")) {
     CopyUTF16toUTF8(GfxDriverInfo::GetDeviceVendor(VendorNVIDIA), mVendorId);
+    mDriverVendor.AssignLiteral("nvidia/unknown");
     // TODO: Use NV-CONTROL X11 extension to query Device ID and VRAM.
   } else if (glVendor.EqualsLiteral("ATI Technologies Inc.")) {
     CopyUTF16toUTF8(GfxDriverInfo::GetDeviceVendor(VendorATI), mVendorId);
+    mDriverVendor.AssignLiteral("ati/unknown");
     // TODO: Look into ways to find the device ID on FGLRX.
   } else {
     NS_WARNING("Failed to detect GL vendor!");
@@ -286,6 +299,7 @@ void GfxInfo::GetData() {
   }
 
   mAdapterDescription.Assign(glRenderer);
+  mDisplayManager.Assign(displayManager);
 
   AddCrashReportAnnotations();
 }
@@ -424,6 +438,33 @@ GfxInfo::GetDWriteVersion(nsAString& aDwriteVersion) {
 NS_IMETHODIMP
 GfxInfo::GetCleartypeParameters(nsAString& aCleartypeParams) {
   return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP
+GfxInfo::GetWindowProtocol(nsAString& aWindowProtocol) {
+#ifdef MOZ_X11
+  if (GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+    aWindowProtocol.AssignLiteral("x11");
+    return NS_OK;
+  }
+#endif /* MOZ_X11 */
+
+#ifdef MOZ_WAYLAND
+  if (GDK_IS_WAYLAND_DISPLAY(gdk_display_get_default())) {
+    aWindowProtocol.AssignLiteral("wayland");
+    return NS_OK;
+  }
+#endif /* MOZ_WAYLAND */
+
+  aWindowProtocol.AssignLiteral("unknown");
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+GfxInfo::GetDisplayManager(nsAString& aDisplayManager) {
+  GetData();
+  AppendASCIItoUTF16(mDisplayManager, aDisplayManager);
+  return NS_OK;
 }
 
 NS_IMETHODIMP

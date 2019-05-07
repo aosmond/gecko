@@ -22,6 +22,8 @@ class GfxInfo final : public GfxInfoBase {
   NS_IMETHOD GetDWriteEnabled(bool* aDWriteEnabled) override;
   NS_IMETHOD GetDWriteVersion(nsAString& aDwriteVersion) override;
   NS_IMETHOD GetCleartypeParameters(nsAString& aCleartypeParams) override;
+  NS_IMETHOD GetWindowProtocol(nsAString& aWindowProtocol) override;
+  NS_IMETHOD GetDisplayManager(nsAString& aDisplayManager) override;
   NS_IMETHOD GetAdapterDescription(nsAString& aAdapterDescription) override;
   NS_IMETHOD GetAdapterDriver(nsAString& aAdapterDriver) override;
   NS_IMETHOD GetAdapterVendorID(nsAString& aAdapterVendorID) override;
@@ -75,6 +77,7 @@ class GfxInfo final : public GfxInfoBase {
   nsCString mAdapterRAM;
   nsCString mOS;
   nsCString mOSRelease;
+  nsCString mDisplayManager;
   bool mHasTextureFromPixmap;
   unsigned int mGLMajorVersion, mGLMinorVersion;
   bool mIsMesa;
