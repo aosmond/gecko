@@ -175,20 +175,20 @@ class SurfacePipeFactory {
           if (blendAnimation) {
             if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, colorManagementConfig,
-                              blendAnimationConfig, premultiplyConfig,
+                              premultiplyConfig, blendAnimationConfig,
                               surfaceConfig);
             } else {  // (adam7Interpolate are false)
-              pipe = MakePipe(colorManagementConfig, blendAnimationConfig,
-                              premultiplyConfig, surfaceConfig);
+              pipe = MakePipe(colorManagementConfig, premultiplyConfig,
+                              blendAnimationConfig, surfaceConfig);
             }
           } else if (removeFrameRect) {
             if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, colorManagementConfig,
-                              removeFrameRectConfig, premultiplyConfig,
+                              premultiplyConfig, removeFrameRectConfig,
                               surfaceConfig);
             } else {  // (adam7Interpolate are false)
-              pipe = MakePipe(colorManagementConfig, removeFrameRectConfig,
-                              premultiplyConfig, surfaceConfig);
+              pipe = MakePipe(colorManagementConfig, premultiplyConfig,
+                              removeFrameRectConfig, surfaceConfig);
             }
           } else {  // (blendAnimation and removeFrameRect is false)
             if (adam7Interpolate) {
@@ -223,18 +223,18 @@ class SurfacePipeFactory {
         } else {  // (downscale is false)
           if (blendAnimation) {
             if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, blendAnimationConfig,
-                              premultiplyConfig, surfaceConfig);
+              pipe = MakePipe(interpolatingConfig, premultiplyConfig,
+                              blendAnimationConfig, surfaceConfig);
             } else {  // (adam7Interpolate are false)
-              pipe = MakePipe(blendAnimationConfig, premultiplyConfig,
+              pipe = MakePipe(premultiplyConfig, blendAnimationConfig,
                               surfaceConfig);
             }
           } else if (removeFrameRect) {
             if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, removeFrameRectConfig,
-                              premultiplyConfig, surfaceConfig);
+              pipe = MakePipe(interpolatingConfig, premultiplyConfig,
+                              removeFrameRectConfig, surfaceConfig);
             } else {  // (adam7Interpolate are false)
-              pipe = MakePipe(removeFrameRectConfig, premultiplyConfig,
+              pipe = MakePipe(premultiplyConfig, removeFrameRectConfig,
                               surfaceConfig);
             }
           } else {  // (blendAnimation and removeFrameRect is false)
