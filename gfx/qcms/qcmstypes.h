@@ -44,8 +44,10 @@ typedef unsigned long uintptr_t;
 #  include <stdint.h>
 #endif
 
+#ifndef __cplusplus
 typedef qcms_bool bool;
 #define true 1
 #define false 0
+#endif
 
 #endif
