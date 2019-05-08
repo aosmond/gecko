@@ -213,6 +213,10 @@ nsresult nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo) {
     pipeFlags |= SurfacePipeFlags::PROGRESSIVE_DISPLAY;
   }
 
+  if (HasAlphaChannel() && !mDisablePremultipliedAlpha) {
+    pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
+  }
+
   qcms_transform* pipeTransform = mUsePipeTransform ? mTransform : nullptr;
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
       this, Size(), OutputSize(), aFrameInfo.mFrameRect, mFormat, animParams,
@@ -607,10 +611,9 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
       }
     }
 
-    decoder->mTransform =
-        qcms_transform_create(decoder->mInProfile, inType,
-                              gfxPlatform::GetCMSOutputProfile(),
-                              outType, (qcms_intent)intent);
+    decoder->mTransform = qcms_transform_create(
+        decoder->mInProfile, inType, gfxPlatform::GetCMSOutputProfile(),
+        outType, (qcms_intent)intent);
   } else {
     png_set_gray_to_rgb(png_ptr);
 
@@ -625,10 +628,18 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     }
   }
 
+  if (!decoder->mUsePipeTransform) {
+    png_set_bgr(png_ptr);
+  }
+
   // now all of those things we set above are used to update various struct
   // members and whatnot, after which we can get channels, rowbytes, etc.
   png_read_update_info(png_ptr, info_ptr);
   decoder->mChannels = channels = png_get_channels(png_ptr, info_ptr);
+
+  if (!decoder->HasAlphaChannel()) {
+    png_set_add_alpha(png_ptr, 0xFF, PNG_FILLER_AFTER);
+  }
 
   //---------------------------------------------------------------//
   // copy PNG info into imagelib structs (formerly png_set_dims()) //
@@ -727,29 +738,6 @@ void nsPNGDecoder::PostInvalidationIfNeeded() {
                    Some(invalidRect->mOutputSpaceRect));
 }
 
-static NextPixel<uint32_t> PackRGBPixelAndAdvance(uint8_t*& aRawPixelInOut) {
-  const uint32_t pixel = gfxPackedPixel(0xFF, aRawPixelInOut[0],
-                                        aRawPixelInOut[1], aRawPixelInOut[2]);
-  aRawPixelInOut += 3;
-  return AsVariant(pixel);
-}
-
-static NextPixel<uint32_t> PackRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut) {
-  const uint32_t pixel = gfxPackedPixel(aRawPixelInOut[3], aRawPixelInOut[0],
-                                        aRawPixelInOut[1], aRawPixelInOut[2]);
-  aRawPixelInOut += 4;
-  return AsVariant(pixel);
-}
-
-static NextPixel<uint32_t> PackUnpremultipliedRGBAPixelAndAdvance(
-    uint8_t*& aRawPixelInOut) {
-  const uint32_t pixel =
-      gfxPackedPixelNoPreMultiply(aRawPixelInOut[3], aRawPixelInOut[0],
-                                  aRawPixelInOut[1], aRawPixelInOut[2]);
-  aRawPixelInOut += 4;
-  return AsVariant(pixel);
-}
-
 void nsPNGDecoder::row_callback(png_structp png_ptr, png_bytep new_row,
                                 png_uint_32 row_num, int pass) {
   /* libpng comments:
@@ -842,20 +830,8 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow) {
   }
 
   // Write this row to the SurfacePipe.
-  DebugOnly<WriteState> result;
-  if (HasAlphaChannel()) {
-    if (mDisablePremultipliedAlpha) {
-      result = mPipe.WritePixelsToRow<uint32_t>(
-          [&] { return PackUnpremultipliedRGBAPixelAndAdvance(rowToWrite); });
-    } else {
-      result = mPipe.WritePixelsToRow<uint32_t>(
-          [&] { return PackRGBAPixelAndAdvance(rowToWrite); });
-    }
-  } else {
-    result = mPipe.WritePixelsToRow<uint32_t>(
-        [&] { return PackRGBPixelAndAdvance(rowToWrite); });
-  }
-
+  DebugOnly<WriteState> result =
+      mPipe.WriteBuffer(reinterpret_cast<uint32_t*>(rowToWrite), 0, width);
   MOZ_ASSERT(WriteState(result) != WriteState::FAILURE);
 
   PostInvalidationIfNeeded();
