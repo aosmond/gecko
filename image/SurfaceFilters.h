@@ -20,6 +20,7 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/Swizzle.h"
 #include "skia/src/core/SkBlitRow.h"
 
 #include "DownscalingFilter.h"
@@ -28,6 +29,63 @@
 
 namespace mozilla {
 namespace image {
+
+//////////////////////////////////////////////////////////////////////////////
+// PremultiplyAlphaFilter
+//////////////////////////////////////////////////////////////////////////////
+
+template <typename Next>
+class PremultiplyAlphaFilter;
+
+/**
+ * A configuration struct for PremultiplyAlphaFilter.
+ */
+struct PremultiplyAlphaConfig {
+  template <typename Next>
+  using Filter = PremultiplyAlphaFilter<Next>;
+};
+
+/**
+ * PremultiplyAlphaFilter performs premultiplication on rows written to it.
+ *
+ * The 'Next' template parameter specifies the next filter in the chain.
+ */
+template <typename Next>
+class PremultiplyAlphaFilter final : public SurfaceFilter {
+ public:
+  PremultiplyAlphaFilter() {}
+
+  template <typename... Rest>
+  nsresult Configure(const PremultiplyAlphaConfig& aConfig,
+                     const Rest&... aRest) {
+    nsresult rv = mNext.Configure(aRest...);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    ConfigureFilter(mNext.InputSize(), sizeof(uint32_t));
+    return NS_OK;
+  }
+
+  Maybe<SurfaceInvalidRect> TakeInvalidRect() override {
+    return mNext.TakeInvalidRect();
+  }
+
+ protected:
+  uint8_t* DoResetToFirstRow() override { return mNext.ResetToFirstRow(); }
+
+  uint8_t* DoAdvanceRow() override {
+    uint8_t* rowPtr = mNext.CurrentRowPointer();
+    const int32_t width = mNext.InputSize().width;
+    const int32_t stride = width * sizeof(uint32_t);
+    const gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
+    const gfx::IntSize size(width, 1);
+    gfx::PremultiplyData(rowPtr, stride, format, rowPtr, stride, format, size);
+    return mNext.AdvanceRow();
+  }
+
+  Next mNext;  /// The next SurfaceFilter in the chain.
+};
 
 //////////////////////////////////////////////////////////////////////////////
 // ColorManagementFilter
