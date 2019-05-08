@@ -161,13 +161,14 @@ void DecodedSurfaceProvider::CheckForNewSurface() {
   }
 
   // We don't have a surface yet; try to get one from the decoder.
-  mSurface = mDecoder->GetCurrentFrameRef().get();
+  mSurface = mDecoder->GetCurrentFrame();
   if (!mSurface) {
     return;  // No surface yet.
   }
 
   // We just got a surface for the first time; let the surface cache know.
   MOZ_ASSERT(mImage);
+  mSurface->ClearUnwrittenPixels();
   SurfaceCache::SurfaceAvailable(WrapNotNull(this));
 }
 

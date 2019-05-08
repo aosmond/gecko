@@ -279,6 +279,14 @@ bool AnimationSurfaceProvider::CheckForNewFrameAtYield() {
     // We should've gotten a different frame than last time.
     MOZ_ASSERT(!mFrames->IsLastInsertedFrame(frame));
 
+    // We only want to handle the first frame if it is the first pass for the
+    // animation decoder. The owning image will be cleared after that.
+    size_t frameCount = mFrames->Size();
+    if (frameCount == 0) {
+      frame->ClearUnwrittenPixels();
+      justGotFirstFrame = !!mImage;
+    }
+
     // Append the new frame to the list.
     AnimationFrameBuffer::InsertStatus status =
         mFrames->Insert(std::move(frame));
@@ -307,13 +315,6 @@ bool AnimationSurfaceProvider::CheckForNewFrameAtYield() {
       default:
         MOZ_ASSERT_UNREACHABLE("Unhandled insert status!");
         break;
-    }
-
-    // We only want to handle the first frame if it is the first pass for the
-    // animation decoder. The owning image will be cleared after that.
-    size_t frameCount = mFrames->Size();
-    if (frameCount == 1 && mImage) {
-      justGotFirstFrame = true;
     }
   }
 
@@ -353,6 +354,14 @@ bool AnimationSurfaceProvider::CheckForNewFrameAtTerminalState() {
       return mFrames->MarkComplete(mDecoder->GetFirstFrameRefreshArea());
     }
 
+    // We only want to handle the first frame if it is the first pass for the
+    // animation decoder. The owning image will be cleared after that.
+    size_t frameCount = mFrames->Size();
+    if (frameCount == 0) {
+      frame->ClearUnwrittenPixels();
+      justGotFirstFrame = !!mImage;
+    }
+
     // Append the new frame to the list.
     AnimationFrameBuffer::InsertStatus status =
         mFrames->Insert(std::move(frame));
@@ -378,12 +387,6 @@ bool AnimationSurfaceProvider::CheckForNewFrameAtTerminalState() {
 
     continueDecoding =
         mFrames->MarkComplete(mDecoder->GetFirstFrameRefreshArea());
-
-    // We only want to handle the first frame if it is the first pass for the
-    // animation decoder. The owning image will be cleared after that.
-    if (mFrames->Size() == 1 && mImage) {
-      justGotFirstFrame = true;
-    }
   }
 
   if (justGotFirstFrame) {

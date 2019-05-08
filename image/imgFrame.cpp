@@ -183,6 +183,7 @@ imgFrame::imgFrame()
       mFinished(false),
       mOptimizable(false),
       mShouldRecycle(false),
+      mCleared(false),
       mTimeout(FrameTimeout::FromRawMilliseconds(100)),
       mDisposalMethod(DisposalMethod::NOT_SPECIFIED),
       mBlendMethod(BlendMethod::OVER),
@@ -271,15 +272,7 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
     }
-  }
 
-  if (!ClearSurface(mRawSurface, mImageSize, mFormat)) {
-    NS_WARNING("Could not clear allocated buffer");
-    mAborted = true;
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
-  if (mBlankRawSurface) {
     if (!GreenSurface(mBlankRawSurface, mImageSize, mFormat)) {
       NS_WARNING("Could not clear allocated blank buffer");
       mAborted = true;
@@ -678,26 +671,13 @@ void imgFrame::Finish(Opacity aFrameOpacity /* = Opacity::SOME_TRANSPARENCY */,
   MonitorAutoLock lock(mMonitor);
   MOZ_ASSERT(mLockCount > 0, "Image data should be locked");
 
-  IntRect frameRect(GetRect());
-  if (!mDecoded.IsEqualEdges(frameRect)) {
-    // The decoder should have produced rows starting from either the bottom or
-    // the top of the image. We need to calculate the region for which we have
-    // not yet invalidated.
-    IntRect delta(0, 0, frameRect.width, 0);
-    if (mDecoded.y == 0) {
-      delta.y = mDecoded.height;
-      delta.height = frameRect.height - mDecoded.height;
-    } else if (mDecoded.y + mDecoded.height == frameRect.height) {
-      delta.height = frameRect.height - mDecoded.y;
-    } else {
-      MOZ_ASSERT_UNREACHABLE("Decoder only updated middle of image!");
-      delta = frameRect;
-    }
-
-    ImageUpdatedInternal(delta);
+  IntRect unwritten = ClearUnwrittenPixelsInternal();
+  if (!unwritten.IsEmpty()) {
+    // We never invalidated these rows. We need to do so now.
+    ImageUpdatedInternal(unwritten);
   }
 
-  MOZ_ASSERT(mDecoded.IsEqualEdges(frameRect));
+  MOZ_ASSERT(mDecoded.IsEqualEdges(GetRect()));
 
   if (aFinalize) {
     FinalizeSurfaceInternal();
@@ -915,6 +895,72 @@ void imgFrame::WaitUntilFinished() const {
     // Not complete yet, so we'll have to wait.
     mMonitor.Wait();
   }
+}
+
+void imgFrame::ClearUnwrittenPixels() {
+  MonitorAutoLock lock(mMonitor);
+  ClearUnwrittenPixelsInternal();
+}
+
+IntRect imgFrame::ClearUnwrittenPixelsInternal() {
+  mMonitor.AssertCurrentThreadOwns();
+
+  IntRect frameRect(GetRect());
+  if (mDecoded.IsEqualEdges(frameRect)) {
+    return IntRect();
+  }
+
+  // The decoder should have produced rows starting from either the bottom or
+  // the top of the image. We need to calculate the region for which we have
+  // not yet explicitly written anything to.
+  IntRect delta(0, 0, frameRect.width, 0);
+  if (mDecoded.y == 0) {
+    delta.y = mDecoded.height;
+    delta.height = frameRect.height - mDecoded.height;
+  } else if (mDecoded.y + mDecoded.height == frameRect.height) {
+    delta.height = frameRect.height - mDecoded.y;
+  } else {
+    MOZ_ASSERT_UNREACHABLE("Decoder only updated middle of image!");
+    delta = frameRect;
+  }
+
+  // If we've already cleared, then the delta is just what the decoder did not
+  // write to. We have explicitly cleared those rows already however.
+  if (mCleared) {
+    return delta;
+  }
+
+  mCleared = true;
+  MOZ_ASSERT(!mFinished);
+
+  if (!mRawSurface) {
+    MOZ_ASSERT_UNREACHABLE("Uncleared pixels but no raw surface");
+    return delta;
+  }
+
+  int32_t stride = mRawSurface->Stride();
+  uint8_t* data = mRawSurface->GetData();
+  MOZ_ASSERT(data);
+
+  uint8_t empty;
+  if (mFormat == SurfaceFormat::B8G8R8X8) {
+    // Skia doesn't support RGBX surfaces, so ensure the alpha value is set
+    // to opaque white. While it would be nice to only do this for Skia,
+    // imgFrame can run off main thread and past shutdown where
+    // we might not have gfxPlatform, so just memset everytime instead.
+    empty = 0xFF;
+  } else if (mRawSurface->OnHeap()) {
+    // We only need to memset it if the buffer was allocated on the heap.
+    // Otherwise, it's allocated via mmap and refers to a zeroed page and will
+    // be COW once it's written to.
+    empty = 0;
+  } else {
+    // Already zero filled on demand.
+    return delta;
+  }
+
+  memset(data + delta.y * stride, empty, delta.height * stride);
+  return delta;
 }
 
 bool imgFrame::AreAllPixelsWritten() const {

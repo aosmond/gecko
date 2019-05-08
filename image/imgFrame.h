@@ -155,6 +155,15 @@ class imgFrame {
   void WaitUntilFinished() const;
 
   /**
+   * Clear any pixels unwritten to by the decoder. This will guarantee that all
+   * pixels have a sane value for the given surface format.
+   *
+   * This should only be called by surface provider while holding the decoder
+   * mutex.
+   */
+  void ClearUnwrittenPixels();
+
+  /**
    * Returns the number of bytes per pixel this imgFrame requires.  This is a
    * worst-case value that does not take into account the effects of format
    * changes caused by Optimize(), since an imgFrame is not optimized throughout
@@ -216,6 +225,7 @@ class imgFrame {
 
   void AssertImageDataLocked() const;
 
+  IntRect ClearUnwrittenPixelsInternal();
   bool AreAllPixelsWritten() const;
   nsresult ImageUpdatedInternal(const nsIntRect& aUpdateRect);
   void GetImageDataInternal(uint8_t** aData, uint32_t* length) const;
@@ -295,10 +305,11 @@ class imgFrame {
   //! Number of RecyclingSourceSurface's currently alive for this imgFrame.
   int16_t mRecycleLockCount;
 
-  bool mAborted;
-  bool mFinished;
-  bool mOptimizable;
-  bool mShouldRecycle;
+  bool mAborted : 1;
+  bool mFinished : 1;
+  bool mOptimizable : 1;
+  bool mShouldRecycle : 1;
+  bool mCleared : 1;
 
   //////////////////////////////////////////////////////////////////////////////
   // Effectively const data, only mutated in the Init methods.
