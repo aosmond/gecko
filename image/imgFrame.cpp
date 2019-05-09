@@ -671,6 +671,8 @@ void imgFrame::Finish(Opacity aFrameOpacity /* = Opacity::SOME_TRANSPARENCY */,
   MonitorAutoLock lock(mMonitor);
   MOZ_ASSERT(mLockCount > 0, "Image data should be locked");
 
+  mFinished = true;
+
   IntRect unwritten = ClearUnwrittenPixelsInternal();
   if (!unwritten.IsEmpty()) {
     // We never invalidated these rows. We need to do so now.
@@ -682,8 +684,6 @@ void imgFrame::Finish(Opacity aFrameOpacity /* = Opacity::SOME_TRANSPARENCY */,
   if (aFinalize) {
     FinalizeSurfaceInternal();
   }
-
-  mFinished = true;
 
   // The image is now complete, wake up anyone who's waiting.
   mMonitor.NotifyAll();
@@ -926,9 +926,11 @@ IntRect imgFrame::ClearUnwrittenPixelsInternal() {
 
   // If we've already cleared, then the delta is just what the decoder did not
   // write to. We have explicitly cleared those rows already however.
-  if (mCleared) {
+  if (mCleared || mFinished) {
     return delta;
   }
+
+  printf_stderr("[AO][%p] clear (%d-%d)x%d\n", this, delta.y, delta.YMost(), delta.width);
 
   mCleared = true;
   MOZ_ASSERT(!mFinished);
