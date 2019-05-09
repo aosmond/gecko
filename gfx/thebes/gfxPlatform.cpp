@@ -2846,13 +2846,25 @@ void gfxPlatform::InitWebRenderConfig() {
     }
   }
 #if defined(MOZ_WIDGET_GTK)
-  else if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
-    // Hardware compositing should be disabled by default if we aren't using
-    // WebRender. We had to check if it is enabled at all, because it may
-    // already have been forced disabled (e.g. safe mode, headless). It may
-    // still be forced on by the user, and if so, this should have no effect.
-    gfxConfig::Disable(Feature::HW_COMPOSITING, FeatureStatus::Blocked,
-                       "Acceleration blocked by platform");
+  else {
+    if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
+      // Hardware compositing should be disabled by default if we aren't using
+      // WebRender. We had to check if it is enabled at all, because it may
+      // already have been forced disabled (e.g. safe mode, headless). It may
+      // still be forced on by the user, and if so, this should have no effect.
+      gfxConfig::Disable(Feature::HW_COMPOSITING, FeatureStatus::Blocked,
+                         "Acceleration blocked by platform");
+    }
+
+    if (gfxConfig::IsEnabled(Feature::GPU_PROCESS) &&
+        !gfxPrefs::GPUProcessAllowSoftware()) {
+      // By default we disable the GPU process on Linux for users without
+      // WebRender. Some users force enable OpenGL compositing, which is
+      // accelerated but since this is not a supported configuration, they can
+      // also force enable the GPU process if desired.
+      gfxConfig::Disable(Feature::GPU_PROCESS, FeatureStatus::Unavailable,
+                         "WebRender is unavailable");
+    }
   }
 #endif
 

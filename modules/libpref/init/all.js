@@ -4983,12 +4983,17 @@ pref("layers.acceleration.disabled", false);
 // and output the result to stderr.
 pref("layers.bench.enabled", false);
 
+// Whether to enable the GPU process.
 #if defined(XP_WIN)
 pref("layers.gpu-process.enabled", true);
 pref("layers.gpu-process.allow-software", true);
 #ifdef NIGHTLY_BUILD
 pref("layers.gpu-process.max_restarts", 3);
 #endif
+#elif defined(MOZ_WIDGET_GTK) && defined(NIGHTLY_BUILD)
+pref("layers.gpu-process.enabled", true);
+pref("layers.gpu-process.allow-software", false);
+pref("layers.gpu-process.max_restarts", 3);
 #endif
 
 // Whether to force acceleration on, ignoring blacklists.
