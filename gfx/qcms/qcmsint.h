@@ -310,28 +310,18 @@ long __cdecl _InterlockedDecrement(long volatile *);
 #endif
 
 
-#ifdef NATIVE_OUTPUT
-# define RGB_OUTPUT_COMPONENTS 4
-# define RGBA_OUTPUT_COMPONENTS 4
-# ifdef IS_LITTLE_ENDIAN
-#  define OUTPUT_A_INDEX 3
-#  define OUTPUT_R_INDEX 2
-#  define OUTPUT_G_INDEX 1
-#  define OUTPUT_B_INDEX 0
-# else
-#  define OUTPUT_A_INDEX 0
-#  define OUTPUT_R_INDEX 1
-#  define OUTPUT_G_INDEX 2
-#  define OUTPUT_B_INDEX 3
-# endif
-#else
-# define RGB_OUTPUT_COMPONENTS 3
-# define RGBA_OUTPUT_COMPONENTS 4
-# define OUTPUT_R_INDEX 0
-# define OUTPUT_G_INDEX 1
-# define OUTPUT_B_INDEX 2
-# define OUTPUT_A_INDEX 3
-#endif
+#define RGB_COMPONENTS 3
+#define RGBA_COMPONENTS 4
+
+#define RGBA_R_INDEX 0
+#define RGBA_G_INDEX 1
+#define RGBA_B_INDEX 2
+#define RGBA_A_INDEX 3
+
+#define BGRA_B_INDEX 0
+#define BGRA_G_INDEX 1
+#define BGRA_R_INDEX 2
+#define BGRA_A_INDEX 3
 
 #ifdef __cplusplus
 }
