@@ -51,7 +51,7 @@
 #include <asm/cputable.h>
 #include <link.h>
 
-static inline qcms_bool have_altivec() {
+static inline bool have_altivec() {
 	static int available = -1;
 	int new_avail = 0;
         ElfW(auxv_t) auxv;
@@ -88,7 +88,7 @@ out:
  * rip-off from ffmpeg AltiVec detection code.
  * this code also appears on Apple's AltiVec pages.
  */
-static inline qcms_bool have_altivec() {
+static inline bool have_altivec() {
 	int sels[2] = {CTL_HW, HW_VECTORUNIT};
 	static int available = -1;
 	size_t len = sizeof(available);
@@ -291,7 +291,7 @@ static struct matrix adapt_matrix_to_D50(struct matrix r, qcms_CIE_xyY source_wh
 	return matrix_multiply(Bradford, r);
 }
 
-qcms_bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries)
+bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries)
 {
 	struct matrix colorants;
 	colorants = build_RGB_to_XYZ_transfer_matrix(white_point, primaries);
@@ -316,7 +316,7 @@ qcms_bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcm
 	return true;
 }
 
-qcms_bool get_rgb_colorants(struct matrix *colorants, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries)
+bool get_rgb_colorants(struct matrix *colorants, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries)
 {
 	*colorants = build_RGB_to_XYZ_transfer_matrix(white_point, primaries);
 	*colorants = adapt_matrix_to_D50(*colorants, white_point);
@@ -1418,7 +1418,7 @@ void qcms_transform_data(qcms_transform *transform, void *src, void *dest, size_
 	transform->transform_fn(transform, src, dest, length);
 }
 
-qcms_bool qcms_supports_iccv4;
+bool qcms_supports_iccv4;
 void qcms_enable_iccv4()
 {
 	qcms_supports_iccv4 = true;
