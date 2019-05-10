@@ -122,7 +122,8 @@ where
 {
     #[inline]
     pub fn intersects(&self, other: &Self) -> bool {
-        self.origin.x < other.origin.x + other.size.width
+        !self.is_empty() && !other.is_empty()
+            && self.origin.x < other.origin.x + other.size.width
             && other.origin.x < self.origin.x + self.size.width
             && self.origin.y < other.origin.y + other.size.height
             && other.origin.y < self.origin.y + self.size.height
