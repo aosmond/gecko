@@ -116,7 +116,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
       mFrameIsHidden(false),
       mDisablePremultipliedAlpha(false),
       mGotInfoCallback(false),
-      mUsePipeTransform(false),
+      mUsePipeTransform(true),
       mNumFrames(0) {}
 
 nsPNGDecoder::~nsPNGDecoder() {
@@ -596,24 +596,28 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     qcms_data_type outType;
 
     uint32_t profileSpace = qcms_profile_get_color_space(decoder->mInProfile);
-    decoder->mUsePipeTransform = profileSpace != icSigGrayData;
-    if (decoder->mUsePipeTransform) {
+    bool usePipeTransform = profileSpace != icSigGrayData;
+    if (usePipeTransform) {
       // If the transform happens with SurfacePipe, it will always be in BGRA.
       inType = QCMS_DATA_BGRA_8;
       outType = QCMS_DATA_BGRA_8;
     } else {
       if (color_type & PNG_COLOR_MASK_ALPHA) {
         inType = QCMS_DATA_GRAYA_8;
-        outType = QCMS_DATA_RGBA_8;
+        outType = QCMS_DATA_BGRA_8;
       } else {
         inType = QCMS_DATA_GRAY_8;
-        outType = QCMS_DATA_RGB_8;
+        outType = QCMS_DATA_BGRA_8;
       }
     }
 
     decoder->mTransform = qcms_transform_create(
         decoder->mInProfile, inType, gfxPlatform::GetCMSOutputProfile(),
         outType, (qcms_intent)intent);
+
+    if (decoder->mTransform) {
+      decoder->mUsePipeTransform = usePipeTransform;
+    }
   } else {
     png_set_gray_to_rgb(png_ptr);
 
@@ -624,22 +628,13 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
 
     if (decoder->mCMSMode == eCMSMode_All) {
       decoder->mTransform = gfxPlatform::GetCMSBGRATransform();
-      decoder->mUsePipeTransform = true;
     }
-  }
-
-  if (!decoder->mUsePipeTransform) {
-    png_set_bgr(png_ptr);
   }
 
   // now all of those things we set above are used to update various struct
   // members and whatnot, after which we can get channels, rowbytes, etc.
   png_read_update_info(png_ptr, info_ptr);
   decoder->mChannels = channels = png_get_channels(png_ptr, info_ptr);
-
-  if (!decoder->HasAlphaChannel()) {
-    png_set_add_alpha(png_ptr, 0xFF, PNG_FILLER_AFTER);
-  }
 
   //---------------------------------------------------------------//
   // copy PNG info into imagelib structs (formerly png_set_dims()) //
@@ -700,13 +695,18 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
   }
 #endif
 
-  if (decoder->mTransform && channels <= 2) {
-    MOZ_ASSERT(!decoder->mUsePipeTransform);
-    uint32_t bpp[] = {0, 3, 4};
+  if (decoder->mUsePipeTransform) {
+    // Grayscale. QCMS will output in BGRA.
     decoder->mCMSLine =
-        static_cast<uint8_t*>(malloc(bpp[channels] * frameRect.Width()));
+        static_cast<uint8_t*>(malloc(4 * frameRect.Width()));
     if (!decoder->mCMSLine) {
       png_error(decoder->mPNG, "malloc of mCMSLine failed");
+    }
+  } else {
+    // RGB. Ensure the output from libpng is BGRA.
+    png_set_bgr(png_ptr);
+    if (!decoder->HasAlphaChannel()) {
+      png_set_add_alpha(png_ptr, 0xFF, PNG_FILLER_AFTER);
     }
   }
 
@@ -820,13 +820,11 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow) {
   uint32_t width = uint32_t(mFrameRect.Width());
 
   // Apply color management to the row, if necessary, before writing it out.
+  // This is only needed for grayscale images.
   if (mTransform && !mUsePipeTransform) {
-    if (mCMSLine) {
-      qcms_transform_data(mTransform, rowToWrite, mCMSLine, width);
-      rowToWrite = mCMSLine;
-    } else {
-      qcms_transform_data(mTransform, rowToWrite, rowToWrite, width);
-    }
+    MOZ_ASSERT(mCMSLine);
+    qcms_transform_data(mTransform, rowToWrite, mCMSLine, width);
+    rowToWrite = mCMSLine;
   }
 
   // Write this row to the SurfacePipe.
