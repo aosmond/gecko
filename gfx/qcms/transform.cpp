@@ -1199,13 +1199,6 @@ qcms_transform* qcms_transform_create(
 
         if (in->color_space == RGB_SIGNATURE) {
 		struct matrix in_matrix, out_matrix, result;
-
-		if (in_type != QCMS_DATA_RGB_8 &&
-                    in_type != QCMS_DATA_RGBA_8){
-                	assert(0 && "input type");
-			qcms_transform_release(transform);
-                	return NULL;
-            	}
 		if (precache) {
 #ifdef X86
 		    if (sse_version_available() >= 2) {
@@ -1300,13 +1293,6 @@ qcms_transform* qcms_transform_create(
 		transform->matrix[2][2] = result.m[2][2];
 
 	} else if (in->color_space == GRAY_SIGNATURE) {
-		if (in_type != QCMS_DATA_GRAY_8 &&
-				in_type != QCMS_DATA_GRAYA_8){
-			assert(0 && "input type");
-			qcms_transform_release(transform);
-			return NULL;
-		}
-
 		transform->input_gamma_table_gray = build_input_gamma_table(in->grayTRC);
 		if (!transform->input_gamma_table_gray) {
 			qcms_transform_release(transform);
