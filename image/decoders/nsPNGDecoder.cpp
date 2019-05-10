@@ -113,10 +113,11 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
       mCMSMode(0),
       mChannels(0),
       mPass(0),
+      mHasAlpha(false),
       mFrameIsHidden(false),
       mDisablePremultipliedAlpha(false),
       mGotInfoCallback(false),
-      mUsePipeTransform(true),
+      mUsePipeTransform(false),
       mNumFrames(0) {}
 
 nsPNGDecoder::~nsPNGDecoder() {
@@ -134,7 +135,7 @@ nsPNGDecoder::~nsPNGDecoder() {
 nsPNGDecoder::TransparencyType nsPNGDecoder::GetTransparencyType(
     const IntRect& aFrameRect) {
   // Check if the image has a transparent color in its palette.
-  if (HasAlphaChannel()) {
+  if (mHasAlpha) {
     return TransparencyType::eAlpha;
   }
   if (!aFrameRect.IsEqualEdges(FullFrame())) {
@@ -213,7 +214,7 @@ nsresult nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo) {
     pipeFlags |= SurfacePipeFlags::PROGRESSIVE_DISPLAY;
   }
 
-  if (HasAlphaChannel() && !mDisablePremultipliedAlpha) {
+  if (mHasAlpha && !mDisablePremultipliedAlpha) {
     pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
   }
 
@@ -523,6 +524,8 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
   png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
                &interlace_type, &compression_type, &filter_type);
 
+  decoder->mHasAlpha = bool(color_type & PNG_COLOR_MASK_ALPHA);
+
   const IntRect frameRect(0, 0, width, height);
 
   // Post our size to the superclass
@@ -596,8 +599,8 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     qcms_data_type outType;
 
     uint32_t profileSpace = qcms_profile_get_color_space(decoder->mInProfile);
-    bool usePipeTransform = profileSpace != icSigGrayData;
-    if (usePipeTransform) {
+    decoder->mUsePipeTransform = profileSpace != icSigGrayData;
+    if (decoder->mUsePipeTransform) {
       // If the transform happens with SurfacePipe, it will always be in BGRA.
       inType = QCMS_DATA_BGRA_8;
       outType = QCMS_DATA_BGRA_8;
@@ -614,13 +617,7 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     decoder->mTransform = qcms_transform_create(
         decoder->mInProfile, inType, gfxPlatform::GetCMSOutputProfile(),
         outType, (qcms_intent)intent);
-
-    if (decoder->mTransform) {
-      decoder->mUsePipeTransform = usePipeTransform;
-    }
   } else {
-    png_set_gray_to_rgb(png_ptr);
-
     // only do gamma correction if CMS isn't entirely disabled
     if (decoder->mCMSMode != eCMSMode_Off) {
       PNGDoGammaCorrection(png_ptr, info_ptr);
@@ -628,6 +625,16 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
 
     if (decoder->mCMSMode == eCMSMode_All) {
       decoder->mTransform = gfxPlatform::GetCMSBGRATransform();
+      decoder->mUsePipeTransform = true;
+    }
+  }
+
+  if (!decoder->mTransform || decoder->mUsePipeTransform) {
+    // Ensure the output from libpng is BGRA.
+    png_set_gray_to_rgb(png_ptr);
+    png_set_bgr(png_ptr);
+    if (!decoder->mHasAlpha) {
+      png_set_add_alpha(png_ptr, 0xFF, PNG_FILLER_AFTER);
     }
   }
 
@@ -676,6 +683,15 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     return decoder->DoTerminate(png_ptr, TerminalState::SUCCESS);
   }
 
+  if (decoder->mTransform && !decoder->mUsePipeTransform) {
+    // Grayscale. QCMS will output in BGRA.
+    decoder->mCMSLine =
+        static_cast<uint8_t*>(malloc(4 * frameRect.Width()));
+    if (!decoder->mCMSLine) {
+      png_error(decoder->mPNG, "malloc of mCMSLine failed");
+    }
+  }
+
 #ifdef PNG_APNG_SUPPORTED
   if (isAnimated) {
     png_set_progressive_frame_fn(png_ptr, nsPNGDecoder::frame_info_callback,
@@ -694,21 +710,6 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
 #ifdef PNG_APNG_SUPPORTED
   }
 #endif
-
-  if (decoder->mUsePipeTransform) {
-    // Grayscale. QCMS will output in BGRA.
-    decoder->mCMSLine =
-        static_cast<uint8_t*>(malloc(4 * frameRect.Width()));
-    if (!decoder->mCMSLine) {
-      png_error(decoder->mPNG, "malloc of mCMSLine failed");
-    }
-  } else {
-    // RGB. Ensure the output from libpng is BGRA.
-    png_set_bgr(png_ptr);
-    if (!decoder->HasAlphaChannel()) {
-      png_set_add_alpha(png_ptr, 0xFF, PNG_FILLER_AFTER);
-    }
-  }
 
   if (interlace_type == PNG_INTERLACE_ADAM7) {
     if (frameRect.Height() <

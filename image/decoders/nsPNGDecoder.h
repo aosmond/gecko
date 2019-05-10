@@ -98,6 +98,7 @@ class nsPNGDecoder : public Decoder {
 
   uint8_t mChannels;
   uint8_t mPass;
+  bool mHasAlpha;
   bool mFrameIsHidden;
   bool mDisablePremultipliedAlpha;
   bool mGotInfoCallback;
