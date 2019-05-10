@@ -11,10 +11,12 @@ use super::UnknownUnit;
 use length::Length;
 use scale::TypedScale;
 use num::*;
+use box2d::TypedBox2D;
 use point::TypedPoint2D;
 use vector::TypedVector2D;
 use side_offsets::TypedSideOffsets2D;
 use size::TypedSize2D;
+use approxord::{min, max};
 
 use num_traits::NumCast;
 #[cfg(feature = "serde")]
@@ -122,7 +124,7 @@ where
 {
     #[inline]
     pub fn intersects(&self, other: &Self) -> bool {
-        self.origin.x < other.origin.x + other.size.width
+        !self.is_empty() && !other.is_empty()
             && other.origin.x < self.origin.x + self.size.width
             && self.origin.y < other.origin.y + other.size.height
             && other.origin.y < self.origin.y + self.size.height
@@ -254,6 +256,14 @@ where
     #[inline]
     pub fn bottom_right(&self) -> TypedPoint2D<T, U> {
         TypedPoint2D::new(self.max_x(), self.max_y())
+    }
+
+    #[inline]
+    pub fn to_box2d(&self) -> TypedBox2D<T, U> {
+        TypedBox2D {
+            min: self.origin,
+            max: self.bottom_right(),
+        }
     }
 
     #[inline]
@@ -425,22 +435,6 @@ impl<T: Copy + PartialEq + Zero, U> TypedRect<T, U> {
     /// Returns true if the size is zero, regardless of the origin's value.
     pub fn is_empty(&self) -> bool {
         self.size.width == Zero::zero() || self.size.height == Zero::zero()
-    }
-}
-
-pub fn min<T: Clone + PartialOrd>(x: T, y: T) -> T {
-    if x <= y {
-        x
-    } else {
-        y
-    }
-}
-
-pub fn max<T: Clone + PartialOrd>(x: T, y: T) -> T {
-    if x >= y {
-        x
-    } else {
-        y
     }
 }
 
@@ -624,15 +618,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_min_max() {
-        assert!(min(0u32, 1u32) == 0u32);
-        assert!(min(-1.0f32, 0.0f32) == -1.0f32);
-
-        assert!(max(0u32, 1u32) == 1u32);
-        assert!(max(-1.0f32, 0.0f32) == 0.0f32);
-    }
-
-    #[test]
     fn test_translate() {
         let p = Rect::new(Point2D::new(0u32, 0u32), Size2D::new(50u32, 40u32));
         let pp = p.translate(&vec2(10, 15));
@@ -695,6 +680,7 @@ mod tests {
         let p = Rect::new(Point2D::new(0, 0), Size2D::new(10, 20));
         let q = Rect::new(Point2D::new(5, 15), Size2D::new(10, 10));
         let r = Rect::new(Point2D::new(-5, -5), Size2D::new(8, 8));
+        let e = Rect::new(Point2D::new(5, 10), Size2D::new(0, 0));
 
         let pq = p.intersection(&q);
         assert!(pq.is_some());
@@ -710,6 +696,12 @@ mod tests {
 
         let qr = q.intersection(&r);
         assert!(qr.is_none());
+
+        let ep = e.intersection(&p);
+        assert!(ep.is_none());
+
+        let pe = p.intersection(&e);
+        assert!(pe.is_none());
     }
 
     #[test]
