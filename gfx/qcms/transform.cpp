@@ -360,16 +360,16 @@ static void qcms_transform_data_rgb_out_pow(qcms_transform *transform, unsigned 
 	See: ftp://ftp.alvyray.com/Acrobat/17_Nonln.pdf
 */
 
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_gray_template_lut(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
 {
-	const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+	const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 	unsigned int i;
 	for (i = 0; i < length; i++) {
 		float out_device_r, out_device_g, out_device_b;
 		unsigned char device = *src++;
 		unsigned char alpha;
-		if (A_INDEX != 0xFF) {
+		if (kAIndex != 0xFF) {
 			alpha = *src++;
 		}
 
@@ -379,11 +379,11 @@ static void qcms_transform_data_gray_template_lut(qcms_transform *transform, uns
 		out_device_g = lut_interp_linear(linear, transform->output_gamma_lut_g, transform->output_gamma_lut_g_length);
 		out_device_b = lut_interp_linear(linear, transform->output_gamma_lut_b, transform->output_gamma_lut_b_length);
 
-		dest[R_INDEX] = clamp_u8(out_device_r*255);
-		dest[G_INDEX] = clamp_u8(out_device_g*255);
-		dest[B_INDEX] = clamp_u8(out_device_b*255);
-		if (A_INDEX != 0xFF) {
-			dest[A_INDEX] = alpha;
+		dest[kRIndex] = clamp_u8(out_device_r*255);
+		dest[kGIndex] = clamp_u8(out_device_g*255);
+		dest[kBIndex] = clamp_u8(out_device_b*255);
+		if (kAIndex != 0xFF) {
+			dest[kAIndex] = alpha;
 		}
 		dest += components;
 	}
@@ -404,15 +404,15 @@ static void qcms_transform_data_graya_bgra_out_lut(qcms_transform *transform, un
 	qcms_transform_data_gray_template_lut<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
 }
 
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_gray_template_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
 {
-	const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+	const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 	unsigned int i;
 	for (i = 0; i < length; i++) {
 		unsigned char device = *src++;
 		unsigned char alpha;
-		if (A_INDEX != 0xFF) {
+		if (kAIndex != 0xFF) {
 		       alpha = *src++;
 		}
 		uint16_t gray;
@@ -422,11 +422,11 @@ static void qcms_transform_data_gray_template_precache(qcms_transform *transform
 		/* we could round here... */
 		gray = linear * PRECACHE_OUTPUT_MAX;
 
-		dest[R_INDEX] = transform->output_table_r->data[gray];
-		dest[G_INDEX] = transform->output_table_g->data[gray];
-		dest[B_INDEX] = transform->output_table_b->data[gray];
-		if (A_INDEX != 0xFF) {
-			dest[A_INDEX] = alpha;
+		dest[kRIndex] = transform->output_table_r->data[gray];
+		dest[kGIndex] = transform->output_table_g->data[gray];
+		dest[kBIndex] = transform->output_table_b->data[gray];
+		if (kAIndex != 0xFF) {
+			dest[kAIndex] = alpha;
 		}
 		dest += components;
 	}
@@ -447,19 +447,19 @@ static void qcms_transform_data_graya_bgra_out_precache(qcms_transform *transfor
 	qcms_transform_data_gray_template_precache<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
 }
 
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_template_lut_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
 {
-	const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+	const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 	unsigned int i;
 	float (*mat)[4] = transform->matrix;
 	for (i = 0; i < length; i++) {
-		unsigned char device_r = src[R_INDEX];
-		unsigned char device_g = src[G_INDEX];
-		unsigned char device_b = src[B_INDEX];
+		unsigned char device_r = src[kRIndex];
+		unsigned char device_g = src[kGIndex];
+		unsigned char device_b = src[kBIndex];
 		unsigned char alpha;
-		if (A_INDEX != 0xFF) {
-			alpha = src[A_INDEX];
+		if (kAIndex != 0xFF) {
+			alpha = src[kAIndex];
 		}
 		src += components;
 		uint16_t r, g, b;
@@ -481,11 +481,11 @@ static void qcms_transform_data_template_lut_precache(qcms_transform *transform,
 		g = out_linear_g * PRECACHE_OUTPUT_MAX;
 		b = out_linear_b * PRECACHE_OUTPUT_MAX;
 
-		dest[R_INDEX] = transform->output_table_r->data[r];
-		dest[G_INDEX] = transform->output_table_g->data[g];
-		dest[B_INDEX] = transform->output_table_b->data[b];
-		if (A_INDEX != 0xFF) {
-			dest[A_INDEX] = alpha;
+		dest[kRIndex] = transform->output_table_r->data[r];
+		dest[kGIndex] = transform->output_table_g->data[g];
+		dest[kBIndex] = transform->output_table_b->data[b];
+		if (kAIndex != 0xFF) {
+			dest[kAIndex] = alpha;
 		}
 		dest += components;
 	}
@@ -569,9 +569,9 @@ static int int_div_ceil(int value, int div) {
 }
 
 // Using lcms' tetra interpolation algorithm.
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_tetra_clut_template(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length) {
-	const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+	const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 	unsigned int i;
 	int xy_len = 1;
 	int x_len = transform->grid_size;
@@ -584,12 +584,12 @@ static void qcms_transform_data_tetra_clut_template(qcms_transform *transform, u
 	float c0_b, c1_b, c2_b, c3_b;
 	float clut_r, clut_g, clut_b;
 	for (i = 0; i < length; i++) {
-		unsigned char in_r = src[R_INDEX];
-		unsigned char in_g = src[G_INDEX];
-		unsigned char in_b = src[B_INDEX];
+		unsigned char in_r = src[kRIndex];
+		unsigned char in_g = src[kGIndex];
+		unsigned char in_b = src[kBIndex];
 		unsigned char in_a;
-		if (A_INDEX != 0xFF) {
-			in_a = src[A_INDEX];
+		if (kAIndex != 0xFF) {
+			in_a = src[kAIndex];
 		}
 		src += components;
 		float linear_r = in_r/255.0f, linear_g=in_g/255.0f, linear_b = in_b/255.0f;
@@ -682,11 +682,11 @@ static void qcms_transform_data_tetra_clut_template(qcms_transform *transform, u
 		clut_g = c0_g + c1_g*rx + c2_g*ry + c3_g*rz;
 		clut_b = c0_b + c1_b*rx + c2_b*ry + c3_b*rz;
 
-		dest[R_INDEX] = clamp_u8(clut_r*255.0f);
-		dest[G_INDEX] = clamp_u8(clut_g*255.0f);
-		dest[B_INDEX] = clamp_u8(clut_b*255.0f);
-		if (A_INDEX != 0xFF) {
-			dest[A_INDEX] = in_a;
+		dest[kRIndex] = clamp_u8(clut_r*255.0f);
+		dest[kGIndex] = clamp_u8(clut_g*255.0f);
+		dest[kBIndex] = clamp_u8(clut_b*255.0f);
+		if (kAIndex != 0xFF) {
+			dest[kAIndex] = in_a;
 		}
 		dest += components;
 	}	
@@ -700,19 +700,19 @@ static void qcms_transform_data_tetra_clut(qcms_transform *transform, unsigned c
 	qcms_transform_data_tetra_clut_template<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX>(transform, src, dest, length);
 }
 
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_template_lut(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length)
 {
-	const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+	const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 	unsigned int i;
 	float (*mat)[4] = transform->matrix;
 	for (i = 0; i < length; i++) {
-		unsigned char device_r = src[R_INDEX];
-		unsigned char device_g = src[G_INDEX];
-		unsigned char device_b = src[B_INDEX];
+		unsigned char device_r = src[kRIndex];
+		unsigned char device_g = src[kGIndex];
+		unsigned char device_b = src[kBIndex];
 		unsigned char alpha;
-		if (A_INDEX != 0xFF) {
-			alpha = src[A_INDEX];
+		if (kAIndex != 0xFF) {
+			alpha = src[kAIndex];
 		}
 		src += components;
 		float out_device_r, out_device_g, out_device_b;
@@ -736,11 +736,11 @@ static void qcms_transform_data_template_lut(qcms_transform *transform, unsigned
 		out_device_b = lut_interp_linear(out_linear_b, 
 				transform->output_gamma_lut_b, transform->output_gamma_lut_b_length);
 
-		dest[R_INDEX] = clamp_u8(out_device_r*255);
-		dest[G_INDEX] = clamp_u8(out_device_g*255);
-		dest[B_INDEX] = clamp_u8(out_device_b*255);
-		if (A_INDEX != 0xFF) {
-			dest[A_INDEX] = alpha;
+		dest[kRIndex] = clamp_u8(out_device_r*255);
+		dest[kGIndex] = clamp_u8(out_device_g*255);
+		dest[kBIndex] = clamp_u8(out_device_b*255);
+		if (kAIndex != 0xFF) {
+			dest[kAIndex] = alpha;
 		}
 		dest += components;
 	}

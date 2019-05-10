@@ -37,7 +37,7 @@ inline vector float load_aligned_float(float *dataPtr)
 	return vec_perm(data, data, moveToStart);
 }
 
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
                                                      unsigned char *src,
                                                      unsigned char *dest,
@@ -74,7 +74,7 @@ static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
 	const vector float max = vec_splat(vec_lde(0, (float*)&clampMaxValueX4), 0);
 	const vector float min = (vector float)vec_splat_u32(0);
 	const vector float scale = vec_splat(vec_lde(0, (float*)&floatScaleX4), 0);
-	const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+	const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 
 	/* working variables */
 	vector float vec_r, vec_g, vec_b, result;
@@ -88,11 +88,11 @@ static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
 	length--;
 
 	/* setup for transforming 1st pixel */
-	vec_r = load_aligned_float((float*)&igtbl_r[src[R_INDEX]]);
-	vec_g = load_aligned_float((float*)&igtbl_r[src[G_INDEX]]);
-	vec_b = load_aligned_float((float*)&igtbl_r[src[B_INDEX]]);
-	if (A_INDEX != 0xFF) {
-		alpha = src[A_INDEX];
+	vec_r = load_aligned_float((float*)&igtbl_r[src[kRIndex]]);
+	vec_g = load_aligned_float((float*)&igtbl_r[src[kGIndex]]);
+	vec_b = load_aligned_float((float*)&igtbl_r[src[kBIndex]]);
+	if (kAIndex != 0xFF) {
+		alpha = src[kAIndex];
 	}
 	src += components;
 
@@ -111,9 +111,9 @@ static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
 		vec_b = vec_madd(vec_b, mat2, min);
 
 		/* store alpha for this pixel; load alpha for next */
-		if (A_INDEX != 0xFF) {
-			dest[A_INDEX] = alpha;
-			alpha = src[A_INDEX];
+		if (kAIndex != 0xFF) {
+			dest[kAIndex] = alpha;
+			alpha = src[kAIndex];
 		}
 
 		/* crunch, crunch, crunch */
@@ -126,15 +126,15 @@ static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
 		vec_st(vec_ctu(vec_round(result), 0), 0, (vector unsigned int*)output);
 
 		/* load gamma values for next loop while store completes */
-		vec_r = load_aligned_float((float*)&igtbl_r[src[R_INDEX]]);
-		vec_g = load_aligned_float((float*)&igtbl_r[src[G_INDEX]]);
-		vec_b = load_aligned_float((float*)&igtbl_r[src[B_INDEX]]);
+		vec_r = load_aligned_float((float*)&igtbl_r[src[kRIndex]]);
+		vec_g = load_aligned_float((float*)&igtbl_r[src[kGIndex]]);
+		vec_b = load_aligned_float((float*)&igtbl_r[src[kBIndex]]);
 		src += components;
 
 		/* use calc'd indices to output RGB values */
-		dest[R_INDEX] = otdata_r[output[0]];
-		dest[G_INDEX] = otdata_g[output[1]];
-		dest[B_INDEX] = otdata_b[output[2]];
+		dest[kRIndex] = otdata_r[output[0]];
+		dest[kGIndex] = otdata_g[output[1]];
+		dest[kBIndex] = otdata_b[output[2]];
 		dest += components;
 	}
 
@@ -148,8 +148,8 @@ static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
 	vec_g = vec_madd(vec_g, mat1, min);
 	vec_b = vec_madd(vec_b, mat2, min);
 
-	if (A_INDEX != 0xFF) {
-		dest[A_INDEX] = alpha;
+	if (kAIndex != 0xFF) {
+		dest[kAIndex] = alpha;
 	}
 
 	vec_r = vec_add(vec_r, vec_add(vec_g, vec_b));
@@ -159,9 +159,9 @@ static void qcms_transform_data_template_lut_altivec(qcms_transform *transform,
 
 	vec_st(vec_ctu(vec_round(result), 0), 0, (vector unsigned int*)output);
 
-	dest[R_INDEX] = otdata_r[output[0]];
-	dest[G_INDEX] = otdata_g[output[1]];
-	dest[B_INDEX] = otdata_b[output[2]];
+	dest[kRIndex] = otdata_r[output[0]];
+	dest[kGIndex] = otdata_g[output[1]];
+	dest[kBIndex] = otdata_b[output[2]];
 }
 
 void qcms_transform_data_rgb_out_lut_altivec(qcms_transform *transform,

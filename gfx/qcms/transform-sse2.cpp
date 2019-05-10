@@ -10,7 +10,7 @@ static const ALIGN float floatScaleX4[4] =
 static const ALIGN float clampMaxValueX4[4] =
     { CLAMPMAXVAL, CLAMPMAXVAL, CLAMPMAXVAL, CLAMPMAXVAL};
 
-template <size_t R_INDEX, size_t G_INDEX, size_t B_INDEX, size_t A_INDEX = 0xFF>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = 0xFF>
 static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
                                                   unsigned char *src,
                                                   unsigned char *dest,
@@ -47,7 +47,7 @@ static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
     const __m128 max   = _mm_load_ps(clampMaxValueX4);
     const __m128 min   = _mm_setzero_ps();
     const __m128 scale = _mm_load_ps(floatScaleX4);
-    const unsigned int components = A_INDEX == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
+    const unsigned int components = kAIndex == 0xFF ? RGB_COMPONENTS : RGBA_COMPONENTS;
 
     /* working variables */
     __m128 vec_r, vec_g, vec_b, result;
@@ -61,11 +61,11 @@ static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
     length--;
 
     /* setup for transforming 1st pixel */
-    vec_r = _mm_load_ss(&igtbl_r[src[R_INDEX]]);
-    vec_g = _mm_load_ss(&igtbl_g[src[G_INDEX]]);
-    vec_b = _mm_load_ss(&igtbl_b[src[B_INDEX]]);
-    if (A_INDEX != 0xFF) {
-        alpha = src[A_INDEX];
+    vec_r = _mm_load_ss(&igtbl_r[src[kRIndex]]);
+    vec_g = _mm_load_ss(&igtbl_g[src[kGIndex]]);
+    vec_b = _mm_load_ss(&igtbl_b[src[kBIndex]]);
+    if (kAIndex != 0xFF) {
+        alpha = src[kAIndex];
     }
     src += components;
 
@@ -84,9 +84,9 @@ static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
         vec_b = _mm_mul_ps(vec_b, mat2);
 
         /* store alpha for this pixel; load alpha for next */
-        if (A_INDEX != 0xFF) {
-            dest[A_INDEX] = alpha;
-            alpha = src[A_INDEX];
+        if (kAIndex != 0xFF) {
+            dest[kAIndex] = alpha;
+            alpha = src[kAIndex];
         }
 
         /* crunch, crunch, crunch */
@@ -99,15 +99,15 @@ static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
         _mm_store_si128((__m128i*)output, _mm_cvtps_epi32(result));
 
         /* load gamma values for next loop while store completes */
-        vec_r = _mm_load_ss(&igtbl_r[src[R_INDEX]]);
-        vec_g = _mm_load_ss(&igtbl_g[src[G_INDEX]]);
-        vec_b = _mm_load_ss(&igtbl_b[src[B_INDEX]]);
+        vec_r = _mm_load_ss(&igtbl_r[src[kRIndex]]);
+        vec_g = _mm_load_ss(&igtbl_g[src[kGIndex]]);
+        vec_b = _mm_load_ss(&igtbl_b[src[kBIndex]]);
         src += components;
 
         /* use calc'd indices to output RGB values */
-        dest[R_INDEX] = otdata_r[output[0]];
-        dest[G_INDEX] = otdata_g[output[1]];
-        dest[B_INDEX] = otdata_b[output[2]];
+        dest[kRIndex] = otdata_r[output[0]];
+        dest[kGIndex] = otdata_g[output[1]];
+        dest[kBIndex] = otdata_b[output[2]];
         dest += components;
     }
 
@@ -121,8 +121,8 @@ static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
     vec_g = _mm_mul_ps(vec_g, mat1);
     vec_b = _mm_mul_ps(vec_b, mat2);
 
-    if (A_INDEX != 0xFF) {
-        dest[A_INDEX] = alpha;
+    if (kAIndex != 0xFF) {
+        dest[kAIndex] = alpha;
     }
 
     vec_r  = _mm_add_ps(vec_r, _mm_add_ps(vec_g, vec_b));
@@ -132,9 +132,9 @@ static void qcms_transform_data_template_lut_sse2(qcms_transform *transform,
 
     _mm_store_si128((__m128i*)output, _mm_cvtps_epi32(result));
 
-    dest[R_INDEX] = otdata_r[output[0]];
-    dest[G_INDEX] = otdata_g[output[1]];
-    dest[B_INDEX] = otdata_b[output[2]];
+    dest[kRIndex] = otdata_r[output[0]];
+    dest[kGIndex] = otdata_g[output[1]];
+    dest[kBIndex] = otdata_b[output[2]];
 }
 
 void qcms_transform_data_rgb_out_lut_sse2(qcms_transform *transform,
