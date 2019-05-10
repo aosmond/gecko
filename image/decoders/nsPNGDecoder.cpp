@@ -524,8 +524,6 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
   png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type,
                &interlace_type, &compression_type, &filter_type);
 
-  decoder->mHasAlpha = bool(color_type & PNG_COLOR_MASK_ALPHA);
-
   const IntRect frameRect(0, 0, width, height);
 
   // Post our size to the superclass
@@ -572,6 +570,8 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
       png_set_expand(png_ptr);
     }
   }
+
+  decoder->mHasAlpha = bool(color_type & PNG_COLOR_MASK_ALPHA) || num_trans > 0;
 
   if (bit_depth == 16) {
     png_set_scale_16(png_ptr);
@@ -647,7 +647,8 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
   // copy PNG info into imagelib structs (formerly png_set_dims()) //
   //---------------------------------------------------------------//
 
-  if (channels < 1 || channels > 4) {
+  if ((decoder->mUsePipeTransform && channels != 4) ||
+      (!decoder->mUsePipeTransform && channels < 1 && channels > 2)) {
     png_error(decoder->mPNG, "Invalid number of channels");
   }
 
