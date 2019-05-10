@@ -2036,9 +2036,16 @@ impl PrimitiveStore {
                 // children, which they snapped to, which is precisely what we also
                 // need to snap to in order to be consistent.
                 let visible_rect = if snap_to_visible {
-                    combined_local_clip_rect
-                        .intersection(&prim_local_rect)
-                        .unwrap_or(LayoutRect::zero())
+                    match combined_local_clip_rect.intersection(&prim_local_rect) {
+                        Some(r) => r,
+                        None => {
+                            if prim_instance.is_chased() {
+                                println!("\tculled for zero visible rectangle");
+                            }
+                            prim_instance.visibility_info = PrimitiveVisibilityIndex::INVALID;
+                            continue;
+                        }
+                    }
                 } else {
                     prim_local_rect
                 };
