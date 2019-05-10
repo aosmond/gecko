@@ -335,6 +335,10 @@ long __cdecl _InterlockedDecrement(long volatile *);
 #define BGRA_R_INDEX 2
 #define BGRA_A_INDEX 3
 
+#define NO_A_INDEX   0xFF
+
+#define A_INDEX_COMPONENTS(kAIndex)    ((kAIndex) == NO_A_INDEX ? RGB_COMPONENTS : RGBA_COMPONENTS)
+
 #ifdef __cplusplus
 }
 #endif
