@@ -806,7 +806,7 @@ static void PackToRGB24(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
 }
 
 #define PACK_RGB_CASE(aSrcFormat, aDstFormat, aPackFunc)      \
-  FORMAT_CASE(aSrcFormat, aDstFormat,                         \
+  FORMAT_CASE_ROW(aSrcFormat, aDstFormat,                     \
               aPackFunc<ShouldSwapRB(aSrcFormat, aDstFormat), \
                         RGBBitShift(aSrcFormat), RGBByteIndex(aSrcFormat)>)
 
@@ -840,6 +840,28 @@ static void PackToA8(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
   PACK_ALPHA_CASE(SurfaceFormat::B8G8R8A8, aDstFormat, aPackFunc) \
   PACK_ALPHA_CASE(SurfaceFormat::R8G8B8A8, aDstFormat, aPackFunc) \
   PACK_ALPHA_CASE(SurfaceFormat::A8R8G8B8, aDstFormat, aPackFunc)
+
+template <bool aSwapRB>
+static void UnpackRowRGB24ToRGBA(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+  const uint8_t* end = aSrc + 3 * aLength;
+  do {
+    uint8_t r = aSrc[aSwapRB ? 2 : 0];
+    uint8_t g = aSrc[1];
+    uint8_t b = aSrc[aSwapRB ? 0 : 2];
+
+    aDst[0] = r;
+    aDst[1] = g;
+    aDst[2] = b;
+    aDst[3] = 0xFF;
+
+    aSrc += 3;
+    aDst += 4;
+  } while (aSrc < end);
+}
+
+#define UNPACK_ROW_RGB(aDstFormat)                   \
+  FORMAT_CASE_ROW(SurfaceFormat::R8G8B8, aDstFormat, \
+                  UnpackRowRGB24ToRGBA<ShouldSwapRB(SurfaceFormat::R8G8B8, aDstFormat)>)
 
 bool SwizzleData(const uint8_t* aSrc, int32_t aSrcStride,
                  SurfaceFormat aSrcFormat, uint8_t* aDst, int32_t aDstStride,
@@ -1007,6 +1029,11 @@ SwizzleRowFn SwizzleRow(SurfaceFormat aSrcFormat, SurfaceFormat aDstFormat) {
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::R8G8B8X8, SurfaceFormat::R8G8B8A8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::A8R8G8B8, SurfaceFormat::X8R8G8B8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::X8R8G8B8, SurfaceFormat::A8R8G8B8)
+
+    UNPACK_ROW_RGB(SurfaceFormat::R8G8B8X8)
+    UNPACK_ROW_RGB(SurfaceFormat::R8G8B8A8)
+    UNPACK_ROW_RGB(SurfaceFormat::B8G8R8X8)
+    UNPACK_ROW_RGB(SurfaceFormat::B8G8R8A8)
 
     default:
       break;
