@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Swizzle.h"
+#include "SwizzleImpl.h"
 #include "Logging.h"
 #include "Tools.h"
 #include "mozilla/CheckedInt.h"
@@ -858,6 +859,13 @@ static void PackToA8(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
   PACK_ALPHA_CASE(SurfaceFormat::R8G8B8A8, aDstFormat, aPackFunc) \
   PACK_ALPHA_CASE(SurfaceFormat::A8R8G8B8, aDstFormat, aPackFunc)
 
+// UnpackRowRGB24 is defined in SwizzleImpl.h as the accelerated variants depend
+// on it to handle the remainders.
+
+#define UNPACK_ROW_RGB(aDstFormat)                   \
+  FORMAT_CASE_ROW(SurfaceFormat::R8G8B8, aDstFormat, \
+                  UnpackRowRGB24<ShouldSwapRB(SurfaceFormat::R8G8B8, aDstFormat)>)
+
 bool SwizzleData(const uint8_t* aSrc, int32_t aSrcStride,
                  SurfaceFormat aSrcFormat, uint8_t* aDst, int32_t aDstStride,
                  SurfaceFormat aDstFormat, const IntSize& aSize) {
@@ -1006,6 +1014,11 @@ SwizzleRowFn SwizzleRow(SurfaceFormat aSrcFormat, SurfaceFormat aDstFormat) {
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::B8G8R8X8, SurfaceFormat::B8G8R8A8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::R8G8B8A8, SurfaceFormat::R8G8B8X8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::R8G8B8X8, SurfaceFormat::R8G8B8A8)
+
+    UNPACK_ROW_RGB(SurfaceFormat::R8G8B8X8)
+    UNPACK_ROW_RGB(SurfaceFormat::R8G8B8A8)
+    UNPACK_ROW_RGB(SurfaceFormat::B8G8R8X8)
+    UNPACK_ROW_RGB(SurfaceFormat::B8G8R8A8)
 
     default:
       break;
