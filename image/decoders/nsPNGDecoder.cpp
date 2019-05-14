@@ -109,6 +109,7 @@ nsPNGDecoder::nsPNGDecoder(RasterImage* aImage)
       mInfo(nullptr),
       mCMSLine(nullptr),
       interlacebuf(nullptr),
+      mSwizzleFn(nullptr),
       mFormat(SurfaceFormat::UNKNOWN),
       mCMSMode(0),
       mChannels(0),
@@ -212,6 +213,25 @@ nsresult nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo) {
     // The first frame may be displayed progressively.
     pipeFlags |= SurfacePipeFlags::PROGRESSIVE_DISPLAY;
   }
+  if (transparency == TransparencyType::eAlpha) {
+    // Only apply premultiplication if the frame has true alpha.
+    if (mDisablePremultipliedAlpha) {
+      pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
+    }
+    // We are outputting directly as RGBA, so we need to swap at this step.
+    pipeFlags |= SurfacePipeFlags::SWAP_RB;
+  } else {
+    // We have no alpha channel, so we need to unpack from RGB to BGRA.
+    mSwizzleFn = gfx::SwizzleRow(SurfaceFormat::R8G8B8, SurfaceFormat::B8G8R8A8);
+    if (!mSwizzleFn) {
+      return NS_ERROR_FAILURE;
+    }
+  }
+
+  // RGB unpacks to BGRX as needed.
+  // RGBA can be put directly into the pipeline
+  // - PremultiplyAlpha will do the conversion
+  // - 
 
   qcms_transform* pipeTransform = mUsePipeTransform ? mTransform : nullptr;
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
@@ -600,10 +620,10 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     } else {
       if (color_type & PNG_COLOR_MASK_ALPHA) {
         inType = QCMS_DATA_GRAYA_8;
-        outType = QCMS_DATA_RGBA_8;
+        outType = QCMS_DATA_BGRA_8;
       } else {
         inType = QCMS_DATA_GRAY_8;
-        outType = QCMS_DATA_RGB_8;
+        outType = QCMS_DATA_BGRA_8;
       }
     }
 
@@ -839,17 +859,16 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow) {
 
   // Write this row to the SurfacePipe.
   DebugOnly<WriteState> result;
-  if (HasAlphaChannel()) {
-    if (mDisablePremultipliedAlpha) {
-      result = mPipe.WritePixelsToRow<uint32_t>(
-          [&] { return PackUnpremultipliedRGBAPixelAndAdvance(rowToWrite); });
-    } else {
-      result = mPipe.WritePixelsToRow<uint32_t>(
-          [&] { return PackRGBAPixelAndAdvance(rowToWrite); });
-    }
+  if (HasAlphaChannel() || mCMSLine) {
+    result = mPipe.WritePixelBlockToRow<uint32_t>([&](uint32_t* aBlockStart, int32_t aBlockSize) {
+      memcpy(aBlockStart, rowToWrite, aBlockSize * sizeof(uint32_t));
+      return MakeTuple(aBlockSize, Maybe<WriteState>());
+    });
   } else {
-    result = mPipe.WritePixelsToRow<uint32_t>(
-        [&] { return PackRGBPixelAndAdvance(rowToWrite); });
+    result = mPipe.WritePixelBlockToRow<uint32_t>([&](uint32_t* aBlockStart, int32_t aBlockSize) {
+      mSwizzleFn(rowToWrite, reinterpret_cast<uint8_t*>(aBlockStart), aBlockSize);
+      return MakeTuple(aBlockSize, Maybe<WriteState>());
+    });
   }
 
   MOZ_ASSERT(WriteState(result) != WriteState::FAILURE);

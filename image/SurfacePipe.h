@@ -243,6 +243,12 @@ class SurfaceFilter {
         .valueOr(WriteState::NEED_MORE_DATA);
   }
 
+  template <typename PixelType, typename Func>
+  WriteState WritePixelBlockToRow(Func aFunc) {
+    return DoWritePixelBlockToRow<PixelType>(std::forward<Func>(aFunc))
+        .valueOr(WriteState::NEED_MORE_DATA);
+  }
+
   /**
    * Write a row to the surface by copying from a buffer. This is bounds checked
    * and memory safe with respect to the surface, but care must still be taken
@@ -636,6 +642,19 @@ class SurfacePipe {
   WriteState WritePixelsToRow(Func aFunc) {
     MOZ_ASSERT(mHead, "Use before configured!");
     return mHead->WritePixelsToRow<PixelType>(std::forward<Func>(aFunc));
+  }
+
+  /**
+   * A variant of WritePixels() that writes up to a single row of pixels to the
+   * surface in blocks by repeatedly calling a lambda that yields up to the
+   * requested number of pixels.
+   *
+   * @see SurfaceFilter::WritePixelBlockToRow() for the canonical documentation.
+   */
+  template <typename PixelType, typename Func>
+  WriteState WritePixelBlockToRow(Func aFunc) {
+    MOZ_ASSERT(mHead, "Use before configured!");
+    return mHead->WritePixelBlockToRow<PixelType>(std::forward<Func>(aFunc));
   }
 
   /**

@@ -11,6 +11,7 @@
 #include "png.h"
 #include "StreamingLexer.h"
 #include "SurfacePipe.h"
+#include "mozilla/gfx/Swizzle.h"
 
 namespace mozilla {
 namespace image {
@@ -91,6 +92,7 @@ class nsPNGDecoder : public Decoder {
   nsIntRect mFrameRect;
   uint8_t* mCMSLine;
   uint8_t* interlacebuf;
+  SwizzleRowFn mSwizzleFn;
   gfx::SurfaceFormat mFormat;
 
   // whether CMS or premultiplied alpha are forced off

@@ -20,6 +20,7 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/Swizzle.h"
 #include "skia/src/core/SkBlitRow.h"
 
 #include "DownscalingFilter.h"
@@ -28,6 +29,97 @@
 
 namespace mozilla {
 namespace image {
+
+//////////////////////////////////////////////////////////////////////////////
+// PremultiplyAlphaFilter
+//////////////////////////////////////////////////////////////////////////////
+
+template <typename Next>
+class PremultiplyAlphaFilter;
+
+/**
+ * A configuration struct for PremultiplyAlphaFilter.
+ */
+struct PremultiplyAlphaConfig {
+  template <typename Next>
+  using Filter = PremultiplyAlphaFilter<Next>;
+  gfx::SurfaceFormat mFormat;
+  bool mPremultiplyAlpha;
+  bool mSwapRb;
+};
+
+/**
+ * PremultiplyAlphaFilter performs premultiplication and RGBA to BGRA swizzling
+ * on rows written to it.
+ *
+ * The 'Next' template parameter specifies the next filter in the chain.
+ */
+template <typename Next>
+class PremultiplyAlphaFilter final : public SurfaceFilter {
+ public:
+  PremultiplyAlphaFilter() : mPremultiplyFn(nullptr) {}
+
+  template <typename... Rest>
+  nsresult Configure(const PremultiplyAlphaConfig& aConfig,
+                     const Rest&... aRest) {
+    nsresult rv = mNext.Configure(aRest...);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    gfx::SurfaceFormat inputFormat = aConfig.mFormat;
+    if (aConfig.mSwapRb) {
+      switch (aConfig.mFormat) {
+        case gfx::SurfaceFormat::B8G8R8A8:
+          inputFormat = gfx::SurfaceFormat::R8G8B8A8;
+          break;
+        case gfx::SurfaceFormat::B8G8R8X8:
+          inputFormat = gfx::SurfaceFormat::R8G8B8X8;
+          break;
+        case gfx::SurfaceFormat::R8G8B8A8:
+          inputFormat = gfx::SurfaceFormat::B8G8R8A8;
+          break;
+        case gfx::SurfaceFormat::R8G8B8X8:
+          inputFormat = gfx::SurfaceFormat::B8G8R8X8;
+          break;
+	default:
+          return NS_ERROR_INVALID_ARG;
+      }
+    }
+
+    if (aConfig.mPremultiplyAlpha) {
+      mPremultiplyFn =
+        gfx::PremultiplyRow(inputFormat, aConfig.mFormat);
+    } else if (aConfig.mSwapRb) {
+      mPremultiplyFn =
+        gfx::SwizzleRow(inputFormat, aConfig.mFormat);
+    }
+
+    if (!mPremultiplyFn) {
+      return NS_ERROR_INVALID_ARG;
+    }
+
+    ConfigureFilter(mNext.InputSize(), sizeof(uint32_t));
+    return NS_OK;
+  }
+
+  Maybe<SurfaceInvalidRect> TakeInvalidRect() override {
+    return mNext.TakeInvalidRect();
+  }
+
+ protected:
+  uint8_t* DoResetToFirstRow() override { return mNext.ResetToFirstRow(); }
+
+  uint8_t* DoAdvanceRow() override {
+    uint8_t* rowPtr = mNext.CurrentRowPointer();
+    mPremultiplyFn(rowPtr, rowPtr, mNext.InputSize().width);
+    return mNext.AdvanceRow();
+  }
+
+  Next mNext;  /// The next SurfaceFilter in the chain.
+
+  gfx::SwizzleRowFn mPremultiplyFn;
+};
 
 //////////////////////////////////////////////////////////////////////////////
 // ColorManagementFilter
