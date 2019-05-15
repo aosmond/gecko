@@ -31,71 +31,48 @@ namespace mozilla {
 namespace image {
 
 //////////////////////////////////////////////////////////////////////////////
-// PremultiplyAlphaFilter
+// SwizzleFilter
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename Next>
-class PremultiplyAlphaFilter;
+class SwizzleFilter;
 
 /**
- * A configuration struct for PremultiplyAlphaFilter.
+ * A configuration struct for SwizzleFilter.
  */
-struct PremultiplyAlphaConfig {
+struct SwizzleConfig {
   template <typename Next>
-  using Filter = PremultiplyAlphaFilter<Next>;
-  gfx::SurfaceFormat mFormat;
+  using Filter = SwizzleFilter<Next>;
+  gfx::SurfaceFormat mInFormat;
+  gfx::SurfaceFormat mOutFormat;
   bool mPremultiplyAlpha;
-  bool mSwapRb;
 };
 
 /**
- * PremultiplyAlphaFilter performs premultiplication and RGBA to BGRA swizzling
+ * SwizzleFilter performs premultiplication and RGBA to BGRA swizzling
  * on rows written to it.
  *
  * The 'Next' template parameter specifies the next filter in the chain.
  */
 template <typename Next>
-class PremultiplyAlphaFilter final : public SurfaceFilter {
+class SwizzleFilter final : public SurfaceFilter {
  public:
-  PremultiplyAlphaFilter() : mPremultiplyFn(nullptr) {}
+  SwizzleFilter() : mSwizzleFn(nullptr) {}
 
   template <typename... Rest>
-  nsresult Configure(const PremultiplyAlphaConfig& aConfig,
-                     const Rest&... aRest) {
+  nsresult Configure(const SwizzleConfig& aConfig, const Rest&... aRest) {
     nsresult rv = mNext.Configure(aRest...);
     if (NS_FAILED(rv)) {
       return rv;
     }
 
-    gfx::SurfaceFormat inputFormat = aConfig.mFormat;
-    if (aConfig.mSwapRb) {
-      switch (aConfig.mFormat) {
-        case gfx::SurfaceFormat::B8G8R8A8:
-          inputFormat = gfx::SurfaceFormat::R8G8B8A8;
-          break;
-        case gfx::SurfaceFormat::B8G8R8X8:
-          inputFormat = gfx::SurfaceFormat::R8G8B8X8;
-          break;
-        case gfx::SurfaceFormat::R8G8B8A8:
-          inputFormat = gfx::SurfaceFormat::B8G8R8A8;
-          break;
-        case gfx::SurfaceFormat::R8G8B8X8:
-          inputFormat = gfx::SurfaceFormat::B8G8R8X8;
-          break;
-	default:
-          return NS_ERROR_INVALID_ARG;
-      }
-    }
-
     if (aConfig.mPremultiplyAlpha) {
-      mPremultiplyFn =
-        gfx::PremultiplyRow(inputFormat, aConfig.mFormat);
-    } else if (aConfig.mSwapRb) {
-      mPremultiplyFn =
-        gfx::SwizzleRow(inputFormat, aConfig.mFormat);
+      mSwizzleFn = gfx::PremultiplyRow(aConfig.mInFormat, aConfig.mOutFormat);
+    } else {
+      mSwizzleFn = gfx::SwizzleRow(aConfig.mInFormat, aConfig.mOutFormat);
     }
 
-    if (!mPremultiplyFn) {
+    if (!mSwizzleFn) {
       return NS_ERROR_INVALID_ARG;
     }
 
@@ -110,15 +87,19 @@ class PremultiplyAlphaFilter final : public SurfaceFilter {
  protected:
   uint8_t* DoResetToFirstRow() override { return mNext.ResetToFirstRow(); }
 
-  uint8_t* DoAdvanceRow() override {
+  uint8_t* DoAdvanceRowFromBuffer(const uint8_t* aInputRow) override {
     uint8_t* rowPtr = mNext.CurrentRowPointer();
-    mPremultiplyFn(rowPtr, rowPtr, mNext.InputSize().width);
+    mSwizzleFn(aInputRow, rowPtr, mNext.InputSize().width);
     return mNext.AdvanceRow();
+  }
+
+  uint8_t* DoAdvanceRow() override {
+    return DoAdvanceRowFromBuffer(mNext.CurrentRowPointer());
   }
 
   Next mNext;  /// The next SurfaceFilter in the chain.
 
-  gfx::SwizzleRowFn mPremultiplyFn;
+  gfx::SwizzleRowFn mSwizzleFn;
 };
 
 //////////////////////////////////////////////////////////////////////////////

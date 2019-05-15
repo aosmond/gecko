@@ -61,7 +61,6 @@ enum class SurfacePipeFlags {
                                  // computationally expensive.
 
   PREMULTIPLY_ALPHA = 1 << 4,
-  SWAP_RB = 1 << 5,
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(SurfacePipeFlags)
 
@@ -91,8 +90,9 @@ class SurfacePipeFactory {
   static Maybe<SurfacePipe> CreateSurfacePipe(
       Decoder* aDecoder, const nsIntSize& aInputSize,
       const nsIntSize& aOutputSize, const nsIntRect& aFrameRect,
-      gfx::SurfaceFormat aFormat, const Maybe<AnimationParams>& aAnimParams,
-      qcms_transform* aTransform, SurfacePipeFlags aFlags) {
+      gfx::SurfaceFormat aInFormat, gfx::SurfaceFormat aOutFormat,
+      const Maybe<AnimationParams>& aAnimParams, qcms_transform* aTransform,
+      SurfacePipeFlags aFlags) {
     const bool deinterlace = bool(aFlags & SurfacePipeFlags::DEINTERLACE);
     const bool flipVertically =
         bool(aFlags & SurfacePipeFlags::FLIP_VERTICALLY);
@@ -105,8 +105,17 @@ class SurfacePipeFactory {
     const bool colorManagement = aTransform != nullptr;
     const bool premultiplyAlpha =
         bool(aFlags & SurfacePipeFlags::PREMULTIPLY_ALPHA);
-    const bool swapRb =
-        bool(aFlags & SurfacePipeFlags::SWAP_RB);
+
+    // Early swizzles are for unpacking RGB to RGBA/BGRA or forcing RGBA/BGRA to
+    // RGBX/BGRX.
+    const bool earlySwizzle = aInFormat == gfx::SurfaceFormat::R8G8B8 ||
+                              ((aInFormat == gfx::SurfaceFormat::R8G8B8A8 ||
+                                aInFormat == gfx::SurfaceFormat::B8G8R8A8) &&
+                               (aOutFormat == gfx::SurfaceFormat::R8G8B8X8 ||
+                                aOutFormat == gfx::SurfaceFormat::B8G8R8X8));
+
+    // Late swizzles are for premultiplying RGBA/BGRA.
+    const bool lateSwizzle = premultiplyAlpha;
 
     // Don't interpolate if we're sure we won't show this surface to the user
     // until it's completely decoded. The final pass of an ADAM7 image doesn't
@@ -115,6 +124,11 @@ class SurfacePipeFactory {
     const bool adam7Interpolate =
         bool(aFlags & SurfacePipeFlags::ADAM7_INTERPOLATE) &&
         progressiveDisplay;
+
+    if (earlySwizzle && lateSwizzle) {
+      MOZ_ASSERT_UNREACHABLE("Early and late swizzles not supported");
+      return Nothing();
+    }
 
     if (deinterlace && adam7Interpolate) {
       MOZ_ASSERT_UNREACHABLE("ADAM7 deinterlacing is handled by libpng");
@@ -131,15 +145,150 @@ class SurfacePipeFactory {
     ADAM7InterpolatingConfig interpolatingConfig;
     RemoveFrameRectConfig removeFrameRectConfig{aFrameRect};
     BlendAnimationConfig blendAnimationConfig{aDecoder};
-    DownscalingConfig downscalingConfig{aInputSize, aFormat};
+    DownscalingConfig downscalingConfig{aInputSize, aOutFormat};
     ColorManagementConfig colorManagementConfig{aTransform};
-    PremultiplyAlphaConfig premultiplyAlphaConfig{aFormat, premultiplyAlpha, swapRb};
-    SurfaceConfig surfaceConfig{aDecoder, aOutputSize, aFormat, flipVertically,
-                                aAnimParams};
+    SwizzleConfig swizzleConfig{aInFormat, aOutFormat, premultiplyAlpha};
+    SurfaceConfig surfaceConfig{aDecoder, aOutputSize, aOutFormat,
+                                flipVertically, aAnimParams};
 
     Maybe<SurfacePipe> pipe;
 
-    if (premultiplyAlpha || swapRb) {
+    if (earlySwizzle) {
+      if (colorManagement) {
+        if (downscale) {
+          MOZ_ASSERT(!blendAnimation);
+          if (removeFrameRect) {
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              removeFrameRectConfig, downscalingConfig,
+                              colorManagementConfig, surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              removeFrameRectConfig, downscalingConfig,
+                              colorManagementConfig, surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, removeFrameRectConfig,
+                              downscalingConfig, colorManagementConfig,
+                              surfaceConfig);
+            }
+          } else {  // (removeFrameRect is false)
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              downscalingConfig, colorManagementConfig,
+                              surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              downscalingConfig, colorManagementConfig,
+                              surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, downscalingConfig,
+                              colorManagementConfig, surfaceConfig);
+            }
+          }
+        } else {  // (downscale is false)
+          if (blendAnimation) {
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              colorManagementConfig, blendAnimationConfig,
+                              surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              colorManagementConfig, blendAnimationConfig,
+                              surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, colorManagementConfig,
+                              blendAnimationConfig, surfaceConfig);
+            }
+          } else if (removeFrameRect) {
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              colorManagementConfig, removeFrameRectConfig,
+                              surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              colorManagementConfig, removeFrameRectConfig,
+                              surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, colorManagementConfig,
+                              removeFrameRectConfig, surfaceConfig);
+            }
+          } else {  // (blendAnimation and removeFrameRect is false)
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              colorManagementConfig, surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              colorManagementConfig, surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe =
+                  MakePipe(swizzleConfig, colorManagementConfig, surfaceConfig);
+            }
+          }
+        }
+      } else {  // (colorManagement is false)
+        if (downscale) {
+          MOZ_ASSERT(!blendAnimation);
+          if (removeFrameRect) {
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              removeFrameRectConfig, downscalingConfig,
+                              surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              removeFrameRectConfig, downscalingConfig,
+                              surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, removeFrameRectConfig,
+                              downscalingConfig, surfaceConfig);
+            }
+          } else {  // (removeFrameRect is false)
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              downscalingConfig, surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              downscalingConfig, surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, downscalingConfig, surfaceConfig);
+            }
+          }
+        } else {  // (downscale is false)
+          if (blendAnimation) {
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              blendAnimationConfig, surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              blendAnimationConfig, surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe =
+                  MakePipe(swizzleConfig, blendAnimationConfig, surfaceConfig);
+            }
+          } else if (removeFrameRect) {
+            if (deinterlace) {
+              pipe = MakePipe(swizzleConfig, deinterlacingConfig,
+                              removeFrameRectConfig, surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe = MakePipe(swizzleConfig, interpolatingConfig,
+                              removeFrameRectConfig, surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe =
+                  MakePipe(swizzleConfig, removeFrameRectConfig, surfaceConfig);
+            }
+          } else {  // (blendAnimation and removeFrameRect is false)
+            if (deinterlace) {
+              pipe =
+                  MakePipe(swizzleConfig, deinterlacingConfig, surfaceConfig);
+            } else if (adam7Interpolate) {
+              pipe =
+                  MakePipe(swizzleConfig, interpolatingConfig, surfaceConfig);
+            } else {  // (deinterlace and adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, surfaceConfig);
+            }
+          }
+        }
+      }
+    } else if (lateSwizzle) {
       if (colorManagement) {
         if (downscale) {
           MOZ_ASSERT(!blendAnimation);
@@ -147,67 +296,67 @@ class SurfacePipeFactory {
             if (deinterlace) {
               pipe = MakePipe(deinterlacingConfig, removeFrameRectConfig,
                               downscalingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, removeFrameRectConfig,
                               downscalingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(removeFrameRectConfig, downscalingConfig,
-                              colorManagementConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(removeFrameRectConfig, downscalingConfig,
+                           colorManagementConfig, swizzleConfig, surfaceConfig);
             }
           } else {  // (removeFrameRect is false)
             if (deinterlace) {
-              pipe = MakePipe(deinterlacingConfig, downscalingConfig,
-                              colorManagementConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(deinterlacingConfig, downscalingConfig,
+                           colorManagementConfig, swizzleConfig, surfaceConfig);
             } else if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, downscalingConfig,
-                              colorManagementConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(interpolatingConfig, downscalingConfig,
+                           colorManagementConfig, swizzleConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
               pipe = MakePipe(downscalingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             }
           }
         } else {  // (downscale is false)
           if (blendAnimation) {
             if (deinterlace) {
-              pipe = MakePipe(deinterlacingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, blendAnimationConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(deinterlacingConfig, colorManagementConfig,
+                           swizzleConfig, blendAnimationConfig, surfaceConfig);
             } else if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, blendAnimationConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(interpolatingConfig, colorManagementConfig,
+                           swizzleConfig, blendAnimationConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(colorManagementConfig, premultiplyAlphaConfig,
+              pipe = MakePipe(colorManagementConfig, swizzleConfig,
                               blendAnimationConfig, surfaceConfig);
             }
           } else if (removeFrameRect) {
             if (deinterlace) {
-              pipe = MakePipe(deinterlacingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, removeFrameRectConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(deinterlacingConfig, colorManagementConfig,
+                           swizzleConfig, removeFrameRectConfig, surfaceConfig);
             } else if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, removeFrameRectConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(interpolatingConfig, colorManagementConfig,
+                           swizzleConfig, removeFrameRectConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(colorManagementConfig, premultiplyAlphaConfig,
+              pipe = MakePipe(colorManagementConfig, swizzleConfig,
                               removeFrameRectConfig, surfaceConfig);
             }
           } else {  // (blendAnimation and removeFrameRect is false)
             if (deinterlace) {
               pipe = MakePipe(deinterlacingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, colorManagementConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(colorManagementConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(colorManagementConfig, swizzleConfig, surfaceConfig);
             }
           }
         }
@@ -217,60 +366,57 @@ class SurfacePipeFactory {
           if (removeFrameRect) {
             if (deinterlace) {
               pipe = MakePipe(deinterlacingConfig, removeFrameRectConfig,
-                              downscalingConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+                              downscalingConfig, swizzleConfig, surfaceConfig);
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, removeFrameRectConfig,
-                              downscalingConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+                              downscalingConfig, swizzleConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
               pipe = MakePipe(removeFrameRectConfig, downscalingConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             }
           } else {  // (removeFrameRect is false)
             if (deinterlace) {
               pipe = MakePipe(deinterlacingConfig, downscalingConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, downscalingConfig,
-                              premultiplyAlphaConfig, surfaceConfig);
+                              swizzleConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(downscalingConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe = MakePipe(downscalingConfig, swizzleConfig, surfaceConfig);
             }
           }
         } else {  // (downscale is false)
           if (blendAnimation) {
             if (deinterlace) {
-              pipe = MakePipe(deinterlacingConfig, premultiplyAlphaConfig,
+              pipe = MakePipe(deinterlacingConfig, swizzleConfig,
                               blendAnimationConfig, surfaceConfig);
             } else if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, premultiplyAlphaConfig,
+              pipe = MakePipe(interpolatingConfig, swizzleConfig,
                               blendAnimationConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(premultiplyAlphaConfig, blendAnimationConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(swizzleConfig, blendAnimationConfig, surfaceConfig);
             }
           } else if (removeFrameRect) {
             if (deinterlace) {
-              pipe = MakePipe(deinterlacingConfig, premultiplyAlphaConfig,
+              pipe = MakePipe(deinterlacingConfig, swizzleConfig,
                               removeFrameRectConfig, surfaceConfig);
             } else if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, premultiplyAlphaConfig,
+              pipe = MakePipe(interpolatingConfig, swizzleConfig,
                               removeFrameRectConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(premultiplyAlphaConfig, removeFrameRectConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(swizzleConfig, removeFrameRectConfig, surfaceConfig);
             }
           } else {  // (blendAnimation and removeFrameRect is false)
             if (deinterlace) {
-              pipe = MakePipe(deinterlacingConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(deinterlacingConfig, swizzleConfig, surfaceConfig);
             } else if (adam7Interpolate) {
-              pipe = MakePipe(interpolatingConfig, premultiplyAlphaConfig,
-                              surfaceConfig);
+              pipe =
+                  MakePipe(interpolatingConfig, swizzleConfig, surfaceConfig);
             } else {  // (deinterlace and adam7Interpolate are false)
-              pipe = MakePipe(premultiplyAlphaConfig, surfaceConfig);
+              pipe = MakePipe(swizzleConfig, surfaceConfig);
             }
           }
         }

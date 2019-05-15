@@ -213,30 +213,27 @@ nsresult nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo) {
     // The first frame may be displayed progressively.
     pipeFlags |= SurfacePipeFlags::PROGRESSIVE_DISPLAY;
   }
+
+  SurfaceFormat inFormat;
   if (transparency == TransparencyType::eAlpha) {
     // Only apply premultiplication if the frame has true alpha.
-    if (mDisablePremultipliedAlpha) {
+    if (!mDisablePremultipliedAlpha) {
       pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
     }
     // We are outputting directly as RGBA, so we need to swap at this step.
-    pipeFlags |= SurfacePipeFlags::SWAP_RB;
+    inFormat = SurfaceFormat::R8G8B8A8;
+  } else if (mTransform && !mUsePipeTransform) {
+    // QCMS will output in the correct format.
+    inFormat = mFormat;
   } else {
     // We have no alpha channel, so we need to unpack from RGB to BGRA.
-    mSwizzleFn = gfx::SwizzleRow(SurfaceFormat::R8G8B8, SurfaceFormat::B8G8R8A8);
-    if (!mSwizzleFn) {
-      return NS_ERROR_FAILURE;
-    }
+    inFormat = SurfaceFormat::R8G8B8;
   }
-
-  // RGB unpacks to BGRX as needed.
-  // RGBA can be put directly into the pipeline
-  // - PremultiplyAlpha will do the conversion
-  // - 
 
   qcms_transform* pipeTransform = mUsePipeTransform ? mTransform : nullptr;
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-      this, Size(), OutputSize(), aFrameInfo.mFrameRect, mFormat, animParams,
-      pipeTransform, pipeFlags);
+      this, Size(), OutputSize(), aFrameInfo.mFrameRect, inFormat, mFormat,
+      animParams, pipeTransform, pipeFlags);
 
   if (!pipe) {
     mPipe = SurfacePipe();
@@ -745,29 +742,6 @@ void nsPNGDecoder::PostInvalidationIfNeeded() {
                    Some(invalidRect->mOutputSpaceRect));
 }
 
-static NextPixel<uint32_t> PackRGBPixelAndAdvance(uint8_t*& aRawPixelInOut) {
-  const uint32_t pixel = gfxPackedPixel(0xFF, aRawPixelInOut[0],
-                                        aRawPixelInOut[1], aRawPixelInOut[2]);
-  aRawPixelInOut += 3;
-  return AsVariant(pixel);
-}
-
-static NextPixel<uint32_t> PackRGBAPixelAndAdvance(uint8_t*& aRawPixelInOut) {
-  const uint32_t pixel = gfxPackedPixel(aRawPixelInOut[3], aRawPixelInOut[0],
-                                        aRawPixelInOut[1], aRawPixelInOut[2]);
-  aRawPixelInOut += 4;
-  return AsVariant(pixel);
-}
-
-static NextPixel<uint32_t> PackUnpremultipliedRGBAPixelAndAdvance(
-    uint8_t*& aRawPixelInOut) {
-  const uint32_t pixel =
-      gfxPackedPixelNoPreMultiply(aRawPixelInOut[3], aRawPixelInOut[0],
-                                  aRawPixelInOut[1], aRawPixelInOut[2]);
-  aRawPixelInOut += 4;
-  return AsVariant(pixel);
-}
-
 void nsPNGDecoder::row_callback(png_structp png_ptr, png_bytep new_row,
                                 png_uint_32 row_num, int pass) {
   /* libpng comments:
@@ -860,19 +834,7 @@ void nsPNGDecoder::WriteRow(uint8_t* aRow) {
   }
 
   // Write this row to the SurfacePipe.
-  DebugOnly<WriteState> result;
-  if (HasAlphaChannel() || mCMSLine) {
-    result = mPipe.WritePixelBlockToRow<uint32_t>([&](uint32_t* aBlockStart, int32_t aBlockSize) {
-      memcpy(aBlockStart, rowToWrite, aBlockSize * sizeof(uint32_t));
-      return MakeTuple(aBlockSize, Maybe<WriteState>());
-    });
-  } else {
-    result = mPipe.WritePixelBlockToRow<uint32_t>([&](uint32_t* aBlockStart, int32_t aBlockSize) {
-      mSwizzleFn(rowToWrite, reinterpret_cast<uint8_t*>(aBlockStart), aBlockSize);
-      return MakeTuple(aBlockSize, Maybe<WriteState>());
-    });
-  }
-
+  DebugOnly<WriteState> result = mPipe.WriteBuffer(reinterpret_cast<uint32_t*>(rowToWrite));
   MOZ_ASSERT(WriteState(result) != WriteState::FAILURE);
 
   PostInvalidationIfNeeded();
