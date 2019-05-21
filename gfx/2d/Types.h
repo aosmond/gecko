@@ -78,6 +78,7 @@ enum class SurfaceFormat : int8_t {
   HSV,
   Lab,
   Depth,
+  CMYK,
 
   // This represents the unknown format.
   UNKNOWN,

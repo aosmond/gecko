@@ -877,6 +877,47 @@ static void UnpackRowRGB24(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) 
   FORMAT_CASE_ROW(SurfaceFormat::R8G8B8, aDstFormat, \
                   UnpackRowRGB24<ShouldSwapRB(SurfaceFormat::R8G8B8, aDstFormat)>)
 
+template <bool aSwapRB>
+static void SwizzleCMYK(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+  const uint8_t* end = aSrc + 3 * aLength;
+  while (aSrc < end) {
+    // Source is 'Inverted CMYK', output is RGB.
+    // See: http://www.easyrgb.com/math.php?MATH=M12#text12
+    // Or:  http://www.ilkeratalay.com/colorspacesfaq.php#rgb
+
+    // From CMYK to CMY
+    // C = ( C * ( 1 - K ) + K )
+    // M = ( M * ( 1 - K ) + K )
+    // Y = ( Y * ( 1 - K ) + K )
+
+    // From Inverted CMYK to CMY is thus:
+    // C = ( (1-iC) * (1 - (1-iK)) + (1-iK) ) => 1 - iC*iK
+    // Same for M and Y
+
+    // Convert from CMY (0..1) to RGB (0..1)
+    // R = 1 - C => 1 - (1 - iC*iK) => iC*iK
+    // G = 1 - M => 1 - (1 - iM*iK) => iM*iK
+    // B = 1 - Y => 1 - (1 - iY*iK) => iY*iK
+
+    // Convert from Inverted CMYK (0..255) to RGB (0..255)
+    const uint32_t iC = aSrc[0];
+    const uint32_t iM = aSrc[1];
+    const uint32_t iY = aSrc[2];
+    const uint32_t iK = aSrc[3];
+    aDst[aSwapRB ? 2 : 0] = iY * iK / 255;  // Blue
+    aDst[1]               = iM * iK / 255;  // Green
+    aDst[aSwapRB ? 0 : 2] = iC * iK / 255;  // Red
+    aDst[3]               = 0xFF;           // Alpha
+
+    aSrc += 4;
+    aDst += 4;
+  }
+}
+
+#define SWIZZLE_ROW_CMYK_FALLBACK(aDstFormat)      \
+  FORMAT_CASE_ROW(SurfaceFormat::CMYK, aDstFormat, \
+                  SwizzleCMYK<ShouldSwapRB(SurfaceFormat::B8G8R8X8, aDstFormat)>)
+
 bool SwizzleData(const uint8_t* aSrc, int32_t aSrcStride,
                  SurfaceFormat aSrcFormat, uint8_t* aDst, int32_t aDstStride,
                  SurfaceFormat aDstFormat, const IntSize& aSize) {
@@ -1066,6 +1107,9 @@ SwizzleRowFn SwizzleRow(SurfaceFormat aSrcFormat, SurfaceFormat aDstFormat) {
     UNPACK_ROW_RGB(SurfaceFormat::R8G8B8A8)
     UNPACK_ROW_RGB(SurfaceFormat::B8G8R8X8)
     UNPACK_ROW_RGB(SurfaceFormat::B8G8R8A8)
+
+    SWIZZLE_ROW_CMYK_FALLBACK(SurfaceFormat::R8G8B8X8)
+    SWIZZLE_ROW_CMYK_FALLBACK(SurfaceFormat::B8G8R8X8)
 
     default:
       break;
