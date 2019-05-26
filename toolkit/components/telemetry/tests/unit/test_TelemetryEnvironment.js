@@ -622,6 +622,10 @@ function checkSystemSection(data) {
     // Assert.ok(checkString(gfxData.DWriteVersion));
   }
 
+  let checkForLinux = gIsLinux ? checkString : checkNullOrString;
+  Assert.ok(checkForLinux(gfxData.windowProtocol));
+  Assert.ok(checkForLinux(gfxData.displayManager));
+
   Assert.ok("adapters" in gfxData);
   Assert.ok(gfxData.adapters.length > 0, "There must be at least one GFX adapter.");
   for (let adapter of gfxData.adapters) {

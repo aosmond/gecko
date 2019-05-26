@@ -159,6 +159,8 @@ Structure:
             DWriteEnabled: <bool>, // null on failure
             Headless: <bool>, // null on failure
             //DWriteVersion: <string>, // temporarily removed, pending bug 1154500
+            displayManager: <string>, // linux only or null on failure
+            windowProtocol: <string>, // linux only or null on failure
             adapters: [
               {
                 description: <string>, // e.g. "Intel(R) HD Graphics 4600", null on failure

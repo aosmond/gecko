@@ -467,6 +467,9 @@ var dataProviders = {
       OffMainThreadPaintEnabled: "offMainThreadPaintEnabled",
       OffMainThreadPaintWorkerCount: "offMainThreadPaintWorkerCount",
       TargetFrameRate: "targetFrameRate",
+
+      displayManager: null,
+      windowProtocol: null,
     };
 
     for (let prop in gfxInfoProps) {
