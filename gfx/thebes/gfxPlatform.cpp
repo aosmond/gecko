@@ -2434,6 +2434,8 @@ void gfxPlatform::InitGPUProcessPrefs() {
                          NS_LITERAL_CSTRING("FEATURE_FAILURE_LAYERSCOPE"));
     return;
   }
+
+  InitPlatformGPUProcessPrefs();
 }
 
 void gfxPlatform::InitCompositorAccelerationPrefs() {
