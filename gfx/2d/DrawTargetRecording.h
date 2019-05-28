@@ -43,7 +43,7 @@ class DrawTargetRecording : public DrawTarget {
    */
   virtual void Flush() override { mFinalDT->Flush(); }
 
-  virtual void FlushItem(const IntRect& aBounds) override;
+  virtual void FlushItem(const IntRect& aBounds, void* aUserData) override;
 
   /*
    * Draw a surface to the draw target. Possibly doing partial drawing or

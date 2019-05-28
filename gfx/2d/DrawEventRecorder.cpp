@@ -104,7 +104,7 @@ DrawEventRecorderMemory::DrawEventRecorderMemory(
 
 void DrawEventRecorderMemory::Flush() {}
 
-void DrawEventRecorderMemory::FlushItem(IntRect aRect) {
+void DrawEventRecorderMemory::FlushItem(IntRect aRect, void* aUserData) {
   MOZ_RELEASE_ASSERT(!aRect.IsEmpty());
   // Detaching our existing resources will add some
   // destruction events to our stream so we need to do that
@@ -115,7 +115,7 @@ void DrawEventRecorderMemory::FlushItem(IntRect aRect) {
   WriteElement(mIndex, mOutputStream.mLength);
 
   // write out the fonts into the extra data section
-  mSerializeCallback(mOutputStream, mScaledFonts);
+  mSerializeCallback(mOutputStream, mScaledFonts, mExternalSurfaces, aUserData);
   WriteElement(mIndex, mOutputStream.mLength);
 
   WriteElement(mIndex, aRect.x);

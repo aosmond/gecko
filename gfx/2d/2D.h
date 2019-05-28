@@ -1489,7 +1489,8 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
    * Note: this is a bit of a hack. It might be better to just recreate
    * the DrawTargetRecording.
    */
-  virtual void FlushItem(const IntRect& aBounds) {}
+  void FlushItem(const IntRect& aBounds) { FlushItem(aBounds, nullptr); }
+  virtual void FlushItem(const IntRect& aBounds, void* aUserParam) {}
 
   /**
    * Ensures that no snapshot is still pointing to this DrawTarget's surface

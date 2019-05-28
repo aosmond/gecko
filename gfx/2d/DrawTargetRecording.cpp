@@ -614,8 +614,8 @@ already_AddRefed<PathRecording> DrawTargetRecording::EnsurePathStored(
 
 // This should only be called on the 'root' DrawTargetRecording.
 // Calling it on a child DrawTargetRecordings will cause confusion.
-void DrawTargetRecording::FlushItem(const IntRect& aBounds) {
-  mRecorder->FlushItem(aBounds);
+void DrawTargetRecording::FlushItem(const IntRect& aBounds, void* aUserData) {
+  mRecorder->FlushItem(aBounds, aUserData);
   // Reinitialize the recorder (FlushItem will write a new recording header)
   // Tell the new recording about our draw target
   // This code should match what happens in the DrawTargetRecording constructor.

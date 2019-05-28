@@ -97,6 +97,7 @@ struct BlobItemData {
   // properties that are used to emulate layer tree invalidation
   Matrix mMatrix;  // updated to track the current transform to device space
   RefPtr<BasicLayerManager> mLayerManager;
+  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
 
   IntRect mImageRect;
   LayerIntPoint mGroupOffset;
@@ -174,22 +175,48 @@ static void DestroyBlobGroupDataProperty(nsTArray<BlobItemData*>* aArray) {
   delete aArray;
 }
 
-static void TakeExternalSurfaces(
-    WebRenderDrawEventRecorder* aRecorder,
-    std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
-    RenderRootStateManager* aManager, wr::IpcResourceUpdateQueue& aResources) {
-  aRecorder->TakeExternalSurfaces(aExternalSurfaces);
-
-  for (auto& surface : aExternalSurfaces) {
-    // While we don't use the image key with the surface, because the blob image
-    // renderer doesn't have easy access to the resource set, we still want to
-    // ensure one is generated. That will ensure the surface remains alive until
-    // at least the last epoch which the blob image could be used in.
-    wr::ImageKey key;
-    DebugOnly<nsresult> rv =
-        SharedSurfacesChild::Share(surface, aManager, aResources, key);
-    MOZ_ASSERT(rv.value != NS_ERROR_NOT_IMPLEMENTED);
+static bool SerializeResources(
+    WebRenderLayerManager* aManager, wr::DisplayListBuilder& aBuilder,
+    wr::IpcResourceUpdateQueue& aResources, MemStream& aStream,
+    std::vector<RefPtr<ScaledFont>>& aScaledFonts,
+    std::vector<RefPtr<SourceSurface>>& aExternalSurfaces, void* aUserData) {
+  bool validFonts = true;
+  size_t count = aScaledFonts.size();
+  aStream.write((const char*)&count, sizeof(count));
+  for (auto& scaled : aScaledFonts) {
+    Maybe<wr::FontInstanceKey> key =
+        aManager->WrBridge()->GetFontKeyForScaledFont(
+            scaled, aBuilder.GetRenderRoot(), &aResources);
+    if (key.isNothing()) {
+      validFonts = false;
+      break;
+    }
+    BlobFont font = {key.value(), scaled};
+    aStream.write((const char*)&font, sizeof(font));
   }
+
+  if (!aExternalSurfaces.empty()) {
+    RenderRootStateManager* renderRootManager =
+        aManager->GetRenderRootStateManager(aBuilder.GetRenderRoot());
+    for (auto& surface : aExternalSurfaces) {
+      // While we don't use the image key with the surface, because the blob
+      // image renderer doesn't have easy access to the resource set, we still
+      // want to ensure one is generated. That will ensure the surface remains
+      // alive until at least the last epoch which the blob image could be used
+      // in.
+      wr::ImageKey key;
+      DebugOnly<nsresult> rv = SharedSurfacesChild::Share(
+          surface, renderRootManager, aResources, key);
+      MOZ_ASSERT(rv.value != NS_ERROR_NOT_IMPLEMENTED);
+    }
+
+    MOZ_RELEASE_ASSERT(aUserData);
+    auto data =
+        reinterpret_cast<std::vector<RefPtr<SourceSurface>>*>(aUserData);
+    *data = std::move(aExternalSurfaces);
+  }
+
+  return validFonts;
 }
 
 struct DIGroup;
@@ -208,7 +235,8 @@ struct Grouper {
   void PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
                           const IntRect& aItemBounds, nsDisplayList* aChildren,
                           gfxContext* aContext,
-                          WebRenderDrawEventRecorder* aRecorder);
+                          WebRenderDrawEventRecorder* aRecorder,
+                          void* aUserData);
 
   // Builds groups of display items split based on 'layer activity'
   void ConstructGroups(nsDisplayListBuilder* aDisplayListBuilder,
@@ -304,7 +332,6 @@ struct DIGroup {
   // current item being processed.
   IntRect mClippedImageBounds;
   Maybe<mozilla::Pair<wr::RenderRoot, wr::BlobImageKey>> mKey;
-  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
   std::vector<RefPtr<ScaledFont>> mFonts;
 
   DIGroup()
@@ -649,19 +676,13 @@ struct DIGroup {
     RefPtr<WebRenderDrawEventRecorder> recorder =
         MakeAndAddRef<WebRenderDrawEventRecorder>(
             [&](MemStream& aStream,
-                std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-              size_t count = aScaledFonts.size();
-              aStream.write((const char*)&count, sizeof(count));
-              for (auto& scaled : aScaledFonts) {
-                Maybe<wr::FontInstanceKey> key =
-                    aWrManager->WrBridge()->GetFontKeyForScaledFont(
-                        scaled, aBuilder.GetRenderRoot(), &aResources);
-                if (key.isNothing()) {
-                  validFonts = false;
-                  break;
-                }
-                BlobFont font = {key.value(), scaled};
-                aStream.write((const char*)&font, sizeof(font));
+                std::vector<RefPtr<ScaledFont>>& aScaledFonts,
+                std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
+                void* aUserData) {
+              if (!SerializeResources(aWrManager, aBuilder, aResources, aStream,
+                                      aScaledFonts, aExternalSurfaces,
+                                      aUserData)) {
+                validFonts = false;
               }
               fonts = std::move(aScaledFonts);
             });
@@ -695,10 +716,6 @@ struct DIGroup {
     //   Contains(paintBounds);?
     wr::OpacityType opacity = wr::OpacityType::HasAlphaChannel;
 
-    TakeExternalSurfaces(
-        recorder, mExternalSurfaces,
-        aWrManager->GetRenderRootStateManager(aBuilder.GetRenderRoot()),
-        aResources);
     bool hasItems = recorder->Finish();
     GP("%d Finish\n", hasItems);
     if (!validFonts) {
@@ -774,7 +791,8 @@ struct DIGroup {
     LayerIntSize size = mLayerBounds.Size();
     for (nsDisplayItem* item = aStartItem; item != aEndItem;
          item = item->GetAbove()) {
-      IntRect bounds = ItemBounds(item);
+      BlobItemData* data = GetBlobItemData(item);
+      IntRect bounds = data->mRect;
       auto bottomRight = bounds.BottomRight();
 
       GP("Trying %s %p-%d %d %d %d %d\n", item->Name(), item->Frame(),
@@ -796,7 +814,6 @@ struct DIGroup {
       if (mInvalidRect.Contains(bounds)) {
         GP("Wholely contained\n");
       } else {
-        BlobItemData* data = GetBlobItemData(item);
         if (data->mInvalid) {
           if (item->GetType() == DisplayItemType::TYPE_TRANSFORM) {
             nsDisplayTransform* transformItem =
@@ -823,7 +840,7 @@ struct DIGroup {
       if (children) {
         GP("doing children in EndGroup\n");
         aGrouper->PaintContainerItem(this, item, bounds, children, aContext,
-                                     aRecorder);
+                                     aRecorder, &data->mExternalSurfaces);
       } else {
         nsPaintedDisplayItem* paintedItem = item->AsPaintedDisplayItem();
         if (dirty && paintedItem &&
@@ -853,7 +870,7 @@ struct DIGroup {
             aContext->Restore();
           }
         }
-        aContext->GetDrawTarget()->FlushItem(bounds);
+        aContext->GetDrawTarget()->FlushItem(bounds, &data->mExternalSurfaces);
       }
     }
   }
@@ -897,7 +914,8 @@ static BlobItemData* GetBlobItemDataForGroup(nsDisplayItem* aItem,
 void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
                                  const IntRect& aItemBounds,
                                  nsDisplayList* aChildren, gfxContext* aContext,
-                                 WebRenderDrawEventRecorder* aRecorder) {
+                                 WebRenderDrawEventRecorder* aRecorder,
+                                 void* aUserData) {
   switch (aItem->GetType()) {
     case DisplayItemType::TYPE_TRANSFORM: {
       DisplayItemClip currentClip = aItem->GetClip();
@@ -922,7 +940,7 @@ void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
           data->mLayerManager->BeginTransaction();
           data->mLayerManager->EndTransaction(
               FrameLayerBuilder::DrawPaintedLayer, mDisplayListBuilder);
-          aContext->GetDrawTarget()->FlushItem(aItemBounds);
+          aContext->GetDrawTarget()->FlushItem(aItemBounds, aUserData);
         }
       } else {
         aContext->Multiply(ThebesMatrix(trans2d));
@@ -1003,7 +1021,7 @@ void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
               GP("endGroup %s %p-%d\n", aItem->Name(), aItem->Frame(),
                  aItem->GetPerFrameKey());
             });
-        aContext->GetDrawTarget()->FlushItem(aItemBounds);
+        aContext->GetDrawTarget()->FlushItem(aItemBounds, aUserData);
       }
       break;
     }
@@ -1019,7 +1037,7 @@ void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
         if (data->mLayerManager->InTransaction()) {
           data->mLayerManager->AbortTransaction();
         }
-        aContext->GetDrawTarget()->FlushItem(aItemBounds);
+        aContext->GetDrawTarget()->FlushItem(aItemBounds, aUserData);
       }
       break;
     }
@@ -2216,23 +2234,18 @@ WebRenderCommandBuilder::GenerateFallbackData(
               ? wr::OpacityType::Opaque
               : wr::OpacityType::HasAlphaChannel;
       std::vector<RefPtr<ScaledFont>> fonts;
+      std::vector<RefPtr<SourceSurface>> externalSurfaces;
       bool validFonts = true;
       RefPtr<WebRenderDrawEventRecorder> recorder =
           MakeAndAddRef<WebRenderDrawEventRecorder>(
               [&](MemStream& aStream,
-                  std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-                size_t count = aScaledFonts.size();
-                aStream.write((const char*)&count, sizeof(count));
-                for (auto& scaled : aScaledFonts) {
-                  Maybe<wr::FontInstanceKey> key =
-                      mManager->WrBridge()->GetFontKeyForScaledFont(
-                          scaled, aBuilder.GetRenderRoot(), &aResources);
-                  if (key.isNothing()) {
-                    validFonts = false;
-                    break;
-                  }
-                  BlobFont font = {key.value(), scaled};
-                  aStream.write((const char*)&font, sizeof(font));
+                  std::vector<RefPtr<ScaledFont>>& aScaledFonts,
+                  std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
+                  void* aUserData) {
+                if (!SerializeResources(mManager, aBuilder, aResources, aStream,
+                                        aScaledFonts, aExternalSurfaces,
+                                        aUserData)) {
+                  validFonts = false;
                 }
                 fonts = std::move(aScaledFonts);
               });
@@ -2255,11 +2268,8 @@ WebRenderCommandBuilder::GenerateFallbackData(
           isInvalidated = true;
         }
       }
-      recorder->FlushItem(IntRect({0, 0}, dtSize.ToUnknownSize()));
-      TakeExternalSurfaces(
-          recorder, fallbackData->mExternalSurfaces,
-          mManager->GetRenderRootStateManager(aBuilder.GetRenderRoot()),
-          aResources);
+      recorder->FlushItem(IntRect({0, 0}, dtSize.ToUnknownSize()),
+                          &externalSurfaces);
       recorder->Finish();
 
       if (!validFonts) {
@@ -2279,6 +2289,7 @@ WebRenderCommandBuilder::GenerateFallbackData(
         }
         fallbackData->SetBlobImageKey(key);
         fallbackData->SetFonts(fonts);
+        fallbackData->mExternalSurfaces = std::move(externalSurfaces);
       } else {
         // If there is no invalidation region and we don't have a image key,
         // it means we don't need to push image for the item.
@@ -2378,7 +2389,7 @@ class WebRenderMaskData : public WebRenderUserData {
 
   Maybe<wr::BlobImageKey> mBlobKey;
   std::vector<RefPtr<gfx::ScaledFont>> mFonts;
-  std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
+  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
   LayerIntRect mItemRect;
   nsPoint mMaskOffset;
   nsStyleImageLayers mMaskStyle;
@@ -2433,26 +2444,19 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
     IntSize size = itemRect.Size().ToUnknownSize();
 
     std::vector<RefPtr<ScaledFont>> fonts;
+    std::vector<RefPtr<SourceSurface>> externalSurfaces;
     bool validFonts = true;
     RefPtr<WebRenderDrawEventRecorder> recorder =
         MakeAndAddRef<WebRenderDrawEventRecorder>(
             [&](MemStream& aStream,
-                std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-              size_t count = aScaledFonts.size();
-              aStream.write((const char*)&count, sizeof(count));
-
-              for (auto& scaled : aScaledFonts) {
-                Maybe<wr::FontInstanceKey> key =
-                    mManager->WrBridge()->GetFontKeyForScaledFont(
-                        scaled, aBuilder.GetRenderRoot(), &aResources);
-                if (key.isNothing()) {
-                  validFonts = false;
-                  break;
-                }
-                BlobFont font = {key.value(), scaled};
-                aStream.write((const char*)&font, sizeof(font));
+                std::vector<RefPtr<ScaledFont>>& aScaledFonts,
+                std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
+                void* aUserData) {
+              if (!SerializeResources(mManager, aBuilder, aResources, aStream,
+                                      aScaledFonts, aExternalSurfaces,
+                                      aUserData)) {
+                validFonts = false;
               }
-
               fonts = std::move(aScaledFonts);
             });
 
@@ -2475,11 +2479,8 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
       return Nothing();
     }
 
-    recorder->FlushItem(IntRect(0, 0, size.width, size.height));
-    TakeExternalSurfaces(
-        recorder, maskData->mExternalSurfaces,
-        mManager->GetRenderRootStateManager(aBuilder.GetRenderRoot()),
-        aResources);
+    recorder->FlushItem(IntRect(0, 0, size.width, size.height),
+                        &externalSurfaces);
     recorder->Finish();
 
     if (!validFonts) {
@@ -2501,6 +2502,7 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
     maskData->ClearImageKey();
     maskData->mBlobKey = Some(key);
     maskData->mFonts = fonts;
+    maskData->mExternalSurfaces = std::move(externalSurfaces);
     if (paintFinished) {
       maskData->mItemRect = itemRect;
       maskData->mMaskOffset = maskOffset;

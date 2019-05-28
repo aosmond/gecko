@@ -34,7 +34,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
     ClearResources();
     return true;
   }
-  virtual void FlushItem(IntRect) {}
+  virtual void FlushItem(IntRect, void*) {}
   void DetachResources() {
     // The iteration is a bit awkward here because our iterator will
     // be invalidated by the removal
@@ -105,10 +105,6 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
 
   bool WantsExternalFonts() const { return mExternalFonts; }
 
-  void TakeExternalSurfaces(std::vector<RefPtr<SourceSurface>>& aSurfaces) {
-    aSurfaces = std::move(mExternalSurfaces);
-  }
-
   virtual void StoreSourceSurfaceRecording(SourceSurface* aSurface,
                                            const char* aReason);
 
@@ -165,8 +161,9 @@ class DrawEventRecorderFile : public DrawEventRecorderPrivate {
   mozilla::OFStream mOutputStream;
 };
 
-typedef std::function<void(MemStream& aStream,
-                           std::vector<RefPtr<ScaledFont>>& aScaledFonts)>
+typedef std::function<void(
+    MemStream& aStream, std::vector<RefPtr<ScaledFont>>& aScaledFonts,
+    std::vector<RefPtr<SourceSurface>>& aExternalSurfaces, void* aUserData)>
     SerializeResourcesFn;
 
 // WARNING: This should not be used in its existing state because
@@ -199,7 +196,7 @@ class DrawEventRecorderMemory : public DrawEventRecorderPrivate {
    */
   void WipeRecording();
   bool Finish() override;
-  void FlushItem(IntRect) override;
+  void FlushItem(IntRect, void*) override;
 
   MemStream mOutputStream;
   /* The index stream is of the form:
