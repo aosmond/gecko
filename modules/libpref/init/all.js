@@ -893,7 +893,7 @@ pref("gfx.webrender.dcomp-win.enabled", true);
 pref("gfx.webrender.dcomp-win-triple-buffering.enabled", true);
 #endif
 
-#if defined(XP_WIN) || defined(MOZ_WIDGET_ANDROID)
+#if defined(XP_WIN) || defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GTK)
 pref("gfx.webrender.program-binary-disk", true);
 #endif
 
