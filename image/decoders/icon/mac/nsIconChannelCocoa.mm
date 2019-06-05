@@ -338,14 +338,12 @@ nsresult nsIconChannel::MakeInputStream(nsIInputStream** _retval, bool aNonBlock
   nsCOMPtr<nsIOutputStream> outStream;
   rv = NS_NewPipe(getter_AddRefs(inStream), getter_AddRefs(outStream), bufferCapacity,
                   bufferCapacity, aNonBlocking);
+  NS_ENSURE_SUCCESS(rv, rv);
 
-  if (NS_SUCCEEDED(rv)) {
-    uint32_t written;
-    rv = outStream->Write((char*)iconBuffer.Elements(), bufferCapacity, &written);
-    if (NS_SUCCEEDED(rv)) {
-      NS_IF_ADDREF(*_retval = inStream);
-    }
-  }
+  uint32_t written;
+  rv = outStream->Write((char*)iconBuffer.Elements(), bufferCapacity, &written);
+  NS_ENSURE_SUCCESS(rv, rv);
+  NS_IF_ADDREF(*_retval = inStream);
 
   // Drop notification callbacks to prevent cycles.
   mCallbacks = nullptr;
