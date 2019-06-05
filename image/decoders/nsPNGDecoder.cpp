@@ -215,19 +215,22 @@ nsresult nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo) {
   }
 
   SurfaceFormat inFormat;
-  if (transparency == TransparencyType::eAlpha) {
-    // Only apply premultiplication if the frame has true alpha.
-    if (!mDisablePremultipliedAlpha) {
-      pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
-    }
-    // We are outputting directly as RGBA, so we need to swap at this step.
-    inFormat = SurfaceFormat::R8G8B8A8;
-  } else if (mTransform && !mUsePipeTransform) {
+  if (mTransform && !mUsePipeTransform) {
     // QCMS will output in the correct format.
     inFormat = mFormat;
+  } else if (transparency == TransparencyType::eAlpha) {
+    // We are outputting directly as RGBA, so we need to swap at this step.
+    inFormat = SurfaceFormat::R8G8B8A8;
   } else {
     // We have no alpha channel, so we need to unpack from RGB to BGRA.
     inFormat = SurfaceFormat::R8G8B8;
+  }
+
+  // Only apply premultiplication if the frame has true alpha. If we ever
+  // support downscaling animated images, we will need to premultiply for frame
+  // rect transparency when downscaling as well.
+  if (transparency == TransparencyType::eAlpha && !mDisablePremultipliedAlpha) {
+    pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
   }
 
   qcms_transform* pipeTransform = mUsePipeTransform ? mTransform : nullptr;
