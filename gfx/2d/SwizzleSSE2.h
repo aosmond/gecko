@@ -7,6 +7,7 @@
 #ifndef MOZILLA_GFX_SWIZZLESSE2_H_
 #define MOZILLA_GFX_SWIZZLESSE2_H_
 
+#include "mozilla/Attributes.h"
 #include <emmintrin.h>
 
 namespace mozilla {
