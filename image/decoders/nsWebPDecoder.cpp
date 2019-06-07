@@ -220,12 +220,14 @@ nsresult nsWebPDecoder::CreateFrame(const nsIntRect& aFrameRect) {
     return NS_ERROR_FAILURE;
   }
 
-  SurfaceFormat inFormat = mFormat;
+  // WebP doesn't guarantee that the alpha generated matches the hint in the
+  // header, so we always need to claim the input is BGRA. If the output is
+  // BGRX, swizzling will mask off the alpha channel.
+  SurfaceFormat inFormat = SurfaceFormat::B8G8R8A8;
+
   SurfacePipeFlags pipeFlags = SurfacePipeFlags();
-  if (mFormat == SurfaceFormat::B8G8R8X8) {
-    // WebP doesn't guarantee that the alpha matching
-    inFormat = SurfaceFormat::B8G8R8A8;
-  } else if (!(GetSurfaceFlags() & SurfaceFlags::NO_PREMULTIPLY_ALPHA)) {
+  if (mFormat == SurfaceFormat::B8G8R8A8 &&
+      !(GetSurfaceFlags() & SurfaceFlags::NO_PREMULTIPLY_ALPHA)) {
     pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
   }
 
