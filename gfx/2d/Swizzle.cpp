@@ -820,7 +820,7 @@ static void PackToRGB24(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
 }
 
 #define PACK_RGB_CASE(aSrcFormat, aDstFormat, aPackFunc)      \
-  FORMAT_CASE_ROW(aSrcFormat, aDstFormat,                     \
+  FORMAT_CASE(aSrcFormat, aDstFormat,                     \
               aPackFunc<ShouldSwapRB(aSrcFormat, aDstFormat), \
                         RGBBitShift(aSrcFormat), RGBByteIndex(aSrcFormat)>)
 
@@ -1079,29 +1079,11 @@ SwizzleRowFn SwizzleRow(SurfaceFormat aSrcFormat, SurfaceFormat aDstFormat) {
     SWIZZLE_ROW_FALLBACK(SurfaceFormat::R8G8B8X8, SurfaceFormat::B8G8R8X8)
     SWIZZLE_ROW_FALLBACK(SurfaceFormat::R8G8B8A8, SurfaceFormat::B8G8R8X8)
     SWIZZLE_ROW_FALLBACK(SurfaceFormat::R8G8B8X8, SurfaceFormat::B8G8R8A8)
-    SWIZZLE_ROW_FALLBACK(SurfaceFormat::R8G8B8A8, SurfaceFormat::A8R8G8B8)
-    SWIZZLE_ROW_FALLBACK(SurfaceFormat::R8G8B8X8, SurfaceFormat::X8R8G8B8)
-
-    SWIZZLE_ROW_FALLBACK(SurfaceFormat::A8R8G8B8, SurfaceFormat::R8G8B8A8)
-    SWIZZLE_ROW_FALLBACK(SurfaceFormat::X8R8G8B8, SurfaceFormat::R8G8B8X8)
-    SWIZZLE_ROW_FALLBACK(SurfaceFormat::A8R8G8B8, SurfaceFormat::R8G8B8X8)
-    SWIZZLE_ROW_FALLBACK(SurfaceFormat::X8R8G8B8, SurfaceFormat::R8G8B8A8)
-
-    SWIZZLE_ROW_SWAP(SurfaceFormat::B8G8R8A8, SurfaceFormat::A8R8G8B8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::B8G8R8A8, SurfaceFormat::X8R8G8B8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::B8G8R8X8, SurfaceFormat::X8R8G8B8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::B8G8R8X8, SurfaceFormat::A8R8G8B8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::A8R8G8B8, SurfaceFormat::B8G8R8A8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::A8R8G8B8, SurfaceFormat::B8G8R8X8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::X8R8G8B8, SurfaceFormat::B8G8R8X8)
-    SWIZZLE_ROW_SWAP(SurfaceFormat::X8R8G8B8, SurfaceFormat::B8G8R8A8)
 
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::B8G8R8A8, SurfaceFormat::B8G8R8X8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::B8G8R8X8, SurfaceFormat::B8G8R8A8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::R8G8B8A8, SurfaceFormat::R8G8B8X8)
     SWIZZLE_ROW_OPAQUE(SurfaceFormat::R8G8B8X8, SurfaceFormat::R8G8B8A8)
-    SWIZZLE_ROW_OPAQUE(SurfaceFormat::A8R8G8B8, SurfaceFormat::X8R8G8B8)
-    SWIZZLE_ROW_OPAQUE(SurfaceFormat::X8R8G8B8, SurfaceFormat::A8R8G8B8)
 
     UNPACK_ROW_RGB(SurfaceFormat::R8G8B8X8)
     UNPACK_ROW_RGB(SurfaceFormat::R8G8B8A8)
