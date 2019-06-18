@@ -24,10 +24,12 @@ if CONFIG['CC_TYPE'] in ('clang', 'gcc'):
 
 use_sse1 = False
 use_sse2 = False
+use_avx = False
 use_neon = False
 use_altivec = False
 if CONFIG['INTEL_ARCHITECTURE']:
     use_sse2 = True
+    use_avx = True
     if CONFIG['CC_TYPE'] == 'clang-cl':
         if CONFIG['OS_ARCH'] != 'WINNT' or CONFIG['CPU_ARCH'] != 'x86_64':
             use_sse1 = True
@@ -45,6 +47,10 @@ if use_sse1:
 if use_sse2:
     SOURCES += ['transform-sse2.cpp']
     SOURCES['transform-sse2.cpp'].flags += CONFIG['SSE2_FLAGS']
+
+if use_avx:
+    SOURCES += ['transform-avx.cpp']
+    SOURCES['transform-avx.cpp'].flags += ['-mavx']
 
 if use_neon:
     SOURCES += ['transform-neon.cpp']

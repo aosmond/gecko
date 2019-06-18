@@ -42,6 +42,7 @@
 #include "VRThread.h"
 
 #include "mozilla/arm.h"
+#include "mozilla/SSE.h"
 
 #ifdef XP_WIN
 #  include <process.h>
@@ -1988,6 +1989,9 @@ eCMSMode gfxPlatform::GetCMSMode() {
     bool enableV4 = StaticPrefs::CMSEnableV4();
     if (enableV4) {
       qcms_enable_iccv4();
+    }
+    if (mozilla::supports_avx()) {
+      qcms_enable_avx();
     }
 #ifdef MOZILLA_MAY_SUPPORT_NEON
     if (mozilla::supports_neon()) {

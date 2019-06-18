@@ -901,11 +901,13 @@ void qcms_transform_release(qcms_transform *t)
 		precache_release(t->output_table_b);
 
 	free(t->input_gamma_table_r);
+#if 0
 	if (t->input_gamma_table_g != t->input_gamma_table_r)
 		free(t->input_gamma_table_g);
 	if (t->input_gamma_table_g != t->input_gamma_table_r &&
 	    t->input_gamma_table_g != t->input_gamma_table_b)
 		free(t->input_gamma_table_b);
+#endif
 
 	free(t->input_gamma_table_gray);
 
@@ -1130,6 +1132,24 @@ qcms_transform* qcms_transform_precacheLUT_float(qcms_transform *transform, qcms
 	return transform;
 }
 
+bool combine_input_gamma_table(qcms_transform* transform) {
+	float* table = (float*)malloc(sizeof(float)*256*3);
+	if (!table) {
+		return false;
+	}
+
+	memcpy(table, transform->input_gamma_table_r, sizeof(float)*256);
+	memcpy(table + 256, transform->input_gamma_table_g, sizeof(float)*256);
+	memcpy(table + 512, transform->input_gamma_table_b, sizeof(float)*256);
+	free(transform->input_gamma_table_r);
+	free(transform->input_gamma_table_g);
+	free(transform->input_gamma_table_b);
+	transform->input_gamma_table_r = table;
+	transform->input_gamma_table_g = table + 256;
+	transform->input_gamma_table_b = table + 512;
+	return true;
+}
+
 #define NO_MEM_TRANSFORM NULL
 
 qcms_transform* qcms_transform_create(
@@ -1208,7 +1228,19 @@ qcms_transform* qcms_transform_create(
 		struct matrix in_matrix, out_matrix, result;
 		if (precache) {
 #ifdef X86
+#if 1
+		    if (qcms_enable_avx) {
+			    if (in_type == QCMS_DATA_RGB_8) {
+				    transform->transform_fn = qcms_transform_data_rgb_out_lut_avx;
+			    } else if (in_type == QCMS_DATA_RGBA_8) {
+				    transform->transform_fn = qcms_transform_data_rgba_out_lut_avx;
+			    } else if (in_type == QCMS_DATA_BGRA_8) {
+				    transform->transform_fn = qcms_transform_data_bgra_out_lut_avx;
+			    }
+		    } else if (sse_version_available() >= 2) {
+#else
 		    if (sse_version_available() >= 2) {
+#endif
 			    if (in_type == QCMS_DATA_RGB_8) {
 				    transform->transform_fn = qcms_transform_data_rgb_out_lut_sse2;
 			    } else if (in_type == QCMS_DATA_RGBA_8) {
@@ -1281,7 +1313,10 @@ qcms_transform* qcms_transform_create(
 			qcms_transform_release(transform);
 			return NO_MEM_TRANSFORM;
 		}
-
+		if (!combine_input_gamma_table(transform)) {
+			qcms_transform_release(transform);
+			return NO_MEM_TRANSFORM;
+		}
 
 		/* build combined colorant matrix */
 		in_matrix = build_colorant_matrix(in);
@@ -1386,5 +1421,15 @@ void qcms_enable_neon()
 {
 #if defined(__arm__) || defined(__aarch64__)
 	qcms_supports_neon = true;
+#endif
+}
+
+#ifdef X86
+bool qcms_supports_avx;
+#endif
+void qcms_enable_avx()
+{
+#ifdef X86
+	qcms_supports_avx = true;
 #endif
 }
