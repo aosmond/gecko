@@ -176,90 +176,6 @@ static void qcms_transform_data_template_lut_avx(const qcms_transform *transform
     const __m128i load_or_mask = _mm_set_epi32(0x8000000, 0x8000100, 0x80000200, 0);
     const unsigned int components = A_INDEX_COMPONENTS(kAIndex);
 
-    /* working variables */
-    __m256 vec_r, vec_g, vec_b, result, tmp;
-    __m128i px, px2;
-    unsigned char alpha[2];
-
-    /* CYA */
-    if (!length)
-        return;
-
-    /* one pixel is handled outside of the loop */
-    length -= 2;
-
-    /* load two pixels into first 32-bit register of 128-bits */
-    px = _mm_loadu_si32(src);
-    px2 = _mm_loadu_si32(src + components);
-
-    /* restructure into RRRRRRRR GGGGGGGG BBBBBBBB AAAAAAAA */
-    px = _mm_unpacklo_epi8(px, px);
-    px2 = _mm_unpacklo_epi8(px2, px2);
-    px = _mm_unpacklo_epi8(px, px);
-    px2 = _mm_unpacklo_epi8(px2, px2);
-
-    /* mask into 800000RR 800001GG 800002BB 00000000 for the maskload below
-     * high bit must be set, and lower bits are offset into lookup table */
-    px = _mm_and_si128(px, load_and_mask);
-    px2 = _mm_and_si128(px2, load_and_mask);
-    px = _mm_or_si128(px, load_or_mask);
-    px2 = _mm_or_si128(px2, load_or_mask);
-
-    /* maskload such that LR1 LG1 LB1 0 LR2 LG2 LB2 0 */
-    vec_g = _mm256_setr_m128(px, px2);
-    vec_g = _mm256_maskload_ps(&igtbl_r[0], vec_g);
-
-    /* set vec_r to LR1 LR1 LR1 LR1 LR2 LR2 LR2 LR2 */
-    vec_r = _mm256_permute_ps(vec_g, kRIndex == 0 ? 0 : 0xAA);
-    vec_b = _mm256_permute_ps(vec_g, kBIndex == 0 ? 0 : 0xAA /*10101010*/);
-    vec_g = _mm256_permute_ps(vec_g, 0x55 /*01010101*/);
-
-#if 0
-    /* setup for transforming 1st pixel */
-    tmp1 = _mm_broadcast_ss(&igtbl_r[src[kRIndex]]);
-    tmp2 = _mm_broadcast_ss(&igtbl_r[src[kRIndex + components]]);
-    vec_r = _mm256_setr_m128(tmp1, tmp2);
-    tmp1 = _mm_broadcast_ss(&igtbl_g[src[kGIndex]]);
-    tmp2 = _mm_broadcast_ss(&igtbl_g[src[kGIndex + components]]);
-    vec_g = _mm256_setr_m128(tmp1, tmp2);
-    tmp1 = _mm_broadcast_ss(&igtbl_b[src[kBIndex]]);
-    tmp2 = _mm_broadcast_ss(&igtbl_b[src[kBIndex + components]]);
-    vec_b = _mm256_setr_m128(tmp1, tmp2);
-#endif
-
-    if (kAIndex != NO_A_INDEX) {
-        alpha[0] = src[kAIndex];
-        alpha[1] = src[kAIndex + components];
-    }
-    src += 2 * components;
-
-    /* transform all but final pixel */
-
-    for (i=0; i<length-1; i += 2)
-    {
-        /* gamma * matrix */
-        vec_r = _mm256_mul_ps(vec_r, mat0);
-        vec_g = _mm256_mul_ps(vec_g, mat1);
-        vec_b = _mm256_mul_ps(vec_b, mat2);
-
-        /* store alpha for this pixel; load alpha for next */
-        if (kAIndex != NO_A_INDEX) {
-            dest[kAIndex] = alpha[0];
-            dest[kAIndex + components] = alpha[1];
-            alpha[0] = src[kAIndex];
-            alpha[1] = src[kAIndex + components];
-        }
-
-        /* crunch, crunch, crunch */
-        result = _mm256_add_ps(vec_r, _mm256_add_ps(vec_g, vec_b));
-        result = _mm256_max_ps(min, result);
-        result = _mm256_min_ps(max, result);
-        result = _mm256_mul_ps(result, scale);
-
-        /* store calc'd output tables indices */
-        _mm256_store_si256((__m256i*)output, _mm256_cvtps_epi32(result));
-
-        /* load gamma values for next loop while store completes */
 #if 0
         tmp1 = _mm_broadcast_ss(&igtbl_r[src[kRIndex]]);
         tmp2 = _mm_broadcast_ss(&igtbl_r[src[kRIndex + components]]);
@@ -270,72 +186,188 @@ static void qcms_transform_data_template_lut_avx(const qcms_transform *transform
         tmp1 = _mm_broadcast_ss(&igtbl_b[src[kBIndex]]);
         tmp2 = _mm_broadcast_ss(&igtbl_b[src[kBIndex + components]]);
         vec_b = _mm256_setr_m128(tmp1, tmp2);
-#else
-#if 0
-	tmp1 = _mm_loadu_si32(src);
-	tmp2 = _mm_loadu_si32(src + components);
-	tmp1 = _mm_shuffle_epi8(tmp1, _
-	tmp = _mm256_setr_m128(tmp1, tmp2);
-	tmp = _mm256_permute2f128_si256(_mm256_castsi128_si256(tmp1), _mm256_castsi128_si256(tmp2), 
-	vec_r = _mm256_maskload_ps(&igtbl_r[0], _mm256_set_epi32(0, 0, 0, src[kRIndex + components], 0, 0, 0, src[kRIndex]));
-	vec_g = _mm256_maskload_ps(&igtbl_g[0], _mm256_set_epi32(0, 0, 0, src[kGIndex + components], 0, 0, 0, src[kGIndex]));
-	vec_b = _mm256_maskload_ps(&igtbl_b[0], _mm256_set_epi32(0, 0, 0, src[kBIndex + components], 0, 0, 0, src[kBIndex]));
-	vec_r = _mm256_permute_ps(vec_r, 0);
-	vec_g = _mm256_permute_ps(vec_g, 0);
-	vec_b = _mm256_permute_ps(vec_b, 0);
-#else
-    px = _mm_loadu_si32(src);
-    px2 = _mm_loadu_si32(src + components);
-    px = _mm_unpacklo_epi8(px, px);
-    px2 = _mm_unpacklo_epi8(px2, px2);
-    px = _mm_unpacklo_epi8(px, px);
-    px2 = _mm_unpacklo_epi8(px2, px2);
-    px = _mm_and_si128(px, load_and_mask);
-    px2 = _mm_and_si128(px2, load_and_mask);
-    px = _mm_or_si128(px, load_or_mask);
-    px2 = _mm_or_si128(px2, load_or_mask);
-    vec_g = _mm256_setr_m128(px, px2);
-    vec_g = _mm256_maskload_ps(&igtbl_r[0], vec_g);
-    vec_r = _mm256_permute_ps(vec_g, kRIndex == 0 ? 0 : 0xAA);
-    vec_b = _mm256_permute_ps(vec_g, kBIndex == 0 ? 0 : 0xAA /*10101010*/);
-    vec_g = _mm256_permute_ps(vec_g, 0x55 /*01010101*/);
 #endif
-#endif
+
+    /* working variables */
+    __m128i px;
+    unsigned char alpha[2];
+
+    /* CYA */
+    if (!length)
+        return;
+
+    if (length > 3) {
+        __m256 vec_r, vec_g, vec_b, result;
+        __m128i px2;
+
+        /* one pixel is handled outside of the loop */
+        /* load two pixels into first 32-bit register of 128-bits */
+        px = _mm_loadu_si32(src);
+        px2 = _mm_loadu_si32(src + components);
+
+        /* restructure into RRRRRRRR GGGGGGGG BBBBBBBB AAAAAAAA */
+        px = _mm_unpacklo_epi8(px, px);
+        px2 = _mm_unpacklo_epi8(px2, px2);
+        px = _mm_unpacklo_epi8(px, px);
+        px2 = _mm_unpacklo_epi8(px2, px2);
+
+        /* mask into 800000RR 800001GG 800002BB 00000000 for the maskload below
+         * high bit must be set, and lower bits are offset into lookup table */
+        px = _mm_and_si128(px, load_and_mask);
+        px2 = _mm_and_si128(px2, load_and_mask);
+        px = _mm_or_si128(px, load_or_mask);
+        px2 = _mm_or_si128(px2, load_or_mask);
+
+        /* maskload such that LR1 LG1 LB1 0 LR2 LG2 LB2 0 */
+        vec_g = _mm256_setr_m128(px, px2);
+        vec_g = _mm256_maskload_ps(&igtbl_r[0], vec_g);
+
+        /* set vec_r to LR1 LR1 LR1 LR1 LR2 LR2 LR2 LR2 */
+        vec_r = _mm256_permute_ps(vec_g, kRIndex == 0 ? 0 : 0xAA);
+        vec_b = _mm256_permute_ps(vec_g, kBIndex == 0 ? 0 : 0xAA /*10101010*/);
+        vec_g = _mm256_permute_ps(vec_g, 0x55 /*01010101*/);
+
+        if (kAIndex != NO_A_INDEX) {
+            alpha[0] = src[kAIndex];
+            alpha[1] = src[kAIndex + components];
+        }
         src += 2 * components;
 
-        /* use calc'd indices to output RGB values */
+        /* transform all but final pixel */
+
+	length -= 3;
+        for (i=0; i<length; i += 2)
+        {
+            /* gamma * matrix */
+            vec_r = _mm256_mul_ps(vec_r, mat0);
+            vec_g = _mm256_mul_ps(vec_g, mat1);
+            vec_b = _mm256_mul_ps(vec_b, mat2);
+
+            /* store alpha for this pixel; load alpha for next */
+            if (kAIndex != NO_A_INDEX) {
+                dest[kAIndex] = alpha[0];
+                dest[kAIndex + components] = alpha[1];
+                alpha[0] = src[kAIndex];
+                alpha[1] = src[kAIndex + components];
+            }
+
+            /* crunch, crunch, crunch */
+            result = _mm256_add_ps(vec_r, _mm256_add_ps(vec_g, vec_b));
+            result = _mm256_max_ps(min, result);
+            result = _mm256_min_ps(max, result);
+            result = _mm256_mul_ps(result, scale);
+
+            /* store calc'd output tables indices */
+            _mm256_store_si256((__m256i*)output, _mm256_cvtps_epi32(result));
+
+            /* load gamma values for next loop while store completes */
+            px = _mm_loadu_si32(src);
+            px2 = _mm_loadu_si32(src + components);
+            px = _mm_unpacklo_epi8(px, px);
+            px2 = _mm_unpacklo_epi8(px2, px2);
+            px = _mm_unpacklo_epi8(px, px);
+            px2 = _mm_unpacklo_epi8(px2, px2);
+            px = _mm_and_si128(px, load_and_mask);
+            px2 = _mm_and_si128(px2, load_and_mask);
+            px = _mm_or_si128(px, load_or_mask);
+            px2 = _mm_or_si128(px2, load_or_mask);
+            vec_g = _mm256_setr_m128(px, px2);
+            vec_g = _mm256_maskload_ps(&igtbl_r[0], vec_g);
+            vec_r = _mm256_permute_ps(vec_g, kRIndex == 0 ? 0 : 0xAA);
+            vec_b = _mm256_permute_ps(vec_g, kBIndex == 0 ? 0 : 0xAA /*10101010*/);
+            vec_g = _mm256_permute_ps(vec_g, 0x55 /*01010101*/);
+
+            src += 2 * components;
+
+            /* use calc'd indices to output RGB values */
+            dest[kRIndex] = otdata_r[output[0]];
+            dest[kGIndex] = otdata_g[output[1]];
+            dest[kBIndex] = otdata_b[output[2]];
+            dest[kRIndex + components] = otdata_r[output[4]];
+            dest[kGIndex + components] = otdata_g[output[5]];
+            dest[kBIndex + components] = otdata_b[output[6]];
+            dest += 2 * components;
+        }
+
+	length -= i - 1;
+
+        /* handle final (maybe only) pixel */
+        vec_r = _mm256_mul_ps(vec_r, mat0);
+        vec_g = _mm256_mul_ps(vec_g, mat1);
+        vec_b = _mm256_mul_ps(vec_b, mat2);
+
+        if (kAIndex != NO_A_INDEX) {
+            dest[kAIndex] = alpha[0];
+            dest[kAIndex + components] = alpha[1];
+        }
+
+        vec_r  = _mm256_add_ps(vec_r, _mm256_add_ps(vec_g, vec_b));
+        vec_r  = _mm256_max_ps(min, vec_r);
+        vec_r  = _mm256_min_ps(max, vec_r);
+        result = _mm256_mul_ps(vec_r, scale);
+
+        _mm256_store_si256((__m256i*)output, _mm256_cvtps_epi32(result));
+
         dest[kRIndex] = otdata_r[output[0]];
         dest[kGIndex] = otdata_g[output[1]];
         dest[kBIndex] = otdata_b[output[2]];
         dest[kRIndex + components] = otdata_r[output[4]];
         dest[kGIndex + components] = otdata_g[output[5]];
         dest[kBIndex + components] = otdata_b[output[6]];
+
+        src += 2 * components;
         dest += 2 * components;
     }
 
-    /* handle final (maybe only) pixel */
-    vec_r = _mm256_mul_ps(vec_r, mat0);
-    vec_g = _mm256_mul_ps(vec_g, mat1);
-    vec_b = _mm256_mul_ps(vec_b, mat2);
+    for (i = 0; i < length; ++i) {
+        __m128 vec_r, vec_g, vec_b, result;
 
-    if (kAIndex != NO_A_INDEX) {
-        dest[kAIndex] = alpha[0];
-        dest[kAIndex + components] = alpha[1];
+        /* one pixel is handled outside of the loop */
+        /* load two pixels into first 32-bit register of 128-bits */
+        px = _mm_loadu_si32(src);
+
+        /* restructure into RRRRRRRR GGGGGGGG BBBBBBBB AAAAAAAA */
+        px = _mm_unpacklo_epi8(px, px);
+        px = _mm_unpacklo_epi8(px, px);
+
+        /* mask into 800000RR 800001GG 800002BB 00000000 for the maskload below
+         * high bit must be set, and lower bits are offset into lookup table */
+        px = _mm_and_si128(px, load_and_mask);
+        px = _mm_or_si128(px, load_or_mask);
+
+        /* maskload such that LR1 LG1 LB1 0 */
+        vec_g = _mm_maskload_ps(&igtbl_r[0], px);
+
+        /* set vec_r to LR1 LR1 LR1 LR1 */
+        vec_r = _mm_permute_ps(vec_g, kRIndex == 0 ? 0 : 0xAA);
+        vec_b = _mm_permute_ps(vec_g, kBIndex == 0 ? 0 : 0xAA /*10101010*/);
+        vec_g = _mm_permute_ps(vec_g, 0x55 /*01010101*/);
+
+        /* gamma * matrix */
+        vec_r = _mm_mul_ps(vec_r, _mm256_castps256_ps128(mat0));
+        vec_g = _mm_mul_ps(vec_g, _mm256_castps256_ps128(mat1));
+        vec_b = _mm_mul_ps(vec_b, _mm256_castps256_ps128(mat2));
+
+        /* store alpha for this pixel; load alpha for next */
+        if (kAIndex != NO_A_INDEX) {
+            dest[kAIndex] = alpha[0];
+            alpha[0] = src[kAIndex];
+        }
+
+        /* crunch, crunch, crunch */
+        result = _mm_add_ps(vec_r, _mm_add_ps(vec_g, vec_b));
+        result = _mm_max_ps(_mm256_castps256_ps128(min), result);
+        result = _mm_min_ps(_mm256_castps256_ps128(max), result);
+        result = _mm_mul_ps(result, _mm256_castps256_ps128(scale));
+
+        /* store calc'd output tables indices */
+        _mm_store_si128((__m128i*)output, _mm_cvtps_epi32(result));
+        dest[kRIndex] = otdata_r[output[0]];
+        dest[kGIndex] = otdata_g[output[1]];
+        dest[kBIndex] = otdata_b[output[2]];
+        src += components;
+        dest += components;
     }
-
-    vec_r  = _mm256_add_ps(vec_r, _mm256_add_ps(vec_g, vec_b));
-    vec_r  = _mm256_max_ps(min, vec_r);
-    vec_r  = _mm256_min_ps(max, vec_r);
-    result = _mm256_mul_ps(vec_r, scale);
-
-    _mm256_store_si256((__m256i*)output, _mm256_cvtps_epi32(result));
-
-    dest[kRIndex] = otdata_r[output[0]];
-    dest[kGIndex] = otdata_g[output[1]];
-    dest[kBIndex] = otdata_b[output[2]];
-    dest[kRIndex + components] = otdata_r[output[4]];
-    dest[kGIndex + components] = otdata_g[output[5]];
-    dest[kBIndex + components] = otdata_b[output[6]];
 }
 
 void qcms_transform_data_rgb_out_lut_avx(const qcms_transform *transform,
