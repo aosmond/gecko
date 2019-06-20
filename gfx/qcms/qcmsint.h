@@ -26,13 +26,13 @@ struct precache_output
 };
 
 #ifdef _MSC_VER
-#define ALIGN __declspec(align(16))
+#define ALIGN(num) __declspec(align(num))
 #else
-#define ALIGN __attribute__(( aligned (16) ))
+#define ALIGN(num) __attribute__(( aligned (num) ))
 #endif
 
 struct _qcms_transform {
-	float ALIGN matrix[3][4];
+	float ALIGN(16) matrix[3][4];
 	float *input_gamma_table_r;
 	float *input_gamma_table_g;
 	float *input_gamma_table_b;
@@ -352,6 +352,12 @@ long __cdecl _InterlockedDecrement(long volatile *);
 #define NO_A_INDEX   0xFF
 
 #define A_INDEX_COMPONENTS(kAIndex)    ((kAIndex) == NO_A_INDEX ? RGB_COMPONENTS : RGBA_COMPONENTS)
+
+#define GET_COMPONENTS_SIZE(aHasAlpha) ((aHasAlpha) ? RGBA_COMPONENTS : RGB_COMPONENTS)
+#define GET_R_INDEX(aSwapRB)           ((aSwapRB) ? BGRA_R_INDEX : RGBA_R_INDEX)
+#define GET_G_INDEX(aSwapRB)           ((aSwapRB) ? BGRA_G_INDEX : RGBA_G_INDEX)
+#define GET_B_INDEX(aSwapRB)           ((aSwapRB) ? BGRA_B_INDEX : RGBA_B_INDEX)
+#define GET_A_INDEX(aSwapRB)           ((aSwapRB) ? BGRA_A_INDEX : RGBA_A_INDEX)
 
 #ifdef __cplusplus
 }

@@ -4,18 +4,15 @@
 
 #define FLOATSCALE  (float)(PRECACHE_OUTPUT_SIZE)
 #define CLAMPMAXVAL ( ((float) (PRECACHE_OUTPUT_SIZE - 1)) / PRECACHE_OUTPUT_SIZE )
-static const ALIGN float floatScale = FLOATSCALE;
-static const ALIGN float clampMaxValue = CLAMPMAXVAL;
+static const float floatScale = FLOATSCALE;
+static const float clampMaxValue = CLAMPMAXVAL;
 
-template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
+template <bool aSwapRB, bool aHasAlpha, bool aInplace>
 static void qcms_transform_data_template_lut_neon(const qcms_transform *transform,
                                                   const unsigned char *src,
                                                   unsigned char *dest,
                                                   size_t length)
 {
-    unsigned int i;
-    const float (*mat)[4] = transform->matrix;
-
     /* deref *transform now to avoid it in loop */
     const float *igtbl_r = transform->input_gamma_table_r;
     const float *igtbl_g = transform->input_gamma_table_g;
@@ -27,6 +24,7 @@ static void qcms_transform_data_template_lut_neon(const qcms_transform *transfor
     const uint8_t *otdata_b = &transform->output_table_b->data[0];
 
     /* input matrix values never change */
+    const float (*mat)[4] = transform->matrix;
     const float32x4_t mat0  = vld1q_f32(mat[0]);
     const float32x4_t mat1  = vld1q_f32(mat[1]);
     const float32x4_t mat2  = vld1q_f32(mat[2]);
@@ -35,12 +33,19 @@ static void qcms_transform_data_template_lut_neon(const qcms_transform *transfor
     const float32x4_t max   = vld1q_dup_f32(&clampMaxValue);
     const float32x4_t min   = { 0.0f, 0.0f, 0.0f, 0.0f };
     const float32x4_t scale = vld1q_dup_f32(&floatScale);
-    const unsigned int components = A_INDEX_COMPONENTS(kAIndex);
+
+    /* pixel layout constants */
+    const size_t kRIndex = GET_R_INDEX(aSwapRB);
+    const size_t kGIndex = GET_G_INDEX(aSwapRB);
+    const size_t kBIndex = GET_B_INDEX(aSwapRB);
+    const size_t kAIndex = GET_A_INDEX(aSwapRB);
+    const size_t kComponents = GET_COMPONENTS_SIZE(aHasAlpha);
 
     /* working variables */
     float32x4_t vec_r, vec_g, vec_b;
     int32x4_t result;
     unsigned char alpha;
+    size_t i;
 
     /* CYA */
     if (!length)
@@ -50,13 +55,21 @@ static void qcms_transform_data_template_lut_neon(const qcms_transform *transfor
     length--;
 
     /* setup for transforming 1st pixel */
-    vec_r = vld1q_dup_f32(&igtbl_r[src[kRIndex]]);
-    vec_g = vld1q_dup_f32(&igtbl_g[src[kGIndex]]);
-    vec_b = vld1q_dup_f32(&igtbl_b[src[kBIndex]]);
-    if (kAIndex != NO_A_INDEX) {
+    if (aInplace) {
+        vec_r = vld1q_dup_f32(&igtbl_r[dest[kRIndex]]);
+        vec_g = vld1q_dup_f32(&igtbl_g[dest[kGIndex]]);
+        vec_b = vld1q_dup_f32(&igtbl_b[dest[kBIndex]]);
+    } else {
+        vec_r = vld1q_dup_f32(&igtbl_r[src[kRIndex]]);
+        vec_g = vld1q_dup_f32(&igtbl_g[src[kGIndex]]);
+        vec_b = vld1q_dup_f32(&igtbl_b[src[kBIndex]]);
+    }
+    if (aHasAlpha && !aInplace) {
         alpha = src[kAIndex];
     }
-    src += components;
+    if (!aInplace) {
+        src += kComponents;
+    }
 
     /* transform all but final pixel */
 
@@ -68,7 +81,7 @@ static void qcms_transform_data_template_lut_neon(const qcms_transform *transfor
         vec_b = vmulq_f32(vec_b, mat2);
 
         /* store alpha for this pixel; load alpha for next */
-        if (kAIndex != NO_A_INDEX) {
+        if (aHasAlpha && !aInplace) {
             dest[kAIndex] = alpha;
             alpha = src[kAIndex];
         }
@@ -85,12 +98,17 @@ static void qcms_transform_data_template_lut_neon(const qcms_transform *transfor
         dest[kBIndex] = otdata_b[vgetq_lane_s32(result, 2)];
 
         /* load for next loop while store completes */
-        vec_r = vld1q_dup_f32(&igtbl_r[src[kRIndex]]);
-        vec_g = vld1q_dup_f32(&igtbl_g[src[kGIndex]]);
-        vec_b = vld1q_dup_f32(&igtbl_b[src[kBIndex]]);
-
-        dest += components;
-        src += components;
+        if (aInplace) {
+            vec_r = vld1q_dup_f32(&igtbl_r[src[kRIndex]]);
+            vec_g = vld1q_dup_f32(&igtbl_g[src[kGIndex]]);
+            vec_b = vld1q_dup_f32(&igtbl_b[src[kBIndex]]);
+            src += kComponents;
+        } else {
+            vec_r = vld1q_dup_f32(&igtbl_r[dest[kRIndex + kComponents]]);
+            vec_g = vld1q_dup_f32(&igtbl_g[dest[kGIndex + kComponents]]);
+            vec_b = vld1q_dup_f32(&igtbl_b[dest[kBIndex + kComponents]]);
+        }
+        dest += kComponents;
     }
 
     /* handle final (maybe only) pixel */
@@ -99,7 +117,7 @@ static void qcms_transform_data_template_lut_neon(const qcms_transform *transfor
     vec_g = vmulq_f32(vec_g, mat1);
     vec_b = vmulq_f32(vec_b, mat2);
 
-    if (kAIndex != NO_A_INDEX) {
+    if (aHasAlpha && !aInplace) {
         dest[kAIndex] = alpha;
     }
 
@@ -118,7 +136,7 @@ void qcms_transform_data_rgb_out_lut_neon(const qcms_transform *transform,
                                           unsigned char *dest,
                                           size_t length)
 {
-  qcms_transform_data_template_lut_neon<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX>(transform, src, dest, length);
+  qcms_transform_data_template_lut_neon<false, false, false>(transform, src, dest, length);
 }
 
 void qcms_transform_data_rgba_out_lut_neon(const qcms_transform *transform,
@@ -126,7 +144,11 @@ void qcms_transform_data_rgba_out_lut_neon(const qcms_transform *transform,
                                            unsigned char *dest,
                                            size_t length)
 {
-  qcms_transform_data_template_lut_neon<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX, RGBA_A_INDEX>(transform, src, dest, length);
+  if (src == dest) {
+    qcms_transform_data_template_lut_neon<false, true, true>(transform, src, dest, length);
+  } else {
+    qcms_transform_data_template_lut_neon<false, true, false>(transform, src, dest, length);
+  }
 }
 
 void qcms_transform_data_bgra_out_lut_neon(const qcms_transform *transform,
@@ -134,5 +156,9 @@ void qcms_transform_data_bgra_out_lut_neon(const qcms_transform *transform,
                                            unsigned char *dest,
                                            size_t length)
 {
-  qcms_transform_data_template_lut_neon<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
+  if (src == dest) {
+    qcms_transform_data_template_lut_neon<true, true, true>(transform, src, dest, length);
+  } else {
+    qcms_transform_data_template_lut_neon<true, true, false>(transform, src, dest, length);
+  }
 }
