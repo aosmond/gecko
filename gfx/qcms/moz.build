@@ -52,6 +52,10 @@ if use_avx:
     SOURCES += ['transform-avx.cpp']
     SOURCES['transform-avx.cpp'].flags += ['-mavx']
 
+if use_avx:
+    SOURCES += ['transform-avx2.cpp']
+    SOURCES['transform-avx2.cpp'].flags += ['-mavx2']
+
 if use_neon:
     SOURCES += ['transform-neon.cpp']
     SOURCES['transform-neon.cpp'].flags += CONFIG['NEON_FLAGS']

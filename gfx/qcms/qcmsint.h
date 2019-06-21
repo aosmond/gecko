@@ -294,6 +294,18 @@ void qcms_transform_data_bgra_out_lut_precache(const qcms_transform *transform,
                                                unsigned char *dest,
                                                size_t length);
 
+void qcms_transform_data_rgb_out_lut_avx2(const qcms_transform *transform,
+                                          const unsigned char *src,
+                                          unsigned char *dest,
+                                          size_t length);
+void qcms_transform_data_rgba_out_lut_avx2(const qcms_transform *transform,
+                                           const unsigned char *src,
+                                           unsigned char *dest,
+                                           size_t length);
+void qcms_transform_data_bgra_out_lut_avx2(const qcms_transform *transform,
+                                           const unsigned char *src,
+                                           unsigned char *dest,
+                                           size_t length);
 void qcms_transform_data_rgb_out_lut_avx(const qcms_transform *transform,
                                          const unsigned char *src,
                                          unsigned char *dest,

@@ -1231,11 +1231,11 @@ qcms_transform* qcms_transform_create(
 #if 1
 		    if (qcms_enable_avx) {
 			    if (in_type == QCMS_DATA_RGB_8) {
-				    transform->transform_fn = qcms_transform_data_rgb_out_lut_avx;
+				    transform->transform_fn = qcms_transform_data_rgb_out_lut_avx2;
 			    } else if (in_type == QCMS_DATA_RGBA_8) {
-				    transform->transform_fn = qcms_transform_data_rgba_out_lut_avx;
+				    transform->transform_fn = qcms_transform_data_rgba_out_lut_avx2;
 			    } else if (in_type == QCMS_DATA_BGRA_8) {
-				    transform->transform_fn = qcms_transform_data_bgra_out_lut_avx;
+				    transform->transform_fn = qcms_transform_data_bgra_out_lut_avx2;
 			    }
 		    } else if (sse_version_available() >= 2) {
 #else
