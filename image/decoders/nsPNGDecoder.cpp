@@ -616,6 +616,12 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     }
   }
 
+  // Let libpng expand interlaced images.
+  const bool isInterlaced = interlace_type == PNG_INTERLACE_ADAM7;
+  if (isInterlaced) {
+    png_set_interlace_handling(png_ptr);
+  }
+
   // now all of those things we set above are used to update various struct
   // members and whatnot, after which we can get channels, rowbytes, etc.
   png_read_update_info(png_ptr, info_ptr);
