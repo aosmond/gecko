@@ -600,7 +600,7 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     if (decoder->mCMSMode != eCMSMode_Off) {
       intent = gfxPlatform::GetRenderingIntent();
       decoder->mInProfile =
-          PNGGetColorProfile(png_ptr, info_ptr, color_type, &inType, &pIntent);
+          PNGGetColorProfile(png_ptr, info_ptr, color_type, &pIntent);
       // If we're not mandating an intent, use the one from the image.
       if (intent == uint32_t(-1)) {
         intent = pIntent;
