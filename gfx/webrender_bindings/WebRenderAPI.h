@@ -504,7 +504,7 @@ class DisplayListBuilder final {
                        const wr::LayoutRect& aClip, bool aIsBackfaceVisible,
                        const wr::LayoutSideOffsets& aWidths,
                        wr::ImageKey aImage, const int32_t aWidth,
-                       const int32_t aHeight,
+                       const int32_t aHeight, bool aFill,
                        const wr::SideOffsets2D<int32_t>& aSlice,
                        const wr::SideOffsets2D<float>& aOutset,
                        const wr::RepeatMode& aRepeatHorizontal,
@@ -514,7 +514,7 @@ class DisplayListBuilder final {
                           const wr::LayoutRect& aClip, bool aIsBackfaceVisible,
                           const wr::LayoutSideOffsets& aWidths,
                           const int32_t aWidth, const int32_t aHeight,
-                          const wr::SideOffsets2D<int32_t>& aSlice,
+                          bool aFill, const wr::SideOffsets2D<int32_t>& aSlice,
                           const wr::LayoutPoint& aStartPoint,
                           const wr::LayoutPoint& aEndPoint,
                           const nsTArray<wr::GradientStop>& aStops,
@@ -523,7 +523,7 @@ class DisplayListBuilder final {
 
   void PushBorderRadialGradient(
       const wr::LayoutRect& aBounds, const wr::LayoutRect& aClip,
-      bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths,
+      bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths, bool aFill,
       const wr::LayoutPoint& aCenter, const wr::LayoutSize& aRadius,
       const nsTArray<wr::GradientStop>& aStops, wr::ExtendMode aExtendMode,
       const wr::SideOffsets2D<float>& aOutset);

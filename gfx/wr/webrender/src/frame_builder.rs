@@ -317,6 +317,11 @@ impl FrameBuilder {
         profile_scope!("cull");
 
         if self.prim_store.pictures.is_empty() {
+            /*profile_marker!("BlockOnResources");
+
+            resource_cache.block_until_all_resources_added(gpu_cache,
+                                                           render_tasks,
+                                                           texture_cache_profile);*/
             return None
         }
 

@@ -5,6 +5,9 @@
 
 #include "VectorImage.h"
 
+       #include <sys/types.h>
+       #include <unistd.h>
+
 #include "gfx2DGlue.h"
 #include "gfxContext.h"
 #include "gfxDrawable.h"
@@ -861,6 +864,14 @@ VectorImage::GetImageContainerAtSize(layers::LayerManager* aManager,
   Maybe<SVGImageContext> newSVGContext;
   MaybeRestrictSVGContext(newSVGContext, aSVGContext, aFlags);
 
+  printf_stderr("[AO][%5d] VectorImage::GetImageContainerAtSize -- size %dx%d, flags %08X, uri %s", getpid(), aSize.width, aSize.height, aFlags, mURI ? mURI->GetSpecOrDefault().get() : "");
+  if (aSVGContext && aSVGContext->GetViewportSize()) {
+    const auto& s = aSVGContext->GetViewportSize();
+    printf_stderr(" viewport=%dx%d\n", s->width, s->height);
+  } else {
+    printf_stderr("\n");
+  }
+
   // The aspect ratio flag was already handled as part of the SVG context
   // restriction above.
   uint32_t flags = aFlags & ~(FLAG_FORCE_PRESERVEASPECTRATIO_NONE);
@@ -930,6 +941,14 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
 
   if (!mIsFullyLoaded) {
     return ImgDrawResult::NOT_READY;
+  }
+
+  printf_stderr("[AO][%5d] VectorImage::Draw -- size %dx%d, flags %08X, uri %s", getpid(), aSize.width, aSize.height, aFlags, mURI ? mURI->GetSpecOrDefault().get() : "");
+  if (aSVGContext && aSVGContext->GetViewportSize()) {
+    const auto& s = aSVGContext->GetViewportSize();
+    printf_stderr(" viewport=%dx%d\n", s->width, s->height);
+  } else {
+    printf_stderr("\n");
   }
 
   if (mAnimationConsumers == 0) {

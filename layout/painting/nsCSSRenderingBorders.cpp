@@ -3395,6 +3395,7 @@ ImgDrawResult nsCSSBorderImageRenderer::DrawBorderImage(
   // NOTE: no Save() yet, we do that later by calling autoSR.EnsureSaved()
   // in case we need it.
   gfxContextAutoSaveRestore autoSR;
+  printf_stderr("[AO] nsCSSBorderImageRenderer::DrawBorderImage -- enter\n");
 
   if (!mClip.IsEmpty()) {
     autoSR.EnsureSaved(&aRenderingContext);
@@ -3555,6 +3556,7 @@ ImgDrawResult nsCSSBorderImageRenderer::DrawBorderImage(
     }
   }
 
+  printf_stderr("[AO] nsCSSBorderImageRenderer::DrawBorderImage -- exit\n");
   return result;
 }
 
@@ -3580,6 +3582,8 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
     outset[i] = (float)(mImageOutset.Side(i)) / appUnitsPerDevPixel;
   }
 
+  LayoutDeviceRect imageDestRect =
+      LayoutDeviceRect::FromAppUnits(nsRect(nsPoint(0, 0), mImageRenderer.GetSize()), appUnitsPerDevPixel);
   LayoutDeviceRect destRect =
       LayoutDeviceRect::FromAppUnits(mArea, appUnitsPerDevPixel);
   destRect.Round();
@@ -3595,7 +3599,89 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
   ImgDrawResult drawResult = ImgDrawResult::SUCCESS;
   switch (mImageRenderer.GetType()) {
     case eStyleImageType_Image: {
-      uint32_t flags = imgIContainer::FLAG_ASYNC_NOTIFY;
+
+      RefPtr<imgIContainer> img = mImageRenderer.GetImage();
+  //if (img->GetType() == imgIContainer::TYPE_VECTOR) {
+  enum { LEFT, MIDDLE, RIGHT, TOP = LEFT, BOTTOM = RIGHT };
+  const int32_t sliceX[3] = {
+      0,
+      mSlice.left,
+      mImageSize.width - mSlice.right,
+  };
+  const int32_t sliceY[3] = {
+      0,
+      mSlice.top,
+      mImageSize.height - mSlice.bottom,
+  };
+  const int32_t sliceWidth[3] = {
+      mSlice.left,
+      std::max(mImageSize.width - mSlice.left - mSlice.right, 0),
+      mSlice.right,
+  };
+  const int32_t sliceHeight[3] = {
+      mSlice.top,
+      std::max(mImageSize.height - mSlice.top - mSlice.bottom, 0),
+      mSlice.bottom,
+  };
+
+  double maxScaleX = 1.0;
+  double maxScaleY = 1.0;
+
+  if (mFill) {
+      nsRect subArea(sliceX[MIDDLE], sliceY[MIDDLE], sliceWidth[MIDDLE], sliceHeight[MIDDLE]);
+      if (!subArea.IsEmpty()) {
+      double scaleX = mImageSize.width / subArea.width;
+      double scaleY = mImageSize.height / subArea.height;
+      printf_stderr("[AO] fill scales %f x %f\n", scaleX, scaleY);
+
+      maxScaleX = std::max(maxScaleX, scaleX);
+      maxScaleY = std::max(maxScaleY, scaleY);
+      }
+  } else {
+  for (int i = LEFT; i <= RIGHT; i++) {
+    for (int j = TOP; j <= BOTTOM; j++) {
+      if (i == MIDDLE && j == MIDDLE && !mFill) {
+        // Discard the middle portion unless set to fill.
+        continue;
+      }
+
+      nsRect subArea(sliceX[i], sliceY[j], sliceWidth[i], sliceHeight[j]);
+      if (subArea.IsEmpty()) {
+        continue;
+      }
+
+      double scaleX = mImageSize.width / subArea.width;
+      double scaleY = mImageSize.height / subArea.height;
+      printf_stderr("[AO] (%d,%d) scales %f x %f\n", i, j, scaleX, scaleY);
+
+      maxScaleX = std::max(maxScaleX, scaleX);
+      maxScaleY = std::max(maxScaleY, scaleY);
+    }
+  //}
+  }
+
+  printf_stderr("[AO] scale %f x %f -> %f x %f\n", imageDestRect.width, imageDestRect.height, imageDestRect.width * maxScaleX, imageDestRect.height * maxScaleY);
+  imageDestRect.width *= maxScaleX;
+  imageDestRect.height *= maxScaleY;
+  }
+      // To draw one portion of an image into a border component, we stretch that
+      // portion to match the size of that border component and then draw onto.
+      // However, preserveAspectRatio attribute of a SVG image may break this
+      // rule. To get correct rendering result, we add
+      // FLAG_FORCE_PRESERVEASPECTRATIO_NONE flag here, to tell mImage to ignore
+      // preserveAspectRatio attribute, and always do non-uniform stretch.
+      uint32_t flags = //imgIContainer::FLAG_FORCE_PRESERVEASPECTRATIO_NONE |
+                       imgIContainer::FLAG_ASYNC_NOTIFY;
+
+#if 0
+      // For those SVG image sources which don't have fixed aspect ratio (i.e.
+      // without viewport size and viewBox), we should scale the source uniformly
+      // after the viewport size is decided by "Default Sizing Algorithm".
+      if (!mImageRenderer.ComputeIntrinsicSize().HasRatio()) {
+        flags |= imgIContainer::FLAG_FORCE_UNIFORM_SCALING;
+      }
+#endif
+
       if (aDisplayListBuilder->IsPaintingToWindow()) {
         flags |= imgIContainer::FLAG_HIGH_QUALITY_SCALING;
       }
@@ -3603,12 +3689,12 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
         flags |= imgIContainer::FLAG_SYNC_DECODE;
       }
 
-      RefPtr<imgIContainer> img = mImageRenderer.GetImage();
       Maybe<SVGImageContext> svgContext;
       gfx::IntSize decodeSize =
           nsLayoutUtils::ComputeImageContainerDrawingParameters(
-              img, aForFrame, destRect, aSc, flags, svgContext);
+              img, aForFrame, imageDestRect, aSc, flags, svgContext);
 
+      //decodeSize = gfx::IntSize(mImageSize.width / appUnitsPerDevPixel, mImageSize.height / appUnitsPerDevPixel);
       RefPtr<layers::ImageContainer> container;
       drawResult = img->GetImageContainerAtSize(aManager->LayerManager(),
                                                 decodeSize, svgContext, flags,
@@ -3627,13 +3713,20 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
         break;
       }
 
+      printf_stderr("[AO] imageSize=%dx%d decodeSize=%dx%d containerSize=%dx%d\n",
+        mImageSize.width, mImageSize.height,
+        decodeSize.width, decodeSize.height,
+	size.width, size.height);
+
       aBuilder.PushBorderImage(
           dest, clip, !aItem->BackfaceIsHidden(),
           wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
           key.value(), (float)(mImageSize.width) / appUnitsPerDevPixel,
           (float)(mImageSize.height) / appUnitsPerDevPixel,
+          mFill,
           wr::ToSideOffsets2D_i32(slice[0], slice[1], slice[2], slice[3]),
-          wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2], outset[3]),
+          //wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2], outset[3]),
+          wr::ToSideOffsets2D_f32(0, 0, 0, 0),
           wr::ToRepeatMode(mRepeatModeHorizontal),
           wr::ToRepeatMode(mRepeatModeVertical));
       break;
@@ -3662,19 +3755,23 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
             (float)(mImageSize.width) / appUnitsPerDevPixel,
             (float)(mImageSize.height) / appUnitsPerDevPixel,
+            mFill,
             wr::ToSideOffsets2D_i32(slice[0], slice[1], slice[2], slice[3]),
             wr::ToLayoutPoint(startPoint), wr::ToLayoutPoint(endPoint), stops,
             extendMode,
-            wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2],
-                                    outset[3]));
+            wr::ToSideOffsets2D_f32(0, 0, 0, 0));
+            /*wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2],
+                                    outset[3]));*/
       } else {
         aBuilder.PushBorderRadialGradient(
             dest, clip, !aItem->BackfaceIsHidden(),
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
+            mFill,
             wr::ToLayoutPoint(lineStart), wr::ToLayoutSize(gradientRadius),
             stops, extendMode,
-            wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2],
-                                    outset[3]));
+            wr::ToSideOffsets2D_f32(0, 0, 0, 0));
+            /*wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2],
+                                    outset[3]));*/
       }
       break;
     }

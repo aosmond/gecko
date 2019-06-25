@@ -1125,40 +1125,41 @@ void DisplayListBuilder::PushBorderImage(
     const wr::LayoutRect& aBounds, const wr::LayoutRect& aClip,
     bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths,
     wr::ImageKey aImage, const int32_t aWidth, const int32_t aHeight,
-    const wr::SideOffsets2D<int32_t>& aSlice,
+    bool aFill, const wr::SideOffsets2D<int32_t>& aSlice,
     const wr::SideOffsets2D<float>& aOutset,
     const wr::RepeatMode& aRepeatHorizontal,
     const wr::RepeatMode& aRepeatVertical) {
   wr_dp_push_border_image(mWrState, aBounds, MergeClipLeaf(aClip),
                           aIsBackfaceVisible, &mCurrentSpaceAndClipChain,
-                          aWidths, aImage, aWidth, aHeight, aSlice, aOutset,
-                          aRepeatHorizontal, aRepeatVertical);
+                          aWidths, aImage, aWidth, aHeight, aFill, aSlice,
+                          aOutset, aRepeatHorizontal, aRepeatVertical);
 }
 
 void DisplayListBuilder::PushBorderGradient(
     const wr::LayoutRect& aBounds, const wr::LayoutRect& aClip,
     bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths,
-    const int32_t aWidth, const int32_t aHeight,
+    const int32_t aWidth, const int32_t aHeight, bool aFill,
     const wr::SideOffsets2D<int32_t>& aSlice,
     const wr::LayoutPoint& aStartPoint, const wr::LayoutPoint& aEndPoint,
     const nsTArray<wr::GradientStop>& aStops, wr::ExtendMode aExtendMode,
     const wr::SideOffsets2D<float>& aOutset) {
-  wr_dp_push_border_gradient(
-      mWrState, aBounds, MergeClipLeaf(aClip), aIsBackfaceVisible,
-      &mCurrentSpaceAndClipChain, aWidths, aWidth, aHeight, aSlice, aStartPoint,
-      aEndPoint, aStops.Elements(), aStops.Length(), aExtendMode, aOutset);
+  wr_dp_push_border_gradient(mWrState, aBounds, MergeClipLeaf(aClip),
+                             aIsBackfaceVisible, &mCurrentSpaceAndClipChain,
+                             aWidths, aWidth, aHeight, aFill, aSlice,
+                             aStartPoint, aEndPoint, aStops.Elements(),
+                             aStops.Length(), aExtendMode, aOutset);
 }
 
 void DisplayListBuilder::PushBorderRadialGradient(
     const wr::LayoutRect& aBounds, const wr::LayoutRect& aClip,
-    bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths,
+    bool aIsBackfaceVisible, const wr::LayoutSideOffsets& aWidths, bool aFill,
     const wr::LayoutPoint& aCenter, const wr::LayoutSize& aRadius,
     const nsTArray<wr::GradientStop>& aStops, wr::ExtendMode aExtendMode,
     const wr::SideOffsets2D<float>& aOutset) {
   wr_dp_push_border_radial_gradient(
       mWrState, aBounds, MergeClipLeaf(aClip), aIsBackfaceVisible,
-      &mCurrentSpaceAndClipChain, aWidths, aCenter, aRadius, aStops.Elements(),
-      aStops.Length(), aExtendMode, aOutset);
+      &mCurrentSpaceAndClipChain, aWidths, aFill, aCenter, aRadius,
+      aStops.Elements(), aStops.Length(), aExtendMode, aOutset);
 }
 
 void DisplayListBuilder::PushText(const wr::LayoutRect& aBounds,

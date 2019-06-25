@@ -721,11 +721,12 @@ ImgDrawResult nsCSSRendering::CreateWebRenderCommandsForBorderWithStyleBorder(
   }
 
   // All this code bitrotted too much (but is almost right); disabled for now.
-  bool imageTypeSupported = false;
+  //bool imageTypeSupported = false;
   // FIXME(1409773): fix this: image->GetType() == eStyleImageType_Image
   // FIXME(1409774): fix this: image->GetType() == eStyleImageType_Gradient;
 
-  if (!imageTypeSupported) {
+  auto type = image->GetType();
+  if (type != eStyleImageType_Image && type != eStyleImageType_Gradient) {
     return ImgDrawResult::NOT_SUPPORTED;
   }
 
