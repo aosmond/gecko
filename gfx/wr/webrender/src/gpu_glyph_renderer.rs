@@ -9,7 +9,7 @@ use crate::api::units::*;
 use crate::debug_colors;
 use crate::device::{DrawTarget, Device, Texture, TextureFilter, VAO};
 use euclid::{Point2D, Size2D, Transform3D, TypedVector2D, Vector2D};
-use crate::internal_types::RenderTargetInfo;
+use crate::internal_types::{RenderTargetInfo, Swizzle};
 use pathfinder_gfx_utils::ShelfBinPacker;
 use crate::profiler::GpuProfileTag;
 use crate::renderer::{self, ImageBufferKind, Renderer, RendererError, RendererStats};
@@ -222,8 +222,9 @@ impl Renderer {
         }
 
         self.device.bind_texture(TextureSampler::color(0),
-                                 &self.gpu_glyph_renderer.area_lut_texture);
-        self.device.bind_texture(TextureSampler::color(1), &path_info_texture);
+                                 &self.gpu_glyph_renderer.area_lut_texture,
+                                 Swizzle::default());
+        self.device.bind_texture(TextureSampler::color(1), &path_info_texture, Swizzle::default());
         self.draw_instanced_batch_with_previously_bound_textures(&instance_data,
                                                                  VertexArrayKind::VectorStencil,
                                                                  stats);
@@ -249,7 +250,7 @@ impl Renderer {
                                                   projection,
                                                   &mut self.renderer_errors);
 
-        self.device.bind_texture(TextureSampler::color(0), &stencil_page.texture);
+        self.device.bind_texture(TextureSampler::color(0), &stencil_page.texture, Swizzle::default());
         self.draw_instanced_batch_with_previously_bound_textures(&stencil_page.glyphs,
                                                                  VertexArrayKind::VectorCover,
                                                                  stats);

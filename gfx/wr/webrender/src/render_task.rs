@@ -19,7 +19,7 @@ use crate::freelist::{FreeList, FreeListHandle, WeakFreeListHandle};
 use crate::glyph_rasterizer::GpuGlyphCacheKey;
 use crate::gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle};
 use crate::gpu_types::{BorderInstance, ImageSource, UvRectKind, SnapOffsets};
-use crate::internal_types::{CacheTextureId, FastHashMap, LayerIndex, SavedTargetIndex, TextureSource};
+use crate::internal_types::{CacheTextureId, FastHashMap, LayerIndex, SavedTargetIndex, Swizzle, TextureSource};
 #[cfg(feature = "pathfinder")]
 use pathfinder_partitioner::mesh::Mesh;
 use crate::prim_store::{PictureIndex, PrimitiveVisibilityMask};
@@ -1691,6 +1691,7 @@ impl RenderTaskCache {
             &mut entry.handle,
             descriptor,
             TextureFilter::Linear,
+            Swizzle::default(),
             None,
             entry.user_data.unwrap_or([0.0; 3]),
             DirtyRect::All,
@@ -1704,7 +1705,7 @@ impl RenderTaskCache {
         // this in the render task. The renderer will draw this
         // task into the appropriate layer and rect of the texture
         // cache on this frame.
-        let (texture_id, texture_layer, uv_rect, _) =
+        let (texture_id, texture_layer, uv_rect, _, _) =
             texture_cache.get_cache_location(&entry.handle);
 
         render_task.location = RenderTaskLocation::TextureCache {

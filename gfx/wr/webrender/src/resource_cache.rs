@@ -26,7 +26,7 @@ use crate::glyph_rasterizer::{BaseFontInstance, FontInstance, GlyphFormat, Glyph
 use crate::gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle};
 use crate::gpu_types::UvRectKind;
 use crate::image::{compute_tile_size, compute_tile_range, for_each_tile_in_range};
-use crate::internal_types::{FastHashMap, FastHashSet, TextureSource, TextureUpdateList};
+use crate::internal_types::{FastHashMap, FastHashSet, Swizzle, TextureSource, TextureUpdateList};
 use crate::profiler::{ResourceProfileCounters, TextureCacheProfileCounters};
 use crate::render_backend::{FrameId, FrameStamp};
 use crate::render_task::{RenderTaskCache, RenderTaskCacheKey, RenderTaskId};
@@ -1749,6 +1749,7 @@ impl ResourceCache {
                     &mut entry.texture_cache_handle,
                     descriptor,
                     filter,
+                    Swizzle::default(), //TODO
                     Some(image_data),
                     [0.0; 3],
                     dirty_rect,
@@ -2194,6 +2195,7 @@ impl ResourceCache {
                     self.texture_cache.max_texture_layers(),
                     &self.texture_cache.picture_tile_sizes(),
                     DeviceIntSize::zero(),
+                    self.texture_cache.color_formats(),
                 );
             }
         }

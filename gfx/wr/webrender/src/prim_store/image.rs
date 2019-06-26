@@ -88,7 +88,6 @@ impl ImageKey {
         prim_size: LayoutSize,
         image: Image,
     ) -> Self {
-
         ImageKey {
             common: PrimKeyCommonData {
                 is_backface_visible,

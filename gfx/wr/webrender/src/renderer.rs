@@ -53,7 +53,7 @@ use crate::device::{DepthFunction, Device, GpuFrameId, Program, UploadMethod, Te
 use crate::device::{DrawTarget, ExternalTexture, FBOId, ReadTarget, TextureSlot};
 use crate::device::{ShaderError, TextureFilter, TextureFlags,
              VertexUsageHint, VAO, VBO, CustomVAO};
-use crate::device::{ProgramCache};
+use crate::device::ProgramCache;
 use crate::device::query::GpuTimer;
 use euclid::{rect, Transform3D, TypedScale};
 use crate::frame_builder::{ChasePrimitive, FrameBuilderConfig};
@@ -67,7 +67,7 @@ use crate::gpu_types::{PrimitiveHeaderI, PrimitiveHeaderF, ScalingInstance, Tran
 use crate::internal_types::{TextureSource, ORTHO_FAR_PLANE, ORTHO_NEAR_PLANE, ResourceCacheError};
 use crate::internal_types::{CacheTextureId, DebugOutput, FastHashMap, FastHashSet, LayerIndex, RenderedDocument, ResultMsg};
 use crate::internal_types::{TextureCacheAllocationKind, TextureCacheUpdate, TextureUpdateList, TextureUpdateSource};
-use crate::internal_types::{RenderTargetInfo, SavedTargetIndex};
+use crate::internal_types::{RenderTargetInfo, SavedTargetIndex, Swizzle};
 use malloc_size_of::MallocSizeOfOps;
 use crate::picture::{RecordedDirtyRegion, TILE_SIZE_WIDTH, TILE_SIZE_HEIGHT};
 use crate::prim_store::DeferredResolve;
@@ -1032,14 +1032,14 @@ impl TextureResolver {
                     Some(ref at) => &at.texture,
                     None => &self.dummy_cache_texture,
                 };
-                device.bind_texture(sampler, texture);
+                device.bind_texture(sampler, texture, Swizzle::default());
             }
             TextureSource::PrevPassColor => {
                 let texture = match self.prev_pass_color {
                     Some(ref at) => &at.texture,
                     None => &self.dummy_cache_texture,
                 };
-                device.bind_texture(sampler, texture);
+                device.bind_texture(sampler, texture, Swizzle::default());
             }
             TextureSource::External(external_image) => {
                 let texture = self.external_images
@@ -1047,13 +1047,13 @@ impl TextureResolver {
                     .expect(&format!("BUG: External image should be resolved by now"));
                 device.bind_external_texture(sampler, texture);
             }
-            TextureSource::TextureCache(index) => {
+            TextureSource::TextureCache(index, swizzle) => {
                 let texture = &self.texture_cache_map[&index];
-                device.bind_texture(sampler, texture);
+                device.bind_texture(sampler, texture, swizzle);
             }
             TextureSource::RenderTaskCache(saved_index) => {
                 let texture = &self.saved_targets[saved_index.0];
-                device.bind_texture(sampler, texture)
+                device.bind_texture(sampler, texture, Swizzle::default())
             }
         }
     }
@@ -1079,7 +1079,7 @@ impl TextureResolver {
             TextureSource::External(..) => {
                 panic!("BUG: External textures cannot be resolved, they can only be bound.");
             }
-            TextureSource::TextureCache(index) => {
+            TextureSource::TextureCache(index, _) => {
                 Some(&self.texture_cache_map[&index])
             }
             TextureSource::RenderTaskCache(saved_index) => {
@@ -1780,6 +1780,7 @@ impl Renderer {
             options.dump_shader_source.take(),
         );
 
+        let color_cache_formats = device.preferred_color_formats();
         let supports_dual_source_blending = match gl_type {
             gl::GlType::Gl => device.supports_extension("GL_ARB_blend_func_extended") &&
                 device.supports_extension("GL_ARB_explicit_attrib_location"),
@@ -2088,6 +2089,7 @@ impl Renderer {
                     &[]
                 },
                 start_size,
+                color_cache_formats,
             );
 
             let resource_cache = ResourceCache::new(
@@ -2233,6 +2235,10 @@ impl Renderer {
             version: self.device.gl().get_string(gl::VERSION),
             renderer: self.device.gl().get_string(gl::RENDERER),
         }
+    }
+
+    pub fn preferred_color_format(&self) -> ImageFormat {
+        self.device.preferred_color_formats().external
     }
 
     pub fn flush_pipeline_info(&mut self) -> PipelineInfo {
@@ -3004,6 +3010,7 @@ impl Renderer {
         self.device.bind_texture(
             TextureSampler::GpuCache,
             self.gpu_cache_texture.texture.as_ref().unwrap(),
+            Swizzle::default(),
         );
     }
 
@@ -3174,7 +3181,7 @@ impl Renderer {
 
         // TODO: this probably isn't the best place for this.
         if let Some(ref texture) = self.dither_matrix_texture {
-            self.device.bind_texture(TextureSampler::Dither, texture);
+            self.device.bind_texture(TextureSampler::Dither, texture, Swizzle::default());
         }
 
         self.draw_instanced_batch_with_previously_bound_textures(data, vertex_array_kind, stats)
@@ -3998,7 +4005,7 @@ impl Renderer {
         render_tasks: &RenderTaskGraph,
         stats: &mut RendererStats,
     ) {
-        let texture_source = TextureSource::TextureCache(*texture);
+        let texture_source = TextureSource::TextureCache(*texture, Swizzle::default());
         let (target_size, projection) = {
             let texture = self.texture_resolver
                 .resolve(&texture_source)
@@ -4223,7 +4230,7 @@ impl Renderer {
 
             let texture = match image.source {
                 ExternalImageSource::NativeTexture(texture_id) => {
-                    ExternalTexture::new(texture_id, texture_target)
+                    ExternalTexture::new(texture_id, texture_target, Swizzle::default())
                 }
                 ExternalImageSource::Invalid => {
                     warn!("Invalid ext-image");
@@ -4233,7 +4240,7 @@ impl Renderer {
                         ext_image.channel_index
                     );
                     // Just use 0 as the gl handle for this failed case.
-                    ExternalTexture::new(0, texture_target)
+                    ExternalTexture::new(0, texture_target, Swizzle::default())
                 }
                 ExternalImageSource::RawData(_) => {
                     panic!("Raw external data is not expected for deferred resolves!");
@@ -4358,6 +4365,7 @@ impl Renderer {
         self.device.bind_texture(
             TextureSampler::PrimitiveHeadersF,
             &self.prim_header_f_texture.texture(),
+            Swizzle::default(),
         );
 
         self.prim_header_i_texture.update(
@@ -4367,6 +4375,7 @@ impl Renderer {
         self.device.bind_texture(
             TextureSampler::PrimitiveHeadersI,
             &self.prim_header_i_texture.texture(),
+            Swizzle::default(),
         );
 
         self.transforms_texture.update(
@@ -4376,6 +4385,7 @@ impl Renderer {
         self.device.bind_texture(
             TextureSampler::TransformPalette,
             &self.transforms_texture.texture(),
+            Swizzle::default(),
         );
 
         self.render_task_texture
@@ -4383,6 +4393,7 @@ impl Renderer {
         self.device.bind_texture(
             TextureSampler::RenderTasks,
             &self.render_task_texture.texture(),
+            Swizzle::default(),
         );
 
         debug_assert!(self.texture_resolver.prev_pass_alpha.is_none());

@@ -5,16 +5,17 @@
 //! Module only available when pathfinder is deactivated when webrender is
 //! compiled regularly (i.e. any configuration without feature = "pathfinder")
 
-use api::{ImageDescriptor, ImageFormat, DirtyRect};
+use api::{ImageDescriptor, DirtyRect};
 use crate::device::TextureFilter;
 use euclid::size2;
 use crate::gpu_types::UvRectKind;
 use rayon::prelude::*;
 use std::sync::{Arc, MutexGuard};
 use crate::platform::font::FontContext;
-use crate::glyph_rasterizer::{FontInstance, FontContexts, GlyphKey};
+use crate::glyph_rasterizer::{FORMAT, FontInstance, FontContexts, GlyphKey};
 use crate::glyph_rasterizer::{GlyphRasterizer, GlyphRasterJob, GlyphRasterJobs};
 use crate::glyph_cache::{GlyphCache, CachedGlyphInfo, GlyphCacheEntry};
+use crate::internal_types::Swizzle;
 use crate::resource_cache::CachedImageData;
 use crate::texture_cache::{TextureCache, TextureCacheHandle, Eviction};
 use crate::gpu_cache::GpuCache;
@@ -177,12 +178,13 @@ impl GlyphRasterizer {
                             ImageDescriptor {
                                 size: size2(glyph.width, glyph.height),
                                 stride: None,
-                                format: ImageFormat::BGRA8,
+                                format: FORMAT,
                                 is_opaque: false,
                                 allow_mipmaps: false,
                                 offset: 0,
                             },
                             TextureFilter::Linear,
+                            Swizzle::default(), //TODO: reconsider
                             Some(CachedImageData::Raw(Arc::new(glyph.bytes))),
                             [glyph.left, -glyph.top, glyph.scale],
                             DirtyRect::All,
