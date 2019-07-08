@@ -446,7 +446,7 @@ ImgDrawResult BulletRenderer::CreateWebRenderCommandsForImage(
       aItem->Frame()->PresContext()->AppUnitsPerDevPixel();
   LayoutDeviceRect destRect =
       LayoutDeviceRect::FromAppUnits(mDest, appUnitsPerDevPixel);
-  destRect.Round();
+  //destRect.Round();
 
   Maybe<SVGImageContext> svgContext;
   gfx::IntSize decodeSize =
