@@ -713,16 +713,19 @@ ImgDrawResult nsCSSRendering::CreateWebRenderCommandsForBorderWithStyleBorder(
     const nsStyleBorder& aStyleBorder) {
   // First try to create commands for simple borders.
   nsStyleImageType type = aStyleBorder.mBorderImageSource.GetType();
-  if (type == eStyleImageType_Null) {
-    CreateWebRenderCommandsForNullBorder(
-        aItem, aForFrame, aBorderArea, aBuilder, aResources, aSc, aStyleBorder);
-    return ImgDrawResult::SUCCESS;
-  }
-
-  // Next we try image and gradient borders. Gradients are not supported at
-  // this very moment.
-  if (type != eStyleImageType_Image) {
-    return ImgDrawResult::NOT_SUPPORTED;
+  switch (type) {
+    case eStyleImageType_Null:
+      CreateWebRenderCommandsForNullBorder(aItem, aForFrame, aBorderArea,
+                                           aBuilder, aResources, aSc,
+                                           aStyleBorder);
+      return ImgDrawResult::SUCCESS;
+    case eStyleImageType_Image:
+    case eStyleImageType_Gradient:
+      // Continue below.
+      break;
+    case eStyleImageType_Element:
+    default:
+      return ImgDrawResult::NOT_SUPPORTED;
   }
 
   if (aStyleBorder.mBorderImageRepeatH == StyleBorderImageRepeat::Round ||

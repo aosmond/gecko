@@ -2822,44 +2822,51 @@ pub extern "C" fn wr_dp_push_border_image(state: &mut WrState,
     );
 }
 
+#[repr(C)]
+pub struct WrBorderGradient {
+    widths: LayoutSideOffsets,
+    width: i32,
+    height: i32,
+    fill: bool,
+    slice: SideOffsets2D<i32>,
+    start_point: LayoutPoint,
+    end_point: LayoutPoint,
+    stops: *const GradientStop,
+    stops_count: usize,
+    extend_mode: ExtendMode,
+    outset: SideOffsets2D<f32>,
+    repeat_horizontal: RepeatMode,
+    repeat_vertical: RepeatMode,
+}
+
 #[no_mangle]
 pub extern "C" fn wr_dp_push_border_gradient(state: &mut WrState,
                                              rect: LayoutRect,
                                              clip: LayoutRect,
                                              is_backface_visible: bool,
                                              parent: &WrSpaceAndClipChain,
-                                             widths: LayoutSideOffsets,
-                                             width: i32,
-                                             height: i32,
-                                             fill: bool,
-                                             slice: SideOffsets2D<i32>,
-                                             start_point: LayoutPoint,
-                                             end_point: LayoutPoint,
-                                             stops: *const GradientStop,
-                                             stops_count: usize,
-                                             extend_mode: ExtendMode,
-                                             outset: SideOffsets2D<f32>) {
+                                             params: &WrBorderGradient) {
     debug_assert!(unsafe { is_in_main_thread() });
 
-    let stops_slice = unsafe { make_slice(stops, stops_count) };
+    let stops_slice = unsafe { make_slice(params.stops, params.stops_count) };
     let stops_vector = stops_slice.to_owned();
 
     let gradient = state.frame_builder.dl_builder.create_gradient(
-        start_point.into(),
-        end_point.into(),
+        params.start_point,
+        params.end_point,
         stops_vector,
-        extend_mode.into()
+        params.extend_mode
     );
 
     let border_details = BorderDetails::NinePatch(NinePatchBorder {
         source: NinePatchBorderSource::Gradient(gradient),
-        width,
-        height,
-        slice,
-        fill,
-        outset: outset.into(),
-        repeat_horizontal: RepeatMode::Stretch,
-        repeat_vertical: RepeatMode::Stretch,
+        width: params.width,
+        height: params.height,
+        slice: params.slice,
+        fill: params.fill,
+        outset: params.outset,
+        repeat_horizontal: params.repeat_horizontal,
+        repeat_vertical: params.repeat_vertical,
     });
 
     let space_and_clip = parent.to_webrender(state.pipeline_id);
@@ -2875,9 +2882,23 @@ pub extern "C" fn wr_dp_push_border_gradient(state: &mut WrState,
     state.frame_builder.dl_builder.push_border(
         &prim_info,
         rect,
-        widths.into(),
+        params.widths,
         border_details,
     );
+}
+
+#[repr(C)]
+pub struct WrBorderRadialGradient {
+    widths: LayoutSideOffsets,
+    fill: bool,
+    center: LayoutPoint,
+    radius: LayoutSize,
+    stops: *const GradientStop,
+    stops_count: usize,
+    extend_mode: ExtendMode,
+    outset: SideOffsets2D<f32>,
+    repeat_horizontal: RepeatMode,
+    repeat_vertical: RepeatMode,
 }
 
 #[no_mangle]
@@ -2886,31 +2907,24 @@ pub extern "C" fn wr_dp_push_border_radial_gradient(state: &mut WrState,
                                                     clip: LayoutRect,
                                                     is_backface_visible: bool,
                                                     parent: &WrSpaceAndClipChain,
-                                                    widths: LayoutSideOffsets,
-                                                    fill: bool,
-                                                    center: LayoutPoint,
-                                                    radius: LayoutSize,
-                                                    stops: *const GradientStop,
-                                                    stops_count: usize,
-                                                    extend_mode: ExtendMode,
-                                                    outset: SideOffsets2D<f32>) {
+                                                    params: &WrBorderRadialGradient) {
     debug_assert!(unsafe { is_in_main_thread() });
 
-    let stops_slice = unsafe { make_slice(stops, stops_count) };
+    let stops_slice = unsafe { make_slice(params.stops, params.stops_count) };
     let stops_vector = stops_slice.to_owned();
 
     let slice = SideOffsets2D::new(
-        widths.top as i32,
-        widths.right as i32,
-        widths.bottom as i32,
-        widths.left as i32,
+        params.widths.top as i32,
+        params.widths.right as i32,
+        params.widths.bottom as i32,
+        params.widths.left as i32,
     );
 
     let gradient = state.frame_builder.dl_builder.create_radial_gradient(
-        center.into(),
-        radius.into(),
+        params.center,
+        params.radius,
         stops_vector,
-        extend_mode.into()
+        params.extend_mode
     );
 
     let border_details = BorderDetails::NinePatch(NinePatchBorder {
@@ -2918,10 +2932,10 @@ pub extern "C" fn wr_dp_push_border_radial_gradient(state: &mut WrState,
         width: rect.size.width as i32,
         height: rect.size.height as i32,
         slice,
-        fill,
-        outset: outset.into(),
-        repeat_horizontal: RepeatMode::Stretch,
-        repeat_vertical: RepeatMode::Stretch,
+        fill: params.fill,
+        outset: params.outset,
+        repeat_horizontal: params.repeat_horizontal,
+        repeat_vertical: params.repeat_vertical,
     });
 
     let space_and_clip = parent.to_webrender(state.pipeline_id);
@@ -2937,7 +2951,7 @@ pub extern "C" fn wr_dp_push_border_radial_gradient(state: &mut WrState,
     state.frame_builder.dl_builder.push_border(
         &prim_info,
         rect,
-        widths.into(),
+        params.widths,
         border_details,
     );
 }

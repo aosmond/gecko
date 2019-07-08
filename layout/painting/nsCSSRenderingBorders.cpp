@@ -3679,24 +3679,38 @@ ImgDrawResult nsCSSBorderImageRenderer::CreateWebRenderCommands(
         LayoutDevicePoint endPoint =
             LayoutDevicePoint(dest.origin.x, dest.origin.y) + lineEnd;
 
-        aBuilder.PushBorderGradient(
-            dest, clip, !aItem->BackfaceIsHidden(),
+        wr::WrBorderGradient params{
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
-            (float)(mImageSize.width) / appUnitsPerDevPixel,
-            (float)(mImageSize.height) / appUnitsPerDevPixel, mFill,
+            mImageSize.width / appUnitsPerDevPixel,
+            mImageSize.height / appUnitsPerDevPixel,
+            mFill,
             wr::ToSideOffsets2D_i32(slice[0], slice[1], slice[2], slice[3]),
-            wr::ToLayoutPoint(startPoint), wr::ToLayoutPoint(endPoint), stops,
+            wr::ToLayoutPoint(startPoint),
+            wr::ToLayoutPoint(endPoint),
+            stops.Elements(),
+            stops.Length(),
             extendMode,
-            wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2],
-                                    outset[3]));
+            wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2], outset[3]),
+            wr::ToRepeatMode(mRepeatModeHorizontal),
+            wr::ToRepeatMode(mRepeatModeVertical)};
+
+        aBuilder.PushBorderGradient(dest, clip, !aItem->BackfaceIsHidden(),
+                                    params);
       } else {
-        aBuilder.PushBorderRadialGradient(
-            dest, clip, !aItem->BackfaceIsHidden(),
+        wr::WrBorderRadialGradient params{
             wr::ToBorderWidths(widths[0], widths[1], widths[2], widths[3]),
-            mFill, wr::ToLayoutPoint(lineStart),
-            wr::ToLayoutSize(gradientRadius), stops, extendMode,
-            wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2],
-                                    outset[3]));
+            mFill,
+            wr::ToLayoutPoint(lineStart),
+            wr::ToLayoutSize(gradientRadius),
+            stops.Elements(),
+            stops.Length(),
+            extendMode,
+            wr::ToSideOffsets2D_f32(outset[0], outset[1], outset[2], outset[3]),
+            wr::ToRepeatMode(mRepeatModeHorizontal),
+            wr::ToRepeatMode(mRepeatModeVertical)};
+
+        aBuilder.PushBorderRadialGradient(dest, clip,
+                                          !aItem->BackfaceIsHidden(), params);
       }
       break;
     }
