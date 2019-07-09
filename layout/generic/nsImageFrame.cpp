@@ -1608,7 +1608,7 @@ ImgDrawResult nsImageFrame::DisplayAltFeedbackWithoutLayer(
 
       const int32_t factor = PresContext()->AppUnitsPerDevPixel();
       LayoutDeviceRect destRect(LayoutDeviceRect::FromAppUnits(dest, factor));
-      destRect.Round();
+      //destRect.Round();
 
       Maybe<SVGImageContext> svgContext;
       IntSize decodeSize =
@@ -1890,7 +1890,7 @@ bool nsDisplayImage::CreateWebRenderCommands(
   const int32_t factor = mFrame->PresContext()->AppUnitsPerDevPixel();
   LayoutDeviceRect destRect(
       LayoutDeviceRect::FromAppUnits(GetDestRect(), factor));
-  destRect.Round();
+  //destRect.Round();
 
   Maybe<SVGImageContext> svgContext;
   IntSize decodeSize = nsLayoutUtils::ComputeImageContainerDrawingParameters(
