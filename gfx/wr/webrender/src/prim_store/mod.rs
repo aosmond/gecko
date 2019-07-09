@@ -2164,6 +2164,11 @@ impl PrimitiveStore {
                     surface.device_pixel_scale,
                 ).unwrap_or((visible_rect, SnapOffsets::empty()));
 
+                if prim_instance.is_chased() {
+                    println!("\tprim {:?} clip {:?}", prim_local_rect, combined_local_clip_rect);
+                    println!("\tsnapped {:?} as {:?}", visible_rect, snapped_visible_rect);
+                }
+
                 let (combined_visible_rect, shadow_snap_offsets) = if !prim_shadow_rect.is_empty() {
                     let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
                         prim_shadow_rect,

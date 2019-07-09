@@ -700,7 +700,7 @@ impl BatchBuilder {
         let prim_vis_mask = prim_info.visibility_mask;
 
         if is_chased {
-            println!("\tbatch {:?} with bound {:?}", prim_rect, bounding_rect);
+            println!("\tbatch {:?} with bound {:?} {:?}", prim_rect, bounding_rect, snap_offsets);
         }
 
         if !bounding_rect.is_empty() {

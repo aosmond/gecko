@@ -636,7 +636,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
           nsRect(firstTilePos.x, firstTilePos.y, aFill.XMost() - firstTilePos.x,
                  aFill.YMost() - firstTilePos.y),
           appUnitsPerDevPixel);
-      wr::LayoutRect fill = wr::ToRoundedLayoutRect(fillRect);
+      wr::LayoutRect fill = wr::ToLayoutRect(fillRect);
 
       wr::LayoutRect roundedDest = wr::ToLayoutRect(destRect);
 
@@ -663,7 +663,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
           break;
       }
 
-      wr::LayoutRect clip = wr::ToRoundedLayoutRect(
+      wr::LayoutRect clip = wr::ToLayoutRect(
           LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
 
       LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
