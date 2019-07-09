@@ -1928,8 +1928,8 @@ bool WebRenderCommandBuilder::PushImage(
     return false;
   }
 
-  auto r = wr::ToRoundedLayoutRect(aRect);
-  auto c = wr::ToRoundedLayoutRect(aClip);
+  auto r = wr::ToLayoutRect(aRect);
+  auto c = wr::ToLayoutRect(aClip);
   aBuilder.PushImage(r, c, !aItem->BackfaceIsHidden(), rendering, key.value());
 
   return true;

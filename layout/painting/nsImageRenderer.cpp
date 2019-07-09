@@ -603,7 +603,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       LayoutDeviceRect destRect =
           LayoutDeviceRect::FromAppUnits(aDest, appUnitsPerDevPixel);
       auto stretchSize = wr::ToLayoutSize(destRect.Size());
-      destRect.Round();
+      //destRect.Round();
 
       gfx::IntSize decodeSize =
           nsLayoutUtils::ComputeImageContainerDrawingParameters(
