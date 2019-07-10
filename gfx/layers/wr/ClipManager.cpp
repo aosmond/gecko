@@ -158,7 +158,7 @@ wr::WrSpaceAndClipChain ClipManager::SwitchItem(nsDisplayItem* aItem) {
     // Container display items are not currently supported because the clip
     // rect of a stacking context is not handled the same as normal display
     // items.
-    separateLeaf = aItem->GetChildren() == nullptr;
+    //separateLeaf = aItem->GetChildren() == nullptr;
   }
 
   ItemClips clips(asr, clip, separateLeaf);
