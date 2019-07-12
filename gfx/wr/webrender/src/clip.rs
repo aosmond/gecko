@@ -10,11 +10,11 @@ use crate::box_shadow::{BLUR_SAMPLE_SCALE, BoxShadowClipSource, BoxShadowCacheKe
 use crate::clip_scroll_tree::{ROOT_SPATIAL_NODE_INDEX, CoordinateSystemId, ClipScrollTree, SpatialNodeIndex};
 use crate::ellipse::Ellipse;
 use crate::gpu_cache::{GpuCache, GpuCacheHandle, ToGpuBlocks};
-use crate::gpu_types::{BoxShadowStretchMode};
+use crate::gpu_types::{BoxShadowStretchMode, SnapOffsets};
 use crate::image::{self, Repetition};
 use crate::intern;
 use crate::prim_store::{ClipData, ImageMaskData, SpaceMapper, VisibleMaskImageTile};
-use crate::prim_store::{PointKey, SizeKey, RectangleKey};
+use crate::prim_store::{PointKey, SizeKey, RectangleKey, get_snapped_rect};
 use crate::render_backend::DataStores;
 use crate::render_task::to_cache_size;
 use crate::resource_cache::{ImageRequest, ResourceCache};
@@ -765,6 +765,8 @@ impl ClipStore {
         &mut self,
         local_prim_clip_rect: LayoutRect,
         spatial_node_index: SpatialNodeIndex,
+        raster_spatial_node_index: SpatialNodeIndex,
+        device_pixel_scale: DevicePixelScale,
         clip_chains: &[ClipChainId],
         clip_scroll_tree: &ClipScrollTree,
         clip_data_store: &mut ClipDataStore,
@@ -773,13 +775,24 @@ impl ClipStore {
         self.active_local_clip_rect = None;
 
         let mut local_clip_rect = local_prim_clip_rect;
+        let mut map_to_raster = SpaceMapper::new(
+            raster_spatial_node_index,
+            RasterRect::max_rect(),
+        );
 
         for clip_chain_id in clip_chains {
             let clip_chain_node = &self.clip_chain_nodes[clip_chain_id.0 as usize];
 
+            map_to_raster.set_target_spatial_node(
+                clip_chain_node.spatial_node_index,
+                clip_scroll_tree,
+            );
+
             if !add_clip_node_to_current_chain(
                 clip_chain_node,
                 spatial_node_index,
+                &map_to_raster,
+                device_pixel_scale,
                 &mut local_clip_rect,
                 &mut self.active_clip_node_info,
                 clip_data_store,
@@ -1570,6 +1583,8 @@ pub fn project_inner_rect(
 fn add_clip_node_to_current_chain(
     node: &ClipChainNode,
     spatial_node_index: SpatialNodeIndex,
+    map_to_raster: &SpaceMapper<LayoutPixel, RasterPixel>,
+    device_pixel_scale: DevicePixelScale,
     local_clip_rect: &mut LayoutRect,
     clip_node_info: &mut Vec<ClipNodeInfo>,
     clip_data_store: &ClipDataStore,
@@ -1588,15 +1603,21 @@ fn add_clip_node_to_current_chain(
     // If we can convert spaces, try to reduce the size of the region
     // requested, and cache the conversion information for the next step.
     if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
+        let (snapped_clip_rect, _) = get_snapped_rect(
+            clip_rect,
+            &map_to_raster,
+            device_pixel_scale,
+        ).unwrap_or((clip_rect, SnapOffsets::empty()));
+
         match conversion {
             ClipSpaceConversion::Local => {
-                *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
+                *local_clip_rect = match local_clip_rect.intersection(&snapped_clip_rect) {
                     Some(rect) => rect,
                     None => return false,
                 };
             }
             ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
-                let clip_rect = scale_offset.map_rect(&clip_rect);
+                let clip_rect = scale_offset.map_rect(&snapped_clip_rect);
                 *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
                     Some(rect) => rect,
                     None => return false,

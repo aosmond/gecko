@@ -1998,14 +1998,26 @@ impl PrimitiveStore {
                     continue;
                 }
 
+                let (snapped_prim_rect, snap_offsets) = get_snapped_rect(
+                    prim_local_rect,
+                    &map_local_to_raster,
+                    surface.device_pixel_scale,
+                ).unwrap_or((prim_local_rect, SnapOffsets::empty()));
+
+                let (snapped_clip_rect, _) = get_snapped_rect(
+                    prim_instance.local_clip_rect,
+                    &map_local_to_raster,
+                    surface.device_pixel_scale,
+                ).unwrap_or((prim_instance.local_clip_rect, SnapOffsets::empty()));
+
                 // Inflate the local rect for this primitive by the inflation factor of
                 // the picture context. This ensures that even if the primitive itself
                 // is not visible, any effects from the blur radius will be correctly
                 // taken into account.
                 let inflation_factor = surface.inflation_factor;
-                let local_rect = prim_local_rect
+                let local_rect = snapped_prim_rect
                     .inflate(inflation_factor, inflation_factor)
-                    .intersection(&prim_instance.local_clip_rect);
+                    .intersection(&snapped_clip_rect);
                 let local_rect = match local_rect {
                     Some(local_rect) => local_rect,
                     None => {
@@ -2027,8 +2039,10 @@ impl PrimitiveStore {
                 );
 
                 frame_state.clip_store.set_active_clips(
-                    prim_instance.local_clip_rect,
+                    snapped_clip_rect,
                     prim_instance.spatial_node_index,
+                    surface.raster_spatial_node_index,
+                    surface.device_pixel_scale,
                     frame_state.clip_chain_stack.current_clips_array(),
                     &frame_context.clip_scroll_tree,
                     &mut frame_state.data_stores.clip,
@@ -2116,7 +2130,7 @@ impl PrimitiveStore {
                 let combined_local_clip_rect = if apply_local_clip_rect {
                     clip_chain.local_clip_rect
                 } else {
-                    prim_instance.local_clip_rect
+                    snapped_clip_rect
                 };
 
                 if combined_local_clip_rect.size.is_empty_or_negative() {
@@ -2137,7 +2151,7 @@ impl PrimitiveStore {
                 // children, which they snapped to, which is precisely what we also
                 // need to snap to in order to be consistent.
                 let visible_rect = if snap_to_visible {
-                    match combined_local_clip_rect.intersection(&prim_local_rect) {
+                    match combined_local_clip_rect.intersection(&snapped_prim_rect) {
                         Some(r) => r,
                         None => {
                             if prim_instance.is_chased() {
@@ -2148,19 +2162,13 @@ impl PrimitiveStore {
                         }
                     }
                 } else {
-                    prim_local_rect
+                    snapped_prim_rect
                 };
 
                 // This is how primitives get snapped. In general, snapping a picture's
                 // visible rect here will have no effect, but if it is rasterized in its
                 // own space, or it has a blur or drop shadow effect applied, it may
                 // provide a snapping offset.
-                let (snapped_visible_rect, snap_offsets) = get_snapped_rect(
-                    visible_rect,
-                    &map_local_to_raster,
-                    surface.device_pixel_scale,
-                ).unwrap_or((visible_rect, SnapOffsets::empty()));
-
                 let (combined_visible_rect, shadow_snap_offsets) = if !prim_shadow_rect.is_empty() {
                     let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
                         prim_shadow_rect,
@@ -2168,9 +2176,9 @@ impl PrimitiveStore {
                         surface.device_pixel_scale,
                     ).unwrap_or((prim_shadow_rect, SnapOffsets::empty()));
 
-                    (snapped_visible_rect.union(&snapped_shadow_rect), shadow_snap_offsets)
+                    (visible_rect.union(&snapped_shadow_rect), shadow_snap_offsets)
                 } else {
-                    (snapped_visible_rect, SnapOffsets::empty())
+                    (visible_rect, SnapOffsets::empty())
                 };
 
                 // Include the snapped primitive/picture local rect, including any shadows,
