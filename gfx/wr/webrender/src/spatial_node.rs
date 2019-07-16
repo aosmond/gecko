@@ -343,6 +343,16 @@ impl SpatialNode {
                             Some(ref scale_offset) => {
                                 cs_scale_offset =
                                     state.coordinate_system_relative_scale_offset.accumulate(scale_offset);
+
+                                if self.coordinate_system_id == CoordinateSystemId::root() {
+                                    if let PropertyBinding::Value(..) = &info.source_transform {
+                                        let rounded_cs_scale_offset = cs_scale_offset.round_offset();
+                                        if rounded_cs_scale_offset.offset != cs_scale_offset.offset {
+                                            println!("snap offset {:?} -> {:?}", cs_scale_offset, rounded_cs_scale_offset);
+                                        }
+                                        cs_scale_offset = rounded_cs_scale_offset;
+                                    }
+                                }
                             }
                             None => reset_cs_id = true,
                         }

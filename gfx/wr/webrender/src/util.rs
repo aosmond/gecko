@@ -203,6 +203,14 @@ impl ScaleOffset {
         }
     }
 
+    /// Produce a ScaleOffset with the offset rounded to the nearest integer.
+    pub fn round_offset(&self) -> Self {
+        ScaleOffset {
+            scale: self.scale,
+            offset: self.offset.round(),
+        }
+    }
+
     pub fn map_rect<F, T>(&self, rect: &TypedRect<f32, F>) -> TypedRect<f32, T> {
         TypedRect::new(
             TypedPoint2D::new(
