@@ -7065,7 +7065,7 @@ IntSize nsLayoutUtils::ComputeImageContainerDrawingParameters(
   // Any changes to the algorithm here will need to be reflected there.
   bool snapped = false;
   gfxSize gfxLayerSize;
-  const gfx::Matrix& itm = aSc.GetSnappingSurfaceTransform();//InheritedTransform();
+  const gfx::Matrix& itm = aSc.GetInheritedTransform();
   if (!itm.HasNonAxisAlignedTransform() && itm._11 > 0.0 && itm._22 > 0.0) {
     gfxRect rect(gfxPoint(aDestRect.X(), aDestRect.Y()),
                  gfxSize(aDestRect.Width(), aDestRect.Height()));
