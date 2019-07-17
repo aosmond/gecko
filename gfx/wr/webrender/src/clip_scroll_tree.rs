@@ -296,6 +296,16 @@ impl ClipScrollTree {
                 .to_transform(),
         );
 
+        if child.may_snap && transform.preserves_2d_axis_alignment() {
+            let x = transform.m41.round();
+            let y = transform.m42.round();
+            if x != transform.m41 || y != transform.m42 {
+                println!("transform snapped translation ({}, {}) -> ({}, {})", transform.m41, transform.m42, x, y);
+            }
+            transform.m41 = x;
+            transform.m42 = y;
+        }
+
         CoordinateSpaceMapping::Transform(transform)
     }
 

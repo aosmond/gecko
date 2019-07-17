@@ -69,6 +69,8 @@ pub struct SpatialNode {
     /// This is calculated in update(). This will be used to decide whether
     /// to override corresponding picture's raster space as an optimisation.
     pub is_ancestor_or_self_zooming: bool,
+
+    pub may_snap: bool,
 }
 
 fn compute_offset_from(
@@ -120,6 +122,7 @@ impl SpatialNode {
             invertible: true,
             is_pinch_zooming: false,
             is_ancestor_or_self_zooming: false,
+            may_snap: false,
         }
     }
 
@@ -346,6 +349,7 @@ impl SpatialNode {
 
                                 if self.coordinate_system_id == CoordinateSystemId::root() {
                                     if let PropertyBinding::Value(..) = &info.source_transform {
+                                        self.may_snap = true;
                                         let rounded_cs_scale_offset = cs_scale_offset.round_offset();
                                         if rounded_cs_scale_offset.offset != cs_scale_offset.offset {
                                             println!("snap offset {:?} -> {:?}", cs_scale_offset, rounded_cs_scale_offset);

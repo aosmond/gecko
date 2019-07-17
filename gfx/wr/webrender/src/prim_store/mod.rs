@@ -135,6 +135,7 @@ pub struct SpaceMapper<F, T> {
     pub ref_spatial_node_index: SpatialNodeIndex,
     pub current_target_spatial_node_index: SpatialNodeIndex,
     pub bounds: TypedRect<f32, T>,
+    pub may_snap: bool,
     visible_face: VisibleFace,
 }
 
@@ -149,6 +150,7 @@ impl<F, T> SpaceMapper<F, T> where F: fmt::Debug {
             current_target_spatial_node_index: ref_spatial_node_index,
             bounds,
             visible_face: VisibleFace::Front,
+            may_snap: true,
         }
     }
 
@@ -193,6 +195,7 @@ impl<F, T> SpaceMapper<F, T> where F: fmt::Debug {
 
         self.visible_face = self.kind.visible_face();
         self.current_target_spatial_node_index = target_node_index;
+        self.may_snap = target_spatial_node.may_snap && ref_spatial_node.may_snap;
     }
 
     pub fn get_transform(&self) -> TypedTransform3D<f32, F, T> {
@@ -4165,7 +4168,7 @@ pub fn get_snapped_rect<PixelSpace>(
         CoordinateSpaceMapping::Transform(ref transform) => transform.preserves_2d_axis_alignment(),
     };
 
-    if is_axis_aligned {
+    if map_to_raster.may_snap && is_axis_aligned {
        let raster_rect = map_to_raster.map(&prim_rect)?;
 
        let device_rect = {
