@@ -1573,6 +1573,8 @@ void WebRenderCommandBuilder::BuildWebRenderCommands(
   wr::RenderRootArray<StackingContextHelper> rootScs;
   MOZ_ASSERT(aBuilder.GetRenderRoot() == wr::RenderRoot::Default);
 
+  printf_stderr("[AO][%p] begin\n", this);
+
   for (auto renderRoot : wr::kRenderRoots) {
     aScrollDatas[renderRoot] = WebRenderScrollData(mManager);
     if (aBuilder.HasSubBuilder(renderRoot)) {
@@ -1652,6 +1654,8 @@ void WebRenderCommandBuilder::BuildWebRenderCommands(
     }
   }
   mLayerScrollDatas.Clear();
+
+  printf_stderr("[AO][%p] end\n", this);
 
   // Remove the user data those are not displayed on the screen and
   // also reset the data to unused for next transaction.
@@ -1937,6 +1941,11 @@ bool WebRenderCommandBuilder::PushImage(
 
   auto r = wr::ToLayoutRect(aRect);
   auto c = wr::ToLayoutRect(aClip);
+
+  if (XRE_IsContentProcess()) {
+    printf_stderr("[AO][%p] (%f,%f) (%fx%f)\n", this, r.origin.x, r.origin.y, r.size.width, r.size.height);
+  }
+
   aBuilder.PushImage(r, c, !aItem->BackfaceIsHidden(), rendering, key.value());
 
   return true;
