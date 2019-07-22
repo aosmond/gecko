@@ -1588,7 +1588,7 @@ uint32_t nsDisplayListBuilder::GetImageDecodeFlags() const {
     flags |= imgIContainer::FLAG_SYNC_DECODE_IF_FAST;
   }
   if (mIsPaintingToWindow) {
-    flags |= imgIContainer::FLAG_HIGH_QUALITY_SCALING;
+    //flags |= imgIContainer::FLAG_HIGH_QUALITY_SCALING;
   }
   return flags;
 }

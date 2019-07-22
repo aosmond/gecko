@@ -68,6 +68,11 @@ NS_IMPL_ISUPPORTS(RasterImage, imgIContainer, nsIProperties)
 NS_IMPL_ISUPPORTS(RasterImage, imgIContainer, nsIProperties, imgIContainerDebug)
 #endif
 
+static bool ShouldLog(nsIURI* aURI) {
+  //return aURI && aURI->GetSpecOrDefault().EqualsLiteral("https://blake.axomo.com/product/packable-picnic-blanket#mask-imagemask-0-029223e5-88a2-e911-9ddb-00155d013206-049223e5-88a2-e911-9ddb-00155d013206");
+  return aURI && aURI->GetSpecOrDefault().EqualsLiteral("https://s3-us-west-2.amazonaws.com/axomo/mm/axomo/6189/users/3c09f095-8693-e911-8b30-00155d013206/hyena-0-web-contrast-000000-10.png");
+}
+
 //******************************************************************************
 RasterImage::RasterImage(nsIURI* aURI /* = nullptr */)
     : ImageResource(aURI),  // invoke superclass's constructor
@@ -89,10 +94,16 @@ RasterImage::RasterImage(nsIURI* aURI /* = nullptr */)
       mPendingAnimation(false),
       mAnimationFinished(false),
       mWantFullDecode(false) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::RasterImage\n", this);
+  }
 }
 
 //******************************************************************************
 RasterImage::~RasterImage() {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::~RasterImage\n", this);
+  }
   // Make sure our SourceBuffer is marked as complete. This will ensure that any
   // outstanding decoders terminate.
   if (!mSourceBuffer->IsComplete()) {
@@ -286,6 +297,9 @@ LookupResult RasterImage::LookupFrameInternal(const IntSize& aSize,
                                               uint32_t aFlags,
                                               PlaybackType aPlaybackType,
                                               bool aMarkUsed) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::LookupFrameInternal\n", this);
+  }
   if (mAnimationState && aPlaybackType == PlaybackType::eAnimated) {
     MOZ_ASSERT(mFrameAnimator);
     MOZ_ASSERT(ToSurfaceFlags(aFlags) == DefaultSurfaceFlags(),
@@ -314,6 +328,9 @@ LookupResult RasterImage::LookupFrameInternal(const IntSize& aSize,
 LookupResult RasterImage::LookupFrame(const IntSize& aSize, uint32_t aFlags,
                                       PlaybackType aPlaybackType,
                                       bool aMarkUsed) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::LookupFrame\n", this);
+  }
   MOZ_ASSERT(NS_IsMainThread());
 
   // If we're opaque, we don't need to care about premultiplied alpha, because
@@ -537,6 +554,9 @@ RasterImage::GetFrame(uint32_t aWhichFrame, uint32_t aFlags) {
 NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 RasterImage::GetFrameAtSize(const IntSize& aSize, uint32_t aWhichFrame,
                             uint32_t aFlags) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::GetFrameAtSize\n", this);
+  }
 #ifdef DEBUG
   NotifyDrawingObservers();
 #endif
@@ -550,6 +570,9 @@ RasterImage::GetFrameInternal(const IntSize& aSize,
                               const Maybe<SVGImageContext>& aSVGContext,
                               uint32_t aWhichFrame, uint32_t aFlags) {
   MOZ_ASSERT(aWhichFrame <= FRAME_MAX_VALUE);
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::GetFrameInternal\n", this);
+  }
 
   if (aSize.IsEmpty() || aWhichFrame > FRAME_MAX_VALUE) {
     return MakeTuple(ImgDrawResult::BAD_ARGS, aSize, RefPtr<SourceSurface>());
@@ -590,6 +613,9 @@ RasterImage::GetFrameInternal(const IntSize& aSize,
 
 Tuple<ImgDrawResult, IntSize> RasterImage::GetImageContainerSize(
     LayerManager* aManager, const IntSize& aSize, uint32_t aFlags) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::GetImageContainerAtSize\n", this);
+  }
   if (!mHasSize) {
     return MakeTuple(ImgDrawResult::NOT_READY, IntSize(0, 0));
   }
@@ -618,11 +644,17 @@ Tuple<ImgDrawResult, IntSize> RasterImage::GetImageContainerSize(
 NS_IMETHODIMP_(bool)
 RasterImage::IsImageContainerAvailable(LayerManager* aManager,
                                        uint32_t aFlags) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::IsImageContainerAvailable\n", this);
+  }
   return IsImageContainerAvailableAtSize(aManager, mSize, aFlags);
 }
 
 NS_IMETHODIMP_(already_AddRefed<ImageContainer>)
 RasterImage::GetImageContainer(LayerManager* aManager, uint32_t aFlags) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::GetImageContainer\n", this);
+  }
   RefPtr<ImageContainer> container;
   ImgDrawResult drawResult = GetImageContainerImpl(
       aManager, mSize, Nothing(), aFlags, getter_AddRefs(container));
@@ -637,6 +669,9 @@ NS_IMETHODIMP_(bool)
 RasterImage::IsImageContainerAvailableAtSize(LayerManager* aManager,
                                              const IntSize& aSize,
                                              uint32_t aFlags) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::IsImageContainerAvailableAtSize\n", this);
+  }
   // We check the minimum size because while we support downscaling, we do not
   // support upscaling. If aSize > mSize, we will never give a larger surface
   // than mSize. If mSize > aSize, and mSize > maxTextureSize, we still want to
@@ -657,6 +692,9 @@ RasterImage::GetImageContainerAtSize(layers::LayerManager* aManager,
                                      const Maybe<SVGImageContext>& aSVGContext,
                                      uint32_t aFlags,
                                      layers::ImageContainer** aOutContainer) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::GetImageContainerAtSize\n", this);
+  }
   // We do not pass in the given SVG context because in theory it could differ
   // between calls, but actually have no impact on the actual contents of the
   // image container.
@@ -874,6 +912,9 @@ RasterImage::GetImageSpaceInvalidationRect(const IntRect& aRect) {
 
 nsresult RasterImage::OnImageDataComplete(nsIRequest*, nsISupports*,
                                           nsresult aStatus, bool aLastPart) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::OnImageDataComplete\n", this);
+  }
   MOZ_ASSERT(NS_IsMainThread());
 
   // Record that we have all the data we're going to get now.
@@ -941,6 +982,9 @@ void RasterImage::NotifyForLoadEvent(Progress aProgress) {
 nsresult RasterImage::OnImageDataAvailable(nsIRequest*, nsISupports*,
                                            nsIInputStream* aInputStream,
                                            uint64_t, uint32_t aCount) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::OnImageDataAvailable\n", this);
+  }
   nsresult rv = mSourceBuffer->AppendFromInputStream(aInputStream, aCount);
   if (NS_SUCCEEDED(rv) && !mSomeSourceData) {
     mSomeSourceData = true;
@@ -1063,6 +1107,9 @@ RasterImage::StartDecoding(uint32_t aFlags, uint32_t aWhichFrame) {
 
 bool RasterImage::StartDecodingWithResult(uint32_t aFlags,
                                           uint32_t aWhichFrame) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::StartDecodingWithResult\n", this);
+  }
   if (mError) {
     return false;
   }
@@ -1081,6 +1128,9 @@ bool RasterImage::StartDecodingWithResult(uint32_t aFlags,
 
 bool RasterImage::RequestDecodeWithResult(uint32_t aFlags,
                                           uint32_t aWhichFrame) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::RequestDecodeWithResult\n", this);
+  }
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mError) {
@@ -1096,6 +1146,9 @@ bool RasterImage::RequestDecodeWithResult(uint32_t aFlags,
 NS_IMETHODIMP
 RasterImage::RequestDecodeForSize(const IntSize& aSize, uint32_t aFlags,
                                   uint32_t aWhichFrame) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::RequestDecodeForSize\n", this);
+  }
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mError) {
@@ -1110,6 +1163,9 @@ RasterImage::RequestDecodeForSize(const IntSize& aSize, uint32_t aFlags,
 DrawableSurface RasterImage::RequestDecodeForSizeInternal(
     const IntSize& aSize, uint32_t aFlags, uint32_t aWhichFrame) {
   MOZ_ASSERT(NS_IsMainThread());
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::RequestDecodeForSizeInternal\n", this);
+  }
 
   if (aWhichFrame > FRAME_MAX_VALUE) {
     return DrawableSurface();
@@ -1163,6 +1219,9 @@ static bool LaunchDecodingTask(IDecodingTask* aTask, RasterImage* aImage,
 
 bool RasterImage::Decode(const IntSize& aSize, uint32_t aFlags,
                          PlaybackType aPlaybackType) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::Decode\n", this);
+  }
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mError) {
@@ -1258,6 +1317,9 @@ bool RasterImage::Decode(const IntSize& aSize, uint32_t aFlags,
 
 NS_IMETHODIMP
 RasterImage::DecodeMetadata(uint32_t aFlags) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::DecodeMetadata\n", this);
+  }
   if (mError) {
     return NS_ERROR_FAILURE;
   }
@@ -1354,6 +1416,9 @@ ImgDrawResult RasterImage::DrawInternal(DrawableSurface&& aSurface,
                                         const ImageRegion& aRegion,
                                         SamplingFilter aSamplingFilter,
                                         uint32_t aFlags, float aOpacity) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::DrawInternal\n", this);
+  }
   gfxContextMatrixAutoSaveRestore saveMatrix(aContext);
   ImageRegion region(aRegion);
   bool frameIsFinished = aSurface->IsFinished();
@@ -1395,6 +1460,9 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
                   SamplingFilter aSamplingFilter,
                   const Maybe<SVGImageContext>& /*aSVGContext - ignored*/,
                   uint32_t aFlags, float aOpacity) {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::Draw\n", this);
+  }
   if (aWhichFrame > FRAME_MAX_VALUE) {
     return ImgDrawResult::BAD_ARGS;
   }
@@ -1513,6 +1581,9 @@ RasterImage::RequestDiscard() {
 
 // Indempotent error flagging routine. If a decoder is open, shuts it down.
 void RasterImage::DoError() {
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::DoError\n", this);
+  }
   // If we've flagged an error before, we have nothing to do
   if (mError) {
     return;
@@ -1591,6 +1662,9 @@ void RasterImage::NotifyProgress(
     SurfaceFlags aSurfaceFlags
     /* = DefaultSurfaceFlags() */) {
   MOZ_ASSERT(NS_IsMainThread());
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::NotifyProgress\n", this);
+  }
 
   // Ensure that we stay alive long enough to finish notifying.
   RefPtr<RasterImage> image = this;
@@ -1626,6 +1700,9 @@ void RasterImage::NotifyDecodeComplete(
     const IntRect& aInvalidRect, const Maybe<uint32_t>& aFrameCount,
     DecoderFlags aDecoderFlags, SurfaceFlags aSurfaceFlags) {
   MOZ_ASSERT(NS_IsMainThread());
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::NotifyDecodeComplete %d\n", this, aStatus.mWasMetadataDecode);
+  }
 
   // If the decoder detected an error, log it to the error console.
   if (aStatus.mShouldReportError) {
@@ -1752,6 +1829,9 @@ IntSize RasterImage::OptimalImageSizeForDest(const gfxSize& aDest,
              "Unexpected destination size");
 
   if (mSize.IsEmpty() || aDest.IsEmpty()) {
+    if (ShouldLog(mURI)) {
+      printf_stderr("[%p] RasterImage::OptimalImageSizeForDest -- empty\n", this);
+    }
     return IntSize(0, 0);
   }
 
@@ -1759,10 +1839,16 @@ IntSize RasterImage::OptimalImageSizeForDest(const gfxSize& aDest,
 
   if (aSamplingFilter == SamplingFilter::GOOD &&
       CanDownscaleDuringDecode(destSize, aFlags)) {
+    if (ShouldLog(mURI)) {
+      printf_stderr("[%p] RasterImage::OptimalImageSizeForDest -- native %dx%d chosen %dx%d\n", this, mSize.width, mSize.height, destSize.width, destSize.height);
+    }
     return destSize;
   }
 
   // We can't scale to this size. Use our intrinsic size for now.
+  if (ShouldLog(mURI)) {
+    printf_stderr("[%p] RasterImage::OptimalImageSizeForDest -- native %dx%d\n", this, mSize.width, mSize.height);
+  }
   return mSize;
 }
 
