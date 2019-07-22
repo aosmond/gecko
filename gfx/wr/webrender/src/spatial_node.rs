@@ -69,6 +69,11 @@ pub struct SpatialNode {
     /// This is calculated in update(). This will be used to decide whether
     /// to override corresponding picture's raster space as an optimisation.
     pub is_ancestor_or_self_zooming: bool,
+
+    pub may_snap: bool,
+
+    /// Whether this node and all of its ancestors may be snapped.
+    pub may_ancestor_and_self_snap: bool,
 }
 
 fn compute_offset_from(
@@ -120,6 +125,8 @@ impl SpatialNode {
             invertible: true,
             is_pinch_zooming: false,
             is_ancestor_or_self_zooming: false,
+            may_snap: true,
+            may_ancestor_and_self_snap: true,
         }
     }
 
@@ -261,11 +268,15 @@ impl SpatialNode {
             TransformedRectKind::Complex
         };
 
-        let is_parent_zooming = match self.parent {
-            Some(parent) => previous_spatial_nodes[parent.0 as usize].is_ancestor_or_self_zooming,
-            _ => false,
+        let (is_parent_zooming, may_parent_snap) = match self.parent {
+            Some(parent) => {
+                let parent = &previous_spatial_nodes[parent.0 as usize];
+                (parent.is_ancestor_or_self_zooming, parent.may_ancestor_and_self_snap)
+            },
+            _ => (false, true),
         };
         self.is_ancestor_or_self_zooming = self.is_pinch_zooming | is_parent_zooming;
+        self.may_ancestor_and_self_snap = self.may_snap && may_parent_snap;
 
         // If this node is a reference frame, we check if it has a non-invertible matrix.
         // For non-reference-frames we assume that they will produce only additional
@@ -291,6 +302,12 @@ impl SpatialNode {
                 let mut cs_scale_offset = ScaleOffset::identity();
 
                 if info.invertible {
+                    // Only non-animating transforms should snap.
+                    self.may_snap = match info.source_transform {
+                        PropertyBinding::Value(..) => true,
+                        PropertyBinding::Binding(..) => false,
+                    };
+
                     // Resolve the transform against any property bindings.
                     let source_transform = LayoutFastTransform::from(
                         scene_properties.resolve_layout_transform(&info.source_transform)

@@ -135,6 +135,7 @@ pub struct SpaceMapper<F, T> {
     pub ref_spatial_node_index: SpatialNodeIndex,
     pub current_target_spatial_node_index: SpatialNodeIndex,
     pub bounds: Rect<f32, T>,
+    pub may_snap: bool,
     visible_face: VisibleFace,
 }
 
@@ -148,6 +149,7 @@ impl<F, T> SpaceMapper<F, T> where F: fmt::Debug {
             ref_spatial_node_index,
             current_target_spatial_node_index: ref_spatial_node_index,
             bounds,
+            may_snap: true,
             visible_face: VisibleFace::Front,
         }
     }
@@ -191,6 +193,7 @@ impl<F, T> SpaceMapper<F, T> where F: fmt::Debug {
             CoordinateSpaceMapping::Transform(transform)
         };
 
+        self.may_snap = target_spatial_node.may_ancestor_and_self_snap;
         self.visible_face = self.kind.visible_face();
         self.current_target_spatial_node_index = target_node_index;
     }
@@ -4141,7 +4144,7 @@ pub fn get_snapped_rect<PixelSpace>(
         CoordinateSpaceMapping::Transform(ref transform) => transform.preserves_2d_axis_alignment(),
     };
 
-    if is_axis_aligned {
+    if map_to_raster.may_snap && is_axis_aligned {
        let raster_rect = map_to_raster.map(&prim_rect)?;
 
        let device_rect = {

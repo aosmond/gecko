@@ -8530,7 +8530,7 @@ Matrix4x4 nsDisplayTransform::GetTransformForRendering(
 
       // The rounding behavior should also be the same as GetTransform().
       if (ShouldRoundTransformOrigin(mFrame)) {
-        aOutOrigin->Round();
+        //aOutOrigin->Round();
       }
       return GetResultingTransformMatrix(mFrame, nsPoint(0, 0), scale,
                                          INCLUDE_PERSPECTIVE);
