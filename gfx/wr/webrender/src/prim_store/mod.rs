@@ -2167,6 +2167,12 @@ impl PrimitiveStore {
                     surface.device_pixel_scale,
                 ).unwrap_or((visible_rect, SnapOffsets::empty()));
 
+                if prim_instance.is_chased() {
+                    if let Some(rect) = map_local_to_raster.map(&visible_rect) {
+                        println!("\tvisible rect {:?} raster {:?}", visible_rect, rect);
+                    }
+                }
+
                 let (combined_visible_rect, shadow_snap_offsets) = if !prim_shadow_rect.is_empty() {
                     let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
                         prim_shadow_rect,

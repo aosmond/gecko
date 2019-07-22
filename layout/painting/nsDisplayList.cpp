@@ -8184,8 +8184,9 @@ static bool ShouldRoundTransformOrigin(const nsIFrame* aFrame) {
   // An SVG frame should not have its translation rounded.
   // Note it's possible that the SVG frame doesn't have an SVG
   // transform but only has a CSS transform.
-  return !aFrame || !aFrame->HasAnyStateBits(NS_FRAME_SVG_LAYOUT) ||
-         aFrame->IsSVGOuterSVGAnonChildFrame();
+  /*return aFrame && (aFrame->HasAnyStateBits(NS_FRAME_SVG_LAYOUT) ||
+         aFrame->IsSVGOuterSVGAnonChildFrame());*/
+  return false;
 }
 
 Matrix4x4 nsDisplayTransform::GetResultingTransformMatrixInternal(
@@ -8522,7 +8523,7 @@ Matrix4x4 nsDisplayTransform::GetTransformForRendering(
 
       // The rounding behavior should also be the same as GetTransform().
       if (ShouldRoundTransformOrigin(mFrame)) {
-        aOutOrigin->Round();
+        //aOutOrigin->Round();
       }
       return GetResultingTransformMatrix(mFrame, nsPoint(0, 0), scale,
                                          INCLUDE_PERSPECTIVE);
@@ -8590,7 +8591,7 @@ bool nsDisplayTransform::CreateWebRenderCommands(
     // In ChooseScaleAndSetTransform, we round the offset from the reference
     // frame used to adjust the transform, if there is no transform, or it
     // is just a translation. We need to do the same here.
-    position.Round();
+    //position.Round();
   }
 
   uint64_t animationsId = AddAnimationsForWebRender(
