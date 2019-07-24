@@ -327,6 +327,7 @@ pub struct DeferredResolve {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "capture", derive(Serialize))]
 pub struct ClipTaskIndex(pub u16);
 
 impl ClipTaskIndex {
@@ -929,6 +930,7 @@ bitflags! {
 }
 
 /// Represents the visibility state of a segment (wrt clip masks).
+#[cfg_attr(feature = "capture", derive(Serialize))]
 #[derive(Debug, Clone)]
 pub enum ClipMaskKind {
     /// The segment has a clip mask, specified by the render task.
@@ -1456,6 +1458,7 @@ impl PrimitiveVisibilityMask {
 
 /// Information stored for a visible primitive about the visible
 /// rect and associated clip information.
+#[cfg_attr(feature = "capture", derive(Serialize))]
 pub struct PrimitiveVisibility {
     /// The clip chain instance that was built for this primitive.
     pub clip_chain: ClipChainInstance,
@@ -1611,6 +1614,7 @@ impl PrimitiveInstance {
     }
 }
 
+#[cfg_attr(feature = "capture", derive(Serialize))]
 #[derive(Debug)]
 pub struct SegmentedInstance {
     pub gpu_cache_handle: GpuCacheHandle,
@@ -1638,6 +1642,7 @@ pub type LinearGradientStorage = storage::Storage<LinearGradientPrimitive>;
 /// where we want to recycle the memory each new display list, to avoid constantly
 /// re-allocating and moving memory around. Written during primitive preparation,
 /// and read during batching.
+#[cfg_attr(feature = "capture", derive(Serialize))]
 pub struct PrimitiveScratchBuffer {
     /// Contains a list of clip mask instance parameters
     /// per segment generated.
