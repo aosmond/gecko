@@ -1016,6 +1016,7 @@ impl DirtyRegion {
 }
 
 /// A recorded copy of the dirty region for exporting to test infrastructure.
+#[cfg_attr(feature = "capture", derive(Serialize))]
 pub struct RecordedDirtyRegion {
     pub rects: Vec<WorldRect>,
 }
