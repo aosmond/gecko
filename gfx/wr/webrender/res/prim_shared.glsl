@@ -85,6 +85,7 @@ struct VertexInfo {
     vec2 local_pos;
     vec2 snap_offset;
     vec4 world_pos;
+    RectWithSize snapped_local_rect;
 };
 
 VertexInfo write_vertex(RectWithSize instance_rect,
@@ -108,6 +109,13 @@ VertexInfo write_vertex(RectWithSize instance_rect,
         snap_offsets
     );
 
+    RectWithSize snapped_local_rect = compute_snapped_rect(
+        snap_rect,
+        transform.m,
+        task.device_pixel_scale,
+        snap_offsets
+    );
+
     // Transform the current vertex to world space.
     vec4 world_pos = transform.m * vec4(clamped_local_pos, 0.0, 1.0);
 
@@ -122,7 +130,8 @@ VertexInfo write_vertex(RectWithSize instance_rect,
     VertexInfo vi = VertexInfo(
         clamped_local_pos,
         snap_offset,
-        world_pos
+        world_pos,
+        snapped_local_rect
     );
 
     return vi;
@@ -205,7 +214,8 @@ VertexInfo write_transform_vertex(RectWithSize local_segment_rect,
     VertexInfo vi = VertexInfo(
         local_pos,
         vec2(0.0),
-        world_pos
+        world_pos,
+        local_prim_rect
     );
 
     return vi;

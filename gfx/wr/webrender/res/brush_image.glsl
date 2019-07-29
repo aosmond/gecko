@@ -74,7 +74,7 @@ void brush_vs(
     vec2 uv0 = res.uv_rect.p0;
     vec2 uv1 = res.uv_rect.p1;
 
-    RectWithSize local_rect = prim_rect;
+    RectWithSize local_rect = vi.snapped_local_rect;//prim_rect;
     vec2 stretch_size = image_data.stretch_size;
     if (stretch_size.x < 0.0) {
         stretch_size = local_rect.size;
