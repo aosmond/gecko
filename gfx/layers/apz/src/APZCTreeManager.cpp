@@ -676,6 +676,7 @@ void APZCTreeManager::SampleForWebRender(wr::TransactionWrapper& aTxn,
     // the scroll offset. Since we are effectively giving WR the async
     // scroll delta here, we want to negate the translation.
     LayoutDevicePoint asyncScrollDelta = -layerTranslation / zoom;
+    //asyncScrollDelta.Round();
     aTxn.UpdateScrollPosition(wr::AsPipelineId(apzc->GetGuid().mLayersId),
                               apzc->GetGuid().mScrollId,
                               wr::ToRoundedLayoutPoint(asyncScrollDelta));

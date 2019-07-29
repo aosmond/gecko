@@ -219,20 +219,32 @@ impl SpatialNode {
 
                 let origin = LayoutPoint::new(origin.x.max(0.0), origin.y.max(0.0));
                 LayoutVector2D::new(
-                    (-origin.x).max(-scrollable_width).min(0.0).round(),
-                    (-origin.y).max(-scrollable_height).min(0.0).round(),
+                    (-origin.x).max(-scrollable_width).min(0.0),
+                    (-origin.y).max(-scrollable_height).min(0.0),
                 )
             }
             ScrollClamping::NoClamping => LayoutPoint::zero() - *origin,
         };
 
         let new_offset = normalized_offset - scrolling.external_scroll_offset;
+        let snapped_offset = if self.invertible {
+            let snapped_world_offset = WorldVector2D::new(
+                new_offset.x * self.content_transform.scale.x + self.content_transform.offset.x,
+                new_offset.y * self.content_transform.scale.y + self.content_transform.offset.y,
+            ).round();
+            LayoutVector2D::new(
+                (snapped_world_offset.x - self.content_transform.offset.x) / self.content_transform.scale.x,
+                (snapped_world_offset.y - self.content_transform.offset.y) / self.content_transform.scale.y,
+            )
+        } else {
+            new_offset.round()
+        };
 
-        if new_offset == scrolling.offset {
+        if snapped_offset == scrolling.offset {
             return false;
         }
 
-        scrolling.offset = new_offset;
+        scrolling.offset = snapped_offset;
         true
     }
 
