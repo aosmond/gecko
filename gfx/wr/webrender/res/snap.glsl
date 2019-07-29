@@ -19,24 +19,4 @@ vec2 compute_snap_offset(
     return mix(snap_positions.xy, snap_positions.zw, normalized_snap_pos);
 }
 
-RectWithSize compute_snapped_rect(
-    RectWithSize reference_rect,
-    mat4 transform,
-    float device_pixel_scale,
-    vec4 snap_positions
-) {
-    vec4 p0 = transform * vec4(reference_rect.p0, 0.0, 1.0);
-    vec4 p1 = transform * vec4(reference_rect.p0 + reference_rect.size, 0.0, 1.0);
-    vec4 pos = device_pixel_scale * vec4(p0.xy, p1.xy) / vec4(p0.ww, p1.ww);
-    pos = (pos + snap_positions) / device_pixel_scale;
-    mat4 inv_transform = inverse(transform);
-    p0 = inv_transform * vec4(pos.xy, 0.0, 1.0);
-    p1 = inv_transform * vec4(pos.wz, 0.0, 1.0);
-    pos = vec4(p0.xy, p1.xy) / vec4(p0.ww, p1.ww);
-    RectWithSize result;
-    result.p0 = pos.xy;
-    result.size = pos.wz - pos.xy;
-    return result;
-}
-
 #endif //WR_VERTEX_SHADER

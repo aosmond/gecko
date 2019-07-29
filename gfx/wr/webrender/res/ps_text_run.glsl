@@ -167,12 +167,7 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
     VertexInfo vi = VertexInfo(
         local_pos,
         snap_offset,
-        world_pos,
-#ifdef WR_FEATURE_GLYPH_TRANSFORM
-        local_rect
-#else
-        glyph_rect
-#endif
+        world_pos
     );
 
     return vi;
