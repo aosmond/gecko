@@ -704,10 +704,7 @@ impl BatchBuilder {
         let z_id = z_generator.next();
 
         let prim_common_data = &ctx.data_stores.as_common_data(&prim_instance);
-        let prim_rect = LayoutRect::new(
-            prim_instance.prim_origin,
-            prim_common_data.prim_size,
-        );
+        let prim_rect = prim_info.snapped_prim_rect;
 
         let mut batch_features = BatchFeatures::empty();
         if prim_common_data.may_need_repetition {

@@ -1419,6 +1419,8 @@ pub struct PrimitiveVisibility {
     /// A mask defining which of the dirty regions this primitive is visible in.
     pub visibility_mask: PrimitiveVisibilityMask,
 
+    pub snapped_prim_rect: LayoutRect,
+
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
@@ -1982,6 +1984,7 @@ impl PrimitiveStore {
                         clipped_world_rect: WorldRect::max_rect(),
                         clip_chain: ClipChainInstance::empty(),
                         clip_task_index: ClipTaskIndex::INVALID,
+                        snapped_prim_rect: LayoutRect::max_rect(),
                         combined_local_clip_rect: LayoutRect::zero(),
                         snap_offsets: SnapOffsets::empty(),
                         shadow_snap_offsets: SnapOffsets::empty(),
@@ -2221,9 +2224,10 @@ impl PrimitiveStore {
                         clipped_world_rect,
                         clip_chain,
                         clip_task_index: ClipTaskIndex::INVALID,
+                        snapped_prim_rect,
                         combined_local_clip_rect,
-                        snap_offsets,
-                        shadow_snap_offsets,
+                        snap_offsets: SnapOffsets::empty(), //snap_offsets,
+                        shadow_snap_offsets: SnapOffsets::empty(), //shadow_snap_offsets,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -2351,10 +2355,7 @@ impl PrimitiveStore {
                         // produce primitives that are partially covering the original image
                         // rect and we want to clip these extra parts out.
                         let prim_info = &frame_state.scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                        let prim_rect = LayoutRect::new(
-                            prim_instance.prim_origin,
-                            common_data.prim_size,
-                        );
+                        let prim_rect = prim_info.snapped_prim_rect;
                         let tight_clip_rect = prim_info
                             .combined_local_clip_rect
                             .intersection(&prim_rect).unwrap();
@@ -3147,10 +3148,7 @@ impl PrimitiveStore {
                     prim_data.common.may_need_repetition = false;
 
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        prim_data.common.prim_size,
-                    );
+                    let prim_rect = prim_info.snapped_prim_rect;
 
                     let map_local_to_world = SpaceMapper::new_with_target(
                         ROOT_SPATIAL_NODE_INDEX,
@@ -3209,10 +3207,7 @@ impl PrimitiveStore {
 
                 if prim_data.tile_spacing != LayoutSize::zero() {
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        prim_data.common.prim_size,
-                    );
+                    let prim_rect = prim_info.snapped_prim_rect;
 
                     let map_local_to_world = SpaceMapper::new_with_target(
                         ROOT_SPATIAL_NODE_INDEX,
@@ -3570,7 +3565,7 @@ impl<'a> GpuDataRequest<'a> {
 impl PrimitiveInstance {
     fn build_segments_if_needed(
         &mut self,
-        prim_clip_chain: &ClipChainInstance,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
         prim_store: &mut PrimitiveStore,
         data_stores: &DataStores,
@@ -3579,10 +3574,8 @@ impl PrimitiveInstance {
     ) {
         // Usually, the primitive rect can be found from information
         // in the instance and primitive template.
-        let mut prim_local_rect = LayoutRect::new(
-            self.prim_origin,
-            data_stores.as_common_data(self).prim_size,
-        );
+        let mut prim_local_rect = prim_info.snapped_prim_rect;
+        let prim_clip_chain = &prim_info.clip_chain;
 
         let segment_instance_index = match self.kind {
             PrimitiveInstanceKind::Rectangle { ref mut segment_instance_index, .. } |
@@ -3826,8 +3819,8 @@ impl PrimitiveInstance {
                     .clip_store
                     .build_clip_chain_instance(
                         segment.local_rect.translate(LayoutVector2D::new(
-                            self.prim_origin.x,
-                            self.prim_origin.y,
+                            prim_info.snapped_prim_rect.origin.x,
+                            prim_info.snapped_prim_rect.origin.y,
                         )),
                         &pic_state.map_local_to_pic,
                         &pic_state.map_pic_to_world,
@@ -3890,7 +3883,7 @@ impl PrimitiveInstance {
         };
 
         self.build_segments_if_needed(
-            &prim_info.clip_chain,
+            &prim_info,
             frame_state,
             prim_store,
             data_stores,
