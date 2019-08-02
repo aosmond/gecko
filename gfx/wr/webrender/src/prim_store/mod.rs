@@ -920,7 +920,6 @@ impl BrushSegment {
         frame_state: &mut FrameBuildingState,
         clip_data_store: &mut ClipDataStore,
         unclipped: &DeviceRect,
-        prim_snap_offsets: SnapOffsets,
         device_pixel_scale: DevicePixelScale,
     ) -> ClipMaskKind {
         match clip_chain {
@@ -943,9 +942,8 @@ impl BrushSegment {
                 // Get a minimal device space rect, clipped to the screen that we
                 // need to allocate for the clip mask, as well as interpolated
                 // snap offsets.
-                let (device_rect, snap_offsets) = match get_clipped_device_rect(
+                let device_rect = match get_clipped_device_rect(
                     unclipped,
-                    prim_snap_offsets,
                     &pic_state.map_raster_to_world,
                     segment_world_rect,
                     device_pixel_scale,
@@ -965,7 +963,7 @@ impl BrushSegment {
                     frame_state.resource_cache,
                     frame_state.render_tasks,
                     clip_data_store,
-                    snap_offsets,
+                    SnapOffsets::empty(),
                     device_pixel_scale,
                     frame_context.fb_config,
                 );
@@ -1419,21 +1417,17 @@ pub struct PrimitiveVisibility {
     /// A mask defining which of the dirty regions this primitive is visible in.
     pub visibility_mask: PrimitiveVisibilityMask,
 
+    /// The local rect for the primitive after snapping in raster
+    /// space, if possible.
+    pub snapped_local_rect: LayoutRect,
+
+    /// The local rect for the drop shadow for picture primitives after snapping
+    /// in raster space, if possible.
+    pub snapped_shadow_rect: LayoutRect,
+
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
-
-    /// The snap offsets in device space for this primitive. They are
-    /// generated based on the visible rect, which is the local rect
-    /// clipped by the combined local clip for most primitives, or
-    /// just the local rect for pictures.
-    pub snap_offsets: SnapOffsets,
-
-    /// The snap offsets in device space for the drop shadow for
-    /// picture primitives, if applicable. Similar to snap offsets,
-    /// they are generated based on the local rect translated by the
-    /// drop shadow offset.
-    pub shadow_snap_offsets: SnapOffsets,
 }
 
 #[derive(Clone, Debug)]
@@ -2020,9 +2014,9 @@ impl PrimitiveStore {
                         clipped_world_rect: WorldRect::max_rect(),
                         clip_chain: ClipChainInstance::empty(),
                         clip_task_index: ClipTaskIndex::INVALID,
+                        snapped_local_rect: LayoutRect::max_rect(),
+                        snapped_shadow_rect: LayoutRect::zero(),
                         combined_local_clip_rect: LayoutRect::zero(),
-                        snap_offsets: SnapOffsets::empty(),
-                        shadow_snap_offsets: SnapOffsets::empty(),
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -2036,12 +2030,22 @@ impl PrimitiveStore {
                     continue;
                 }
 
+                // This is how primitives get snapped. In general, snapping a picture's
+                // primitive rect here will have no effect, but if it is rasterized in its
+                // own space, or it has a blur or drop shadow effect applied, it may
+                // provide a snapping offset.
+                let snapped_prim_local_rect = get_snapped_rect(
+                    prim_local_rect,
+                    &map_local_to_raster,
+                    surface.device_pixel_scale,
+                ).unwrap_or(prim_local_rect);
+
                 // Inflate the local rect for this primitive by the inflation factor of
                 // the picture context and include the shadow offset. This ensures that
                 // even if the primitive itself is not visible, any effects from the
                 // blur radius or shadow will be correctly taken into account.
                 let inflation_factor = surface.inflation_factor;
-                let local_rect = prim_local_rect
+                let local_rect = snapped_prim_local_rect
                     .inflate(inflation_factor, inflation_factor)
                     .union(&prim_shadow_rect)
                     .intersection(&prim_instance.local_clip_rect);
@@ -2093,7 +2097,7 @@ impl PrimitiveStore {
                     if !tile_cache.update_prim_dependencies(
                         prim_instance,
                         clip_chain.as_ref(),
-                        prim_local_rect,
+                        snapped_prim_local_rect,
                         frame_context.clip_scroll_tree,
                         frame_state.data_stores,
                         frame_state.clip_store,
@@ -2176,7 +2180,7 @@ impl PrimitiveStore {
                 // children, which they snapped to, which is precisely what we also
                 // need to snap to in order to be consistent.
                 let visible_rect = if snap_to_visible {
-                    match combined_local_clip_rect.intersection(&prim_local_rect) {
+                    match combined_local_clip_rect.intersection(&snapped_prim_local_rect) {
                         Some(r) => r,
                         None => {
                             if prim_instance.is_chased() {
@@ -2187,29 +2191,19 @@ impl PrimitiveStore {
                         }
                     }
                 } else {
-                    prim_local_rect
+                    snapped_prim_local_rect
                 };
 
-                // This is how primitives get snapped. In general, snapping a picture's
-                // visible rect here will have no effect, but if it is rasterized in its
-                // own space, or it has a blur or drop shadow effect applied, it may
-                // provide a snapping offset.
-                let (snapped_visible_rect, snap_offsets) = get_snapped_rect(
-                    visible_rect,
-                    &map_local_to_raster,
-                    surface.device_pixel_scale,
-                ).unwrap_or((visible_rect, SnapOffsets::empty()));
-
-                let (combined_visible_rect, shadow_snap_offsets) = if !prim_shadow_rect.is_empty() {
-                    let (snapped_shadow_rect, shadow_snap_offsets) = get_snapped_rect(
+                let (combined_visible_rect, snapped_shadow_rect) = if !prim_shadow_rect.is_empty() {
+                    let snapped_shadow_rect = get_snapped_rect(
                         prim_shadow_rect,
                         &map_local_to_raster,
                         surface.device_pixel_scale,
-                    ).unwrap_or((prim_shadow_rect, SnapOffsets::empty()));
+                    ).unwrap_or(prim_shadow_rect);
 
-                    (snapped_visible_rect.union(&snapped_shadow_rect), shadow_snap_offsets)
+                    (visible_rect.union(&snapped_shadow_rect), snapped_shadow_rect)
                 } else {
-                    (snapped_visible_rect, SnapOffsets::empty())
+                    (visible_rect, LayoutRect::zero())
                 };
 
                 // Include the snapped primitive/picture local rect, including any shadows,
@@ -2253,9 +2247,9 @@ impl PrimitiveStore {
                         clipped_world_rect,
                         clip_chain,
                         clip_task_index: ClipTaskIndex::INVALID,
+                        snapped_local_rect: snapped_prim_local_rect,
+                        snapped_shadow_rect,
                         combined_local_clip_rect,
-                        snap_offsets,
-                        shadow_snap_offsets,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -2385,13 +2379,10 @@ impl PrimitiveStore {
                         // produce primitives that are partially covering the original image
                         // rect and we want to clip these extra parts out.
                         let prim_info = &frame_state.scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                        let prim_rect = LayoutRect::new(
-                            prim_instance.prim_origin,
-                            common_data.prim_size,
-                        );
+                        let prim_rect = &prim_info.snapped_local_rect;
                         let tight_clip_rect = prim_info
                             .combined_local_clip_rect
-                            .intersection(&prim_rect).unwrap();
+                            .intersection(prim_rect).unwrap();
                         image_instance.tight_local_clip_rect = tight_clip_rect;
 
                         let map_local_to_world = SpaceMapper::new_with_target(
@@ -2416,7 +2407,7 @@ impl PrimitiveStore {
                         common_data.may_need_repetition = false;
 
                         let repetitions = crate::image::repetitions(
-                            &prim_rect,
+                            prim_rect,
                             &visible_rect,
                             stride,
                         );
@@ -2713,7 +2704,9 @@ impl PrimitiveStore {
             );
 
             if prim_instance.is_chased() {
-                println!("\tconsidered visible and ready with local pos {:?}", prim_instance.prim_origin);
+                let prim_rect = scratch
+                    .prim_info[prim_instance.visibility_info.0 as usize].snapped_local_rect;
+                println!("\tconsidered visible and ready with local pos {:?}", prim_rect.origin);
             }
         }
 
@@ -2873,7 +2866,8 @@ impl PrimitiveStore {
                         pic_context.raster_spatial_node_index,
                     )
                     .into_fast_transform();
-                let prim_offset = prim_instance.prim_origin.to_vector() - run.reference_frame_relative_offset;
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_offset = prim_info.snapped_local_rect.origin.to_vector() - run.reference_frame_relative_offset;
 
                 let pic = &self.pictures[pic_context.pic_index.0];
                 let raster_space = pic.get_raster_space(frame_context.clip_scroll_tree);
@@ -3183,10 +3177,6 @@ impl PrimitiveStore {
                     prim_data.common.may_need_repetition = false;
 
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        prim_data.common.prim_size,
-                    );
 
                     let map_local_to_world = SpaceMapper::new_with_target(
                         ROOT_SPATIAL_NODE_INDEX,
@@ -3197,7 +3187,7 @@ impl PrimitiveStore {
 
                     gradient.visible_tiles_range = decompose_repeated_primitive(
                         &prim_info.combined_local_clip_rect,
-                        &prim_rect,
+                        &prim_info.snapped_local_rect,
                         prim_info.clipped_world_rect,
                         &prim_data.stretch_size,
                         &prim_data.tile_spacing,
@@ -3245,10 +3235,6 @@ impl PrimitiveStore {
 
                 if prim_data.tile_spacing != LayoutSize::zero() {
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                    let prim_rect = LayoutRect::new(
-                        prim_instance.prim_origin,
-                        prim_data.common.prim_size,
-                    );
 
                     let map_local_to_world = SpaceMapper::new_with_target(
                         ROOT_SPATIAL_NODE_INDEX,
@@ -3261,7 +3247,7 @@ impl PrimitiveStore {
 
                     *visible_tiles_range = decompose_repeated_primitive(
                         &prim_info.combined_local_clip_rect,
-                        &prim_rect,
+                        &prim_info.snapped_local_rect,
                         prim_info.clipped_world_rect,
                         &prim_data.stretch_size,
                         &prim_data.tile_spacing,
@@ -3621,19 +3607,18 @@ impl<'a> GpuDataRequest<'a> {
 impl PrimitiveInstance {
     fn build_segments_if_needed(
         &mut self,
-        prim_clip_chain: &ClipChainInstance,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
         prim_store: &mut PrimitiveStore,
         data_stores: &DataStores,
         segments_store: &mut SegmentStorage,
         segment_instances_store: &mut SegmentInstanceStorage,
     ) {
+        let prim_clip_chain = &prim_info.clip_chain;
+
         // Usually, the primitive rect can be found from information
         // in the instance and primitive template.
-        let mut prim_local_rect = LayoutRect::new(
-            self.prim_origin,
-            data_stores.as_common_data(self).prim_size,
-        );
+        let mut prim_local_rect = prim_info.snapped_local_rect;
 
         let segment_instance_index = match self.kind {
             PrimitiveInstanceKind::Rectangle { ref mut segment_instance_index, .. } |
@@ -3858,7 +3843,6 @@ impl PrimitiveInstance {
                 frame_state,
                 &mut data_stores.clip,
                 unclipped,
-                prim_info.snap_offsets,
                 device_pixel_scale,
             );
             clip_mask_instances.push(clip_mask_kind);
@@ -3879,8 +3863,8 @@ impl PrimitiveInstance {
                     .clip_store
                     .build_clip_chain_instance(
                         segment.local_rect.translate(LayoutVector2D::new(
-                            self.prim_origin.x,
-                            self.prim_origin.y,
+                            prim_info.snapped_local_rect.origin.x,
+                            prim_info.snapped_local_rect.origin.y,
                         )),
                         &pic_state.map_local_to_pic,
                         &pic_state.map_pic_to_world,
@@ -3904,7 +3888,6 @@ impl PrimitiveInstance {
                     frame_state,
                     &mut data_stores.clip,
                     unclipped,
-                    prim_info.snap_offsets,
                     device_pixel_scale,
                 );
                 clip_mask_instances.push(clip_mask_kind);
@@ -3943,7 +3926,7 @@ impl PrimitiveInstance {
         };
 
         self.build_segments_if_needed(
-            &prim_info.clip_chain,
+            &prim_info,
             frame_state,
             prim_store,
             data_stores,
@@ -3977,9 +3960,8 @@ impl PrimitiveInstance {
             // Get a minimal device space rect, clipped to the screen that we
             // need to allocate for the clip mask, as well as interpolated
             // snap offsets.
-            if let Some((device_rect, snap_offsets)) = get_clipped_device_rect(
+            if let Some(device_rect) = get_clipped_device_rect(
                 &unclipped,
-                prim_info.snap_offsets,
                 &pic_state.map_raster_to_world,
                 prim_info.clipped_world_rect,
                 device_pixel_scale,
@@ -3993,7 +3975,7 @@ impl PrimitiveInstance {
                     frame_state.resource_cache,
                     frame_state.render_tasks,
                     &mut data_stores.clip,
-                    snap_offsets,
+                    SnapOffsets::empty(),
                     device_pixel_scale,
                     frame_context.fb_config,
                 );
@@ -4050,46 +4032,6 @@ fn compute_snap_offset_impl<PixelSpace>(
     )
 }
 
-/// Given the snapping offsets for a primitive rectangle, recompute
-/// the snapping offsets to be relative to given local rectangle.
-/// This *must* exactly match the logic in the GLSL
-/// compute_snap_offset function.
-pub fn recompute_snap_offsets<PixelSpace>(
-    local_rect: Rect<f32, PixelSpace>,
-    prim_rect: Rect<f32, PixelSpace>,
-    snap_offsets: SnapOffsets,
-) -> SnapOffsets
-{
-    if prim_rect.is_empty() || snap_offsets.is_empty() {
-        return SnapOffsets::empty();
-    }
-
-    let normalized_top_left = Point2D::<f32, PixelSpace>::new(
-        (local_rect.origin.x - prim_rect.origin.x) / prim_rect.size.width,
-        (local_rect.origin.y - prim_rect.origin.y) / prim_rect.size.height,
-    );
-
-    let normalized_bottom_right = Point2D::<f32, PixelSpace>::new(
-        (local_rect.origin.x + local_rect.size.width - prim_rect.origin.x) / prim_rect.size.width,
-        (local_rect.origin.y + local_rect.size.height - prim_rect.origin.y) / prim_rect.size.height,
-    );
-
-    let top_left = DeviceVector2D::new(
-        mix(snap_offsets.top_left.x, snap_offsets.bottom_right.x, normalized_top_left.x),
-        mix(snap_offsets.top_left.y, snap_offsets.bottom_right.y, normalized_top_left.y),
-    );
-
-    let bottom_right = DeviceVector2D::new(
-        mix(snap_offsets.top_left.x, snap_offsets.bottom_right.x, normalized_bottom_right.x),
-        mix(snap_offsets.top_left.y, snap_offsets.bottom_right.y, normalized_bottom_right.y),
-    );
-
-    SnapOffsets {
-        top_left,
-        bottom_right,
-    }
-}
-
 /// Retrieve the exact unsnapped device space rectangle for a primitive.
 fn get_unclipped_device_rect(
     prim_rect: PictureRect,
@@ -4108,11 +4050,10 @@ fn get_unclipped_device_rect(
 /// scale per-raster-root.
 fn get_clipped_device_rect(
     unclipped: &DeviceRect,
-    prim_snap_offsets: SnapOffsets,
     map_to_world: &SpaceMapper<RasterPixel, WorldPixel>,
     prim_bounding_rect: WorldRect,
     device_pixel_scale: DevicePixelScale,
-) -> Option<(DeviceIntRect, SnapOffsets)> {
+) -> Option<DeviceIntRect> {
     let unclipped_raster_rect = {
         let world_rect = *unclipped * Scale::new(1.0);
         let raster_rect = world_rect * device_pixel_scale.inv();
@@ -4137,28 +4078,7 @@ fn get_clipped_device_rect(
         device_pixel_scale,
     );
 
-    let fx0 = (clipped.origin.x - unclipped.origin.x) / unclipped.size.width;
-    let fy0 = (clipped.origin.y - unclipped.origin.y) / unclipped.size.height;
-
-    let fx1 = (clipped.origin.x + clipped.size.width - unclipped.origin.x) / unclipped.size.width;
-    let fy1 = (clipped.origin.y + clipped.size.height - unclipped.origin.y) / unclipped.size.height;
-
-    let top_left = DeviceVector2D::new(
-        mix(prim_snap_offsets.top_left.x, prim_snap_offsets.bottom_right.x, fx0),
-        mix(prim_snap_offsets.top_left.y, prim_snap_offsets.bottom_right.y, fy0),
-    );
-
-    let bottom_right = DeviceVector2D::new(
-        mix(prim_snap_offsets.top_left.x, prim_snap_offsets.bottom_right.x, fx1),
-        mix(prim_snap_offsets.top_left.y, prim_snap_offsets.bottom_right.y, fy1),
-    );
-
-    let snap_offsets = SnapOffsets {
-        top_left,
-        bottom_right,
-    };
-
-    Some((clipped.to_i32(), snap_offsets))
+    Some(clipped.to_i32())
 }
 
 pub fn get_raster_rects(
@@ -4203,7 +4123,7 @@ pub fn get_snapped_rect<PixelSpace>(
     prim_rect: Rect<f32, PixelSpace>,
     map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
-) -> Option<(Rect<f32, PixelSpace>, SnapOffsets)> where PixelSpace: fmt::Debug {
+) -> Option<Rect<f32, PixelSpace>> where PixelSpace: fmt::Debug {
     let is_axis_aligned = match map_to_raster.kind {
         CoordinateSpaceMapping::Local |
         CoordinateSpaceMapping::ScaleOffset(..) => true,
@@ -4232,11 +4152,6 @@ pub fn get_snapped_rect<PixelSpace>(
             device_rect.bottom_right(),
         );
 
-        let snap_offsets = SnapOffsets {
-            top_left,
-            bottom_right,
-        };
-
         let snapped_device_rect = DeviceRect::new(
             device_rect.origin + top_left,
             device_rect.size + (bottom_right - top_left).to_size()
@@ -4245,7 +4160,7 @@ pub fn get_snapped_rect<PixelSpace>(
         let snapped_world_rect = snapped_device_rect / device_pixel_scale;
         let snapped_raster_rect = snapped_world_rect * Scale::new(1.0);
         let snapped_prim_rect = map_to_raster.unmap(&snapped_raster_rect)?;
-        Some((snapped_prim_rect, snap_offsets))
+        Some(snapped_prim_rect)
     } else {
         None
     }
