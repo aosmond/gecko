@@ -22,7 +22,7 @@ use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureCont
 use crate::frame_builder::{FrameVisibilityContext, FrameVisibilityState};
 use crate::glyph_rasterizer::GlyphKey;
 use crate::gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle, GpuDataRequest, ToGpuBlocks};
-use crate::gpu_types::{BrushFlags, SnapOffsets};
+use crate::gpu_types::{BrushFlags};
 use crate::image::{Repetition};
 use crate::intern;
 use malloc_size_of::MallocSizeOf;
@@ -961,7 +961,6 @@ impl BrushSegment {
                     frame_state.resource_cache,
                     frame_state.render_tasks,
                     clip_data_store,
-                    SnapOffsets::empty(),
                     device_pixel_scale,
                     frame_context.fb_config,
                 );
@@ -3906,7 +3905,6 @@ impl PrimitiveInstance {
                     frame_state.resource_cache,
                     frame_state.render_tasks,
                     &mut data_stores.clip,
-                    SnapOffsets::empty(),
                     device_pixel_scale,
                     frame_context.fb_config,
                 );
