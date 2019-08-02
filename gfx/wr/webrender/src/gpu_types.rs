@@ -613,11 +613,6 @@ impl SnapOffsets {
             bottom_right: DeviceVector2D::zero(),
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        let zero = DeviceVector2D::zero();
-        self.top_left == zero && self.bottom_right == zero
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
