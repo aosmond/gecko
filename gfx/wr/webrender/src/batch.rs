@@ -10,7 +10,7 @@ use crate::clip_scroll_tree::{ClipScrollTree, ROOT_SPATIAL_NODE_INDEX, SpatialNo
 use crate::glyph_rasterizer::GlyphFormat;
 use crate::gpu_cache::{GpuBlockData, GpuCache, GpuCacheHandle, GpuCacheAddress};
 use crate::gpu_types::{BrushFlags, BrushInstance, PrimitiveHeaders, ZBufferId, ZBufferIdGenerator};
-use crate::gpu_types::{ClipMaskInstance, SplitCompositeInstance, SnapOffsets};
+use crate::gpu_types::{ClipMaskInstance, SplitCompositeInstance};
 use crate::gpu_types::{PrimitiveInstanceData, RasterizationSpace, GlyphInstance};
 use crate::gpu_types::{PrimitiveHeader, PrimitiveHeaderIndex, TransformPaletteId, TransformPalette};
 use crate::internal_types::{FastHashMap, SavedTargetIndex, Swizzle, TextureSource, Filter};
@@ -715,7 +715,6 @@ impl BatchBuilder {
             batch_features |= BatchFeatures::ANTIALIASING;
         }
 
-        let snap_offsets = SnapOffsets::empty();
         let prim_vis_mask = prim_info.visibility_mask;
         let clip_task_address = ctx.get_prim_clip_task_address(
             prim_info.clip_task_index,
@@ -746,7 +745,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -813,7 +811,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -865,7 +862,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -1035,7 +1031,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -1074,7 +1069,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: picture.snapped_local_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -1101,7 +1095,6 @@ impl BatchBuilder {
                             let prim_header = PrimitiveHeader {
                                 local_rect: pic.snapped_local_rect,
                                 local_clip_rect: child_prim_info.combined_local_clip_rect,
-                                snap_offsets,
                                 specific_prim_address: GpuCacheAddress::INVALID,
                                 transform_id: transforms
                                     .get_id(
@@ -1254,7 +1247,6 @@ impl BatchBuilder {
                                     let prim_header = PrimitiveHeader {
                                         local_rect: local_tile_rect,
                                         local_clip_rect: local_tile_clip_rect,
-                                        snap_offsets: SnapOffsets::empty(),
                                         specific_prim_address: prim_cache_address,
                                         transform_id,
                                     };
@@ -1368,7 +1360,6 @@ impl BatchBuilder {
 
                                             let shadow_prim_header = PrimitiveHeader {
                                                 local_rect: prim_info.snapped_shadow_rect,
-                                                snap_offsets: SnapOffsets::empty(),
                                                 specific_prim_address: shadow_prim_address,
                                                 ..prim_header
                                             };
@@ -1663,7 +1654,6 @@ impl BatchBuilder {
                                 let prim_header = PrimitiveHeader {
                                     local_rect: picture.snapped_local_rect,
                                     local_clip_rect: prim_info.combined_local_clip_rect,
-                                    snap_offsets,
                                     specific_prim_address: prim_cache_address,
                                     transform_id,
                                 };
@@ -1784,7 +1774,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -1859,7 +1848,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -1969,7 +1957,6 @@ impl BatchBuilder {
                 let prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: prim_cache_address,
                     transform_id,
                 };
@@ -2075,7 +2062,6 @@ impl BatchBuilder {
                     let prim_header = PrimitiveHeader {
                         local_rect: prim_rect,
                         local_clip_rect: prim_info.combined_local_clip_rect,
-                        snap_offsets,
                         specific_prim_address: prim_cache_address,
                         transform_id,
                     };
@@ -2124,7 +2110,6 @@ impl BatchBuilder {
                         let prim_header = PrimitiveHeader {
                             local_rect: prim_rect,
                             local_clip_rect: image_instance.tight_local_clip_rect,
-                            snap_offsets,
                             specific_prim_address: gpu_cache.get_address(&gpu_handle),
                             transform_id,
                         };
@@ -2168,7 +2153,6 @@ impl BatchBuilder {
                 let mut prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: GpuCacheAddress::INVALID,
                     transform_id,
                 };
@@ -2296,7 +2280,6 @@ impl BatchBuilder {
                 let mut prim_header = PrimitiveHeader {
                     local_rect: prim_rect,
                     local_clip_rect: prim_info.combined_local_clip_rect,
-                    snap_offsets,
                     specific_prim_address: GpuCacheAddress::INVALID,
                     transform_id,
                 };
@@ -2897,7 +2880,6 @@ impl ClipBatcher {
             local_pos,
             tile_rect: LayoutRect::zero(),
             sub_rect,
-            snap_offsets: SnapOffsets::empty(),
             task_origin,
             screen_origin,
             device_pixel_scale,
@@ -3026,7 +3008,6 @@ impl ClipBatcher {
         actual_rect: DeviceIntRect,
         world_rect: &WorldRect,
         device_pixel_scale: DevicePixelScale,
-        snap_offsets: SnapOffsets,
         task_origin: DevicePoint,
         screen_origin: DevicePoint,
     ) {
@@ -3059,7 +3040,6 @@ impl ClipBatcher {
                     DevicePoint::zero(),
                     actual_rect.size.to_f32(),
                 ),
-                snap_offsets,
                 task_origin,
                 screen_origin,
                 device_pixel_scale: device_pixel_scale.0,

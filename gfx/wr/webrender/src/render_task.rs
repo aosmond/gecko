@@ -14,7 +14,7 @@ use crate::filterdata::SFilterData;
 use crate::frame_builder::FrameBuilderConfig;
 use crate::freelist::{FreeList, FreeListHandle, WeakFreeListHandle};
 use crate::gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle};
-use crate::gpu_types::{BorderInstance, ImageSource, UvRectKind, SnapOffsets};
+use crate::gpu_types::{BorderInstance, ImageSource, UvRectKind};
 use crate::internal_types::{CacheTextureId, FastHashMap, LayerIndex, SavedTargetIndex, TextureSource};
 use crate::prim_store::{PictureIndex, PrimitiveVisibilityMask};
 use crate::prim_store::image::ImageCacheKey;
@@ -524,7 +524,6 @@ pub struct CacheMaskTask {
     pub actual_rect: DeviceIntRect,
     pub root_spatial_node_index: SpatialNodeIndex,
     pub clip_node_range: ClipNodeRange,
-    pub snap_offsets: SnapOffsets,
     pub device_pixel_scale: DevicePixelScale,
 }
 
@@ -919,7 +918,6 @@ impl RenderTask {
         resource_cache: &mut ResourceCache,
         render_tasks: &mut RenderTaskGraph,
         clip_data_store: &mut ClipDataStore,
-        snap_offsets: SnapOffsets,
         device_pixel_scale: DevicePixelScale,
         fb_config: &FrameBuilderConfig,
     ) -> Self {
@@ -1013,7 +1011,6 @@ impl RenderTask {
                 actual_rect: outer_rect,
                 clip_node_range,
                 root_spatial_node_index,
-                snap_offsets,
                 device_pixel_scale,
             }),
             clear_mode,
