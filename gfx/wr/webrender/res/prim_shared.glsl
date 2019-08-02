@@ -89,17 +89,13 @@ VertexInfo write_vertex(RectWithSize instance_rect,
                         RectWithSize local_clip_rect,
                         float z,
                         Transform transform,
-                        PictureTask task,
-                        RectWithSize snap_rect) {
+                        PictureTask task) {
 
     // Select the corner of the local rect that we are processing.
     vec2 local_pos = instance_rect.p0 + instance_rect.size * aPosition.xy;
 
     // Clamp to the two local clip rects.
     vec2 clamped_local_pos = clamp_rect(local_pos, local_clip_rect);
-
-    /// Compute the snapping offset.
-    vec2 snap_offset = vec2(0.0, 0.0);
 
     // Transform the current vertex to world space.
     vec4 world_pos = transform.m * vec4(clamped_local_pos, 0.0, 1.0);
@@ -108,13 +104,13 @@ VertexInfo write_vertex(RectWithSize instance_rect,
     vec2 device_pos = world_pos.xy * task.device_pixel_scale;
 
     // Apply offsets for the render task to get correct screen location.
-    vec2 final_offset = snap_offset - task.content_origin + task.common_data.task_rect.p0;
+    vec2 final_offset = -task.content_origin + task.common_data.task_rect.p0;
 
     gl_Position = uTransform * vec4(device_pos + final_offset * world_pos.w, z * world_pos.w, world_pos.w);
 
     VertexInfo vi = VertexInfo(
         clamped_local_pos,
-        snap_offset,
+        vec2(0.0, 0.0),
         world_pos
     );
 
