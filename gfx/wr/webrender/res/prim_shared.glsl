@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include rect,render_task,gpu_cache,snap,transform
+#include rect,render_task,gpu_cache,transform
 
 #define EXTEND_MODE_CLAMP  0
 #define EXTEND_MODE_REPEAT 1
@@ -47,13 +47,12 @@ uniform HIGHP_SAMPLER_FLOAT isampler2D sPrimitiveHeadersI;
 // Instanced attributes
 in ivec4 aData;
 
-#define VECS_PER_PRIM_HEADER_F 3U
+#define VECS_PER_PRIM_HEADER_F 2U
 #define VECS_PER_PRIM_HEADER_I 2U
 
 struct PrimitiveHeader {
     RectWithSize local_rect;
     RectWithSize local_clip_rect;
-    vec4 snap_offsets;
     float z;
     int specific_prim_address;
     int transform_id;
@@ -66,7 +65,6 @@ PrimitiveHeader fetch_prim_header(int index) {
     ivec2 uv_f = get_fetch_uv(index, VECS_PER_PRIM_HEADER_F);
     vec4 local_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(0, 0));
     vec4 local_clip_rect = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(1, 0));
-    ph.snap_offsets = TEXEL_FETCH(sPrimitiveHeadersF, uv_f, 0, ivec2(2, 0));
     ph.local_rect = RectWithSize(local_rect.xy, local_rect.zw);
     ph.local_clip_rect = RectWithSize(local_clip_rect.xy, local_clip_rect.zw);
 
@@ -92,8 +90,7 @@ VertexInfo write_vertex(RectWithSize instance_rect,
                         float z,
                         Transform transform,
                         PictureTask task,
-                        RectWithSize snap_rect,
-                        vec4 snap_offsets) {
+                        RectWithSize snap_rect) {
 
     // Select the corner of the local rect that we are processing.
     vec2 local_pos = instance_rect.p0 + instance_rect.size * aPosition.xy;

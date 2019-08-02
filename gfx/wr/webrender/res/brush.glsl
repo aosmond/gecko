@@ -71,8 +71,7 @@ void main(void) {
             ph.z,
             transform,
             pic_task,
-            ph.local_rect,
-            ph.snap_offsets
+            ph.local_rect
         );
 
         // TODO(gw): transform bounds may be referenced by
