@@ -102,11 +102,7 @@ VertexInfo write_vertex(RectWithSize instance_rect,
     vec2 clamped_local_pos = clamp_rect(local_pos, local_clip_rect);
 
     /// Compute the snapping offset.
-    vec2 snap_offset = compute_snap_offset(
-        clamped_local_pos,
-        snap_rect,
-        snap_offsets
-    );
+    vec2 snap_offset = vec2(0.0, 0.0);
 
     // Transform the current vertex to world space.
     vec4 world_pos = transform.m * vec4(clamped_local_pos, 0.0, 1.0);
