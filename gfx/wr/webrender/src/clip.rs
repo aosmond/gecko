@@ -227,6 +227,7 @@ pub struct ClipNodeInstance {
     pub flags: ClipNodeFlags,
     pub spatial_node_index: SpatialNodeIndex,
     pub local_pos: LayoutPoint,
+    pub snapped_local_rect: LayoutRect,
 
     pub visible_tiles: Option<Vec<VisibleMaskImageTile>>,
 }
@@ -321,6 +322,7 @@ struct ClipNodeInfo {
     conversion: ClipSpaceConversion,
     handle: ClipDataHandle,
     local_pos: LayoutPoint,
+    snapped_local_rect: LayoutRect,
     spatial_node_index: SpatialNodeIndex,
 }
 
@@ -363,7 +365,7 @@ impl ClipNodeInfo {
             if let Some(props) = resource_cache.get_image_properties(image) {
                 if let Some(tile_size) = props.tiling {
                     let mut mask_tiles = Vec::new();
-                    let mask_rect = LayoutRect::new(self.local_pos, size);
+                    let mask_rect = self.snapped_local_rect; //LayoutRect::new(self.local_pos, size);
 
                     let visible_rect = if repeat {
                         *clipped_rect
@@ -422,6 +424,7 @@ impl ClipNodeInfo {
             flags,
             spatial_node_index: self.spatial_node_index,
             local_pos: self.local_pos,
+            snapped_local_rect: self.snapped_local_rect,
             visible_tiles,
         })
     }
@@ -830,6 +833,7 @@ impl ClipStore {
             self.active_clip_node_info.push(ClipNodeInfo {
                 handle: clip_instance.handle,
                 local_pos: clip_instance.local_pos,
+                snapped_local_rect: clip_instance.snapped_local_rect,
                 spatial_node_index: clip_instance.spatial_node_index,
                 conversion,
             });
@@ -1602,7 +1606,7 @@ fn add_clip_node_to_current_chain(
 
     // If we can convert spaces, try to reduce the size of the region
     // requested, and cache the conversion information for the next step.
-    if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
+    let snapped_clip_rect = if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
         let (snapped_clip_rect, _) = get_snapped_rect(
             clip_rect,
             &map_to_raster,
@@ -1635,11 +1639,16 @@ fn add_clip_node_to_current_chain(
                 //           would be a worthwhile perf win.
             }
         }
-    }
+
+        snapped_clip_rect
+    } else {
+        LayoutRect::new(node.local_pos, LayoutSize::new(0.0, 0.0))
+    };
 
     clip_node_info.push(ClipNodeInfo {
         conversion,
         local_pos: node.local_pos,
+        snapped_local_rect: snapped_clip_rect,
         handle: node.handle,
         spatial_node_index: node.spatial_node_index,
     });

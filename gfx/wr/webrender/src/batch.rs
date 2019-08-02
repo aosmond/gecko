@@ -2866,10 +2866,10 @@ impl ClipBatcher {
 
         // Get the world rect of the clip rectangle. If we can't transform it due
         // to the matrix, just fall back to drawing the entire clip mask.
-        let local_clip_rect = LayoutRect::new(
+        let local_clip_rect = clip_instance.snapped_local_rect; /*LayoutRect::new(
             clip_instance.local_pos,
             clip_rect_size,
-        );
+        );*/
         let transform = clip_scroll_tree.get_world_transform(
             clip_instance.spatial_node_index,
         );
@@ -3037,7 +3037,7 @@ impl ClipBatcher {
                             }
                         }
                         None => {
-                            let mask_rect = LayoutRect::new(clip_instance.local_pos, size);
+                            let mask_rect = clip_instance.snapped_local_rect; //LayoutRect::new(clip_instance.local_pos, size);
                             add_image(request, mask_rect)
                         }
                     }

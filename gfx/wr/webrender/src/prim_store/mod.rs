@@ -3474,10 +3474,12 @@ impl<'a> GpuDataRequest<'a> {
             let (local_clip_rect, radius, mode) = match clip_node.item {
                 ClipItem::RoundedRectangle(size, radii, clip_mode) => {
                     rect_clips_only = false;
-                    (LayoutRect::new(clip_instance.local_pos, size), Some(radii), clip_mode)
+                    //(LayoutRect::new(clip_instance.local_pos, size), Some(radii), clip_mode)
+                    (clip_instance.snapped_local_rect, Some(radii), clip_mode)
                 }
                 ClipItem::Rectangle(size, mode) => {
-                    (LayoutRect::new(clip_instance.local_pos, size), None, mode)
+                    //(LayoutRect::new(clip_instance.local_pos, size), None, mode)
+                    (clip_instance.snapped_local_rect, None, mode)
                 }
                 ClipItem::BoxShadow(ref info) => {
                     rect_clips_only = false;
