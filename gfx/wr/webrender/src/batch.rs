@@ -18,7 +18,6 @@ use crate::picture::{Picture3DContext, PictureCompositeMode, PicturePrimitive};
 use crate::prim_store::{DeferredResolve, EdgeAaSegmentMask, PrimitiveInstanceKind, PrimitiveVisibilityIndex, PrimitiveVisibilityMask};
 use crate::prim_store::{VisibleGradientTile, PrimitiveInstance, PrimitiveOpacity, SegmentInstanceIndex};
 use crate::prim_store::{BrushSegment, ClipMaskKind, ClipTaskIndex, VECS_PER_SEGMENT};
-use crate::prim_store::{recompute_snap_offsets};
 use crate::prim_store::image::ImageSource;
 use crate::render_backend::DataStores;
 use crate::render_task::{RenderTaskAddress, RenderTaskId, RenderTaskGraph};
@@ -704,10 +703,7 @@ impl BatchBuilder {
         let z_id = z_generator.next();
 
         let prim_common_data = &ctx.data_stores.as_common_data(&prim_instance);
-        let prim_rect = LayoutRect::new(
-            prim_instance.prim_origin,
-            prim_common_data.prim_size,
-        );
+        let prim_rect = prim_info.snapped_local_rect;
 
         let mut batch_features = BatchFeatures::empty();
         if prim_common_data.may_need_repetition {
@@ -718,7 +714,7 @@ impl BatchBuilder {
             batch_features |= BatchFeatures::ANTIALIASING;
         }
 
-        let snap_offsets = prim_info.snap_offsets;
+        let snap_offsets = SnapOffsets::empty();
         let prim_vis_mask = prim_info.visibility_mask;
 
         if is_chased {
@@ -1340,15 +1336,13 @@ impl BatchBuilder {
                                             .get_texture_address(gpu_cache)
                                             .as_int();
 
-                                        for (shadow, shadow_gpu_data) in shadows.iter().zip(picture.extra_gpu_data_handles.iter()) {
+                                        for (_, shadow_gpu_data) in shadows.iter().zip(picture.extra_gpu_data_handles.iter()) {
                                             // Get the GPU cache address of the extra data handle.
                                             let shadow_prim_address = gpu_cache.get_address(shadow_gpu_data);
 
-                                            let shadow_rect = prim_header.local_rect.translate(shadow.offset);
-
                                             let shadow_prim_header = PrimitiveHeader {
-                                                local_rect: shadow_rect,
-                                                snap_offsets: prim_info.shadow_snap_offsets,
+                                                local_rect: prim_info.snapped_shadow_rect,
+                                                snap_offsets: SnapOffsets::empty(),
                                                 specific_prim_address: shadow_prim_address,
                                                 ..prim_header
                                             };
@@ -2553,18 +2547,10 @@ impl BatchBuilder {
         let user_data = [stops_handle.as_int(gpu_cache), 0, 0, 0];
 
         for tile in visible_tiles {
-            // Adjust the snap offsets for the tile.
-            let snap_offsets = recompute_snap_offsets(
-                tile.local_rect,
-                base_prim_header.local_rect,
-                base_prim_header.snap_offsets,
-            );
-
             let prim_header = PrimitiveHeader {
                 specific_prim_address: gpu_cache.get_address(&tile.handle),
                 local_rect: tile.local_rect,
                 local_clip_rect: tile.local_clip_rect,
-                snap_offsets,
                 ..*base_prim_header
             };
             let prim_header_index = prim_headers.push(&prim_header, z_id, user_data);
