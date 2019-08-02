@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include rect,render_task,gpu_cache,snap,transform
+#include rect,render_task,gpu_cache,transform
 
 #ifdef WR_VERTEX_SHADER
 
@@ -11,7 +11,6 @@ in ivec4 aClipDataResourceAddress;
 in vec2 aClipLocalPos;
 in vec4 aClipTileRect;
 in vec4 aClipDeviceArea;
-in vec4 aClipSnapOffsets;
 in vec4 aClipOrigins;
 in float aDevicePixelScale;
 
@@ -39,7 +38,7 @@ ClipMaskInstance fetch_clip_item() {
     cmi.local_pos = aClipLocalPos;
     cmi.tile_rect = RectWithSize(aClipTileRect.xy, aClipTileRect.zw);
     cmi.sub_rect = RectWithSize(aClipDeviceArea.xy, aClipDeviceArea.zw);
-    cmi.snap_offsets = aClipSnapOffsets;
+    cmi.snap_offsets = vec4(0.0, 0.0, 0.0, 0.0);
     cmi.task_origin = aClipOrigins.xy;
     cmi.screen_origin = aClipOrigins.zw;
     cmi.device_pixel_scale = aDevicePixelScale;
