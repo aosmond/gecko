@@ -17,6 +17,7 @@ use crate::prim_store::{BrushSegment, GradientTileRange, VectorKey};
 use crate::prim_store::{PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData};
 use crate::prim_store::{PrimKeyCommonData, PrimTemplateCommonData, PrimitiveStore};
 use crate::prim_store::{NinePatchDescriptor, PointKey, SizeKey, InternablePrimitive};
+use crate::prim_store::{PrimitiveVisibility};
 use crate::render_task::RenderTaskCacheEntryHandle;
 use std::{hash, ops::{Deref, DerefMut}, mem};
 use crate::util::pack_as_float;
@@ -227,6 +228,7 @@ impl LinearGradientTemplate {
     /// done if the cache entry is invalid (due to first use or eviction).
     pub fn update(
         &mut self,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
         if let Some(mut request) =
@@ -240,8 +242,8 @@ impl LinearGradientTemplate {
             ]);
             request.push([
                 pack_as_float(self.extend_mode as u32),
-                self.stretch_size.width,
-                self.stretch_size.height,
+                prim_info.stretch_size.width,
+                prim_info.stretch_size.height,
                 0.0,
             ]);
 
@@ -471,6 +473,7 @@ impl RadialGradientTemplate {
     /// done if the cache entry is invalid (due to first use or eviction).
     pub fn update(
         &mut self,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
         if let Some(mut request) =
@@ -485,8 +488,8 @@ impl RadialGradientTemplate {
             request.push([
                 self.params.ratio_xy,
                 pack_as_float(self.extend_mode as u32),
-                self.stretch_size.width,
-                self.stretch_size.height,
+                prim_info.stretch_size.width,
+                prim_info.stretch_size.height,
             ]);
 
             // write_segment_gpu_blocks

@@ -1427,6 +1427,8 @@ pub struct PrimitiveVisibility {
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
+
+    pub stretch_size: LayoutSize,
 }
 
 #[derive(Clone, Debug)]
@@ -1875,6 +1877,22 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
+            let mut stretch_size = match prim_instance.kind {
+                PrimitiveInstanceKind::Image { data_handle, .. } => {
+                    let image_data = &frame_state.data_stores.image[data_handle].kind;
+                    image_data.stretch_size
+                }
+                PrimitiveInstanceKind::LinearGradient { data_handle, .. } => {
+                    let gradient_data = &frame_state.data_stores.linear_grad[data_handle];
+                    gradient_data.stretch_size
+                }
+                PrimitiveInstanceKind::RadialGradient { data_handle, .. } => {
+                    let gradient_data = &frame_state.data_stores.radial_grad[data_handle];
+                    gradient_data.stretch_size
+                }
+                _ => LayoutSize::zero(),
+            };
+
             let (is_passthrough, snap_to_visible, prim_local_rect, prim_shadow_rect) = match prim_instance.kind {
                 PrimitiveInstanceKind::PushClipChain => {
                     frame_state.clip_chain_stack.push_clip(
@@ -2016,6 +2034,7 @@ impl PrimitiveStore {
                         snapped_local_rect: LayoutRect::max_rect(),
                         snapped_shadow_rect: LayoutRect::zero(),
                         combined_local_clip_rect: LayoutRect::zero(),
+                        stretch_size: LayoutSize::zero(),
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -2038,6 +2057,21 @@ impl PrimitiveStore {
                     &map_local_to_raster,
                     surface.device_pixel_scale,
                 ).unwrap_or(prim_local_rect);
+
+                // If we have a stretch size for the primitive, we need to adjust it if
+                // we changed the size of the primitive after snapping.
+                if stretch_size.is_positive() {
+                    // TODO(aosmond): We may need to split the 1px difference between the
+                    // stretch size and the tile spacing when we don't just snap the size
+                    // due to not needing repititions.
+                    let delta = snapped_prim_local_rect.size - prim_local_rect.size;
+                    if delta.width.abs() < 1.0 {
+                        stretch_size.width = snapped_prim_local_rect.size.width;
+                    }
+                    if delta.height.abs() < 1.0 {
+                        stretch_size.height = snapped_prim_local_rect.size.height;
+                    }
+                }
 
                 // Inflate the local rect for this primitive by the inflation factor of
                 // the picture context and include the shadow offset. This ensures that
@@ -2249,6 +2283,7 @@ impl PrimitiveStore {
                         snapped_local_rect: snapped_prim_local_rect,
                         snapped_shadow_rect,
                         combined_local_clip_rect,
+                        stretch_size,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -3064,7 +3099,8 @@ impl PrimitiveStore {
 
                 // Update the template this instane references, which may refresh the GPU
                 // cache with any shared template data.
-                image_data.update(common_data, frame_state);
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                image_data.update(common_data, prim_info, frame_state);
 
                 let image_instance = &mut self.images[*image_instance_index];
 
@@ -3080,17 +3116,18 @@ impl PrimitiveStore {
                     &mut scratch.segments,
                     &mut scratch.segment_instances,
                     |request| {
-                        image_data.write_prim_gpu_blocks(request);
+                        image_data.write_prim_gpu_blocks(prim_info, request);
                     },
                 );
             }
             PrimitiveInstanceKind::LinearGradient { data_handle, gradient_index, .. } => {
                 let prim_data = &mut data_stores.linear_grad[*data_handle];
                 let gradient = &mut self.linear_gradients[*gradient_index];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
 
                 // Update the template this instane references, which may refresh the GPU
                 // cache with any shared template data.
-                prim_data.update(frame_state);
+                prim_data.update(prim_info, frame_state);
 
                 if prim_data.stretch_size.width >= prim_data.common.prim_size.width &&
                     prim_data.stretch_size.height >= prim_data.common.prim_size.height {
@@ -3175,8 +3212,6 @@ impl PrimitiveStore {
                     // have it in the shader.
                     prim_data.common.may_need_repetition = false;
 
-                    let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-
                     let map_local_to_world = SpaceMapper::new_with_target(
                         ROOT_SPATIAL_NODE_INDEX,
                         prim_instance.spatial_node_index,
@@ -3219,6 +3254,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::RadialGradient { data_handle, ref mut visible_tiles_range, .. } => {
                 let prim_data = &mut data_stores.radial_grad[*data_handle];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
 
                 if prim_data.stretch_size.width >= prim_data.common.prim_size.width &&
                     prim_data.stretch_size.height >= prim_data.common.prim_size.height {
@@ -3230,11 +3266,9 @@ impl PrimitiveStore {
 
                 // Update the template this instane references, which may refresh the GPU
                 // cache with any shared template data.
-                prim_data.update(frame_state);
+                prim_data.update(prim_info, frame_state);
 
                 if prim_data.tile_spacing != LayoutSize::zero() {
-                    let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-
                     let map_local_to_world = SpaceMapper::new_with_target(
                         ROOT_SPATIAL_NODE_INDEX,
                         prim_instance.spatial_node_index,
