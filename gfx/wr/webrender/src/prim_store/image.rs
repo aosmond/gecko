@@ -17,7 +17,7 @@ use crate::prim_store::{
     EdgeAaSegmentMask, OpacityBindingIndex, PrimitiveInstanceKind,
     PrimitiveOpacity, PrimitiveSceneData, PrimKey, PrimKeyCommonData,
     PrimTemplate, PrimTemplateCommonData, PrimitiveStore, SegmentInstanceIndex,
-    SizeKey, InternablePrimitive,
+    SizeKey, InternablePrimitive, PrimitiveVisibility,
 };
 use crate::render_task::{
     BlitSource, RenderTask, RenderTaskCacheEntryHandle, RenderTaskCacheKey,
@@ -152,10 +152,11 @@ impl ImageData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
         if let Some(mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
-            self.write_prim_gpu_blocks(&mut request);
+            self.write_prim_gpu_blocks(prim_info, &mut request);
         }
 
         common.opacity = {
@@ -284,15 +285,15 @@ impl ImageData {
         };
     }
 
-    pub fn write_prim_gpu_blocks(&self, request: &mut GpuDataRequest) {
+    pub fn write_prim_gpu_blocks(&self, prim_info: &PrimitiveVisibility, request: &mut GpuDataRequest) {
         // Images are drawn as a white color, modulated by the total
         // opacity coming from any collapsed property bindings.
         // Size has to match `VECS_PER_SPECIFIC_BRUSH` from `brush_image.glsl` exactly.
         request.push(self.color.premultiplied());
         request.push(PremultipliedColorF::WHITE);
         request.push([
-            self.stretch_size.width + self.tile_spacing.width,
-            self.stretch_size.height + self.tile_spacing.height,
+            prim_info.stretch_size.width + self.tile_spacing.width,
+            prim_info.stretch_size.height + self.tile_spacing.height,
             0.0,
             0.0,
         ]);
