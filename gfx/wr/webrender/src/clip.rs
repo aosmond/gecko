@@ -226,8 +226,7 @@ pub struct ClipNodeInstance {
     pub handle: ClipDataHandle,
     pub flags: ClipNodeFlags,
     pub spatial_node_index: SpatialNodeIndex,
-    pub local_pos: LayoutPoint,
-
+    pub snapped_local_rect: LayoutRect,
     pub visible_tiles: Option<Vec<VisibleMaskImageTile>>,
 }
 
@@ -320,7 +319,7 @@ impl ClipSpaceConversion {
 struct ClipNodeInfo {
     conversion: ClipSpaceConversion,
     handle: ClipDataHandle,
-    local_pos: LayoutPoint,
+    snapped_local_rect: LayoutRect,
     spatial_node_index: SpatialNodeIndex,
 }
 
@@ -353,7 +352,7 @@ impl ClipNodeInfo {
 
         let mut visible_tiles = None;
 
-        if let ClipItem::Image { size, image, repeat } = node.item {
+        if let ClipItem::Image { size: _, image, repeat } = node.item {
             let request = ImageRequest {
                 key: image,
                 rendering: ImageRendering::Auto,
@@ -363,7 +362,7 @@ impl ClipNodeInfo {
             if let Some(props) = resource_cache.get_image_properties(image) {
                 if let Some(tile_size) = props.tiling {
                     let mut mask_tiles = Vec::new();
-                    let mask_rect = LayoutRect::new(self.local_pos, size);
+                    let mask_rect = self.snapped_local_rect;
 
                     let visible_rect = if repeat {
                         *clipped_rect
@@ -374,7 +373,7 @@ impl ClipNodeInfo {
                     let repetitions = image::repetitions(
                         &mask_rect,
                         &visible_rect,
-                        size,
+                        mask_rect.size,
                     );
 
                     // TODO: As a followup, if the image is a tiled blob, the device_image_rect below
@@ -382,10 +381,10 @@ impl ClipNodeInfo {
                     let device_image_rect = DeviceIntRect::from_size(props.descriptor.size);
 
                     for Repetition { origin, .. } in repetitions {
-                        let layout_image_rect = LayoutRect {
+                        let layout_image_rect = LayoutRect::new(
                             origin,
-                            size,
-                        };
+                            mask_rect.size,
+                        );
                         let tiles = image::tiles(
                             &layout_image_rect,
                             &visible_rect,
@@ -421,7 +420,7 @@ impl ClipNodeInfo {
             handle: self.handle,
             flags,
             spatial_node_index: self.spatial_node_index,
-            local_pos: self.local_pos,
+            snapped_local_rect: self.snapped_local_rect,
             visible_tiles,
         })
     }
@@ -815,7 +814,7 @@ impl ClipStore {
             );
             self.active_clip_node_info.push(ClipNodeInfo {
                 handle: clip_instance.handle,
-                local_pos: clip_instance.local_pos,
+                snapped_local_rect: clip_instance.snapped_local_rect,
                 spatial_node_index: clip_instance.spatial_node_index,
                 conversion,
             });
@@ -866,16 +865,16 @@ impl ClipStore {
             // See how this clip affects the prim region.
             let clip_result = match node_info.conversion {
                 ClipSpaceConversion::Local => {
-                    node.item.get_clip_result(node_info.local_pos, &local_bounding_rect)
+                    node.item.get_clip_result(node_info.snapped_local_rect, &local_bounding_rect)
                 }
                 ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
                     has_non_local_clips = true;
-                    node.item.get_clip_result(node_info.local_pos, &scale_offset.unmap_rect(&local_bounding_rect))
+                    node.item.get_clip_result(node_info.snapped_local_rect, &scale_offset.unmap_rect(&local_bounding_rect))
                 }
                 ClipSpaceConversion::Transform(ref transform) => {
                     has_non_local_clips = true;
                     node.item.get_clip_result_complex(
-                        node_info.local_pos,
+                        node_info.snapped_local_rect,
                         transform,
                         &world_clip_rect,
                         world_rect,
@@ -884,7 +883,7 @@ impl ClipStore {
             };
 
             if is_chased {
-                println!("\t\tclip {:?} at {:?} in space {:?}", node.item, node_info.local_pos, node_info.spatial_node_index);
+                println!("\t\tclip {:?} at {:?} in space {:?}", node.item, node_info.snapped_local_rect, node_info.spatial_node_index);
                 println!("\t\tflags {:?}, resulted in {:?}", node_info.conversion.to_flags(), clip_result);
             }
 
@@ -1325,7 +1324,7 @@ impl ClipItem {
 
     fn get_clip_result_complex(
         &self,
-        local_pos: LayoutPoint,
+        local_rect: LayoutRect,
         transform: &LayoutToWorldTransform,
         prim_world_rect: &WorldRect,
         world_rect: &WorldRect,
@@ -1335,19 +1334,16 @@ impl ClipItem {
             None => return ClipResult::Reject,
         };
 
-        let (clip_rect, inner_rect, mode) = match *self {
-            ClipItem::Rectangle(size, mode) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-                (clip_rect, Some(clip_rect), mode)
+        let (inner_rect, mode) = match *self {
+            ClipItem::Rectangle(_, mode) => {
+                (Some(local_rect), mode)
             }
-            ClipItem::RoundedRectangle(size, ref radius, mode) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-                let inner_clip_rect = extract_inner_rect_safe(&clip_rect, radius);
-                (clip_rect, inner_clip_rect, mode)
+            ClipItem::RoundedRectangle(_, ref radius, mode) => {
+                let inner_clip_rect = extract_inner_rect_safe(&local_rect, radius);
+                (inner_clip_rect, mode)
             }
-            ClipItem::Image { size, repeat: false, .. } => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-                (clip_rect, None, ClipMode::Clip)
+            ClipItem::Image { size: _, repeat: false, .. } => {
+                (None, ClipMode::Clip)
             }
             ClipItem::Image { repeat: true, .. } |
             ClipItem::BoxShadow(..) => {
@@ -1370,7 +1366,7 @@ impl ClipItem {
             ClipMode::Clip => {
                 let outer_clip_rect = match project_rect(
                     transform,
-                    &clip_rect,
+                    &local_rect,
                     world_rect,
                 ) {
                     Some(outer_clip_rect) => outer_clip_rect,
@@ -1393,18 +1389,16 @@ impl ClipItem {
     // Check how a given clip source affects a local primitive region.
     fn get_clip_result(
         &self,
-        local_pos: LayoutPoint,
+        local_rect: LayoutRect,
         prim_rect: &LayoutRect,
     ) -> ClipResult {
         match *self {
-            ClipItem::Rectangle(size, ClipMode::Clip) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
-                if clip_rect.contains_rect(prim_rect) {
+            ClipItem::Rectangle(_, ClipMode::Clip) => {
+                if local_rect.contains_rect(prim_rect) {
                     return ClipResult::Accept;
                 }
 
-                match clip_rect.intersection(prim_rect) {
+                match local_rect.intersection(prim_rect) {
                     Some(..) => {
                         ClipResult::Partial
                     }
@@ -1413,14 +1407,12 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::Rectangle(size, ClipMode::ClipOut) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
-                if clip_rect.contains_rect(prim_rect) {
+            ClipItem::Rectangle(_, ClipMode::ClipOut) => {
+                if local_rect.contains_rect(prim_rect) {
                     return ClipResult::Reject;
                 }
 
-                match clip_rect.intersection(prim_rect) {
+                match local_rect.intersection(prim_rect) {
                     Some(_) => {
                         ClipResult::Partial
                     }
@@ -1429,21 +1421,19 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::RoundedRectangle(size, ref radius, ClipMode::Clip) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
+            ClipItem::RoundedRectangle(_, ref radius, ClipMode::Clip) => {
                 // TODO(gw): Consider caching this in the ClipNode
                 //           if it ever shows in profiles.
                 // TODO(gw): extract_inner_rect_safe is overly
                 //           conservative for this code!
-                let inner_clip_rect = extract_inner_rect_safe(&clip_rect, radius);
+                let inner_clip_rect = extract_inner_rect_safe(&local_rect, radius);
                 if let Some(inner_clip_rect) = inner_clip_rect {
                     if inner_clip_rect.contains_rect(prim_rect) {
                         return ClipResult::Accept;
                     }
                 }
 
-                match clip_rect.intersection(prim_rect) {
+                match local_rect.intersection(prim_rect) {
                     Some(..) => {
                         ClipResult::Partial
                     }
@@ -1452,21 +1442,19 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::RoundedRectangle(size, ref radius, ClipMode::ClipOut) => {
-                let clip_rect = LayoutRect::new(local_pos, size);
-
+            ClipItem::RoundedRectangle(_, ref radius, ClipMode::ClipOut) => {
                 // TODO(gw): Consider caching this in the ClipNode
                 //           if it ever shows in profiles.
                 // TODO(gw): extract_inner_rect_safe is overly
                 //           conservative for this code!
-                let inner_clip_rect = extract_inner_rect_safe(&clip_rect, radius);
+                let inner_clip_rect = extract_inner_rect_safe(&local_rect, radius);
                 if let Some(inner_clip_rect) = inner_clip_rect {
                     if inner_clip_rect.contains_rect(prim_rect) {
                         return ClipResult::Reject;
                     }
                 }
 
-                match clip_rect.intersection(prim_rect) {
+                match local_rect.intersection(prim_rect) {
                     Some(_) => {
                         ClipResult::Partial
                     }
@@ -1475,12 +1463,11 @@ impl ClipItem {
                     }
                 }
             }
-            ClipItem::Image { size, repeat, .. } => {
+            ClipItem::Image { size: _, repeat, .. } => {
                 if repeat {
                     ClipResult::Partial
                 } else {
-                    let mask_rect = LayoutRect::new(local_pos, size);
-                    match mask_rect.intersection(prim_rect) {
+                    match local_rect.intersection(prim_rect) {
                         Some(..) => {
                             ClipResult::Partial
                         }
@@ -1596,7 +1583,7 @@ fn add_clip_node_to_current_chain(
 
     // If we can convert spaces, try to reduce the size of the region
     // requested, and cache the conversion information for the next step.
-    if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
+    let clip_rect = if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
         match conversion {
             ClipSpaceConversion::Local => {
                 *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
@@ -1623,11 +1610,14 @@ fn add_clip_node_to_current_chain(
                 //           would be a worthwhile perf win.
             }
         }
-    }
+        clip_rect
+    } else {
+        LayoutRect::new(node.local_pos, LayoutSize::zero())
+    };
 
     clip_node_info.push(ClipNodeInfo {
         conversion,
-        local_pos: node.local_pos,
+        snapped_local_rect: clip_rect,
         handle: node.handle,
         spatial_node_index: node.spatial_node_index,
     });

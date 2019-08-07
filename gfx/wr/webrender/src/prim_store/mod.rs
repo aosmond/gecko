@@ -3547,12 +3547,12 @@ impl<'a> GpuDataRequest<'a> {
             local_clip_count += 1;
 
             let (local_clip_rect, radius, mode) = match clip_node.item {
-                ClipItem::RoundedRectangle(size, radii, clip_mode) => {
+                ClipItem::RoundedRectangle(_, radii, clip_mode) => {
                     rect_clips_only = false;
-                    (LayoutRect::new(clip_instance.local_pos, size), Some(radii), clip_mode)
+                    (clip_instance.snapped_local_rect, Some(radii), clip_mode)
                 }
-                ClipItem::Rectangle(size, mode) => {
-                    (LayoutRect::new(clip_instance.local_pos, size), None, mode)
+                ClipItem::Rectangle(_, mode) => {
+                    (clip_instance.snapped_local_rect, None, mode)
                 }
                 ClipItem::BoxShadow(ref info) => {
                     rect_clips_only = false;
@@ -3571,7 +3571,7 @@ impl<'a> GpuDataRequest<'a> {
                     // ensures clip-mask tasks get allocated for these
                     // pixel regions, even if no other clips affect them.
                     let prim_shadow_rect = info.prim_shadow_rect.translate(
-                        LayoutVector2D::new(clip_instance.local_pos.x, clip_instance.local_pos.y),
+                        LayoutVector2D::new(clip_instance.snapped_local_rect.origin.x, clip_instance.snapped_local_rect.origin.y),
                     );
                     segment_builder.push_mask_region(
                         prim_shadow_rect,
