@@ -1319,7 +1319,7 @@ impl ClipItem {
             ClipItem::Rectangle(size, ClipMode::ClipOut) => (false, size),
             ClipItem::RoundedRectangle(size, _, ClipMode::Clip) => (true, size),
             ClipItem::RoundedRectangle(size, _, ClipMode::ClipOut) => (false, size),
-            ClipItem::Image { repeat, size, .. } => (repeat, size),
+            ClipItem::Image { repeat, size, .. } => (!repeat, size),
             ClipItem::BoxShadow(..) => (false, LayoutSize::zero()),
         };
 
