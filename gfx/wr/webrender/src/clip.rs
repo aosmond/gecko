@@ -1313,25 +1313,17 @@ impl ClipItem {
     // reduce the size of a primitive region. This is typically
     // used to eliminate redundant clips, and reduce the size of
     // any clip mask that eventually gets drawn.
-    pub fn get_local_clip_rect(&self, local_pos: LayoutPoint) -> Option<LayoutRect> {
-        let size = match *self {
-            ClipItem::Rectangle(size, ClipMode::Clip) => Some(size),
-            ClipItem::Rectangle(_, ClipMode::ClipOut) => None,
-            ClipItem::RoundedRectangle(size, _, ClipMode::Clip) => Some(size),
-            ClipItem::RoundedRectangle(_, _, ClipMode::ClipOut) => None,
-            ClipItem::Image { repeat, size, .. } => {
-                if repeat {
-                    None
-                } else {
-                    Some(size)
-                }
-            }
-            ClipItem::BoxShadow(..) => None,
+    fn get_local_clip_rect(&self, local_pos: LayoutPoint) -> (bool, LayoutRect) {
+        let (snap, size) = match *self {
+            ClipItem::Rectangle(size, ClipMode::Clip) => (true, size),
+            ClipItem::Rectangle(size, ClipMode::ClipOut) => (false, size),
+            ClipItem::RoundedRectangle(size, _, ClipMode::Clip) => (true, size),
+            ClipItem::RoundedRectangle(size, _, ClipMode::ClipOut) => (false, size),
+            ClipItem::Image { repeat, size, .. } => (repeat, size),
+            ClipItem::BoxShadow(..) => (false, LayoutSize::zero()),
         };
 
-        size.map(|size| {
-            LayoutRect::new(local_pos, size)
-        })
+        (snap, LayoutRect::new(local_pos, size))
     }
 
     fn get_clip_result_complex(
@@ -1597,22 +1589,23 @@ fn add_clip_node_to_current_chain(
 
     // If we can convert spaces, try to reduce the size of the region
     // requested, and cache the conversion information for the next step.
-    let clip_rect = if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
-        let snapped_clip_rect = get_snapped_rect(
-            clip_rect,
+    let (snap, local_rect) = clip_node.item.get_local_clip_rect(node.local_pos);
+    let snapped_local_rect = if snap {
+        let snapped_local_rect = get_snapped_rect(
+            local_rect,
             map_to_world,
             device_pixel_scale,
-        ).unwrap_or(clip_rect);
+        ).unwrap_or(local_rect);
 
         match conversion {
             ClipSpaceConversion::Local => {
-                *local_clip_rect = match local_clip_rect.intersection(&snapped_clip_rect) {
+                *local_clip_rect = match local_clip_rect.intersection(&snapped_local_rect) {
                     Some(rect) => rect,
                     None => return false,
                 };
             }
             ClipSpaceConversion::ScaleOffset(ref scale_offset) => {
-                let clip_rect = scale_offset.map_rect(&snapped_clip_rect);
+                let clip_rect = scale_offset.map_rect(&snapped_local_rect);
                 *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
                     Some(rect) => rect,
                     None => return false,
@@ -1630,14 +1623,14 @@ fn add_clip_node_to_current_chain(
                 //           would be a worthwhile perf win.
             }
         }
-        snapped_clip_rect
+        snapped_local_rect
     } else {
-        LayoutRect::new(node.local_pos, LayoutSize::zero())
+        local_rect
     };
 
     clip_node_info.push(ClipNodeInfo {
         conversion,
-        snapped_local_rect: clip_rect,
+        snapped_local_rect,
         handle: node.handle,
         spatial_node_index: node.spatial_node_index,
     });
