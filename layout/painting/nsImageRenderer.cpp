@@ -603,7 +603,6 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       LayoutDeviceRect destRect =
           LayoutDeviceRect::FromAppUnits(aDest, appUnitsPerDevPixel);
       auto stretchSize = wr::ToLayoutSize(destRect.Size());
-      destRect.Round();
 
       gfx::IntSize decodeSize =
           nsLayoutUtils::ComputeImageContainerDrawingParameters(
@@ -636,9 +635,9 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
           nsRect(firstTilePos.x, firstTilePos.y, aFill.XMost() - firstTilePos.x,
                  aFill.YMost() - firstTilePos.y),
           appUnitsPerDevPixel);
-      wr::LayoutRect fill = wr::ToRoundedLayoutRect(fillRect);
+      wr::LayoutRect fill = wr::ToLayoutRect(fillRect);
 
-      wr::LayoutRect roundedDest = wr::ToLayoutRect(destRect);
+      wr::LayoutRect r = wr::ToLayoutRect(destRect);
 
       // WebRender special cases situations where stretchSize == fillSize to
       // infer that it shouldn't use repeat sampling. This makes sure
@@ -646,24 +645,24 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
 
       switch (mExtendMode) {
         case ExtendMode::CLAMP:
-          fill = roundedDest;
-          stretchSize = roundedDest.size;
+          fill = r;
+          stretchSize = r.size;
           break;
         case ExtendMode::REPEAT_Y:
-          fill.origin.x = roundedDest.origin.x;
-          fill.size.width = roundedDest.size.width;
-          stretchSize.width = roundedDest.size.width;
+          fill.origin.x = r.origin.x;
+          fill.size.width = r.size.width;
+          stretchSize.width = r.size.width;
           break;
         case ExtendMode::REPEAT_X:
-          fill.origin.y = roundedDest.origin.y;
-          fill.size.height = roundedDest.size.height;
-          stretchSize.height = roundedDest.size.height;
+          fill.origin.y = r.origin.y;
+          fill.size.height = r.size.height;
+          stretchSize.height = r.size.height;
           break;
         default:
           break;
       }
 
-      wr::LayoutRect clip = wr::ToRoundedLayoutRect(
+      wr::LayoutRect clip = wr::ToLayoutRect(
           LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
 
       LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
