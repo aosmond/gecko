@@ -1013,7 +1013,7 @@ impl TileCacheInstance {
             for clip_instance in clip_instances {
                 clips.push(ClipDescriptor {
                     uid: clip_instance.handle.uid(),
-                    origin: clip_instance.local_pos.into(),
+                    origin: clip_instance.snapped_local_rect.origin.into(),
                 });
 
                 // If the clip has the same spatial node, the relative transform

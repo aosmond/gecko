@@ -2815,7 +2815,6 @@ impl ClipBatcher {
     fn add_tiled_clip_mask(
         &mut self,
         mask_screen_rect: DeviceIntRect,
-        clip_rect_size: LayoutSize,
         clip_instance: &ClipNodeInstance,
         clip_scroll_tree: &ClipScrollTree,
         world_rect: &WorldRect,
@@ -2841,16 +2840,12 @@ impl ClipBatcher {
 
         // Get the world rect of the clip rectangle. If we can't transform it due
         // to the matrix, just fall back to drawing the entire clip mask.
-        let local_clip_rect = LayoutRect::new(
-            clip_instance.local_pos,
-            clip_rect_size,
-        );
         let transform = clip_scroll_tree.get_world_transform(
             clip_instance.spatial_node_index,
         );
         let world_clip_rect = match project_rect(
             &transform.into_transform(),
-            &local_clip_rect,
+            &clip_instance.snapped_local_rect,
             world_rect,
         ) {
             Some(rect) => rect,
@@ -2956,7 +2951,7 @@ impl ClipBatcher {
                 prim_transform_id,
                 clip_data_address: GpuCacheAddress::INVALID,
                 resource_address: GpuCacheAddress::INVALID,
-                local_pos: clip_instance.local_pos,
+                local_pos: clip_instance.snapped_local_rect.origin,
                 tile_rect: LayoutRect::zero(),
                 sub_rect: DeviceRect::new(
                     DevicePoint::zero(),
@@ -2968,7 +2963,7 @@ impl ClipBatcher {
             };
 
             let added_clip = match clip_node.item {
-                ClipItem::Image { image, size, .. } => {
+                ClipItem::Image { image, .. } => {
                     let request = ImageRequest {
                         key: image,
                         rendering: ImageRendering::Auto,
@@ -3010,7 +3005,7 @@ impl ClipBatcher {
                             }
                         }
                         None => {
-                            let mask_rect = LayoutRect::new(clip_instance.local_pos, size);
+                            let mask_rect = clip_instance.snapped_local_rect;
                             add_image(request, mask_rect)
                         }
                     }
@@ -3054,7 +3049,7 @@ impl ClipBatcher {
 
                     true
                 }
-                ClipItem::Rectangle(clip_rect_size, ClipMode::Clip) => {
+                ClipItem::Rectangle(_, ClipMode::Clip) => {
                     if clip_instance.flags.contains(ClipNodeFlags::SAME_COORD_SYSTEM) {
                         false
                     } else {
@@ -3062,7 +3057,6 @@ impl ClipBatcher {
 
                         if !self.add_tiled_clip_mask(
                             actual_rect,
-                            clip_rect_size,
                             clip_instance,
                             clip_scroll_tree,
                             world_rect,
