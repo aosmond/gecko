@@ -118,19 +118,16 @@ class ClipManager {
   // This holds some clip state for a single nsDisplayItem
   struct ItemClips {
     ItemClips(const ActiveScrolledRoot* aASR,
-              const DisplayItemClipChain* aChain, bool aSeparateLeaf);
+              const DisplayItemClipChain* aChain);
 
     // These are the "inputs" - they come from the nsDisplayItem
     const ActiveScrolledRoot* mASR;
     const DisplayItemClipChain* mChain;
-    bool mSeparateLeaf;
 
     // These are the "outputs" - they are pushed to WR as needed
     wr::WrSpatialId mScrollId;
     Maybe<wr::WrClipChainId> mClipChainId;
 
-    void UpdateSeparateLeaf(wr::DisplayListBuilder& aBuilder,
-                            int32_t aAppUnitsPerDevPixel);
     bool HasSameInputs(const ItemClips& aOther);
     void CopyOutputsFrom(const ItemClips& aOther);
     wr::WrSpaceAndClipChain GetSpaceAndClipChain() const;
