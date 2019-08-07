@@ -1244,7 +1244,7 @@ bool nsNativeThemeGTK::CreateWebRenderCommandsForWidget(
     StyleAppearance aAppearance, const nsRect& aRect) {
   nsPresContext* presContext = aFrame->PresContext();
   wr::LayoutRect bounds =
-      wr::ToRoundedLayoutRect(LayoutDeviceRect::FromAppUnits(
+      wr::ToLayoutRect(LayoutDeviceRect::FromAppUnits(
           aRect, presContext->AppUnitsPerDevPixel()));
 
   switch (aAppearance) {
