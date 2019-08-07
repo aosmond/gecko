@@ -586,10 +586,6 @@ class DisplayListBuilder final {
   // Try to avoid using this when possible.
   wr::WrState* Raw() { return mWrState; }
 
-  void SetClipChainLeaf(const Maybe<wr::LayoutRect>& aClipRect) {
-    mClipChainLeaf = aClipRect;
-  }
-
   // A chain of RAII objects, each holding a (ASR, ViewID) tuple of data. The
   // topmost object is pointed to by the mActiveFixedPosTracker pointer in
   // the wr::DisplayListBuilder.
@@ -609,18 +605,6 @@ class DisplayListBuilder final {
     layers::ScrollableLayerGuid::ViewID mScrollId;
   };
 
- protected:
-  wr::LayoutRect MergeClipLeaf(const wr::LayoutRect& aClip) {
-    if (mClipChainLeaf) {
-      return wr::IntersectLayoutRect(*mClipChainLeaf, aClip);
-    }
-    return aClip;
-  }
-
-  // See the implementation of PushShadow for details on these methods.
-  void SuspendClipLeafMerging();
-  void ResumeClipLeafMerging();
-
   wr::WrState* mWrState;
 
   // Track each scroll id that we encountered. We use this structure to
@@ -630,16 +614,6 @@ class DisplayListBuilder final {
       mScrollIds;
 
   wr::WrSpaceAndClipChain mCurrentSpaceAndClipChain;
-
-  // Contains the current leaf of the clip chain to be merged with the
-  // display item's clip rect when pushing an item. May be set to Nothing() if
-  // there is no clip rect to merge with.
-  Maybe<wr::LayoutRect> mClipChainLeaf;
-
-  // Versions of the above that are on hold while SuspendClipLeafMerging is on
-  // (see the implementation of PushShadow for details).
-  Maybe<wr::WrSpaceAndClipChain> mSuspendedSpaceAndClipChain;
-  Maybe<wr::LayoutRect> mSuspendedClipChainLeaf;
 
   RefPtr<layout::TextDrawTarget> mCachedTextDT;
   RefPtr<gfxContext> mCachedContext;
