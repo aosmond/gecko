@@ -26,7 +26,7 @@ use crate::gpu_types::{BrushFlags};
 use crate::image::{Repetition};
 use crate::intern;
 use malloc_size_of::MallocSizeOf;
-use crate::picture::{PictureCompositeMode, PicturePrimitive};
+use crate::picture::{PictureCompositeMode, PicturePrimitive, ROOT_SURFACE_INDEX};
 use crate::picture::{ClusterIndex, PrimitiveList, RecordedDirtyRegion, SurfaceIndex, RetainedTiles, RasterConfig};
 use crate::prim_store::borders::{ImageBorderDataHandle, NormalBorderDataHandle};
 use crate::prim_store::gradient::{GRADIENT_FP_STOPS, GradientCacheKey, GradientStopKey};
@@ -2012,6 +2012,12 @@ impl PrimitiveStore {
                     surface.device_pixel_scale,
                 ).unwrap_or(prim_local_rect);
 
+                let snapped_clip_local_rect = get_snapped_rect(
+                    prim_instance.local_clip_rect,
+                    &map_local_to_raster,
+                    surface.device_pixel_scale,
+                ).unwrap_or(prim_instance.local_clip_rect);
+
                 // If we have a stretch size for the primitive, we need to adjust it if
                 // we changed the size of the primitive after snapping.
                 if stretch_size.is_positive() {
@@ -2034,13 +2040,13 @@ impl PrimitiveStore {
                 let inflation_factor = surface.inflation_factor;
                 let local_rect = snapped_prim_local_rect
                     .inflate(inflation_factor, inflation_factor)
-                    .intersection(&prim_instance.local_clip_rect);
+                    .intersection(&snapped_clip_local_rect);
                 let local_rect = match local_rect {
                     Some(local_rect) => local_rect,
                     None => {
                         if prim_instance.is_chased() {
                             println!("\tculled for being out of the local clip rectangle: {:?}",
-                                prim_instance.local_clip_rect);
+                                snapped_clip_local_rect);
                         }
                         continue;
                     }
@@ -2056,8 +2062,9 @@ impl PrimitiveStore {
                 );
 
                 frame_state.clip_store.set_active_clips(
-                    prim_instance.local_clip_rect,
+                    snapped_clip_local_rect,
                     prim_instance.spatial_node_index,
+                    frame_context.surfaces[ROOT_SURFACE_INDEX.0].device_pixel_scale,
                     frame_state.clip_chain_stack.current_clips_array(),
                     &frame_context.clip_scroll_tree,
                     &mut frame_state.data_stores.clip,
@@ -2145,7 +2152,7 @@ impl PrimitiveStore {
                 let combined_local_clip_rect = if apply_local_clip_rect {
                     clip_chain.local_clip_rect
                 } else {
-                    prim_instance.local_clip_rect
+                    snapped_clip_local_rect
                 };
 
                 if combined_local_clip_rect.size.is_empty_or_negative() {
@@ -4082,11 +4089,11 @@ pub fn get_raster_rects(
 /// Snap the given rect in raster space if the transform is
 /// axis-aligned. It return the snapped rect transformed back into the
 /// given pixel space, and the snap offsets in device space.
-pub fn get_snapped_rect<PixelSpace>(
+pub fn get_snapped_rect<PixelSpace, SnappingSpace>(
     prim_rect: Rect<f32, PixelSpace>,
-    map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
+    map_to_raster: &SpaceMapper<PixelSpace, SnappingSpace>,
     device_pixel_scale: DevicePixelScale,
-) -> Option<Rect<f32, PixelSpace>> where PixelSpace: fmt::Debug {
+) -> Option<Rect<f32, PixelSpace>> where PixelSpace: fmt::Debug, SnappingSpace: fmt::Debug {
     let is_axis_aligned = match map_to_raster.kind {
         CoordinateSpaceMapping::Local |
         CoordinateSpaceMapping::ScaleOffset(..) => true,
