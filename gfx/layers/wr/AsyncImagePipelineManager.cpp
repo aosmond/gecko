@@ -389,7 +389,7 @@ void AsyncImagePipelineManager::ApplyAsyncImageForPipeline(
   params.mix_blend_mode = aPipeline->mMixBlendMode;
 
   Maybe<wr::WrSpatialId> referenceFrameId = builder.PushStackingContext(
-      params, wr::ToRoundedLayoutRect(aPipeline->mScBounds),
+      params, wr::ToLayoutRect(aPipeline->mScBounds),
       // This is fine to do unconditionally because we only push images here.
       wr::RasterSpace::Screen());
 
@@ -410,13 +410,13 @@ void AsyncImagePipelineManager::ApplyAsyncImageForPipeline(
       MOZ_ASSERT(aPipeline->mCurrentTexture->AsWebRenderTextureHost());
       Range<wr::ImageKey> range_keys(&keys[0], keys.Length());
       aPipeline->mCurrentTexture->PushDisplayItems(
-          builder, wr::ToRoundedLayoutRect(rect), wr::ToRoundedLayoutRect(rect),
+          builder, wr::ToLayoutRect(rect), wr::ToLayoutRect(rect),
           aPipeline->mFilter, range_keys);
       HoldExternalImage(aPipelineId, aEpoch, aPipeline->mCurrentTexture);
     } else {
       MOZ_ASSERT(keys.Length() == 1);
-      builder.PushImage(wr::ToRoundedLayoutRect(rect),
-                        wr::ToRoundedLayoutRect(rect), true, aPipeline->mFilter,
+      builder.PushImage(wr::ToLayoutRect(rect),
+                        wr::ToLayoutRect(rect), true, aPipeline->mFilter,
                         keys[0]);
     }
   }
