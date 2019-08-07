@@ -60,7 +60,7 @@ void ClipManager::BeginList(const StackingContextHelper& aStackingContext) {
     }
   }
 
-  ItemClips clips(nullptr, nullptr, false);
+  ItemClips clips(nullptr, nullptr);
   if (!mItemClipStack.empty()) {
     clips.CopyOutputsFrom(mItemClipStack.top());
   }
@@ -74,7 +74,6 @@ void ClipManager::BeginList(const StackingContextHelper& aStackingContext) {
 
 void ClipManager::EndList(const StackingContextHelper& aStackingContext) {
   MOZ_ASSERT(!mItemClipStack.empty());
-  mBuilder->SetClipChainLeaf(Nothing());
   mItemClipStack.pop();
 
   if (aStackingContext.AffectsClipPositioning()) {
@@ -150,18 +149,7 @@ wr::WrSpaceAndClipChain ClipManager::SwitchItem(nsDisplayItem* aItem) {
     asr = static_cast<nsDisplayStickyPosition*>(aItem)->GetContainerASR();
   }
 
-  // In most cases we can combine the leaf of the clip chain with the clip rect
-  // of the display item. This reduces the number of clip items, which avoids
-  // some overhead further down the pipeline.
-  bool separateLeaf = false;
-  if (clip && clip->mASR == asr && clip->mClip.GetRoundedRectCount() == 0) {
-    // Container display items are not currently supported because the clip
-    // rect of a stacking context is not handled the same as normal display
-    // items.
-    separateLeaf = aItem->GetChildren() == nullptr;
-  }
-
-  ItemClips clips(asr, clip, separateLeaf);
+  ItemClips clips(asr, clip);
   MOZ_ASSERT(!mItemClipStack.empty());
   if (clips.HasSameInputs(mItemClipStack.top())) {
     // Early-exit because if the clips are the same as aItem's previous sibling,
@@ -189,13 +177,6 @@ wr::WrSpaceAndClipChain ClipManager::SwitchItem(nsDisplayItem* aItem) {
     auPerDevPixel = aItem->Frame()->PresContext()->AppUnitsPerDevPixel();
   }
 
-  // If the leaf of the clip chain is going to be merged with the display item's
-  // clip rect, then we should create a clip chain id from the leaf's parent.
-  if (separateLeaf) {
-    CLIP_LOG("\tseparate leaf detected, ignoring the last clip\n");
-    clip = clip->mParent;
-  }
-
   // There are two ASR chains here that we need to be fully defined. One is the
   // ASR chain pointed to by |asr|. The other is the
   // ASR chain pointed to by clip->mASR. We pick the leafmost
@@ -221,7 +202,6 @@ wr::WrSpaceAndClipChain ClipManager::SwitchItem(nsDisplayItem* aItem) {
 
   // Now that we have the scroll id and a clip id for the item, push it onto
   // the WR stack.
-  clips.UpdateSeparateLeaf(*mBuilder, auPerDevPixel);
   auto spaceAndClipChain = clips.GetSpaceAndClipChain();
   mItemClipStack.push(clips);
 
@@ -362,27 +342,13 @@ ClipManager::~ClipManager() {
 }
 
 ClipManager::ItemClips::ItemClips(const ActiveScrolledRoot* aASR,
-                                  const DisplayItemClipChain* aChain,
-                                  bool aSeparateLeaf)
-    : mASR(aASR), mChain(aChain), mSeparateLeaf(aSeparateLeaf) {
+                                  const DisplayItemClipChain* aChain)
+    : mASR(aASR), mChain(aChain) {
   mScrollId = wr::wr_root_scroll_node_id();
 }
 
-void ClipManager::ItemClips::UpdateSeparateLeaf(
-    wr::DisplayListBuilder& aBuilder, int32_t aAppUnitsPerDevPixel) {
-  Maybe<wr::LayoutRect> clipLeaf;
-  if (mSeparateLeaf) {
-    MOZ_ASSERT(mChain);
-    clipLeaf.emplace(wr::ToLayoutRect(LayoutDeviceRect::FromAppUnits(
-        mChain->mClip.GetClipRect(), aAppUnitsPerDevPixel)));
-  }
-
-  aBuilder.SetClipChainLeaf(clipLeaf);
-}
-
 bool ClipManager::ItemClips::HasSameInputs(const ItemClips& aOther) {
-  return mASR == aOther.mASR && mChain == aOther.mChain &&
-         mSeparateLeaf == aOther.mSeparateLeaf;
+  return mASR == aOther.mASR && mChain == aOther.mChain;
 }
 
 void ClipManager::ItemClips::CopyOutputsFrom(const ItemClips& aOther) {
