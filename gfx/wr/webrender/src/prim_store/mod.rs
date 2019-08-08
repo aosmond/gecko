@@ -2029,12 +2029,16 @@ impl PrimitiveStore {
                     // TODO(aosmond): We may need to split the 1px difference between the
                     // stretch size and the tile spacing when we don't just snap the size
                     // due to not needing repititions.
-                    let delta = snapped_prim_local_rect.size - stretch_size;
-                    if delta.width.abs() < 1.0 {
+                    let delta = prim_local_rect.size - stretch_size;
+                    if delta.width.abs() < 0.1 {
                         stretch_size.width = snapped_prim_local_rect.size.width;
+                    } else {
+                        stretch_size.width *= snapped_prim_local_rect.size.width / prim_local_rect.size.width;
                     }
-                    if delta.height.abs() < 1.0 {
+                    if delta.height.abs() < 0.1 {
                         stretch_size.height = snapped_prim_local_rect.size.height;
+                    } else {
+                        stretch_size.height *= snapped_prim_local_rect.size.height / prim_local_rect.size.height;
                     }
                 }
 
