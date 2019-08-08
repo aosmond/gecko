@@ -1426,6 +1426,8 @@ pub struct PrimitiveVisibility {
     pub combined_local_clip_rect: LayoutRect,
 
     pub stretch_size: LayoutSize,
+
+    pub tile_spacing: LayoutSize,
 }
 
 #[derive(Clone, Debug)]
@@ -1873,20 +1875,20 @@ impl PrimitiveStore {
                 frame_context.clip_scroll_tree,
             );
 
-            let mut stretch_size = match prim_instance.kind {
+            let (mut stretch_size, mut tile_spacing) = match prim_instance.kind {
                 PrimitiveInstanceKind::Image { data_handle, .. } => {
                     let image_data = &frame_state.data_stores.image[data_handle].kind;
-                    image_data.stretch_size
+                    (image_data.stretch_size, image_data.tile_spacing)
                 }
                 PrimitiveInstanceKind::LinearGradient { data_handle, .. } => {
                     let gradient_data = &frame_state.data_stores.linear_grad[data_handle];
-                    gradient_data.stretch_size
+                    (gradient_data.stretch_size, gradient_data.tile_spacing)
                 }
                 PrimitiveInstanceKind::RadialGradient { data_handle, .. } => {
                     let gradient_data = &frame_state.data_stores.radial_grad[data_handle];
-                    gradient_data.stretch_size
+                    (gradient_data.stretch_size, gradient_data.tile_spacing)
                 }
-                _ => LayoutSize::zero(),
+                _ => (LayoutSize::zero(), LayoutSize::zero()),
             };
 
             let (is_passthrough, snap_to_visible, prim_local_rect, prim_shadow_rect) = match prim_instance.kind {
@@ -1994,6 +1996,7 @@ impl PrimitiveStore {
                         snapped_shadow_rect: LayoutRect::zero(),
                         combined_local_clip_rect: LayoutRect::zero(),
                         stretch_size: LayoutSize::zero(),
+                        tile_spacing: LayoutSize::zero(),
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -2025,21 +2028,14 @@ impl PrimitiveStore {
 
                 // If we have a stretch size for the primitive, we need to adjust it if
                 // we changed the size of the primitive after snapping.
-                if stretch_size.is_positive() {
-                    // TODO(aosmond): We may need to split the 1px difference between the
-                    // stretch size and the tile spacing when we don't just snap the size
-                    // due to not needing repititions.
-                    let delta = prim_local_rect.size - stretch_size;
-                    if delta.width.abs() < 0.1 {
-                        stretch_size.width = snapped_prim_local_rect.size.width;
-                    } else {
-                        stretch_size.width *= snapped_prim_local_rect.size.width / prim_local_rect.size.width;
-                    }
-                    if delta.height.abs() < 0.1 {
-                        stretch_size.height = snapped_prim_local_rect.size.height;
-                    } else {
-                        stretch_size.height *= snapped_prim_local_rect.size.height / prim_local_rect.size.height;
-                    }
+                if stretch_size.is_positive() || tile_spacing.is_positive() {
+                    // Adjust the stretch size and tile spacing as necessary.
+                    let width_ratio = snapped_prim_local_rect.size.width / prim_local_rect.size.width;
+                    let height_ratio = snapped_prim_local_rect.size.height / prim_local_rect.size.height;
+                    stretch_size.width *= width_ratio;
+                    stretch_size.height *= height_ratio;
+                    tile_spacing.width *= width_ratio;
+                    tile_spacing.height *= height_ratio;
                 }
 
                 // Inflate the local rect for this primitive by the inflation factor of
@@ -2252,6 +2248,7 @@ impl PrimitiveStore {
                         snapped_shadow_rect,
                         combined_local_clip_rect,
                         stretch_size,
+                        tile_spacing,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
                 );
@@ -2398,9 +2395,9 @@ impl PrimitiveStore {
                             &map_local_to_world,
                         );
 
-                        let base_edge_flags = edge_flags_for_tile_spacing(&image_data.tile_spacing);
+                        let base_edge_flags = edge_flags_for_tile_spacing(&prim_info.tile_spacing);
 
-                        let stride = image_data.stretch_size + image_data.tile_spacing;
+                        let stride = prim_info.stretch_size + prim_info.tile_spacing;
 
                         // We are performing the decomposition on the CPU here, no need to
                         // have it in the shader.
@@ -2417,7 +2414,7 @@ impl PrimitiveStore {
 
                             let layout_image_rect = LayoutRect {
                                 origin,
-                                size: image_data.stretch_size,
+                                size: prim_info.stretch_size,
                             };
 
                             let tiles = crate::image::tiles(
@@ -3187,8 +3184,8 @@ impl PrimitiveStore {
                         &prim_info.combined_local_clip_rect,
                         &prim_info.snapped_local_rect,
                         prim_info.clipped_world_rect,
-                        &prim_data.stretch_size,
-                        &prim_data.tile_spacing,
+                        &prim_info.stretch_size,
+                        &prim_info.tile_spacing,
                         frame_state,
                         &mut scratch.gradient_tiles,
                         &map_local_to_world,
@@ -3246,8 +3243,8 @@ impl PrimitiveStore {
                         &prim_info.combined_local_clip_rect,
                         &prim_info.snapped_local_rect,
                         prim_info.clipped_world_rect,
-                        &prim_data.stretch_size,
-                        &prim_data.tile_spacing,
+                        &prim_info.stretch_size,
+                        &prim_info.tile_spacing,
                         frame_state,
                         &mut scratch.gradient_tiles,
                         &map_local_to_world,

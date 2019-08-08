@@ -203,8 +203,8 @@ impl ImageData {
                         ImageSource::Cache { ref mut size, ref mut handle } => {
                             let padding = DeviceIntSideOffsets::new(
                                 0,
-                                (self.tile_spacing.width * size.width as f32 / self.stretch_size.width) as i32,
-                                (self.tile_spacing.height * size.height as f32 / self.stretch_size.height) as i32,
+                                (prim_info.tile_spacing.width * size.width as f32 / prim_info.stretch_size.width) as i32,
+                                (prim_info.tile_spacing.height * size.height as f32 / prim_info.stretch_size.height) as i32,
                                 0,
                             );
 
@@ -292,8 +292,8 @@ impl ImageData {
         request.push(self.color.premultiplied());
         request.push(PremultipliedColorF::WHITE);
         request.push([
-            prim_info.stretch_size.width + self.tile_spacing.width,
-            prim_info.stretch_size.height + self.tile_spacing.height,
+            prim_info.stretch_size.width + prim_info.tile_spacing.width,
+            prim_info.stretch_size.height + prim_info.tile_spacing.height,
             0.0,
             0.0,
         ]);
