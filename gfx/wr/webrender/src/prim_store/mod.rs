@@ -1891,7 +1891,12 @@ impl PrimitiveStore {
                 _ => (LayoutSize::zero(), LayoutSize::zero()),
             };
 
-            let (is_passthrough, snap_to_visible, prim_local_rect, prim_shadow_rect) = match prim_instance.kind {
+            let snap = match prim_instance.kind {
+                PrimitiveInstanceKind::TextRun { .. } => false,
+                _ => true,
+            };
+
+            let (is_passthrough, clip_visible, prim_local_rect, prim_shadow_rect) = match prim_instance.kind {
                 PrimitiveInstanceKind::PushClipChain => {
                     frame_state.clip_chain_stack.push_clip(
                         prim_instance.clip_chain_id,
@@ -2014,17 +2019,25 @@ impl PrimitiveStore {
                 // primitive rect here will have no effect, but if it is rasterized in its
                 // own space, or it has a blur or drop shadow effect applied, it may
                 // provide a snapping offset.
-                let snapped_prim_local_rect = get_snapped_rect(
-                    prim_local_rect,
-                    &map_local_to_raster,
-                    surface.device_pixel_scale,
-                ).unwrap_or(prim_local_rect);
+                let snapped_prim_local_rect = if snap {
+                    get_snapped_rect(
+                        prim_local_rect,
+                        &map_local_to_raster,
+                        surface.device_pixel_scale,
+                    ).unwrap_or(prim_local_rect)
+                } else {
+                    prim_local_rect
+                };
 
-                let snapped_clip_local_rect = get_snapped_rect(
-                    prim_instance.local_clip_rect,
-                    &map_local_to_raster,
-                    surface.device_pixel_scale,
-                ).unwrap_or(prim_instance.local_clip_rect);
+                let snapped_clip_local_rect = if snap {
+                    get_snapped_rect(
+                        prim_instance.local_clip_rect,
+                        &map_local_to_raster,
+                        surface.device_pixel_scale,
+                    ).unwrap_or(prim_instance.local_clip_rect)
+                } else {
+                    prim_instance.local_clip_rect
+                };
 
                 // If we have a stretch size for the primitive, we need to adjust it if
                 // we changed the size of the primitive after snapping.
@@ -2177,7 +2190,7 @@ impl PrimitiveStore {
                 // rect however is simply the union of the visible rect of the
                 // children, which they snapped to, which is precisely what we also
                 // need to snap to in order to be consistent.
-                let visible_rect = if snap_to_visible {
+                let visible_rect = if clip_visible {
                     match combined_local_clip_rect.intersection(&snapped_prim_local_rect) {
                         Some(r) => r,
                         None => {
