@@ -15,7 +15,7 @@ use crate::prim_store::{
     BorderSegmentInfo, BrushSegment, NinePatchDescriptor, PrimKey,
     PrimKeyCommonData, PrimTemplate, PrimTemplateCommonData,
     PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData,
-    PrimitiveStore, InternablePrimitive,
+    PrimitiveStore, InternablePrimitive, PrimitiveVisibility
 };
 use crate::resource_cache::{ImageRequest, ResourceCache};
 use crate::storage;
@@ -64,10 +64,11 @@ impl NormalBorderData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
         if let Some(ref mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
-            self.write_prim_gpu_blocks(request, common.prim_size);
+            self.write_prim_gpu_blocks(request, prim_info.snapped_local_rect.size);
             self.write_segment_gpu_blocks(request);
         }
 
@@ -236,10 +237,11 @@ impl ImageBorderData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
         if let Some(ref mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
-            self.write_prim_gpu_blocks(request, &common.prim_size);
+            self.write_prim_gpu_blocks(request, &prim_info.snapped_local_rect.size);
             self.write_segment_gpu_blocks(request);
         }
 

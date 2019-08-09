@@ -2958,6 +2958,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::NormalBorder { data_handle, ref mut cache_handles, .. } => {
                 let prim_data = &mut data_stores.normal_border[*data_handle];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
                 let common_data = &mut prim_data.common;
                 let border_data = &mut prim_data.kind;
 
@@ -2970,7 +2971,7 @@ impl PrimitiveStore {
 
                 // Update the template this instance references, which may refresh the GPU
                 // cache with any shared template data.
-                border_data.update(common_data, frame_state);
+                border_data.update(common_data, prim_info, frame_state);
 
                 // TODO(gw): For now, the scale factors to rasterize borders at are
                 //           based on the true world transform of the primitive. When
@@ -3038,6 +3039,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::ImageBorder { data_handle, .. } => {
                 let prim_data = &mut data_stores.image_border[*data_handle];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
                 let border_data = &prim_data.kind;
 
                 // TODO: remove this in future by changing the request_image() calls to
@@ -3049,7 +3051,7 @@ impl PrimitiveStore {
 
                 // Update the template this instane references, which may refresh the GPU
                 // cache with any shared template data.
-                prim_data.kind.update(&mut prim_data.common, frame_state);
+                prim_data.kind.update(&mut prim_data.common, prim_info, frame_state);
             }
             PrimitiveInstanceKind::Rectangle { data_handle, segment_instance_index, opacity_binding_index, .. } => {
                 let prim_data = &mut data_stores.prim[*data_handle];
