@@ -1421,6 +1421,8 @@ pub struct PrimitiveVisibility {
     /// in raster space, if possible.
     pub snapped_shadow_rect: LayoutRect,
 
+    pub snapped_local_clip_rect: LayoutRect,
+
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
@@ -1999,6 +2001,7 @@ impl PrimitiveStore {
                         clip_task_index: ClipTaskIndex::INVALID,
                         snapped_local_rect: LayoutRect::max_rect(),
                         snapped_shadow_rect: LayoutRect::zero(),
+                        snapped_local_clip_rect: LayoutRect::zero(),
                         combined_local_clip_rect: LayoutRect::zero(),
                         stretch_size: LayoutSize::zero(),
                         tile_spacing: LayoutSize::zero(),
@@ -2029,6 +2032,10 @@ impl PrimitiveStore {
                     prim_local_rect
                 };
 
+                if prim_instance.is_chased() && snapped_prim_local_rect != prim_local_rect {
+                    println!("\tprim local {:?} snapped to {:?}", prim_local_rect, snapped_prim_local_rect);
+                }
+
                 let snapped_clip_local_rect = if snap {
                     get_snapped_rect(
                         prim_instance.local_clip_rect,
@@ -2038,6 +2045,10 @@ impl PrimitiveStore {
                 } else {
                     prim_instance.local_clip_rect
                 };
+
+                if prim_instance.is_chased() && snapped_clip_local_rect != prim_instance.local_clip_rect {
+                    println!("\tprim local clip {:?} snapped to {:?}", prim_instance.local_clip_rect, snapped_clip_local_rect);
+                }
 
                 // If we have a stretch size for the primitive, we need to adjust it if
                 // we changed the size of the primitive after snapping.
@@ -2258,6 +2269,7 @@ impl PrimitiveStore {
                         clip_chain,
                         clip_task_index: ClipTaskIndex::INVALID,
                         snapped_local_rect: snapped_prim_local_rect,
+                        snapped_local_clip_rect: snapped_clip_local_rect,
                         snapped_shadow_rect,
                         combined_local_clip_rect,
                         stretch_size,
@@ -3674,7 +3686,7 @@ impl PrimitiveInstance {
 
             if write_brush_segment_description(
                 prim_local_rect,
-                self.local_clip_rect,
+                prim_info.snapped_local_clip_rect,
                 prim_clip_chain,
                 &mut frame_state.segment_builder,
                 frame_state.clip_store,
@@ -4149,6 +4161,7 @@ pub fn get_snapped_rect<PixelSpace, SnappingSpace>(
         let snapped_world_rect = snapped_device_rect / device_pixel_scale;
         let snapped_raster_rect = snapped_world_rect * Scale::new(1.0);
         let snapped_prim_rect = map_to_raster.unmap(&snapped_raster_rect)?;
+
         Some(snapped_prim_rect)
     } else {
         None
