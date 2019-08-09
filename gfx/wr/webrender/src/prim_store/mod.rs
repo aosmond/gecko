@@ -1423,10 +1423,6 @@ pub struct PrimitiveVisibility {
     /// space, if possible.
     pub snapped_local_rect: LayoutRect,
 
-    /// The local rect for the drop shadow for picture primitives after snapping
-    /// in raster space, if possible.
-    pub snapped_shadow_rect: LayoutRect,
-
     pub snapped_local_clip_rect: LayoutRect,
 
     /// The current combined local clip for this primitive, from
@@ -2046,7 +2042,6 @@ impl PrimitiveStore {
                         clip_chain: ClipChainInstance::empty(),
                         clip_task_index: ClipTaskIndex::INVALID,
                         snapped_local_rect: LayoutRect::max_rect(),
-                        snapped_shadow_rect: LayoutRect::zero(),
                         snapped_local_clip_rect: LayoutRect::zero(),
                         combined_local_clip_rect: LayoutRect::zero(),
                         stretch_size: LayoutSize::zero(),
@@ -2263,17 +2258,7 @@ impl PrimitiveStore {
                     snapped_prim_local_rect
                 };
 
-                let (combined_visible_rect, snapped_shadow_rect) = if !prim_shadow_rect.is_empty() {
-                    let snapped_shadow_rect = get_snapped_rect(
-                        prim_shadow_rect,
-                        &map_local_to_raster,
-                        surface.device_pixel_scale,
-                    ).unwrap_or(prim_shadow_rect);
-
-                    (visible_rect.union(&snapped_shadow_rect), snapped_shadow_rect)
-                } else {
-                    (visible_rect, LayoutRect::zero())
-                };
+                let combined_visible_rect = visible_rect.union(&prim_shadow_rect);
 
                 // Include the snapped primitive/picture local rect, including any shadows,
                 // in the area affected by the surface.
@@ -2318,7 +2303,6 @@ impl PrimitiveStore {
                         clip_task_index: ClipTaskIndex::INVALID,
                         snapped_local_rect: snapped_prim_local_rect,
                         snapped_local_clip_rect: snapped_clip_local_rect,
-                        snapped_shadow_rect,
                         combined_local_clip_rect,
                         stretch_size,
                         tile_spacing,
