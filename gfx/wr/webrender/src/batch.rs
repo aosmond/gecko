@@ -1313,12 +1313,14 @@ impl BatchBuilder {
                                             .get_texture_address(gpu_cache)
                                             .as_int();
 
-                                        for (_, shadow_gpu_data) in shadows.iter().zip(picture.extra_gpu_data_handles.iter()) {
+                                        for (shadow, shadow_gpu_data) in shadows.iter().zip(picture.extra_gpu_data_handles.iter()) {
                                             // Get the GPU cache address of the extra data handle.
                                             let shadow_prim_address = gpu_cache.get_address(shadow_gpu_data);
 
+                                            let shadow_rect = prim_info.snapped_local_rect.translate(shadow.offset);
+
                                             let shadow_prim_header = PrimitiveHeader {
-                                                local_rect: prim_info.snapped_shadow_rect,
+                                                local_rect: shadow_rect,
                                                 specific_prim_address: shadow_prim_address,
                                                 ..prim_header
                                             };
