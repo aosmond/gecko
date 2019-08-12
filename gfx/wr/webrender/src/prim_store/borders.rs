@@ -12,7 +12,7 @@ use crate::gpu_cache::{GpuCache, GpuDataRequest};
 use crate::intern;
 use crate::internal_types::LayoutPrimitiveInfo;
 use crate::prim_store::{
-    NinePatchDescriptor, PrimKey,
+    BorderSegmentInfo, BrushSegment, NinePatchDescriptor, PrimKey,
     PrimKeyCommonData, PrimTemplate, PrimTemplateCommonData,
     PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData,
     PrimitiveStore, InternablePrimitive, PrimitiveVisibility
@@ -55,6 +55,24 @@ pub struct NormalBorderData {
 }
 
 impl NormalBorderData {
+    pub fn prepare_segments(
+        &self,
+        prim_size: LayoutSize,
+    ) -> (Vec<BorderSegmentInfo>, Vec<BrushSegment>) {
+        let mut border_segments = Vec::new();
+        let mut brush_segments = Vec::new();
+
+        create_border_segments(
+            prim_size,
+            &self.border,
+            &self.widths,
+            &mut border_segments,
+            &mut brush_segments,
+        );
+
+        (border_segments, brush_segments)
+    }
+
     /// Update the GPU cache for a given primitive template. This may be called multiple
     /// times per frame, by each primitive reference that refers to this interned
     /// template. The initial request call to the GPU cache ensures that work is only
@@ -62,17 +80,9 @@ impl NormalBorderData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
-        prim_info: &mut PrimitiveVisibility,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
-        create_border_segments(
-            prim_info.snapped_local_rect.size,
-            &self.border,
-            &self.widths,
-            &mut prim_info.border_segments,
-            &mut prim_info.brush_segments,
-        );
-
         if let Some(ref mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
             self.write_prim_gpu_blocks(request, prim_info.snapped_local_rect.size);
             self.write_segment_gpu_blocks(request, prim_info);
@@ -224,6 +234,13 @@ pub struct ImageBorderData {
 }
 
 impl ImageBorderData {
+    pub fn prepare_segments(
+        &self,
+        prim_size: LayoutSize,
+    ) -> Vec<BrushSegment> {
+        self.nine_patch.create_segments(prim_size)
+    }
+
     /// Update the GPU cache for a given primitive template. This may be called multiple
     /// times per frame, by each primitive reference that refers to this interned
     /// template. The initial request call to the GPU cache ensures that work is only
@@ -231,11 +248,9 @@ impl ImageBorderData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
-        prim_info: &mut PrimitiveVisibility,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
-        prim_info.brush_segments = self.nine_patch.create_segments(prim_info.snapped_local_rect.size);
-
         if let Some(ref mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
             self.write_prim_gpu_blocks(request, &prim_info.snapped_local_rect.size);
             self.write_segment_gpu_blocks(request, prim_info);
