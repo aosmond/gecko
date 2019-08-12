@@ -11,7 +11,8 @@ use crate::display_list_flattener::DisplayListFlattener;
 use crate::gpu_types::{BorderInstance, BorderSegment, BrushFlags};
 use crate::prim_store::{BorderSegmentInfo, BrushSegment, NinePatchDescriptor};
 use crate::prim_store::{EdgeAaSegmentMask, ScrollNodeAndClipChain};
-use crate::prim_store::borders::{NormalBorderPrim, NormalBorderData};
+use crate::prim_store::{PrimitiveVisibility};
+use crate::prim_store::borders::{NormalBorderPrim};
 use crate::util::{lerp, RectHelpers};
 use crate::internal_types::LayoutPrimitiveInfo;
 
@@ -884,10 +885,10 @@ pub fn create_border_segments(
 /// resolution and stretching them, so they will have the right shape, but
 /// blurrier.
 pub fn get_max_scale_for_border(
-    border_data: &NormalBorderData,
+    prim_info: &PrimitiveVisibility,
 ) -> LayoutToDeviceScale {
     let mut r = 1.0;
-    for segment in &border_data.border_segments {
+    for segment in &prim_info.border_segments {
         let size = segment.local_task_size;
         r = size.width.max(size.height.max(r));
     }
