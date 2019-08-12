@@ -1270,7 +1270,7 @@ impl BatchBuilder {
                                             prim_vis_mask,
                                         );
                                     }
-                                    Filter::DropShadows(shadows) => {
+                                    Filter::DropShadows(..) => {
                                         // Draw an instance per shadow first, following by the content.
 
                                         // The shadows and the content get drawn as a brush image.
