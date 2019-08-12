@@ -12,7 +12,7 @@ use crate::gpu_cache::{GpuCache, GpuDataRequest};
 use crate::intern;
 use crate::internal_types::LayoutPrimitiveInfo;
 use crate::prim_store::{
-    BorderSegmentInfo, BrushSegment, NinePatchDescriptor, PrimKey,
+    NinePatchDescriptor, PrimKey,
     PrimKeyCommonData, PrimTemplate, PrimTemplateCommonData,
     PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData,
     PrimitiveStore, InternablePrimitive, PrimitiveVisibility
@@ -50,8 +50,6 @@ impl intern::InternDebug for NormalBorderKey {}
 #[cfg_attr(feature = "replay", derive(Deserialize))]
 #[derive(MallocSizeOf)]
 pub struct NormalBorderData {
-    pub brush_segments: Vec<BrushSegment>,
-    pub border_segments: Vec<BorderSegmentInfo>,
     pub border: NormalBorder,
     pub widths: LayoutSideOffsets,
 }
@@ -64,12 +62,20 @@ impl NormalBorderData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
-        prim_info: &PrimitiveVisibility,
+        prim_info: &mut PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
+        create_border_segments(
+            prim_info.snapped_local_rect.size,
+            &self.border,
+            &self.widths,
+            &mut prim_info.border_segments,
+            &mut prim_info.brush_segments,
+        );
+
         if let Some(ref mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
             self.write_prim_gpu_blocks(request, prim_info.snapped_local_rect.size);
-            self.write_segment_gpu_blocks(request);
+            self.write_segment_gpu_blocks(request, prim_info);
         }
 
         common.opacity = PrimitiveOpacity::translucent();
@@ -96,8 +102,9 @@ impl NormalBorderData {
     fn write_segment_gpu_blocks(
         &self,
         request: &mut GpuDataRequest,
+        prim_info: &PrimitiveVisibility,
     ) {
-        for segment in &self.brush_segments {
+        for segment in &prim_info.brush_segments {
             // has to match VECS_PER_SEGMENT
             request.write_segment(
                 segment.local_rect,
@@ -119,22 +126,9 @@ impl From<NormalBorderKey> for NormalBorderTemplate {
         // FIXME(emilio): Is this the best place to do this?
         border.normalize(&widths);
 
-        let mut brush_segments = Vec::new();
-        let mut border_segments = Vec::new();
-
-        create_border_segments(
-            common.prim_size,
-            &border,
-            &widths,
-            &mut border_segments,
-            &mut brush_segments,
-        );
-
         NormalBorderTemplate {
             common,
             kind: NormalBorderData {
-                brush_segments,
-                border_segments,
                 border,
                 widths,
             }
@@ -226,7 +220,7 @@ impl intern::InternDebug for ImageBorderKey {}
 pub struct ImageBorderData {
     #[ignore_malloc_size_of = "Arc"]
     pub request: ImageRequest,
-    pub brush_segments: Vec<BrushSegment>,
+    pub nine_patch: NinePatchDescriptor,
 }
 
 impl ImageBorderData {
@@ -237,12 +231,14 @@ impl ImageBorderData {
     pub fn update(
         &mut self,
         common: &mut PrimTemplateCommonData,
-        prim_info: &PrimitiveVisibility,
+        prim_info: &mut PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
+        prim_info.brush_segments = self.nine_patch.create_segments(prim_info.snapped_local_rect.size);
+
         if let Some(ref mut request) = frame_state.gpu_cache.request(&mut common.gpu_cache_handle) {
             self.write_prim_gpu_blocks(request, &prim_info.snapped_local_rect.size);
-            self.write_segment_gpu_blocks(request);
+            self.write_segment_gpu_blocks(request, prim_info);
         }
 
         let image_properties = frame_state
@@ -290,8 +286,9 @@ impl ImageBorderData {
     fn write_segment_gpu_blocks(
         &self,
         request: &mut GpuDataRequest,
+        prim_info: &PrimitiveVisibility,
     ) {
-        for segment in &self.brush_segments {
+        for segment in &prim_info.brush_segments {
             // has to match VECS_PER_SEGMENT
             request.write_segment(
                 segment.local_rect,
@@ -307,12 +304,11 @@ impl From<ImageBorderKey> for ImageBorderTemplate {
     fn from(key: ImageBorderKey) -> Self {
         let common = PrimTemplateCommonData::with_key_common(key.common);
 
-        let brush_segments = key.kind.nine_patch.create_segments(common.prim_size);
         ImageBorderTemplate {
             common,
             kind: ImageBorderData {
                 request: key.kind.request,
-                brush_segments,
+                nine_patch: key.kind.nine_patch,
             }
         }
     }

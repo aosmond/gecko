@@ -1428,6 +1428,8 @@ pub struct PrimitiveVisibility {
     pub tile_spacing: LayoutSize,
 
     pub brush_segments: Vec<BrushSegment>,
+
+    pub border_segments: Vec<BorderSegmentInfo>,
 }
 
 #[derive(Clone, Debug)]
@@ -2004,6 +2006,7 @@ impl PrimitiveStore {
                         tile_spacing: LayoutSize::zero(),
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                         brush_segments: Vec::new(),
+                        border_segments: Vec::new(),
                     }
                 );
 
@@ -2263,6 +2266,7 @@ impl PrimitiveStore {
                         tile_spacing,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                         brush_segments: Vec::new(),
+                        border_segments: Vec::new(),
                     }
                 );
 
@@ -2910,7 +2914,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::NormalBorder { data_handle, ref mut cache_handles, .. } => {
                 let prim_data = &mut data_stores.normal_border[*data_handle];
-                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
                 let common_data = &mut prim_data.common;
                 let border_data = &mut prim_data.kind;
 
@@ -2947,7 +2951,7 @@ impl PrimitiveStore {
                 // Pick the maximum dimension as scale
                 let world_scale = LayoutToWorldScale::new(scale_width.max(scale_height));
                 let mut scale = world_scale * device_pixel_scale;
-                let max_scale = get_max_scale_for_border(border_data);
+                let max_scale = get_max_scale_for_border(prim_info);
                 scale.0 = scale.0.min(max_scale.0);
 
                 // For each edge and corner, request the render task by content key
@@ -2955,7 +2959,7 @@ impl PrimitiveStore {
                 // this segment will be available for batching later in the frame.
                 let mut handles: SmallVec<[RenderTaskCacheEntryHandle; 8]> = SmallVec::new();
 
-                for segment in &border_data.border_segments {
+                for segment in &prim_info.border_segments {
                     // Update the cache key device size based on requested scale.
                     let cache_size = to_cache_size(segment.local_task_size * scale);
                     let cache_key = RenderTaskCacheKey {
@@ -2991,7 +2995,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::ImageBorder { data_handle, .. } => {
                 let prim_data = &mut data_stores.image_border[*data_handle];
-                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
                 let border_data = &prim_data.kind;
 
                 // TODO: remove this in future by changing the request_image() calls to
@@ -3771,20 +3775,8 @@ impl PrimitiveInstance {
 
                 &segments_store[segment_instance.segments_range]
             }
-            PrimitiveInstanceKind::ImageBorder { data_handle, .. } => {
-                let border_data = &data_stores.image_border[data_handle].kind;
-
-                // TODO: This is quite messy - once we remove legacy primitives we
-                //       can change this to be a tuple match on (instance, template)
-                border_data.brush_segments.as_slice()
-            }
-            PrimitiveInstanceKind::NormalBorder { data_handle, .. } => {
-                let border_data = &data_stores.normal_border[data_handle].kind;
-
-                // TODO: This is quite messy - once we remove legacy primitives we
-                //       can change this to be a tuple match on (instance, template)
-                border_data.brush_segments.as_slice()
-            }
+            PrimitiveInstanceKind::ImageBorder { .. } |
+            PrimitiveInstanceKind::NormalBorder { .. } |
             PrimitiveInstanceKind::LinearGradient { .. } |
             PrimitiveInstanceKind::RadialGradient { .. } => {
                 // TODO: This is quite messy - once we remove legacy primitives we

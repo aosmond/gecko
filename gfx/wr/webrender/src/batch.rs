@@ -832,9 +832,8 @@ impl BatchBuilder {
                     batch_params.prim_user_data,
                 );
 
-                let border_data = &prim_data.kind;
                 self.add_segmented_prim_to_batch(
-                    Some(border_data.brush_segments.as_slice()),
+                    Some(prim_info.brush_segments.as_slice()),
                     common_data.opacity,
                     &batch_params,
                     specified_blend_mode,
@@ -1748,7 +1747,7 @@ impl BatchBuilder {
                 );
 
                 self.add_segmented_prim_to_batch(
-                    Some(border_data.brush_segments.as_slice()),
+                    Some(prim_info.brush_segments.as_slice()),
                     common_data.opacity,
                     &batch_params,
                     specified_blend_mode,
