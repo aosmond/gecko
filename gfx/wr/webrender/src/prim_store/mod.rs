@@ -1953,10 +1953,10 @@ impl PrimitiveStore {
                         Some(ref rc) => match rc.composite_mode {
                             // If we have a drop shadow filter, we also need to include the shadow in
                             // our local rect for the purpose of calculating the size of the picture.
-                            PictureCompositeMode::Filter(Filter::DropShadows(ref shadows)) => {
+                            PictureCompositeMode::Filter(Filter::DropShadows(..)) => {
                                 let mut rect = LayoutRect::zero();
-                                for shadow in shadows {
-                                    rect = rect.union(&pic.snapped_local_rect.translate(shadow.offset));
+                                for translation in &pic.extra_snapped_translations {
+                                    rect = rect.union(&pic.snapped_local_rect.translate(*translation));
                                 }
 
                                 rect
@@ -2341,18 +2341,32 @@ impl PrimitiveStore {
                 pic.snapped_local_rect = pic_local_rect;
             }
 
-            if let PictureCompositeMode::TileCache { .. } = raster_config.composite_mode {
-                let mut tile_cache = frame_state.tile_cache.take().unwrap();
+            match raster_config.composite_mode {
+                PictureCompositeMode::Filter(Filter::DropShadows(ref shadows)) => {
+                    for (i, shadow) in shadows.iter().enumerate() {
+                        let shadow_rect = pic.snapped_local_rect.translate(shadow.offset);
+                        let snapped_shadow_rect = get_snapped_rect(
+                            shadow_rect,
+                            &map_local_to_raster,
+                            surface.device_pixel_scale,
+                        ).unwrap_or(shadow_rect);
+                        pic.extra_snapped_translations[i] = snapped_shadow_rect.origin - pic.snapped_local_rect.origin;
+                    }
+                }
+                PictureCompositeMode::TileCache { .. } => {
+                    let mut tile_cache = frame_state.tile_cache.take().unwrap();
 
-                // Build the dirty region(s) for this tile cache.
-                tile_cache.post_update(
-                    frame_state.resource_cache,
-                    frame_state.gpu_cache,
-                    frame_context,
-                    frame_state.scratch,
-                );
+                    // Build the dirty region(s) for this tile cache.
+                    tile_cache.post_update(
+                        frame_state.resource_cache,
+                        frame_state.gpu_cache,
+                        frame_context,
+                        frame_state.scratch,
+                    );
 
-                pic.tile_cache = Some(tile_cache);
+                    pic.tile_cache = Some(tile_cache);
+                }
+                _ => {}
             }
 
             None

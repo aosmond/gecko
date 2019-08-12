@@ -2192,6 +2192,7 @@ pub struct PicturePrimitive {
     // in the GPU cache, depending on the type of
     // picture.
     pub extra_gpu_data_handles: SmallVec<[GpuCacheHandle; 1]>,
+    pub extra_snapped_translations: SmallVec<[LayoutVector2D; 1]>,
 
     /// The spatial node index of this picture when it is
     /// composited into the parent picture.
@@ -2336,6 +2337,7 @@ impl PicturePrimitive {
             context_3d,
             frame_output_pipeline_id,
             extra_gpu_data_handles: SmallVec::new(),
+            extra_snapped_translations: SmallVec::new(),
             apply_local_clip_rect,
             is_backface_visible,
             requested_raster_space,
@@ -2594,6 +2596,7 @@ impl PicturePrimitive {
                         let mut blur_tasks = BlurTaskCache::default();
 
                         self.extra_gpu_data_handles.resize(shadows.len(), GpuCacheHandle::new());
+                        self.extra_snapped_translations.resize(shadows.len(), LayoutVector2D::zero());
 
                         let mut blur_render_task_id = picture_task_id;
                         for shadow in shadows {
@@ -3325,12 +3328,13 @@ impl PicturePrimitive {
             PictureCompositeMode::Filter(Filter::Blur(..)) => {}
             PictureCompositeMode::Filter(Filter::DropShadows(ref shadows)) => {
                 self.extra_gpu_data_handles.resize(shadows.len(), GpuCacheHandle::new());
-                for (shadow, extra_handle) in shadows.iter().zip(self.extra_gpu_data_handles.iter_mut()) {
+                self.extra_snapped_translations.resize(shadows.len(), LayoutVector2D::zero());
+                for ((shadow, extra_handle), snapped_offset) in shadows.iter().zip(self.extra_gpu_data_handles.iter_mut()).zip(self.extra_snapped_translations.iter()) {
                     if let Some(mut request) = frame_state.gpu_cache.request(extra_handle) {
                         // Basic brush primitive header is (see end of prepare_prim_for_render_inner in prim_store.rs)
                         //  [brush specific data]
                         //  [segment_rect, segment data]
-                        let shadow_rect = self.snapped_local_rect.translate(shadow.offset);
+                        let shadow_rect = self.snapped_local_rect.translate(*snapped_offset);
 
                         // ImageBrush colors
                         request.push(shadow.color.premultiplied());
