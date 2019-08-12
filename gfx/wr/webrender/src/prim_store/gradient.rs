@@ -13,7 +13,7 @@ use crate::frame_builder::FrameBuildingState;
 use crate::gpu_cache::{GpuCacheHandle, GpuDataRequest};
 use crate::intern::{Internable, InternDebug, Handle as InternHandle};
 use crate::internal_types::LayoutPrimitiveInfo;
-use crate::prim_store::{GradientTileRange, VectorKey};
+use crate::prim_store::{BrushSegment, GradientTileRange, VectorKey};
 use crate::prim_store::{PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData};
 use crate::prim_store::{PrimKeyCommonData, PrimTemplateCommonData, PrimitiveStore};
 use crate::prim_store::{NinePatchDescriptor, PointKey, SizeKey, InternablePrimitive};
@@ -216,19 +216,26 @@ impl From<LinearGradientKey> for LinearGradientTemplate {
 }
 
 impl LinearGradientTemplate {
+    pub fn prepare_segments(
+        &self,
+        prim_size: LayoutSize,
+    ) -> Vec<BrushSegment> {
+        if let Some(ref nine_patch) = self.nine_patch {
+            nine_patch.create_segments(prim_size)
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Update the GPU cache for a given primitive template. This may be called multiple
     /// times per frame, by each primitive reference that refers to this interned
     /// template. The initial request call to the GPU cache ensures that work is only
     /// done if the cache entry is invalid (due to first use or eviction).
     pub fn update(
         &mut self,
-        prim_info: &mut PrimitiveVisibility,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
-        if let Some(ref nine_patch) = self.nine_patch {
-            prim_info.brush_segments = nine_patch.create_segments(prim_info.snapped_local_rect.size);
-        }
-
         if let Some(mut request) =
             frame_state.gpu_cache.request(&mut self.common.gpu_cache_handle) {
             // write_prim_gpu_blocks
@@ -460,19 +467,26 @@ impl From<RadialGradientKey> for RadialGradientTemplate {
 }
 
 impl RadialGradientTemplate {
+    pub fn prepare_segments(
+        &self,
+        prim_size: LayoutSize,
+    ) -> Vec<BrushSegment> {
+        if let Some(ref nine_patch) = self.nine_patch {
+            nine_patch.create_segments(prim_size)
+        } else {
+            Vec::new()
+        }
+    }
+
     /// Update the GPU cache for a given primitive template. This may be called multiple
     /// times per frame, by each primitive reference that refers to this interned
     /// template. The initial request call to the GPU cache ensures that work is only
     /// done if the cache entry is invalid (due to first use or eviction).
     pub fn update(
         &mut self,
-        prim_info: &mut PrimitiveVisibility,
+        prim_info: &PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
-        if let Some(ref nine_patch) = self.nine_patch {
-            prim_info.brush_segments = nine_patch.create_segments(prim_info.snapped_local_rect.size);
-        }
-
         if let Some(mut request) =
             frame_state.gpu_cache.request(&mut self.common.gpu_cache_handle) {
             // write_prim_gpu_blocks

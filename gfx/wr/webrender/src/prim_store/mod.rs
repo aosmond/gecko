@@ -2249,6 +2249,28 @@ impl PrimitiveStore {
                     }
                 }
 
+                // Some primitives require brush/border segments to be built now that we
+                // know the primitive's snapped size.
+                let (border_segments, brush_segments) = match prim_instance.kind {
+                        PrimitiveInstanceKind::NormalBorder { data_handle, .. } => {
+                            let prim_data = &frame_state.data_stores.normal_border[data_handle];
+                            prim_data.kind.prepare_segments(snapped_prim_local_rect.size)
+                        }
+                        PrimitiveInstanceKind::ImageBorder { data_handle, .. } => {
+                            let prim_data = &frame_state.data_stores.image_border[data_handle];
+                            (Vec::new(), prim_data.kind.prepare_segments(snapped_prim_local_rect.size))
+                        }
+                        PrimitiveInstanceKind::LinearGradient { data_handle, .. } => {
+                            let prim_data = &frame_state.data_stores.linear_grad[data_handle];
+                            (Vec::new(), prim_data.prepare_segments(snapped_prim_local_rect.size))
+                        }
+                        PrimitiveInstanceKind::RadialGradient { data_handle, .. } => {
+                            let prim_data = &frame_state.data_stores.radial_grad[data_handle];
+                            (Vec::new(), prim_data.prepare_segments(snapped_prim_local_rect.size))
+                        }
+                        _ => (Vec::new(), Vec::new()),
+                };
+
                 let vis_index = PrimitiveVisibilityIndex(frame_state.scratch.prim_info.len() as u32);
                 if prim_instance.is_chased() {
                     println!("\tvisible {:?} with {:?}", vis_index, combined_local_clip_rect);
@@ -2265,8 +2287,8 @@ impl PrimitiveStore {
                         stretch_size,
                         tile_spacing,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
-                        brush_segments: Vec::new(),
-                        border_segments: Vec::new(),
+                        brush_segments,
+                        border_segments,
                     }
                 );
 
@@ -2914,7 +2936,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::NormalBorder { data_handle, ref mut cache_handles, .. } => {
                 let prim_data = &mut data_stores.normal_border[*data_handle];
-                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
                 let common_data = &mut prim_data.common;
                 let border_data = &mut prim_data.kind;
 
@@ -2995,7 +3017,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::ImageBorder { data_handle, .. } => {
                 let prim_data = &mut data_stores.image_border[*data_handle];
-                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
                 let border_data = &prim_data.kind;
 
                 // TODO: remove this in future by changing the request_image() calls to
@@ -3103,7 +3125,7 @@ impl PrimitiveStore {
             PrimitiveInstanceKind::LinearGradient { data_handle, gradient_index, .. } => {
                 let prim_data = &mut data_stores.linear_grad[*data_handle];
                 let gradient = &mut self.linear_gradients[*gradient_index];
-                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
 
                 // Update the template this instane references, which may refresh the GPU
                 // cache with any shared template data.
@@ -3234,7 +3256,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::RadialGradient { data_handle, ref mut visible_tiles_range, .. } => {
                 let prim_data = &mut data_stores.radial_grad[*data_handle];
-                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
 
                 if prim_data.stretch_size.width >= prim_data.common.prim_size.width &&
                     prim_data.stretch_size.height >= prim_data.common.prim_size.height {
