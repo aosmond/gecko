@@ -1426,6 +1426,8 @@ pub struct PrimitiveVisibility {
     pub stretch_size: LayoutSize,
 
     pub tile_spacing: LayoutSize,
+
+    pub brush_segments: Vec<BrushSegment>,
 }
 
 #[derive(Clone, Debug)]
@@ -2001,6 +2003,7 @@ impl PrimitiveStore {
                         stretch_size: LayoutSize::zero(),
                         tile_spacing: LayoutSize::zero(),
                         visibility_mask: PrimitiveVisibilityMask::empty(),
+                        brush_segments: Vec::new(),
                     }
                 );
 
@@ -2259,6 +2262,7 @@ impl PrimitiveStore {
                         stretch_size,
                         tile_spacing,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
+                        brush_segments: Vec::new(),
                     }
                 );
 
@@ -3095,7 +3099,7 @@ impl PrimitiveStore {
             PrimitiveInstanceKind::LinearGradient { data_handle, gradient_index, .. } => {
                 let prim_data = &mut data_stores.linear_grad[*data_handle];
                 let gradient = &mut self.linear_gradients[*gradient_index];
-                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
 
                 // Update the template this instane references, which may refresh the GPU
                 // cache with any shared template data.
@@ -3226,7 +3230,7 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::RadialGradient { data_handle, ref mut visible_tiles_range, .. } => {
                 let prim_data = &mut data_stores.radial_grad[*data_handle];
-                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
+                let prim_info = &mut scratch.prim_info[prim_instance.visibility_info.0 as usize];
 
                 if prim_data.stretch_size.width >= prim_data.common.prim_size.width &&
                     prim_data.stretch_size.height >= prim_data.common.prim_size.height {
@@ -3781,27 +3785,15 @@ impl PrimitiveInstance {
                 //       can change this to be a tuple match on (instance, template)
                 border_data.brush_segments.as_slice()
             }
-            PrimitiveInstanceKind::LinearGradient { data_handle, .. } => {
-                let prim_data = &data_stores.linear_grad[data_handle];
-
+            PrimitiveInstanceKind::LinearGradient { .. } |
+            PrimitiveInstanceKind::RadialGradient { .. } => {
                 // TODO: This is quite messy - once we remove legacy primitives we
                 //       can change this to be a tuple match on (instance, template)
-                if prim_data.brush_segments.is_empty() {
+                if prim_info.brush_segments.is_empty() {
                     return false;
                 }
 
-                prim_data.brush_segments.as_slice()
-            }
-            PrimitiveInstanceKind::RadialGradient { data_handle, .. } => {
-                let prim_data = &data_stores.radial_grad[data_handle];
-
-                // TODO: This is quite messy - once we remove legacy primitives we
-                //       can change this to be a tuple match on (instance, template)
-                if prim_data.brush_segments.is_empty() {
-                    return false;
-                }
-
-                prim_data.brush_segments.as_slice()
+                prim_info.brush_segments.as_slice()
             }
         };
 

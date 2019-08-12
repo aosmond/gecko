@@ -13,7 +13,7 @@ use crate::frame_builder::FrameBuildingState;
 use crate::gpu_cache::{GpuCacheHandle, GpuDataRequest};
 use crate::intern::{Internable, InternDebug, Handle as InternHandle};
 use crate::internal_types::LayoutPrimitiveInfo;
-use crate::prim_store::{BrushSegment, GradientTileRange, VectorKey};
+use crate::prim_store::{GradientTileRange, VectorKey};
 use crate::prim_store::{PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData};
 use crate::prim_store::{PrimKeyCommonData, PrimTemplateCommonData, PrimitiveStore};
 use crate::prim_store::{NinePatchDescriptor, PointKey, SizeKey, InternablePrimitive};
@@ -123,7 +123,7 @@ pub struct LinearGradientTemplate {
     pub tile_spacing: LayoutSize,
     pub stops_opacity: PrimitiveOpacity,
     pub stops: Vec<GradientStop>,
-    pub brush_segments: Vec<BrushSegment>,
+    pub nine_patch: Option<Box<NinePatchDescriptor>>,
     pub reverse_stops: bool,
     pub stops_handle: GpuCacheHandle,
     /// If true, this gradient can be drawn via the fast path
@@ -193,12 +193,6 @@ impl From<LinearGradientKey> for LinearGradientTemplate {
             }
         }).collect();
 
-        let mut brush_segments = Vec::new();
-
-        if let Some(ref nine_patch) = item.nine_patch {
-            brush_segments = nine_patch.create_segments(common.prim_size);
-        }
-
         // Save opacity of the stops for use in
         // selecting which pass this gradient
         // should be drawn in.
@@ -213,7 +207,7 @@ impl From<LinearGradientKey> for LinearGradientTemplate {
             tile_spacing: item.tile_spacing.into(),
             stops_opacity,
             stops,
-            brush_segments,
+            nine_patch: item.nine_patch,
             reverse_stops: item.reverse_stops,
             stops_handle: GpuCacheHandle::new(),
             supports_caching,
@@ -228,9 +222,13 @@ impl LinearGradientTemplate {
     /// done if the cache entry is invalid (due to first use or eviction).
     pub fn update(
         &mut self,
-        prim_info: &PrimitiveVisibility,
+        prim_info: &mut PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
+        if let Some(ref nine_patch) = self.nine_patch {
+            prim_info.brush_segments = nine_patch.create_segments(prim_info.snapped_local_rect.size);
+        }
+
         if let Some(mut request) =
             frame_state.gpu_cache.request(&mut self.common.gpu_cache_handle) {
             // write_prim_gpu_blocks
@@ -248,7 +246,7 @@ impl LinearGradientTemplate {
             ]);
 
             // write_segment_gpu_blocks
-            for segment in &self.brush_segments {
+            for segment in &prim_info.brush_segments {
                 // has to match VECS_PER_SEGMENT
                 request.write_segment(
                     segment.local_rect,
@@ -418,7 +416,7 @@ pub struct RadialGradientTemplate {
     pub params: RadialGradientParams,
     pub stretch_size: LayoutSize,
     pub tile_spacing: LayoutSize,
-    pub brush_segments: Vec<BrushSegment>,
+    pub nine_patch: Option<Box<NinePatchDescriptor>>,
     pub stops: Vec<GradientStop>,
     pub stops_handle: GpuCacheHandle,
 }
@@ -439,11 +437,6 @@ impl DerefMut for RadialGradientTemplate {
 impl From<RadialGradientKey> for RadialGradientTemplate {
     fn from(item: RadialGradientKey) -> Self {
         let common = PrimTemplateCommonData::with_key_common(item.common);
-        let mut brush_segments = Vec::new();
-
-        if let Some(ref nine_patch) = item.nine_patch {
-            brush_segments = nine_patch.create_segments(common.prim_size);
-        }
 
         let stops = item.stops.iter().map(|stop| {
             GradientStop {
@@ -459,7 +452,7 @@ impl From<RadialGradientKey> for RadialGradientTemplate {
             params: item.params,
             stretch_size: item.stretch_size.into(),
             tile_spacing: item.tile_spacing.into(),
-            brush_segments,
+            nine_patch: item.nine_patch,
             stops,
             stops_handle: GpuCacheHandle::new(),
         }
@@ -473,9 +466,13 @@ impl RadialGradientTemplate {
     /// done if the cache entry is invalid (due to first use or eviction).
     pub fn update(
         &mut self,
-        prim_info: &PrimitiveVisibility,
+        prim_info: &mut PrimitiveVisibility,
         frame_state: &mut FrameBuildingState,
     ) {
+        if let Some(ref nine_patch) = self.nine_patch {
+            prim_info.brush_segments = nine_patch.create_segments(prim_info.snapped_local_rect.size);
+        }
+
         if let Some(mut request) =
             frame_state.gpu_cache.request(&mut self.common.gpu_cache_handle) {
             // write_prim_gpu_blocks
@@ -493,7 +490,7 @@ impl RadialGradientTemplate {
             ]);
 
             // write_segment_gpu_blocks
-            for segment in &self.brush_segments {
+            for segment in &prim_info.brush_segments {
                 // has to match VECS_PER_SEGMENT
                 request.write_segment(
                     segment.local_rect,

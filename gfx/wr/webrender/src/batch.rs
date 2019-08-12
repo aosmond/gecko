@@ -2184,10 +2184,10 @@ impl BatchBuilder {
                         batch_params.prim_user_data,
                     );
 
-                    let segments = if prim_data.brush_segments.is_empty() {
+                    let segments = if prim_info.brush_segments.is_empty() {
                         None
                     } else {
-                        Some(prim_data.brush_segments.as_slice())
+                        Some(prim_info.brush_segments.as_slice())
                     };
 
                     self.add_segmented_prim_to_batch(
@@ -2265,10 +2265,10 @@ impl BatchBuilder {
                         batch_params.prim_user_data,
                     );
 
-                    let segments = if prim_data.brush_segments.is_empty() {
+                    let segments = if prim_info.brush_segments.is_empty() {
                         None
                     } else {
-                        Some(prim_data.brush_segments.as_slice())
+                        Some(prim_info.brush_segments.as_slice())
                     };
 
                     self.add_segmented_prim_to_batch(
