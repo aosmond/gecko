@@ -1353,11 +1353,11 @@ impl BatchBuilder {
                                             .get_texture_address(gpu_cache)
                                             .as_int();
 
-                                        for (shadow, shadow_gpu_data) in shadows.iter().zip(picture.extra_gpu_data_handles.iter()) {
+                                        for (shadow_gpu_data, snapped_translation) in picture.extra_gpu_data_handles.iter().zip(picture.extra_snapped_translations.iter()) {
                                             // Get the GPU cache address of the extra data handle.
                                             let shadow_prim_address = gpu_cache.get_address(shadow_gpu_data);
 
-                                            let shadow_rect = prim_info.snapped_local_rect.translate(shadow.offset);
+                                            let shadow_rect = prim_info.snapped_local_rect.translate(*snapped_translation);
 
                                             let shadow_prim_header = PrimitiveHeader {
                                                 local_rect: shadow_rect,
