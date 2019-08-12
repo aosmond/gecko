@@ -16,7 +16,7 @@ use crate::clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, 
 use crate::debug_colors;
 use crate::debug_render::DebugItem;
 use crate::display_list_flattener::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Point2D};
+use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D};
 use euclid::approxeq::ApproxEq;
 use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use crate::frame_builder::{FrameVisibilityContext, FrameVisibilityState};
@@ -4060,40 +4060,6 @@ impl PrimitiveInstance {
     }
 }
 
-/// Mimics the GLSL mix() function.
-fn mix(x: f32, y: f32, a: f32) -> f32 {
-    x * (1.0 - a) + y * a
-}
-
-/// Given a point within a local rectangle, and the device space corners
-/// of a snapped primitive, return the snap offsets.
-fn compute_snap_offset_impl<PixelSpace>(
-    reference_pos: Point2D<f32, PixelSpace>,
-    reference_rect: Rect<f32, PixelSpace>,
-    prim_top_left: DevicePoint,
-    prim_bottom_right: DevicePoint,
-) -> DeviceVector2D {
-    let normalized_snap_pos = Point2D::<f32, PixelSpace>::new(
-        (reference_pos.x - reference_rect.origin.x) / reference_rect.size.width,
-        (reference_pos.y - reference_rect.origin.y) / reference_rect.size.height,
-    );
-
-    let top_left = DeviceVector2D::new(
-        (prim_top_left.x + 0.5).floor() - prim_top_left.x,
-        (prim_top_left.y + 0.5).floor() - prim_top_left.y,
-    );
-
-    let bottom_right = DeviceVector2D::new(
-        (prim_bottom_right.x + 0.5).floor() - prim_bottom_right.x,
-        (prim_bottom_right.y + 0.5).floor() - prim_bottom_right.y,
-    );
-
-    DeviceVector2D::new(
-        mix(top_left.x, bottom_right.x, normalized_snap_pos.x),
-        mix(top_left.y, bottom_right.y, normalized_snap_pos.y),
-    )
-}
-
 /// Retrieve the exact unsnapped device space rectangle for a primitive.
 fn get_unclipped_device_rect(
     prim_rect: PictureRect,
@@ -4200,25 +4166,7 @@ pub fn get_snapped_rect<PixelSpace, SnappingSpace>(
             world_rect * device_pixel_scale
         };
 
-        let top_left = compute_snap_offset_impl(
-            prim_rect.origin,
-            prim_rect,
-            device_rect.origin,
-            device_rect.bottom_right(),
-        );
-
-        let bottom_right = compute_snap_offset_impl(
-            prim_rect.bottom_right(),
-            prim_rect,
-            device_rect.origin,
-            device_rect.bottom_right(),
-        );
-
-        let snapped_device_rect = DeviceRect::new(
-            device_rect.origin + top_left,
-            device_rect.size + (bottom_right - top_left).to_size()
-        );
-
+        let snapped_device_rect = device_rect.round();
         let snapped_world_rect = snapped_device_rect / device_pixel_scale;
         let snapped_raster_rect = snapped_world_rect * Scale::new(1.0);
         let snapped_prim_rect = map_to_raster.unmap(&snapped_raster_rect)?;
