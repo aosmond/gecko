@@ -1763,13 +1763,13 @@ impl BatchBuilder {
                     ctx,
                 );
             }
-            PrimitiveInstanceKind::Rectangle { data_handle, segment_instance_index, opacity_binding_index, .. } => {
-                let prim_data = &ctx.data_stores.prim[data_handle];
+            PrimitiveInstanceKind::Rectangle { segment_instance_index, opacity_binding_index, .. } |
+            PrimitiveInstanceKind::BoxShadow { segment_instance_index, opacity_binding_index, .. } => {
                 let specified_blend_mode = BlendMode::PremultipliedAlpha;
                 let opacity_binding = ctx.prim_store.get_opacity_binding(opacity_binding_index);
 
                 let opacity = PrimitiveOpacity::from_alpha(opacity_binding);
-                let opacity = opacity.combine(prim_data.opacity);
+                let opacity = opacity.combine(prim_common_data.opacity);
 
                 let non_segmented_blend_mode = if !opacity.is_opaque ||
                     prim_info.clip_task_index != ClipTaskIndex::INVALID ||
@@ -1788,7 +1788,7 @@ impl BatchBuilder {
                 );
 
                 let (prim_cache_address, segments) = if segment_instance_index == SegmentInstanceIndex::UNUSED {
-                    (gpu_cache.get_address(&prim_data.gpu_cache_handle), None)
+                    (gpu_cache.get_address(&prim_common_data.gpu_cache_handle), None)
                 } else {
                     let segment_instance = &ctx.scratch.segment_instances[segment_instance_index];
                     let segments = Some(&ctx.scratch.segments[segment_instance.segments_range]);
@@ -2620,6 +2620,7 @@ impl PrimitiveInstance {
             PrimitiveInstanceKind::NormalBorder { .. } |
             PrimitiveInstanceKind::ImageBorder { .. } |
             PrimitiveInstanceKind::Rectangle { .. } |
+            PrimitiveInstanceKind::BoxShadow { .. } |
             PrimitiveInstanceKind::LinearGradient { .. } |
             PrimitiveInstanceKind::RadialGradient { .. } |
             PrimitiveInstanceKind::PushClipChain |

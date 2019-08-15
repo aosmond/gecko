@@ -876,6 +876,7 @@ macro_rules! enumerate_interners {
         $macro_name! {
             clip: ClipIntern,
             prim: PrimitiveKeyKind,
+            box_shadow: BoxShadow,
             normal_border: NormalBorderPrim,
             image_border: ImageBorder,
             image: Image,

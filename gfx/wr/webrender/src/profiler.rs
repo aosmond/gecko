@@ -569,6 +569,7 @@ impl BackendProfileCounters {
             //TODO: generate this by a macro
             intern: InternProfileCounters {
                 prim: ResourceProfileCounter::new("Interned primitives"),
+                box_shadow: ResourceProfileCounter::new("Interened box shadows"),
                 image: ResourceProfileCounter::new("Interned images"),
                 image_border: ResourceProfileCounter::new("Interned image borders"),
                 line_decoration: ResourceProfileCounter::new("Interned line decorations"),

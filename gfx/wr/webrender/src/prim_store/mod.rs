@@ -29,6 +29,7 @@ use malloc_size_of::MallocSizeOf;
 use crate::picture::{PictureCompositeMode, PicturePrimitive, ROOT_SURFACE_INDEX};
 use crate::picture::{ClusterIndex, PrimitiveList, RecordedDirtyRegion, SurfaceIndex, RetainedTiles, RasterConfig};
 use crate::prim_store::borders::{ImageBorderDataHandle, NormalBorderDataHandle};
+use crate::prim_store::box_shadow::{BoxShadowDataHandle};
 use crate::prim_store::gradient::{GRADIENT_FP_STOPS, GradientCacheKey, GradientStopKey};
 use crate::prim_store::gradient::{LinearGradientPrimitive, LinearGradientDataHandle, RadialGradientDataHandle};
 use crate::prim_store::image::{ImageDataHandle, ImageInstance, VisibleImageTile, YuvImageDataHandle};
@@ -55,6 +56,7 @@ use crate::internal_types::{LayoutPrimitiveInfo, Filter};
 use smallvec::SmallVec;
 
 pub mod borders;
+pub mod box_shadow;
 pub mod gradient;
 pub mod image;
 pub mod line_dec;
@@ -1299,6 +1301,12 @@ pub enum PrimitiveInstanceKind {
         opacity_binding_index: OpacityBindingIndex,
         segment_instance_index: SegmentInstanceIndex,
     },
+    BoxShadow {
+        /// Handle to the common interned data for this primitive.
+        data_handle: BoxShadowDataHandle,
+        opacity_binding_index: OpacityBindingIndex,
+        segment_instance_index: SegmentInstanceIndex,
+    },
     YuvImage {
         /// Handle to the common interned data for this primitive.
         data_handle: YuvImageDataHandle,
@@ -1514,6 +1522,9 @@ impl PrimitiveInstance {
         match &self.kind {
             PrimitiveInstanceKind::Clear { data_handle, .. } |
             PrimitiveInstanceKind::Rectangle { data_handle, .. } => {
+                data_handle.uid()
+            }
+            PrimitiveInstanceKind::BoxShadow { data_handle, .. } => {
                 data_handle.uid()
             }
             PrimitiveInstanceKind::Image { data_handle, .. } => {
@@ -2236,7 +2247,8 @@ impl PrimitiveStore {
                         PrimitiveInstanceKind::LineDecoration { .. } => debug_colors::PURPLE,
                         PrimitiveInstanceKind::NormalBorder { .. } |
                         PrimitiveInstanceKind::ImageBorder { .. } => debug_colors::ORANGE,
-                        PrimitiveInstanceKind::Rectangle { .. } => ColorF { r: 0.8, g: 0.8, b: 0.8, a: 0.5 },
+                        PrimitiveInstanceKind::Rectangle { .. } |
+                        PrimitiveInstanceKind::BoxShadow { .. } => ColorF { r: 0.8, g: 0.8, b: 0.8, a: 0.5 },
                         PrimitiveInstanceKind::YuvImage { .. } => debug_colors::BLUE,
                         PrimitiveInstanceKind::Image { .. } => debug_colors::BLUE,
                         PrimitiveInstanceKind::LinearGradient { .. } => debug_colors::PINK,
@@ -2553,6 +2565,7 @@ impl PrimitiveStore {
             // If we find a single rect or image, we can use that
             // as the primitive to collapse the opacity into.
             PrimitiveInstanceKind::Rectangle { .. } |
+            PrimitiveInstanceKind::BoxShadow { .. } |
             PrimitiveInstanceKind::Image { .. } => {
                 return Some(pic_index);
             }
@@ -2618,7 +2631,8 @@ impl PrimitiveStore {
                         let opacity_binding = &mut self.opacity_bindings[image_instance.opacity_binding_index];
                         opacity_binding.push(binding);
                     }
-                    PrimitiveInstanceKind::Rectangle { ref mut opacity_binding_index, .. } => {
+                    PrimitiveInstanceKind::Rectangle { ref mut opacity_binding_index, .. } |
+                    PrimitiveInstanceKind::BoxShadow { ref mut opacity_binding_index, .. } => {
                         // By this point, we know we should only have found a primitive
                         // that supports opacity collapse.
                         if *opacity_binding_index == OpacityBindingIndex::INVALID {
@@ -2694,6 +2708,7 @@ impl PrimitiveStore {
                 }
                 PrimitiveInstanceKind::TextRun { .. } |
                 PrimitiveInstanceKind::Rectangle { .. } |
+                PrimitiveInstanceKind::BoxShadow { .. } |
                 PrimitiveInstanceKind::LineDecoration { .. } |
                 PrimitiveInstanceKind::NormalBorder { .. } |
                 PrimitiveInstanceKind::ImageBorder { .. } |
@@ -3047,6 +3062,32 @@ impl PrimitiveStore {
             }
             PrimitiveInstanceKind::Rectangle { data_handle, segment_instance_index, opacity_binding_index, .. } => {
                 let prim_data = &mut data_stores.prim[*data_handle];
+                prim_data.common.may_need_repetition = false;
+
+                // Update the template this instane references, which may refresh the GPU
+                // cache with any shared template data.
+                prim_data.update(frame_state);
+
+                update_opacity_binding(
+                    &mut self.opacity_bindings,
+                    *opacity_binding_index,
+                    frame_context.scene_properties,
+                );
+
+                write_segment(
+                    *segment_instance_index,
+                    frame_state,
+                    &mut scratch.segments,
+                    &mut scratch.segment_instances,
+                    |request| {
+                        prim_data.kind.write_prim_gpu_blocks(
+                            request,
+                        );
+                    }
+                );
+            }
+            PrimitiveInstanceKind::BoxShadow { data_handle, segment_instance_index, opacity_binding_index, .. } => {
+                let prim_data = &mut data_stores.box_shadow[*data_handle];
                 prim_data.common.may_need_repetition = false;
 
                 // Update the template this instane references, which may refresh the GPU
@@ -3656,6 +3697,7 @@ impl PrimitiveInstance {
 
         let segment_instance_index = match self.kind {
             PrimitiveInstanceKind::Rectangle { ref mut segment_instance_index, .. } |
+            PrimitiveInstanceKind::BoxShadow { ref mut segment_instance_index, .. } |
             PrimitiveInstanceKind::YuvImage { ref mut segment_instance_index, .. } => {
                 segment_instance_index
             }
@@ -3800,7 +3842,8 @@ impl PrimitiveInstance {
                 &segments_store[segment_instance.segments_range]
             }
             PrimitiveInstanceKind::YuvImage { segment_instance_index, .. } |
-            PrimitiveInstanceKind::Rectangle { segment_instance_index, .. } => {
+            PrimitiveInstanceKind::Rectangle { segment_instance_index, .. } |
+            PrimitiveInstanceKind::BoxShadow { segment_instance_index, .. } => {
                 debug_assert!(segment_instance_index != SegmentInstanceIndex::INVALID);
 
                 if segment_instance_index == SegmentInstanceIndex::UNUSED {

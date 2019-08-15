@@ -5,6 +5,7 @@
 // list of all interned primitives to match enumerate_interners!
 
 pub use crate::prim_store::borders::{ImageBorder, NormalBorderPrim};
+pub use crate::prim_store::box_shadow::BoxShadow;
 pub use crate::prim_store::image::{Image, YuvImage};
 pub use crate::prim_store::line_dec::{LineDecoration};
 pub use crate::prim_store::gradient::{LinearGradient, RadialGradient};

@@ -1426,6 +1426,47 @@ impl TileCacheInstance {
 
                 prim_info.clip_by_tile = true;
             }
+            PrimitiveInstanceKind::BoxShadow { data_handle, opacity_binding_index, .. } => {
+                if opacity_binding_index == OpacityBindingIndex::INVALID {
+                    // Check a number of conditions to see if we can consider this
+                    // primitive as an opaque rect. Several of these are conservative
+                    // checks and could be relaxed in future. However, these checks
+                    // are quick and capture the common cases of background rects.
+                    // Specifically, we currently require:
+                    //  - No opacity binding (to avoid resolving the opacity here).
+                    //  - Color.a >= 1.0 (the primitive is opaque).
+                    //  - Same coord system as picture cache (ensures rects are axis-aligned).
+                    //  - No clip masks exist.
+
+                    let on_picture_surface = surface_index == self.surface_index;
+
+                    let prim_is_opaque = data_stores.box_shadow[data_handle].kind.color.a >= 1.0;
+
+                    let same_coord_system = {
+                        let prim_spatial_node = &clip_scroll_tree
+                            .spatial_nodes[prim_instance.spatial_node_index.0 as usize];
+                        let surface_spatial_node = &clip_scroll_tree
+                            .spatial_nodes[self.spatial_node_index.0 as usize];
+
+                        prim_spatial_node.coordinate_system_id == surface_spatial_node.coordinate_system_id
+                    };
+
+                    if let Some(ref clip_chain) = prim_clip_chain {
+                        if prim_is_opaque && same_coord_system && !clip_chain.needs_mask && on_picture_surface {
+                            if clip_chain.pic_clip_rect.contains_rect(&self.opaque_rect) {
+                                self.opaque_rect = clip_chain.pic_clip_rect;
+                            }
+                        }
+                    };
+                } else {
+                    let opacity_binding = &opacity_binding_store[opacity_binding_index];
+                    for binding in &opacity_binding.bindings {
+                        prim_info.opacity_bindings.push(OpacityBinding::from(*binding));
+                    }
+                }
+
+                prim_info.clip_by_tile = true;
+            }
             PrimitiveInstanceKind::Image { data_handle, image_instance_index, .. } => {
                 let image_data = &data_stores.image[data_handle].kind;
                 let image_instance = &image_instances[image_instance_index];
@@ -2041,6 +2082,10 @@ impl PrimitiveList {
                 PrimitiveInstanceKind::Rectangle { data_handle, .. } |
                 PrimitiveInstanceKind::Clear { data_handle, .. } => {
                     let data = &interners.prim[data_handle];
+                    (data.is_backface_visible, data.prim_size)
+                }
+                PrimitiveInstanceKind::BoxShadow { data_handle, .. } => {
+                    let data = &interners.box_shadow[data_handle];
                     (data.is_backface_visible, data.prim_size)
                 }
                 PrimitiveInstanceKind::Image { data_handle, .. } => {

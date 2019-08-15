@@ -272,6 +272,10 @@ impl DataStores {
                 let prim_data = &self.prim[data_handle];
                 &prim_data.common
             }
+            PrimitiveInstanceKind::BoxShadow { data_handle, .. } => {
+                let prim_data = &self.box_shadow[data_handle];
+                &prim_data.common
+            }
             PrimitiveInstanceKind::Image { data_handle, .. } => {
                 let prim_data = &self.image[data_handle];
                 &prim_data.common
