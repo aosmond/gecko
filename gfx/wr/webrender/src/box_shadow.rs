@@ -262,7 +262,7 @@ impl<'a> DisplayListFlattener<'a> {
     }
 }
 
-fn adjust_border_radius_for_box_shadow(radius: BorderRadius, spread_amount: f32) -> BorderRadius {
+pub fn adjust_border_radius_for_box_shadow(radius: BorderRadius, spread_amount: f32) -> BorderRadius {
     BorderRadius {
         top_left: adjust_corner_for_box_shadow(radius.top_left, spread_amount),
         top_right: adjust_corner_for_box_shadow(radius.top_right, spread_amount),

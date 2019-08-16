@@ -751,6 +751,41 @@ impl ClipStore {
         id
     }
 
+    // Given a list of clip sources, a positioning node and
+    // a parent clip chain, return a new clip chain entry.
+    // If the supplied list of clip sources is empty, then
+    // just return the parent clip chain id directly.
+    pub fn build_clip_chain(
+        &mut self,
+        clip_items: Vec<(LayoutPoint, ClipItemKey)>,
+        spatial_node_index: SpatialNodeIndex,
+        parent_clip_chain_id: ClipChainId,
+        clip_data_store: &mut ClipDataStore,
+    ) -> ClipChainId {
+        if clip_items.is_empty() {
+            parent_clip_chain_id
+        } else {
+            let mut clip_chain_id = parent_clip_chain_id;
+
+            for (local_pos, item) in clip_items {
+                // Intern this clip item, and store the handle
+                // in the clip chain node.
+                let has_complex_clip = item.has_complex_clip();
+                //let handle = clip_data_store.intern(&item, || ());
+
+                clip_chain_id = self.add_clip_chain_node(
+                    handle,
+                    local_pos,
+                    spatial_node_index,
+                    clip_chain_id,
+                    has_complex_clip,
+                );
+            }
+
+            clip_chain_id
+        }
+    }
+
     pub fn get_instance_from_range(
         &self,
         node_range: &ClipNodeRange,
