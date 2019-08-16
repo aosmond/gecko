@@ -5886,8 +5886,8 @@ bool nsDisplayBoxShadowOuter::CreateWebRenderCommands(
 
       LayoutDeviceRect deviceBox =
           LayoutDeviceRect::FromAppUnits(shadowRect, appUnitsPerDevPixel);
-      wr::LayoutRect deviceBoxRect = wr::ToLayoutRect(deviceBox);
-      wr::LayoutRect deviceClipRect = wr::ToLayoutRect(clipRect);
+      wr::LayoutRect deviceBoxRect = wr::ToRoundedLayoutRect(deviceBox);
+      wr::LayoutRect deviceClipRect = wr::ToRoundedLayoutRect(clipRect);
 
       LayoutDeviceSize zeroSize;
       wr::BorderRadius borderRadius =
@@ -6015,7 +6015,7 @@ void nsDisplayBoxShadowInner::CreateInsetBoxShadowWebRenderCommands(
       // Now translate everything to device pixels.
       LayoutDeviceRect deviceBoxRect =
           LayoutDeviceRect::FromAppUnits(shadowRect, appUnitsPerDevPixel);
-      wr::LayoutRect deviceClipRect = wr::ToLayoutRect(clipRect);
+      wr::LayoutRect deviceClipRect = wr::ToRoundedLayoutRect(clipRect);
       Color shadowColor =
           nsCSSRendering::GetShadowColor(shadow.base, aFrame, 1.0);
 
