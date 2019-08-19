@@ -3342,10 +3342,13 @@ void nsCSSBorderRenderer::CreateWebRenderCommands(
                          LayoutDeviceSize::FromUnknownSize(mBorderRadii[3]),
                          LayoutDeviceSize::FromUnknownSize(mBorderRadii[2]));
 
+  Maybe<wr::SpaceAndClipChainHelper> localClipHelper;
   if (mLocalClip) {
-    LayoutDeviceRect localClip =
-        LayoutDeviceRect::FromUnknownRect(mLocalClip.value());
-    clipRect = wr::ToLayoutRect(localClip.Intersect(outerRect));
+    wr::LayoutRect localClip =
+        wr::ToLayoutRect(LayoutDeviceRect::FromUnknownRect(mLocalClip.value()));
+    auto clipId = aBuilder.DefineClip(Nothing(), localClip);
+    auto clipChainId = aBuilder.DefineClipChain({clipId}, true);
+    localClipHelper.emplace(aBuilder, clipChainId);
   }
 
   Range<const wr::BorderSide> wrsides(side, 4);
