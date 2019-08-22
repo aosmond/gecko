@@ -2178,6 +2178,14 @@ impl<'a> DisplayListFlattener<'a> {
         // Map the ClipId for the positioning node to a spatial node index.
         let spatial_node = self.id_to_index_mapper.get_spatial_node_index(space_and_clip.spatial_id);
 
+        let snap_to_raster = &mut self.sc_stack.last_mut().unwrap().snap_to_raster;
+        snap_to_raster.set_target_spatial_node(
+            spatial_node,
+            self.clip_scroll_tree,
+        );
+
+        let snapped_clip_rect = snap_to_raster.snap(&clip_region.main).unwrap_or(clip_region.main);
+
         let mut clip_count = 0;
 
         // Intern each clip item in this clip node, and add the interned
@@ -2189,13 +2197,13 @@ impl<'a> DisplayListFlattener<'a> {
         let handle = self
             .interners
             .clip
-            .intern(&ClipItemKey::rectangle(clip_region.main.size, ClipMode::Clip), || ());
+            .intern(&ClipItemKey::rectangle(snapped_clip_rect.size, ClipMode::Clip), || ());
 
         parent_clip_chain_index = self
             .clip_store
             .add_clip_chain_node(
                 handle,
-                clip_region.main.origin,
+                snapped_clip_rect.origin,
                 spatial_node,
                 parent_clip_chain_index,
                 false,
@@ -2203,16 +2211,18 @@ impl<'a> DisplayListFlattener<'a> {
         clip_count += 1;
 
         if let Some(ref image_mask) = clip_region.image_mask {
+            let snapped_mask_rect = snap_to_raster.snap(&image_mask.rect).unwrap_or(image_mask.rect);
+
             let handle = self
                 .interners
                 .clip
-                .intern(&ClipItemKey::image_mask(image_mask), || ());
+                .intern(&ClipItemKey::image_mask(image_mask, &snapped_mask_rect), || ());
 
             parent_clip_chain_index = self
                 .clip_store
                 .add_clip_chain_node(
                     handle,
-                    image_mask.rect.origin,
+                    snapped_mask_rect.origin,
                     spatial_node,
                     parent_clip_chain_index,
                     true,
@@ -2221,16 +2231,17 @@ impl<'a> DisplayListFlattener<'a> {
         }
 
         for region in clip_region.complex_clips {
+            let snapped_region_rect = snap_to_raster.snap(&region.rect).unwrap_or(region.rect);
             let handle = self
                 .interners
                 .clip
-                .intern(&ClipItemKey::rounded_rect(region.rect.size, region.radii, region.mode), || ());
+                .intern(&ClipItemKey::rounded_rect(snapped_region_rect.size, region.radii, region.mode), || ());
 
             parent_clip_chain_index = self
                 .clip_store
                 .add_clip_chain_node(
                     handle,
-                    region.rect.origin,
+                    snapped_region_rect.origin,
                     spatial_node,
                     parent_clip_chain_index,
                     true,

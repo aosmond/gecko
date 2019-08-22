@@ -14,7 +14,7 @@ use crate::gpu_types::{BoxShadowStretchMode};
 use crate::image::{self, Repetition};
 use crate::intern;
 use crate::prim_store::{ClipData, ImageMaskData, SpaceMapper, VisibleMaskImageTile};
-use crate::prim_store::{PointKey, SizeKey, RectangleKey};
+use crate::prim_store::{PointKey, SizeKey, RectangleKey, SpaceSnapper};
 use crate::render_backend::DataStores;
 use crate::render_task::to_cache_size;
 use crate::resource_cache::{ImageRequest, ResourceCache};
@@ -1060,9 +1060,9 @@ impl ClipItemKey {
         }
     }
 
-    pub fn image_mask(image_mask: &ImageMask) -> Self {
+    pub fn image_mask(image_mask: &ImageMask, mask_rect: &LayoutRect) -> Self {
         ClipItemKey::ImageMask(
-            image_mask.rect.size.into(),
+            mask_rect.size.into(),
             image_mask.image,
             image_mask.repeat,
         )
