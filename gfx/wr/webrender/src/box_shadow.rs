@@ -98,10 +98,10 @@ impl<'a> DisplayListFlattener<'a> {
 
         // Apply parameters that affect where the shadow rect
         // exists in the local space of the primitive.
-        let shadow_rect = prim_info
+        let shadow_rect = self.snap_or_self(&prim_info
             .rect
             .translate(*box_offset)
-            .inflate(spread_amount, spread_amount);
+            .inflate(spread_amount, spread_amount));
 
         // If blur radius is zero, we can use a fast path with
         // no blur applied.

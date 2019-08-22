@@ -14,7 +14,7 @@ use crate::gpu_types::{BoxShadowStretchMode};
 use crate::image::{self, Repetition};
 use crate::intern;
 use crate::prim_store::{ClipData, ImageMaskData, SpaceMapper, VisibleMaskImageTile};
-use crate::prim_store::{PointKey, SizeKey, RectangleKey, SpaceSnapper};
+use crate::prim_store::{PointKey, SizeKey, RectangleKey};
 use crate::render_backend::DataStores;
 use crate::render_task::to_cache_size;
 use crate::resource_cache::{ImageRequest, ResourceCache};
