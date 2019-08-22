@@ -38,6 +38,14 @@ pub struct SpatialNode {
     /// Content scale/offset relative to the coordinate system.
     pub content_transform: ScaleOffset,
 
+    /// Snapping scale/offset relative to the coordinate system. If None, then
+    /// we should not snap entities bound to this spatial node.
+    pub snapping_transform: Option<ScaleOffset>,
+
+    /// Same as snapping_transform, but incorporates the current snapped scroll
+    /// offsets given during frame building.
+    pub scrolling_snapping_transform: Option<ScaleOffset>,
+
     /// The axis-aligned coordinate system id of this node.
     pub coordinate_system_id: CoordinateSystemId,
 
@@ -111,6 +119,8 @@ impl SpatialNode {
         SpatialNode {
             viewport_transform: ScaleOffset::identity(),
             content_transform: ScaleOffset::identity(),
+            snapping_transform: None,
+            scrolling_snapping_transform: None,
             coordinate_system_id: CoordinateSystemId(0),
             transform_kind: TransformedRectKind::AxisAligned,
             parent: parent_index,
@@ -289,6 +299,7 @@ impl SpatialNode {
         match self.node_type {
             SpatialNodeType::ReferenceFrame(ref mut info) => {
                 let mut cs_scale_offset = ScaleOffset::identity();
+                let mut ss_scale_offset = None;
 
                 if info.invertible {
                     // Resolve the transform against any property bindings.
@@ -328,6 +339,29 @@ impl SpatialNode {
                         .post_translate(state.parent_accumulated_scroll_offset)
                         .to_transform()
                         .with_destination::<LayoutPixel>();
+
+                    // The scrolling snapping transform is the original snapping transform used during
+                    // scene building plus the snapped scroll offset.
+                    ss_scale_offset = match state.scrolling_snapping_scale_offset {
+                        Some(ref parent_scale_offset) => {
+                            let local_scale_offset = match info.source_transform {
+                                PropertyBinding::Value(ref value) => ScaleOffset::from_transform(value),
+                                PropertyBinding::Binding(..) => Some(ScaleOffset::identity()),
+                            };
+
+                            match local_scale_offset {
+                                Some(ref scale_offset) => {
+                                    let origin_offset = info.origin_in_parent_reference_frame;
+                                    Some(ScaleOffset::from_offset(origin_offset.to_untyped())
+                                        .accumulate(&parent_scale_offset)
+                                        .accumulate(&scale_offset)
+                                        .offset(state.parent_accumulated_scroll_offset.to_untyped()))
+                                }
+                                None => None,
+                            }
+                        }
+                        None => None,
+                    };
 
                     let mut reset_cs_id = match info.transform_style {
                         TransformStyle::Preserve3D => !state.preserves_3d,
@@ -386,6 +420,7 @@ impl SpatialNode {
                 self.coordinate_system_id = state.current_coordinate_system_id;
                 self.viewport_transform = cs_scale_offset;
                 self.content_transform = cs_scale_offset;
+                self.scrolling_snapping_transform = ss_scale_offset;
                 self.invertible = info.invertible;
             }
             _ => {
@@ -407,6 +442,15 @@ impl SpatialNode {
                 let added_offset = accumulated_offset + self.scroll_offset();
                 self.content_transform = state.coordinate_system_relative_scale_offset
                     .offset(added_offset.to_untyped());
+
+                // The scrolling snapping transform is the original snapping transform used during
+                // scene building plus the snapped scroll offset.
+                self.scrolling_snapping_transform = match state.scrolling_snapping_scale_offset {
+                    Some(ref scale_offset) => {
+                        Some(scale_offset.offset(added_offset.to_untyped()))
+                    }
+                    None => None,
+                };
 
                 if let SpatialNodeType::StickyFrame(ref mut info) = self.node_type {
                     info.current_offset = sticky_offset;
@@ -557,6 +601,7 @@ impl SpatialNode {
                 state.preserves_3d = info.transform_style == TransformStyle::Preserve3D;
                 state.parent_accumulated_scroll_offset = LayoutVector2D::zero();
                 state.coordinate_system_relative_scale_offset = self.content_transform;
+                state.scrolling_snapping_scale_offset = self.scrolling_snapping_transform;
                 let translation = -info.origin_in_parent_reference_frame;
                 state.nearest_scrolling_ancestor_viewport =
                     state.nearest_scrolling_ancestor_viewport
@@ -633,6 +678,51 @@ impl SpatialNode {
             SpatialNodeType::ScrollFrame(info) if info.external_id == Some(external_id) => true,
             _ => false,
         }
+    }
+
+    /// Updates the snapping transform.
+    pub fn update_snapping(
+        &mut self,
+        parent: Option<&SpatialNode>,
+    ) {
+        // We need to incorporate the parent scale/offset with the child.
+        // If the parent does not have a scale/offset, then we know we are
+        // not 2d axis aligned and thus do not need to snap its children
+        // either.
+        let parent_scale_offset = match parent {
+            Some(parent) => {
+                match parent.snapping_transform {
+                    Some(scale_offset) => scale_offset,
+                    None => return,
+                }
+            },
+            _ => ScaleOffset::identity(),
+        };
+
+        let scale_offset = if let SpatialNodeType::ReferenceFrame(ref info) = self.node_type {
+            match info.source_transform {
+                PropertyBinding::Value(ref value) => {
+                    // We can only get a ScaleOffset if the transform is 2d axis
+                    // aligned.
+                    match ScaleOffset::from_transform(value) {
+                        Some(scale_offset) => {
+                            let origin_offset = info.origin_in_parent_reference_frame;
+                            ScaleOffset::from_offset(origin_offset.to_untyped())
+                                .accumulate(&scale_offset)
+                        }
+                        None => return,
+                    }
+                }
+
+                // Assume animations start at the identity transform for snapping purposes.
+                // TODO(aosmond): Is there a better known starting point?
+                PropertyBinding::Binding(..) => ScaleOffset::identity(),
+            }
+        } else {
+            ScaleOffset::identity()
+        };
+
+        self.snapping_transform = Some(parent_scale_offset.accumulate(&scale_offset));
     }
 
     /// Returns true for ReferenceFrames whose source_transform is

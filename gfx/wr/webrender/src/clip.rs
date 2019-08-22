@@ -14,7 +14,7 @@ use crate::gpu_types::{BoxShadowStretchMode};
 use crate::image::{self, Repetition};
 use crate::intern;
 use crate::prim_store::{ClipData, ImageMaskData, SpaceMapper, VisibleMaskImageTile};
-use crate::prim_store::{PointKey, SizeKey, RectangleKey};
+use crate::prim_store::{PointKey, SizeKey, RectangleKey, SpaceSnapper};
 use crate::render_backend::DataStores;
 use crate::render_task::to_cache_size;
 use crate::resource_cache::{ImageRequest, ResourceCache};
@@ -521,6 +521,7 @@ pub struct ClipStore {
 // A clip chain instance is what gets built for a given clip
 // chain id + local primitive region + positioning node.
 #[derive(Debug)]
+#[cfg_attr(feature = "capture", derive(Serialize))]
 pub struct ClipChainInstance {
     pub clips_range: ClipNodeRange,
     // Combined clip rect for clips that are in the
@@ -767,6 +768,7 @@ impl ClipStore {
         clip_chains: &[ClipChainId],
         clip_scroll_tree: &ClipScrollTree,
         clip_data_store: &mut ClipDataStore,
+        snap_local_to_raster: &mut SpaceSnapper,
     ) {
         self.active_clip_node_info.clear();
         self.active_local_clip_rect = None;
@@ -783,6 +785,7 @@ impl ClipStore {
                 &mut self.active_clip_node_info,
                 clip_data_store,
                 clip_scroll_tree,
+                snap_local_to_raster,
             ) {
                 return;
             }
@@ -1059,9 +1062,9 @@ impl ClipItemKey {
         }
     }
 
-    pub fn image_mask(image_mask: &ImageMask) -> Self {
+    pub fn image_mask(image_mask: &ImageMask, mask_rect: &LayoutRect) -> Self {
         ClipItemKey::ImageMask(
-            image_mask.rect.size.into(),
+            mask_rect.size.into(),
             image_mask.image,
             image_mask.repeat,
         )
@@ -1583,8 +1586,16 @@ fn add_clip_node_to_current_chain(
     clip_node_info: &mut Vec<ClipNodeInfo>,
     clip_data_store: &ClipDataStore,
     clip_scroll_tree: &ClipScrollTree,
+    snap_local_to_raster: &mut SpaceSnapper,
 ) -> bool {
     let clip_node = &clip_data_store[node.handle];
+
+    snap_local_to_raster.set_target_spatial_node_for_visibility(
+        node.spatial_node_index,
+        clip_scroll_tree
+    );
+
+    let snapped_pos = snap_local_to_raster.snap_point(&node.local_pos);
 
     // Determine the most efficient way to convert between coordinate
     // systems of the primitive and clip node.
@@ -1596,7 +1607,7 @@ fn add_clip_node_to_current_chain(
 
     // If we can convert spaces, try to reduce the size of the region
     // requested, and cache the conversion information for the next step.
-    if let Some(clip_rect) = clip_node.item.get_local_clip_rect(node.local_pos) {
+    if let Some(clip_rect) = clip_node.item.get_local_clip_rect(snapped_pos) {
         match conversion {
             ClipSpaceConversion::Local => {
                 *local_clip_rect = match local_clip_rect.intersection(&clip_rect) {
@@ -1627,7 +1638,7 @@ fn add_clip_node_to_current_chain(
 
     clip_node_info.push(ClipNodeInfo {
         conversion,
-        local_pos: node.local_pos,
+        local_pos: snapped_pos,
         handle: node.handle,
         spatial_node_index: node.spatial_node_index,
     });

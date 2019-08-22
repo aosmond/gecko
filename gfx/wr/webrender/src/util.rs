@@ -166,6 +166,13 @@ impl ScaleOffset {
         })
     }
 
+    pub fn from_offset(offset: default::Vector2D<f32>) -> Self {
+        ScaleOffset {
+            scale: Vector2D::new(1.0, 1.0),
+            offset,
+        }
+    }
+
     pub fn inverse(&self) -> Self {
         ScaleOffset {
             scale: Vector2D::new(
@@ -184,6 +191,15 @@ impl ScaleOffset {
             &ScaleOffset {
                 scale: Vector2D::new(1.0, 1.0),
                 offset,
+            }
+        )
+    }
+
+    pub fn scale(&self, scale: f32) -> Self {
+        self.accumulate(
+            &ScaleOffset {
+                scale: Vector2D::new(scale, scale),
+                offset: Vector2D::zero(),
             }
         )
     }
@@ -217,6 +233,13 @@ impl ScaleOffset {
         )
     }
 
+    pub fn map_point<F, T>(&self, point: &Point2D<f32, F>) -> Point2D<f32, T> {
+        Point2D::new(
+            point.x * self.scale.x + self.offset.x,
+            point.y * self.scale.y + self.offset.y,
+        )
+    }
+
     pub fn unmap_rect<F, T>(&self, rect: &Rect<f32, F>) -> Rect<f32, T> {
         Rect::new(
             Point2D::new(
@@ -227,6 +250,13 @@ impl ScaleOffset {
                 rect.size.width / self.scale.x,
                 rect.size.height / self.scale.y,
             )
+        )
+    }
+
+    pub fn unmap_point<F, T>(&self, point: &Point2D<f32, F>) -> Point2D<f32, T> {
+        Point2D::new(
+            (point.x - self.offset.x) / self.scale.x,
+            (point.y - self.offset.y) / self.scale.y,
         )
     }
 
@@ -405,12 +435,29 @@ impl<Src, Dst> MatrixHelpers<Src, Dst> for Transform3D<f32, Src, Dst> {
     }
 }
 
+pub trait PointHelpers<U>
+where
+    Self: Sized,
+{
+    fn snap(&self) -> Self;
+}
+
+impl<U> PointHelpers<U> for Point2D<f32, U> {
+    fn snap(&self) -> Self {
+        Point2D::new(
+            (self.x + 0.5).floor(),
+            (self.y + 0.5).floor(),
+        )
+    }
+}
+
 pub trait RectHelpers<U>
 where
     Self: Sized,
 {
     fn from_floats(x0: f32, y0: f32, x1: f32, y1: f32) -> Self;
     fn is_well_formed_and_nonempty(&self) -> bool;
+    fn snap(&self) -> Self;
 }
 
 impl<U> RectHelpers<U> for Rect<f32, U> {
@@ -423,6 +470,20 @@ impl<U> RectHelpers<U> for Rect<f32, U> {
 
     fn is_well_formed_and_nonempty(&self) -> bool {
         self.size.width > 0.0 && self.size.height > 0.0
+    }
+
+    fn snap(&self) -> Self {
+        let origin = Point2D::new(
+            (self.origin.x + 0.5).floor(),
+            (self.origin.y + 0.5).floor(),
+        );
+        Rect::new(
+            origin,
+            Size2D::new(
+                (self.origin.x + self.size.width + 0.5).floor() - origin.x,
+                (self.origin.y + self.size.height + 0.5).floor() - origin.y,
+            ),
+        )
     }
 }
 

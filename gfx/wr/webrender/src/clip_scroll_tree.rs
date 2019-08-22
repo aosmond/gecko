@@ -130,6 +130,9 @@ pub struct TransformUpdateState {
     /// Scale and offset from the coordinate system that started this compatible coordinate system.
     pub coordinate_system_relative_scale_offset: ScaleOffset,
 
+    /// Scale and offset for snapping purposes.
+    pub scrolling_snapping_scale_offset: Option<ScaleOffset>,
+
     /// True if this node is transformed by an invertible transform.  If not, display items
     /// transformed by this node will not be displayed and display items not transformed by this
     /// node will not be clipped by clips that are transformed by this node.
@@ -458,6 +461,7 @@ impl ClipScrollTree {
             nearest_scrolling_ancestor_viewport: LayoutRect::zero(),
             current_coordinate_system_id: CoordinateSystemId::root(),
             coordinate_system_relative_scale_offset: ScaleOffset::identity(),
+            scrolling_snapping_scale_offset: Some(ScaleOffset::identity()),
             invertible: true,
             preserves_3d: false,
         };
@@ -570,12 +574,16 @@ impl ClipScrollTree {
         self.add_spatial_node(node)
     }
 
-    pub fn add_spatial_node(&mut self, node: SpatialNode) -> SpatialNodeIndex {
+    pub fn add_spatial_node(&mut self, mut node: SpatialNode) -> SpatialNodeIndex {
         let index = SpatialNodeIndex::new(self.spatial_nodes.len());
 
         // When the parent node is None this means we are adding the root.
         if let Some(parent_index) = node.parent {
-            self.spatial_nodes[parent_index.0 as usize].add_child(index);
+            let parent_node = &mut self.spatial_nodes[parent_index.0 as usize];
+            parent_node.add_child(index);
+            node.update_snapping(Some(parent_node));
+        } else {
+            node.update_snapping(None);
         }
 
         self.spatial_nodes.push(node);
@@ -640,12 +648,16 @@ impl ClipScrollTree {
                 pt.new_level(format!("ReferenceFrame"));
                 pt.add_item(format!("kind: {:?}", info.kind));
                 pt.add_item(format!("transform_style: {:?}", info.transform_style));
+                pt.add_item(format!("source_transform: {:?}", info.source_transform));
+                pt.add_item(format!("origin_in_parent_reference_frame: {:?}", info.origin_in_parent_reference_frame));
             }
         }
 
         pt.add_item(format!("index: {:?}", index));
         pt.add_item(format!("content_transform: {:?}", node.content_transform));
         pt.add_item(format!("viewport_transform: {:?}", node.viewport_transform));
+        pt.add_item(format!("snapping_transform: {:?}", node.snapping_transform));
+        pt.add_item(format!("scrolling_snapping_transform: {:?}", node.scrolling_snapping_transform));
         pt.add_item(format!("coordinate_system_id: {:?}", node.coordinate_system_id));
 
         for child_index in &node.children {

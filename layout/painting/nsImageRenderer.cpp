@@ -603,7 +603,6 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       LayoutDeviceRect destRect =
           LayoutDeviceRect::FromAppUnits(aDest, appUnitsPerDevPixel);
       auto stretchSize = wr::ToLayoutSize(destRect.Size());
-      destRect.Round();
 
       gfx::IntSize decodeSize =
           nsLayoutUtils::ComputeImageContainerDrawingParameters(
@@ -630,47 +629,45 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
         break;
       }
 
-      nsPoint firstTilePos = nsLayoutUtils::GetBackgroundFirstTilePos(
-          aDest.TopLeft(), aFill.TopLeft(), aRepeatSize);
-      LayoutDeviceRect fillRect = LayoutDeviceRect::FromAppUnits(
-          nsRect(firstTilePos.x, firstTilePos.y, aFill.XMost() - firstTilePos.x,
-                 aFill.YMost() - firstTilePos.y),
-          appUnitsPerDevPixel);
-      wr::LayoutRect fill = wr::ToRoundedLayoutRect(fillRect);
+      wr::LayoutRect r = wr::ToLayoutRect(destRect);
 
-      wr::LayoutRect roundedDest = wr::ToLayoutRect(destRect);
-
-      // WebRender special cases situations where stretchSize == fillSize to
-      // infer that it shouldn't use repeat sampling. This makes sure
-      // we hit those special cases when not repeating.
-
-      switch (mExtendMode) {
-        case ExtendMode::CLAMP:
-          fill = roundedDest;
-          stretchSize = roundedDest.size;
-          break;
-        case ExtendMode::REPEAT_Y:
-          fill.origin.x = roundedDest.origin.x;
-          fill.size.width = roundedDest.size.width;
-          stretchSize.width = roundedDest.size.width;
-          break;
-        case ExtendMode::REPEAT_X:
-          fill.origin.y = roundedDest.origin.y;
-          fill.size.height = roundedDest.size.height;
-          stretchSize.height = roundedDest.size.height;
-          break;
-        default:
-          break;
-      }
-
-      wr::LayoutRect clip = wr::ToRoundedLayoutRect(
+      wr::LayoutRect clip = wr::ToLayoutRect(
           LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
 
-      LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
-          aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
+      if (mExtendMode == ExtendMode::CLAMP) {
+        // The image is not repeating. Just push as a regular image.
+        aBuilder.PushImage(r, clip, !aItem->BackfaceIsHidden(), rendering,
+                           key.value());
+      } else {
+        nsPoint firstTilePos = nsLayoutUtils::GetBackgroundFirstTilePos(
+            aDest.TopLeft(), aFill.TopLeft(), aRepeatSize);
+        LayoutDeviceRect fillRect = LayoutDeviceRect::FromAppUnits(
+            nsRect(firstTilePos.x, firstTilePos.y, aFill.XMost() - firstTilePos.x,
+                   aFill.YMost() - firstTilePos.y),
+            appUnitsPerDevPixel);
+        wr::LayoutRect fill = wr::ToLayoutRect(fillRect);
 
-      aBuilder.PushImage(fill, clip, !aItem->BackfaceIsHidden(), stretchSize,
-                         wr::ToLayoutSize(gapSize), rendering, key.value());
+        switch (mExtendMode) {
+          case ExtendMode::REPEAT_Y:
+            fill.origin.x = r.origin.x;
+            fill.size.width = r.size.width;
+            stretchSize.width = r.size.width;
+            break;
+          case ExtendMode::REPEAT_X:
+            fill.origin.y = r.origin.y;
+            fill.size.height = r.size.height;
+            stretchSize.height = r.size.height;
+            break;
+          default:
+            break;
+        }
+
+        LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
+            aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
+
+        aBuilder.PushImage(fill, clip, !aItem->BackfaceIsHidden(), stretchSize,
+                           wr::ToLayoutSize(gapSize), rendering, key.value());
+      }
       break;
     }
     default:

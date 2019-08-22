@@ -3436,7 +3436,7 @@ bool nsNativeThemeCocoa::CreateWebRenderCommandsForWidget(
     mozilla::layers::RenderRootStateManager* aManager, nsIFrame* aFrame,
     StyleAppearance aAppearance, const nsRect& aRect) {
   nsPresContext* presContext = aFrame->PresContext();
-  wr::LayoutRect bounds = wr::ToRoundedLayoutRect(
+  wr::LayoutRect bounds = wr::ToLayoutRect(
       LayoutDeviceRect::FromAppUnits(aRect, presContext->AppUnitsPerDevPixel()));
 
   EventStates eventState = GetContentState(aFrame, aAppearance);
