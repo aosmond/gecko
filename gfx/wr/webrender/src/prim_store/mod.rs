@@ -51,7 +51,7 @@ use std::{cmp, fmt, hash, ops, u32, usize, mem};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::storage;
 use crate::texture_cache::TEXTURE_REGION_DIMENSIONS;
-use crate::util::{MatrixHelpers, MaxRect, Recycler};
+use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset};
 use crate::util::{clamp_to_scale_factor, pack_as_float, project_rect, raster_rect_to_device_pixels};
 use crate::internal_types::{LayoutPrimitiveInfo, Filter};
 use smallvec::SmallVec;
@@ -131,6 +131,65 @@ impl PrimitiveOpacity {
     }
 }
 
+pub struct SpaceSnapper {
+    pub ref_spatial_node_index: SpatialNodeIndex,
+    pub current_target_spatial_node_index: SpatialNodeIndex,
+    pub snapping_transform: Option<ScaleOffset>,
+    pub device_pixel_scale: DevicePixelScale,
+}
+
+impl SpaceSnapper {
+    pub fn new(
+        ref_spatial_node_index: SpatialNodeIndex,
+        device_pixel_scale: DevicePixelScale,
+    ) -> Self {
+        SpaceSnapper {
+            ref_spatial_node_index,
+            current_target_spatial_node_index: SpatialNodeIndex::INVALID,
+            snapping_transform: None,
+            device_pixel_scale,
+        }
+    }
+
+    pub fn set_target_spatial_node(
+        &mut self,
+        target_node_index: SpatialNodeIndex,
+        clip_scroll_tree: &ClipScrollTree,
+    ) {
+        if target_node_index == self.current_target_spatial_node_index {
+            return
+        }
+
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        let ref_spatial_node = &clip_scroll_tree.spatial_nodes[self.ref_spatial_node_index.0 as usize];
+        let target_spatial_node = &clip_scroll_tree.spatial_nodes[target_node_index.0 as usize];
+
+        self.snapping_transform = match ref_spatial_node.snapping_transform {
+            Some(ref ref_scale_offset) => {
+                match target_spatial_node.snapping_transform {
+                    Some(ref target_scale_offset) => {
+                        Some(ref_scale_offset
+                            .inverse()
+                            .accumulate(target_scale_offset)
+                            .scale(self.device_pixel_scale.0))
+                    }
+                    None => None,
+                }
+            },
+            None => None,
+        }
+    }
+
+    pub fn snap<F>(&self, rect: &Rect<f32, F>) -> Option<Rect<f32, F>> where F: fmt::Debug {
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let snapped_device_rect : RasterRect = scale_offset.map_rect(rect).round();
+                Some(scale_offset.unmap_rect(&snapped_device_rect))
+            }
+            None => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SpaceMapper<F, T> {
