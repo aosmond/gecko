@@ -570,12 +570,16 @@ impl ClipScrollTree {
         self.add_spatial_node(node)
     }
 
-    pub fn add_spatial_node(&mut self, node: SpatialNode) -> SpatialNodeIndex {
+    pub fn add_spatial_node(&mut self, mut node: SpatialNode) -> SpatialNodeIndex {
         let index = SpatialNodeIndex::new(self.spatial_nodes.len());
 
         // When the parent node is None this means we are adding the root.
         if let Some(parent_index) = node.parent {
-            self.spatial_nodes[parent_index.0 as usize].add_child(index);
+            let parent_node = &mut self.spatial_nodes[parent_index.0 as usize];
+            parent_node.add_child(index);
+            node.update_snapping(Some(parent_node));
+        } else {
+            node.update_snapping(None);
         }
 
         self.spatial_nodes.push(node);
