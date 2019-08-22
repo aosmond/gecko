@@ -16,7 +16,7 @@ use crate::clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, 
 use crate::debug_colors;
 use crate::debug_render::DebugItem;
 use crate::display_list_flattener::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D};
+use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Point2D};
 use euclid::approxeq::ApproxEq;
 use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use crate::frame_builder::{FrameVisibilityContext, FrameVisibilityState};
@@ -151,6 +151,23 @@ impl SpaceSnapper {
         }
     }
 
+    pub fn new_with_target(
+        ref_spatial_node_index: SpatialNodeIndex,
+        target_node_index: SpatialNodeIndex,
+        device_pixel_scale: DevicePixelScale,
+        clip_scroll_tree: &ClipScrollTree,
+    ) -> Self {
+        let mut snapper = SpaceSnapper {
+            ref_spatial_node_index,
+            current_target_spatial_node_index: SpatialNodeIndex::INVALID,
+            snapping_transform: None,
+            device_pixel_scale,
+        };
+
+        snapper.set_target_spatial_node(target_node_index, clip_scroll_tree);
+        snapper
+    }
+
     pub fn set_target_spatial_node(
         &mut self,
         target_node_index: SpatialNodeIndex,
@@ -160,10 +177,10 @@ impl SpaceSnapper {
             return
         }
 
-        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         let ref_spatial_node = &clip_scroll_tree.spatial_nodes[self.ref_spatial_node_index.0 as usize];
         let target_spatial_node = &clip_scroll_tree.spatial_nodes[target_node_index.0 as usize];
 
+        self.current_target_spatial_node_index = target_node_index;
         self.snapping_transform = match ref_spatial_node.snapping_transform {
             Some(ref ref_scale_offset) => {
                 match target_spatial_node.snapping_transform {
@@ -180,13 +197,38 @@ impl SpaceSnapper {
         }
     }
 
-    pub fn snap<F>(&self, rect: &Rect<f32, F>) -> Option<Rect<f32, F>> where F: fmt::Debug {
+    pub fn snap_or_self<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
             Some(ref scale_offset) => {
-                let snapped_device_rect : RasterRect = scale_offset.map_rect(rect).round();
-                Some(scale_offset.unmap_rect(&snapped_device_rect))
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round();
+                scale_offset.unmap_rect(&snapped_device_rect)
             }
-            None => None,
+            None => *rect,
+        }
+    }
+
+    /*pub fn snap_origin<F>(&self, origin: &Point2D<f32, F>) -> Point2D<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let rect = Rect::<f32, F>::new(*origin, Size2D::<f32, F>::new(1.0, 1.0));
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
+                scale_offset.unmap_rect(&snapped_device_rect).origin
+            }
+            None => *origin,
+        }
+    }*/
+
+    pub fn snap_size<F>(&self, size: &Size2D<f32, F>) -> Size2D<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let rect = Rect::<f32, F>::new(Point2D::<f32, F>::zero(), *size);
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
+                scale_offset.unmap_rect(&snapped_device_rect).size
+            }
+            None => *size,
         }
     }
 }
@@ -4149,10 +4191,11 @@ pub fn get_raster_rects(
 /// axis-aligned. It return the snapped rect transformed back into the
 /// given pixel space, and the snap offsets in device space.
 pub fn get_snapped_rect<PixelSpace>(
-    prim_rect: Rect<f32, PixelSpace>,
-    map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
-    device_pixel_scale: DevicePixelScale,
+    _prim_rect: Rect<f32, PixelSpace>,
+    _map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
+    _device_pixel_scale: DevicePixelScale,
 ) -> Option<Rect<f32, PixelSpace>> where PixelSpace: fmt::Debug {
+    /*
     let is_axis_aligned = match map_to_raster.kind {
         CoordinateSpaceMapping::Local |
         CoordinateSpaceMapping::ScaleOffset(..) => true,
@@ -4174,7 +4217,8 @@ pub fn get_snapped_rect<PixelSpace>(
         Some(snapped_prim_rect)
     } else {
         None
-    }
+    }*/
+    None
 }
 
 /// Get the inline (horizontal) and block (vertical) sizes
