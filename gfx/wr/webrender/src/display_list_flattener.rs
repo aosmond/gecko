@@ -27,6 +27,7 @@ use crate::prim_store::{PrimitiveInstanceKind, NinePatchDescriptor, PrimitiveSto
 use crate::prim_store::{ScrollNodeAndClipChain, PictureIndex};
 use crate::prim_store::{InternablePrimitive, SegmentInstanceIndex};
 use crate::prim_store::{register_prim_chase_id, get_line_decoration_sizes};
+use crate::prim_store::{SpaceSnapper};
 use crate::prim_store::backdrop::Backdrop;
 use crate::prim_store::borders::{ImageBorder, NormalBorderPrim};
 use crate::prim_store::gradient::{GradientStopKey, LinearGradient, RadialGradient, RadialGradientParams};
@@ -333,6 +334,7 @@ impl<'a> DisplayListFlattener<'a> {
             ClipChainId::NONE,
             RasterSpace::Screen,
             /* is_backdrop_root = */ true,
+            view.accumulated_scale_factor(),
         );
 
         flattener.flatten_items(
@@ -832,6 +834,7 @@ impl<'a> DisplayListFlattener<'a> {
             clip_chain_id,
             stacking_context.raster_space,
             stacking_context.is_backdrop_root,
+            self.sc_stack.last().unwrap().snap_to_raster.device_pixel_scale,
         );
 
         if cfg!(debug_assertions) && apply_pipeline_clip && clip_chain_id != ClipChainId::NONE {
@@ -969,11 +972,18 @@ impl<'a> DisplayListFlattener<'a> {
 
         let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
 
+        let snap_to_raster = &mut self.sc_stack.last_mut().unwrap().snap_to_raster;
+        snap_to_raster.set_target_spatial_node(
+            clip_and_scroll.spatial_node_index,
+            self.clip_scroll_tree
+        );
+
         let clip_rect = common.clip_rect.translate(current_offset);
         let rect = bounds.translate(current_offset);
+
         let layout = LayoutPrimitiveInfo {
-            rect,
-            clip_rect,
+            rect: snap_to_raster.snap(&rect).unwrap_or(rect),
+            clip_rect: snap_to_raster.snap(&clip_rect).unwrap_or(clip_rect),
             is_backface_visible: common.is_backface_visible,
             hit_info: common.hit_info,
         };
@@ -1593,6 +1603,7 @@ impl<'a> DisplayListFlattener<'a> {
         clip_chain_id: ClipChainId,
         requested_raster_space: RasterSpace,
         is_backdrop_root: bool,
+        device_pixel_scale: DevicePixelScale,
     ) {
         // Check if this stacking context is the root of a pipeline, and the caller
         // has requested it as an output frame.
@@ -1693,6 +1704,16 @@ impl<'a> DisplayListFlattener<'a> {
             current_clip_chain_id = clip_chain_node.parent_clip_chain_id;
         }
 
+        let raster_spatial_node_index = self.sc_stack.last().map_or(
+            ROOT_SPATIAL_NODE_INDEX,
+            |sc| sc.snap_to_raster.ref_spatial_node_index
+        );
+
+        let snap_to_raster = SpaceSnapper::new(
+            raster_spatial_node_index,
+            device_pixel_scale,
+        );
+
         // Push the SC onto the stack, so we know how to handle things in
         // pop_stacking_context.
         self.sc_stack.push(FlattenedStackingContext {
@@ -1709,6 +1730,7 @@ impl<'a> DisplayListFlattener<'a> {
             context_3d,
             create_tile_cache,
             is_backdrop_root,
+            snap_to_raster,
         });
     }
 
@@ -3329,6 +3351,8 @@ struct FlattenedStackingContext {
 
     /// True if this stacking context is a backdrop root.
     is_backdrop_root: bool,
+
+    snap_to_raster: SpaceSnapper,
 }
 
 impl FlattenedStackingContext {

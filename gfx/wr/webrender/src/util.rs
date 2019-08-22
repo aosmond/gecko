@@ -188,6 +188,15 @@ impl ScaleOffset {
         )
     }
 
+    pub fn scale(&self, scale: f32) -> Self {
+        self.accumulate(
+            &ScaleOffset {
+                scale: Vector2D::new(scale, scale),
+                offset: Vector2D::zero(),
+            }
+        )
+    }
+
     /// Produce a ScaleOffset that includes both self and other.
     /// The 'self' ScaleOffset is applied after other.
     /// This is equivalent to `Transform3D::pre_transform`.
