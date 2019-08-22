@@ -180,13 +180,13 @@ impl SpaceSnapper {
         }
     }
 
-    pub fn snap<F>(&self, rect: &Rect<f32, F>) -> Option<Rect<f32, F>> where F: fmt::Debug {
+    pub fn snap_or_self<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
         match self.snapping_transform {
             Some(ref scale_offset) => {
                 let snapped_device_rect : RasterRect = scale_offset.map_rect(rect).round();
-                Some(scale_offset.unmap_rect(&snapped_device_rect))
+                scale_offset.unmap_rect(&snapped_device_rect)
             }
-            None => None,
+            None => *rect,
         }
     }
 }
@@ -4149,9 +4149,9 @@ pub fn get_raster_rects(
 /// axis-aligned. It return the snapped rect transformed back into the
 /// given pixel space, and the snap offsets in device space.
 pub fn get_snapped_rect<PixelSpace>(
-    prim_rect: Rect<f32, PixelSpace>,
-    map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
-    device_pixel_scale: DevicePixelScale,
+    _prim_rect: Rect<f32, PixelSpace>,
+    _map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
+    _device_pixel_scale: DevicePixelScale,
 ) -> Option<Rect<f32, PixelSpace>> where PixelSpace: fmt::Debug {
     /*
     let is_axis_aligned = match map_to_raster.kind {

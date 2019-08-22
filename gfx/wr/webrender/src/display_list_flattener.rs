@@ -63,6 +63,11 @@ impl ClipNode {
     }
 }
 
+struct LayoutPrimitiveInfoEx {
+    unsnapped_rect: LayoutRect,
+    unsnapped_clip_rect: LayoutRect,
+}
+
 /// The offset stack for a given reference frame.
 struct ReferenceFrameState {
     /// A stack of current offsets from the current reference frame scope.
@@ -996,6 +1001,17 @@ impl<'a> DisplayListFlattener<'a> {
         bounds: &LayoutRect,
         apply_pipeline_clip: bool
     ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain) {
+        let (layout, _, clip_and_scroll) =
+            self.process_common_properties_with_bounds_ex(common, bounds, apply_pipeline_clip);
+        (layout, clip_and_scroll)
+    }
+
+    fn process_common_properties_with_bounds_ex(
+        &mut self,
+        common: &CommonItemProperties,
+        bounds: &LayoutRect,
+        apply_pipeline_clip: bool
+    ) -> (LayoutPrimitiveInfo, LayoutPrimitiveInfoEx, ScrollNodeAndClipChain) {
         let clip_and_scroll = self.get_clip_and_scroll(
             &common.clip_id,
             &common.spatial_id,
@@ -1014,13 +1030,46 @@ impl<'a> DisplayListFlattener<'a> {
         let rect = bounds.translate(current_offset);
 
         let layout = LayoutPrimitiveInfo {
-            rect: snap_to_raster.snap(&rect).unwrap_or(rect),
-            clip_rect: snap_to_raster.snap(&clip_rect).unwrap_or(clip_rect),
+            rect: snap_to_raster.snap_or_self(&rect),
+            clip_rect: snap_to_raster.snap_or_self(&clip_rect),
             is_backface_visible: common.is_backface_visible,
             hit_info: common.hit_info,
         };
 
-        (layout, clip_and_scroll)
+        let layout_ex = LayoutPrimitiveInfoEx {
+            unsnapped_rect: rect,
+            unsnapped_clip_rect: clip_rect
+        };
+
+        (layout, layout_ex, clip_and_scroll)
+    }
+
+    fn process_stretch_size_and_tiling(
+        &self,
+        layout: &LayoutPrimitiveInfo,
+        layout_ex: &LayoutPrimitiveInfoEx,
+        stretch_size: LayoutSize,
+        tile_spacing: LayoutSize,
+    ) -> (LayoutSize, LayoutSize) {
+        let width_ratio = layout.rect.size.width / layout_ex.unsnapped_rect.size.width;
+        let height_ratio = layout.rect.size.height / layout_ex.unsnapped_rect.size.height;
+        (
+            LayoutSize::new(
+                stretch_size.width * width_ratio,
+                stretch_size.height * height_ratio,
+            ),
+            LayoutSize::new(
+                tile_spacing.width * width_ratio,
+                tile_spacing.height * height_ratio,
+            ),
+        )
+    }
+
+    pub fn snap_or_self(
+        &self,
+        rect: &LayoutRect,
+    ) -> LayoutRect {
+        self.sc_stack.last().unwrap().snap_to_raster.snap_or_self(rect)
     }
 
     fn flatten_item<'b>(
@@ -1031,17 +1080,24 @@ impl<'a> DisplayListFlattener<'a> {
     ) -> Option<BuiltDisplayListIter<'a>> {
         match *item.item() {
             DisplayItem::Image(ref info) => {
-                let (layout, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, layout_ex, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
                 );
 
+                let (stretch_size, tile_spacing) = self.process_stretch_size_and_tiling(
+                    &layout,
+                    &layout_ex,
+                    info.stretch_size,
+                    info.tile_spacing,
+                );
+
                 self.add_image(
                     clip_and_scroll,
                     &layout,
-                    info.stretch_size,
-                    info.tile_spacing,
+                    stretch_size,
+                    tile_spacing,
                     None,
                     info.image_key,
                     info.image_rendering,
@@ -1134,10 +1190,17 @@ impl<'a> DisplayListFlattener<'a> {
                 );
             }
             DisplayItem::Gradient(ref info) => {
-                let (layout, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, layout_ex, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
+                );
+
+                let (tile_size, tile_spacing) = self.process_stretch_size_and_tiling(
+                    &layout,
+                    &layout_ex,
+                    info.tile_size,
+                    info.tile_spacing
                 );
 
                 if let Some(prim_key_kind) = self.create_linear_gradient_prim(
@@ -1146,8 +1209,8 @@ impl<'a> DisplayListFlattener<'a> {
                     info.gradient.end_point,
                     item.gradient_stops(),
                     info.gradient.extend_mode,
-                    info.tile_size,
-                    info.tile_spacing,
+                    tile_size,
+                    tile_spacing,
                     None,
                 ) {
                     self.add_nonshadowable_primitive(
@@ -1159,10 +1222,17 @@ impl<'a> DisplayListFlattener<'a> {
                 }
             }
             DisplayItem::RadialGradient(ref info) => {
-                let (layout, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, layout_ex, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
+                );
+
+                let (tile_size, tile_spacing) = self.process_stretch_size_and_tiling(
+                    &layout,
+                    &layout_ex,
+                    info.tile_size,
+                    info.tile_spacing
                 );
 
                 let prim_key_kind = self.create_radial_gradient_prim(
@@ -1173,8 +1243,8 @@ impl<'a> DisplayListFlattener<'a> {
                     info.gradient.radius.width / info.gradient.radius.height,
                     item.gradient_stops(),
                     info.gradient.extend_mode,
-                    info.tile_size,
-                    info.tile_spacing,
+                    tile_size,
+                    tile_spacing,
                     None,
                 );
 
@@ -2184,7 +2254,7 @@ impl<'a> DisplayListFlattener<'a> {
             self.clip_scroll_tree,
         );
 
-        let snapped_clip_rect = snap_to_raster.snap(&clip_region.main).unwrap_or(clip_region.main);
+        let snapped_clip_rect = snap_to_raster.snap_or_self(&clip_region.main);
 
         let mut clip_count = 0;
 
@@ -2211,7 +2281,7 @@ impl<'a> DisplayListFlattener<'a> {
         clip_count += 1;
 
         if let Some(ref image_mask) = clip_region.image_mask {
-            let snapped_mask_rect = snap_to_raster.snap(&image_mask.rect).unwrap_or(image_mask.rect);
+            let snapped_mask_rect = snap_to_raster.snap_or_self(&image_mask.rect);
 
             let handle = self
                 .interners
@@ -2231,7 +2301,7 @@ impl<'a> DisplayListFlattener<'a> {
         }
 
         for region in clip_region.complex_clips {
-            let snapped_region_rect = snap_to_raster.snap(&region.rect).unwrap_or(region.rect);
+            let snapped_region_rect = snap_to_raster.snap_or_self(&region.rect);
             let handle = self
                 .interners
                 .clip
