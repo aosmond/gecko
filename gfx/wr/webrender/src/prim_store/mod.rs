@@ -4152,6 +4152,7 @@ pub fn get_snapped_rect<PixelSpace>(
     map_to_raster: &SpaceMapper<PixelSpace, RasterPixel>,
     device_pixel_scale: DevicePixelScale,
 ) -> Option<Rect<f32, PixelSpace>> where PixelSpace: fmt::Debug {
+    /*
     let is_axis_aligned = match map_to_raster.kind {
         CoordinateSpaceMapping::Local |
         CoordinateSpaceMapping::ScaleOffset(..) => true,
@@ -4173,7 +4174,8 @@ pub fn get_snapped_rect<PixelSpace>(
         Some(snapped_prim_rect)
     } else {
         None
-    }
+    }*/
+    None
 }
 
 /// Get the inline (horizontal) and block (vertical) sizes
