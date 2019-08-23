@@ -307,10 +307,13 @@ impl<'a> DisplayListFlattener<'a> {
             found_explicit_tile_cache: false,
         };
 
+        let device_pixel_scale = view.accumulated_scale_factor_for_snapping();
+
         flattener.push_root(
             root_pipeline_id,
             &root_pipeline.viewport_size,
             &root_pipeline.content_size,
+            device_pixel_scale,
         );
 
         // In order to ensure we have a single root stacking context for the
@@ -334,7 +337,7 @@ impl<'a> DisplayListFlattener<'a> {
             ClipChainId::NONE,
             RasterSpace::Screen,
             /* is_backdrop_root = */ true,
-            view.accumulated_scale_factor_for_snapping(),
+            device_pixel_scale,
         );
 
         flattener.flatten_items(
@@ -892,8 +895,18 @@ impl<'a> DisplayListFlattener<'a> {
         );
         self.pipeline_clip_chain_stack.push(clip_chain_index);
 
-        let bounds = info.bounds;
-        let origin = current_offset + bounds.origin.to_vector();
+        let snap_to_raster = &mut self.sc_stack.last_mut().unwrap().snap_to_raster;
+        snap_to_raster.set_target_spatial_node(
+            spatial_node_index,
+            self.clip_scroll_tree,
+        );
+
+        let bounds = snap_to_raster.snap_or_self(
+            &info.bounds.translate(current_offset),
+        );
+
+        let content_size = snap_to_raster.snap_size(&pipeline.content_size);
+
         let spatial_node_index = self.push_reference_frame(
             SpatialId::root_reference_frame(iframe_pipeline_id),
             Some(spatial_node_index),
@@ -901,7 +914,7 @@ impl<'a> DisplayListFlattener<'a> {
             TransformStyle::Flat,
             PropertyBinding::Value(LayoutTransform::identity()),
             ReferenceFrameKind::Transform,
-            origin,
+            bounds.origin.to_vector(),
         );
 
         let iframe_rect = LayoutRect::new(LayoutPoint::zero(), bounds.size);
@@ -911,7 +924,7 @@ impl<'a> DisplayListFlattener<'a> {
             Some(ExternalScrollId(0, iframe_pipeline_id)),
             iframe_pipeline_id,
             &iframe_rect,
-            &pipeline.content_size,
+            &content_size,
             ScrollSensitivity::ScriptAndInputEvents,
             ScrollFrameKind::PipelineRoot,
             LayoutVector2D::zero(),
@@ -2164,6 +2177,7 @@ impl<'a> DisplayListFlattener<'a> {
         pipeline_id: PipelineId,
         viewport_size: &LayoutSize,
         content_size: &LayoutSize,
+        device_pixel_scale: DevicePixelScale,
     ) {
         if let ChasePrimitive::Id(id) = self.config.chase_primitive {
             println!("Chasing {:?} by index", id);
@@ -2182,13 +2196,27 @@ impl<'a> DisplayListFlattener<'a> {
             LayoutVector2D::zero(),
         );
 
+        // We can't use this with the stacking context because it does not exist
+        // yet. Just create a dedicated snapper for the root.
+        let snap_to_raster = SpaceSnapper::new_with_target(
+            spatial_node_index,
+            ROOT_SPATIAL_NODE_INDEX,
+            device_pixel_scale,
+            self.clip_scroll_tree,
+        );
+
+        let content_size = snap_to_raster.snap_size(content_size);
+        let viewport_rect = snap_to_raster.snap_or_self(
+            &LayoutRect::new(LayoutPoint::zero(), *viewport_size),
+        );
+
         self.add_scroll_frame(
             SpatialId::root_scroll_node(pipeline_id),
             spatial_node_index,
             Some(ExternalScrollId(0, pipeline_id)),
             pipeline_id,
-            &LayoutRect::new(LayoutPoint::zero(), *viewport_size),
-            content_size,
+            &viewport_rect,
+            &content_size,
             ScrollSensitivity::ScriptAndInputEvents,
             ScrollFrameKind::PipelineRoot,
             LayoutVector2D::zero(),

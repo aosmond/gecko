@@ -16,7 +16,7 @@ use crate::clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, 
 use crate::debug_colors;
 use crate::debug_render::DebugItem;
 use crate::display_list_flattener::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D};
+use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Point2D};
 use euclid::approxeq::ApproxEq;
 use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use crate::frame_builder::{FrameVisibilityContext, FrameVisibilityState};
@@ -150,6 +150,23 @@ impl SpaceSnapper {
         }
     }
 
+    pub fn new_with_target(
+        ref_spatial_node_index: SpatialNodeIndex,
+        target_node_index: SpatialNodeIndex,
+        device_pixel_scale: DevicePixelScale,
+        clip_scroll_tree: &ClipScrollTree,
+    ) -> Self {
+        let mut snapper = SpaceSnapper {
+            ref_spatial_node_index,
+            current_target_spatial_node_index: SpatialNodeIndex::INVALID,
+            snapping_transform: None,
+            device_pixel_scale,
+        };
+
+        snapper.set_target_spatial_node(target_node_index, clip_scroll_tree);
+        snapper
+    }
+
     pub fn set_target_spatial_node(
         &mut self,
         target_node_index: SpatialNodeIndex,
@@ -187,6 +204,30 @@ impl SpaceSnapper {
                 scale_offset.unmap_rect(&snapped_device_rect)
             }
             None => *rect,
+        }
+    }
+
+    /*pub fn snap_origin<F>(&self, origin: &Point2D<f32, F>) -> Point2D<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let rect = Rect::<f32, F>::new(*origin, Size2D::<f32, F>::new(1.0, 1.0));
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
+                scale_offset.unmap_rect(&snapped_device_rect).origin
+            }
+            None => *origin,
+        }
+    }*/
+
+    pub fn snap_size<F>(&self, size: &Size2D<f32, F>) -> Size2D<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let rect = Rect::<f32, F>::new(Point2D::<f32, F>::zero(), *size);
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
+                scale_offset.unmap_rect(&snapped_device_rect).size
+            }
+            None => *size,
         }
     }
 }
