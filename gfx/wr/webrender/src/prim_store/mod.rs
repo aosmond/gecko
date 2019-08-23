@@ -159,10 +159,10 @@ impl SpaceSnapper {
             return
         }
 
-        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         let ref_spatial_node = &clip_scroll_tree.spatial_nodes[self.ref_spatial_node_index.0 as usize];
         let target_spatial_node = &clip_scroll_tree.spatial_nodes[target_node_index.0 as usize];
 
+        self.current_target_spatial_node_index = target_node_index;
         self.snapping_transform = match ref_spatial_node.snapping_transform {
             Some(ref ref_scale_offset) => {
                 match target_spatial_node.snapping_transform {
@@ -180,9 +180,10 @@ impl SpaceSnapper {
     }
 
     pub fn snap_or_self<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
             Some(ref scale_offset) => {
-                let snapped_device_rect : RasterRect = scale_offset.map_rect(rect).round();
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round();
                 scale_offset.unmap_rect(&snapped_device_rect)
             }
             None => *rect,

@@ -334,7 +334,7 @@ impl<'a> DisplayListFlattener<'a> {
             ClipChainId::NONE,
             RasterSpace::Screen,
             /* is_backdrop_root = */ true,
-            view.accumulated_scale_factor(),
+            view.accumulated_scale_factor_for_snapping(),
         );
 
         flattener.flatten_items(
@@ -1024,10 +1024,16 @@ impl<'a> DisplayListFlattener<'a> {
     }
 
     pub fn snap_or_self(
-        &self,
+        &mut self,
         rect: &LayoutRect,
+        target_spatial_node: SpatialNodeIndex,
     ) -> LayoutRect {
-        self.sc_stack.last().unwrap().snap_to_raster.snap_or_self(rect)
+        let snap_to_raster = &mut self.sc_stack.last_mut().unwrap().snap_to_raster;
+        snap_to_raster.set_target_spatial_node(
+            target_spatial_node,
+            self.clip_scroll_tree
+        );
+        snap_to_raster.snap_or_self(rect)
     }
 
     fn flatten_item<'b>(

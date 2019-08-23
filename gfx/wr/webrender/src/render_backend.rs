@@ -84,6 +84,13 @@ impl DocumentView {
             self.pinch_zoom_factor
         )
     }
+
+    pub fn accumulated_scale_factor_for_snapping(&self) -> DevicePixelScale {
+        DevicePixelScale::new(
+            self.device_pixel_ratio *
+            self.page_zoom_factor
+        )
+    }
 }
 
 #[derive(Copy, Clone, Hash, MallocSizeOf, PartialEq, PartialOrd, Debug, Eq, Ord)]
