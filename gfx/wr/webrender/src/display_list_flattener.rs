@@ -64,11 +64,6 @@ impl ClipNode {
     }
 }
 
-struct LayoutPrimitiveInfoEx {
-    unsnapped_rect: LayoutRect,
-    unsnapped_clip_rect: LayoutRect,
-}
-
 /// The offset stack for a given reference frame.
 struct ReferenceFrameState {
     /// A stack of current offsets from the current reference frame scope.
@@ -979,7 +974,7 @@ impl<'a> DisplayListFlattener<'a> {
         common: &CommonItemProperties,
         bounds: &LayoutRect,
         apply_pipeline_clip: bool
-    ) -> (LayoutPrimitiveInfo, LayoutPrimitiveInfoEx, ScrollNodeAndClipChain) {
+    ) -> (LayoutPrimitiveInfo, LayoutRect, ScrollNodeAndClipChain) {
         let clip_and_scroll = self.get_clip_and_scroll(
             &common.clip_id,
             &common.spatial_id,
@@ -1004,23 +999,18 @@ impl<'a> DisplayListFlattener<'a> {
             hit_info: common.hit_info,
         };
 
-        let layout_ex = LayoutPrimitiveInfoEx {
-            unsnapped_rect: rect,
-            unsnapped_clip_rect: clip_rect
-        };
-
-        (layout, layout_ex, clip_and_scroll)
+        (layout, rect, clip_and_scroll)
     }
 
     fn process_stretch_size_and_tiling(
         &self,
-        layout: &LayoutPrimitiveInfo,
-        layout_ex: &LayoutPrimitiveInfoEx,
+        snapped_rect: &LayoutRect,
+        unsnapped_rect: &LayoutRect,
         stretch_size: LayoutSize,
         tile_spacing: LayoutSize,
     ) -> (LayoutSize, LayoutSize) {
-        let width_ratio = layout.rect.size.width / layout_ex.unsnapped_rect.size.width;
-        let height_ratio = layout.rect.size.height / layout_ex.unsnapped_rect.size.height;
+        let width_ratio = snapped_rect.size.width / unsnapped_rect.size.width;
+        let height_ratio = snapped_rect.size.height / unsnapped_rect.size.height;
         (
             LayoutSize::new(
                 stretch_size.width * width_ratio,
@@ -1048,15 +1038,15 @@ impl<'a> DisplayListFlattener<'a> {
     ) -> Option<BuiltDisplayListIter<'a>> {
         match *item.item() {
             DisplayItem::Image(ref info) => {
-                let (layout, layout_ex, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
+                let (layout, unsnapped_rect, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
                 );
 
                 let (stretch_size, tile_spacing) = self.process_stretch_size_and_tiling(
-                    &layout,
-                    &layout_ex,
+                    &layout.rect,
+                    &unsnapped_rect,
                     info.stretch_size,
                     info.tile_spacing,
                 );
@@ -1158,15 +1148,15 @@ impl<'a> DisplayListFlattener<'a> {
                 );
             }
             DisplayItem::Gradient(ref info) => {
-                let (layout, layout_ex, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
+                let (layout, unsnapped_rect, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
                 );
 
                 let (tile_size, tile_spacing) = self.process_stretch_size_and_tiling(
-                    &layout,
-                    &layout_ex,
+                    &layout.rect,
+                    &unsnapped_rect,
                     info.tile_size,
                     info.tile_spacing
                 );
@@ -1190,15 +1180,15 @@ impl<'a> DisplayListFlattener<'a> {
                 }
             }
             DisplayItem::RadialGradient(ref info) => {
-                let (layout, layout_ex, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
+                let (layout, unsnapped_rect, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
                 );
 
                 let (tile_size, tile_spacing) = self.process_stretch_size_and_tiling(
-                    &layout,
-                    &layout_ex,
+                    &layout.rect,
+                    &unsnapped_rect,
                     info.tile_size,
                     info.tile_spacing
                 );
@@ -2539,11 +2529,23 @@ impl<'a> DisplayListFlattener<'a> {
         P: InternablePrimitive + CreateShadow,
         Interners: AsMut<Interner<P>>,
     {
-        // Offset the local rect and clip rect by the shadow offset.
+        let snap_to_raster = &mut self.sc_stack.last_mut().unwrap().snap_to_raster;
+        snap_to_raster.set_target_spatial_node(
+            pending_primitive.clip_and_scroll.spatial_node_index,
+            self.clip_scroll_tree
+        );
+
+        // Offset the local rect and clip rect by the shadow offset. The pending
+        // primitive has already been snapped, but we will need to snap the
+        // shadow after translation. We don't need to worry about the size
+        // changing because the shadow has the same raster space as the
+        // primitive, and thus we know the size is already rounded.
         let mut info = pending_primitive.info.clone();
-        info.rect = info.rect.translate(pending_shadow.shadow.offset);
-        info.clip_rect = info.clip_rect.translate(
-            pending_shadow.shadow.offset
+        info.rect = snap_to_raster.snap_or_self(
+            &info.rect.translate(pending_shadow.shadow.offset),
+        );
+        info.clip_rect = snap_to_raster.snap_or_self(
+            &info.clip_rect.translate(pending_shadow.shadow.offset),
         );
 
         // Construct and add a primitive for the given shadow.
