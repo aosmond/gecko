@@ -130,6 +130,9 @@ pub struct TransformUpdateState {
     /// Scale and offset from the coordinate system that started this compatible coordinate system.
     pub coordinate_system_relative_scale_offset: ScaleOffset,
 
+    /// Scale and offset for snapping purposes.
+    pub scrolling_snapping_scale_offset: Option<ScaleOffset>,
+
     /// True if this node is transformed by an invertible transform.  If not, display items
     /// transformed by this node will not be displayed and display items not transformed by this
     /// node will not be clipped by clips that are transformed by this node.
@@ -458,6 +461,7 @@ impl ClipScrollTree {
             nearest_scrolling_ancestor_viewport: LayoutRect::zero(),
             current_coordinate_system_id: CoordinateSystemId::root(),
             coordinate_system_relative_scale_offset: ScaleOffset::identity(),
+            scrolling_snapping_scale_offset: Some(ScaleOffset::identity()),
             invertible: true,
             preserves_3d: false,
         };
