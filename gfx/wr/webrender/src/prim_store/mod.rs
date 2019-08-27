@@ -45,6 +45,7 @@ use crate::renderer::{MAX_VERTEX_TEXTURE_WIDTH};
 use crate::resource_cache::{ImageProperties, ImageRequest};
 use crate::scene::SceneProperties;
 use crate::segment::SegmentBuilder;
+use crate::spatial_node::SpatialNode;
 use std::{cmp, fmt, hash, ops, u32, usize, mem};
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -130,6 +131,7 @@ impl PrimitiveOpacity {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct SpaceSnapper {
     pub ref_spatial_node_index: SpatialNodeIndex,
     pub current_target_spatial_node_index: SpatialNodeIndex,
@@ -172,6 +174,31 @@ impl SpaceSnapper {
         target_node_index: SpatialNodeIndex,
         clip_scroll_tree: &ClipScrollTree,
     ) {
+        self.set_target_spatial_node_internal(
+            target_node_index,
+            clip_scroll_tree,
+            |node| &node.snapping_transform
+        )
+    }
+
+    pub fn set_target_spatial_node_for_visibility(
+        &mut self,
+        target_node_index: SpatialNodeIndex,
+        clip_scroll_tree: &ClipScrollTree,
+    ) {
+        self.set_target_spatial_node_internal(
+            target_node_index,
+            clip_scroll_tree,
+            |node| &node.scrolling_snapping_transform
+        )
+    }
+
+    fn set_target_spatial_node_internal<F>(
+        &mut self,
+        target_node_index: SpatialNodeIndex,
+        clip_scroll_tree: &ClipScrollTree,
+        func: F,
+    ) where F: Fn(&SpatialNode) -> &Option<ScaleOffset> {
         if target_node_index == self.current_target_spatial_node_index {
             return
         }
@@ -182,7 +209,7 @@ impl SpaceSnapper {
         self.current_target_spatial_node_index = target_node_index;
         self.snapping_transform = match ref_spatial_node.snapping_transform {
             Some(ref ref_scale_offset) => {
-                match target_spatial_node.snapping_transform {
+                match func(target_spatial_node) {
                     Some(ref target_scale_offset) => {
                         Some(ref_scale_offset
                             .inverse()
@@ -207,17 +234,39 @@ impl SpaceSnapper {
         }
     }
 
-    /*pub fn snap_origin<F>(&self, origin: &Point2D<f32, F>) -> Point2D<f32, F> where F: fmt::Debug {
+    pub fn snap_inflated<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
             Some(ref scale_offset) => {
-                let rect = Rect::<f32, F>::new(*origin, Size2D::<f32, F>::new(1.0, 1.0));
-                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
-                scale_offset.unmap_rect(&snapped_device_rect).origin
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round_out();
+                scale_offset.unmap_rect(&snapped_device_rect)
             }
-            None => *origin,
+            None => *rect,
         }
-    }*/
+    }
+
+    pub fn snap_point<F>(&self, point: &Point2D<f32, F>) -> Point2D<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let snapped_device_point : DevicePoint = scale_offset.map_point(point).round();
+                scale_offset.unmap_point(&snapped_device_point)
+            }
+            None => *point,
+        }
+    }
+
+    pub fn snap_origin_only<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let device_rect : DeviceRect = scale_offset.map_rect(rect);
+                let snapped_device_rect = DeviceRect::new(device_rect.origin.round(), device_rect.size);
+                scale_offset.unmap_rect(&snapped_device_rect)
+            }
+            None => *rect,
+        }
+    }
 
     pub fn snap_size<F>(&self, size: &Size2D<f32, F>) -> Size2D<f32, F> where F: fmt::Debug {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
@@ -1953,6 +2002,11 @@ impl PrimitiveStore {
             RasterRect::max_rect(),
         );
 
+        let mut snap_local_to_raster = SpaceSnapper::new(
+            surface.raster_spatial_node_index,
+            surface.device_pixel_scale,
+        );
+
         let mut surface_rect = PictureRect::zero();
 
         for prim_instance in &mut prim_list.prim_instances {
@@ -1977,6 +2031,11 @@ impl PrimitiveStore {
             );
 
             map_local_to_raster.set_target_spatial_node(
+                prim_instance.spatial_node_index,
+                frame_context.clip_scroll_tree,
+            );
+
+            snap_local_to_raster.set_target_spatial_node_for_visibility(
                 prim_instance.spatial_node_index,
                 frame_context.clip_scroll_tree,
             );
@@ -2139,21 +2198,31 @@ impl PrimitiveStore {
                 // primitive rect here will have no effect, but if it is rasterized in its
                 // own space, or it has a blur or drop shadow effect applied, it may
                 // provide a snapping offset.
-                let snapped_prim_local_rect = get_snapped_rect(
-                    prim_local_rect,
-                    &map_local_to_raster,
-                    surface.device_pixel_scale,
-                ).unwrap_or(prim_local_rect);
+                let snapped_prim_local_rect =
+                    snap_local_to_raster.snap_origin_only(&prim_local_rect);
+
+                let snapped_prim_clip_rect =
+                    snap_local_to_raster.snap_origin_only(&prim_instance.local_clip_rect);
 
                 // Inflate the local rect for this primitive by the inflation factor of
                 // the picture context and include the shadow offset. This ensures that
                 // even if the primitive itself is not visible, any effects from the
                 // blur radius or shadow will be correctly taken into account.
                 let inflation_factor = surface.inflation_factor;
-                let local_rect = snapped_prim_local_rect
-                    .inflate(inflation_factor, inflation_factor)
-                    .union(&prim_shadow_rect)
-                    .intersection(&prim_instance.local_clip_rect);
+                let local_rect = if inflation_factor > 0.0 {
+                    let r = snapped_prim_local_rect
+                        .inflate(inflation_factor, inflation_factor)
+                        .union(&prim_shadow_rect);
+
+                    snap_local_to_raster
+                        .snap_inflated(&r)
+                        .intersection(&snapped_prim_clip_rect)
+                } else {
+                    snapped_prim_local_rect
+                        .union(&prim_shadow_rect)
+                        .intersection(&snapped_prim_clip_rect)
+                };
+
                 let local_rect = match local_rect {
                     Some(local_rect) => local_rect,
                     None => {
@@ -2175,11 +2244,12 @@ impl PrimitiveStore {
                 );
 
                 frame_state.clip_store.set_active_clips(
-                    prim_instance.local_clip_rect,
+                    snapped_prim_clip_rect,
                     prim_instance.spatial_node_index,
                     frame_state.clip_chain_stack.current_clips_array(),
                     &frame_context.clip_scroll_tree,
                     &mut frame_state.data_stores.clip,
+                    &mut snap_local_to_raster.clone(),
                 );
 
                 let clip_chain = frame_state
@@ -2264,7 +2334,7 @@ impl PrimitiveStore {
                 let combined_local_clip_rect = if apply_local_clip_rect {
                     clip_chain.local_clip_rect
                 } else {
-                    prim_instance.local_clip_rect
+                    snapped_prim_clip_rect
                 };
 
                 if combined_local_clip_rect.size.is_empty_or_negative() {
@@ -2386,11 +2456,21 @@ impl PrimitiveStore {
         //           stretch size from the segment rect in the shaders, we can
         //           remove this invalidation here completely.
         if let Some(ref raster_config) = pic.raster_config {
+            snap_local_to_raster.set_target_spatial_node_for_visibility(
+                surface.raster_spatial_node_index,
+                frame_context.clip_scroll_tree,
+            );
+
             // Inflate the local bounding rect if required by the filter effect.
             // This inflaction factor is to be applied to the surface itself.
-            if pic.options.inflate_if_required {
-                surface_rect = raster_config.composite_mode.inflate_picture_rect(surface_rect, surface.inflation_factor);
-            }
+            surface_rect = if pic.options.inflate_if_required {
+                snap_local_to_raster.snap_inflated(
+                    &raster_config.composite_mode
+                        .inflate_picture_rect(surface_rect, surface.inflation_factor)
+                )
+            } else {
+                snap_local_to_raster.snap_origin_only(&surface_rect)
+            };
 
             // Layout space for the picture is picture space from the
             // perspective of its child primitives.
