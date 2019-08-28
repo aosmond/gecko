@@ -648,12 +648,16 @@ impl ClipScrollTree {
                 pt.new_level(format!("ReferenceFrame"));
                 pt.add_item(format!("kind: {:?}", info.kind));
                 pt.add_item(format!("transform_style: {:?}", info.transform_style));
+                pt.add_item(format!("source_transform: {:?}", info.source_transform));
+                pt.add_item(format!("origin_in_parent_reference_frame: {:?}", info.origin_in_parent_reference_frame));
             }
         }
 
         pt.add_item(format!("index: {:?}", index));
         pt.add_item(format!("content_transform: {:?}", node.content_transform));
         pt.add_item(format!("viewport_transform: {:?}", node.viewport_transform));
+        pt.add_item(format!("snapping_transform: {:?}", node.snapping_transform));
+        pt.add_item(format!("scrolling_snapping_transform: {:?}", node.scrolling_snapping_transform));
         pt.add_item(format!("coordinate_system_id: {:?}", node.coordinate_system_id));
 
         for child_index in &node.children {

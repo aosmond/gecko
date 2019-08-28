@@ -351,9 +351,11 @@ impl SpatialNode {
 
                             match local_scale_offset {
                                 Some(ref scale_offset) => {
-                                    Some(parent_scale_offset
-                                         .accumulate(scale_offset)
-                                         .offset(state.parent_accumulated_scroll_offset.to_untyped()))
+                                    let origin_offset = info.origin_in_parent_reference_frame;
+                                    Some(ScaleOffset::from_offset(origin_offset.to_untyped())
+                                        .accumulate(&parent_scale_offset)
+                                        .accumulate(&scale_offset)
+                                        .offset(state.parent_accumulated_scroll_offset.to_untyped()))
                                 }
                                 None => None,
                             }
@@ -703,7 +705,11 @@ impl SpatialNode {
                     // We can only get a ScaleOffset if the transform is 2d axis
                     // aligned.
                     match ScaleOffset::from_transform(value) {
-                        Some(scale_offset) => scale_offset,
+                        Some(scale_offset) => {
+                            let origin_offset = info.origin_in_parent_reference_frame;
+                            ScaleOffset::from_offset(origin_offset.to_untyped())
+                                .accumulate(&scale_offset)
+                        }
                         None => return,
                     }
                 }
