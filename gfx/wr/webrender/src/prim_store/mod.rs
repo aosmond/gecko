@@ -223,14 +223,49 @@ impl SpaceSnapper {
         }
     }
 
+    fn nudge(x: f32) -> f32 {
+        let nudged = (x + 0.5).floor();
+        let err = if nudged == 0.0 {
+            0.000001
+        } else {
+            nudged * 0.000001
+        };
+        if nudged + err >= x && nudged - err <= x {
+            nudged
+        } else {
+            x
+        }
+    }
+
+    pub fn nudge_point<F>(point: &Point2D<f32, F>) -> Point2D<f32, F> where F: fmt::Debug {
+        Point2D::<f32, F>::new(
+            Self::nudge(point.x),
+            Self::nudge(point.y),
+        )
+    }
+
+    pub fn nudge_size<F>(size: &Size2D<f32, F>) -> Size2D<f32, F> where F: fmt::Debug {
+        Size2D::<f32, F>::new(
+            Self::nudge(size.width),
+            Self::nudge(size.height),
+        )
+    }
+
+    pub fn nudge_rect<F>(rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
+        Rect::<f32, F>::new(
+            Self::nudge_point(&rect.origin),
+            Self::nudge_size(&rect.size),
+        )
+    }
+
     pub fn snap_or_self<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
             Some(ref scale_offset) => {
                 let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round();
-                scale_offset.unmap_rect(&snapped_device_rect)
+                Self::nudge_rect(&scale_offset.unmap_rect(&snapped_device_rect))
             }
-            None => *rect,
+            None => Self::nudge_rect(rect),
         }
     }
 
@@ -239,9 +274,9 @@ impl SpaceSnapper {
         match self.snapping_transform {
             Some(ref scale_offset) => {
                 let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round_out();
-                scale_offset.unmap_rect(&snapped_device_rect)
+                Self::nudge_rect(&scale_offset.unmap_rect(&snapped_device_rect))
             }
-            None => *rect,
+            None => Self::nudge_rect(rect),
         }
     }
 
@@ -250,9 +285,9 @@ impl SpaceSnapper {
         match self.snapping_transform {
             Some(ref scale_offset) => {
                 let snapped_device_point : DevicePoint = scale_offset.map_point(point).round();
-                scale_offset.unmap_point(&snapped_device_point)
+                Self::nudge_point(&scale_offset.unmap_point(&snapped_device_point))
             }
-            None => *point,
+            None => Self::nudge_point(point),
         }
     }
 
@@ -262,9 +297,9 @@ impl SpaceSnapper {
             Some(ref scale_offset) => {
                 let device_rect : DeviceRect = scale_offset.map_rect(rect);
                 let snapped_device_rect = DeviceRect::new(device_rect.origin.round(), device_rect.size);
-                scale_offset.unmap_rect(&snapped_device_rect)
+                Self::nudge_rect(&scale_offset.unmap_rect(&snapped_device_rect))
             }
-            None => *rect,
+            None => Self::nudge_rect(rect),
         }
     }
 
@@ -274,9 +309,9 @@ impl SpaceSnapper {
             Some(ref scale_offset) => {
                 let rect = Rect::<f32, F>::new(Point2D::<f32, F>::zero(), *size);
                 let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
-                scale_offset.unmap_rect(&snapped_device_rect).size
+                Self::nudge_size(&scale_offset.unmap_rect(&snapped_device_rect).size)
             }
-            None => *size,
+            None => Self::nudge_size(size),
         }
     }
 }
