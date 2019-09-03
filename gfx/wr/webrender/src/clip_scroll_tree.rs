@@ -445,6 +445,7 @@ impl ClipScrollTree {
         &mut self,
         pan: WorldPoint,
         scene_properties: &SceneProperties,
+        device_pixel_scale: DevicePixelScale,
     ) {
         if self.spatial_nodes.is_empty() {
             return;
@@ -475,7 +476,7 @@ impl ClipScrollTree {
                 None => continue,
             };
 
-            node.update(&mut state, &mut self.coord_systems, scene_properties, &*previous);
+            node.update(&mut state, &mut self.coord_systems, scene_properties, &*previous, device_pixel_scale);
 
             if !node.children.is_empty() {
                 node.prepare_state_for_children(&mut state);
@@ -526,6 +527,7 @@ impl ClipScrollTree {
         scroll_sensitivity: ScrollSensitivity,
         frame_kind: ScrollFrameKind,
         external_scroll_offset: LayoutVector2D,
+        device_pixel_scale: DevicePixelScale,
     ) -> SpatialNodeIndex {
         let node = SpatialNode::new_scroll_frame(
             pipeline_id,
@@ -537,7 +539,7 @@ impl ClipScrollTree {
             frame_kind,
             external_scroll_offset,
         );
-        self.add_spatial_node(node)
+        self.add_spatial_node(node, device_pixel_scale)
     }
 
     pub fn add_reference_frame(
@@ -548,6 +550,7 @@ impl ClipScrollTree {
         kind: ReferenceFrameKind,
         origin_in_parent_reference_frame: LayoutVector2D,
         pipeline_id: PipelineId,
+        device_pixel_scale: DevicePixelScale,
     ) -> SpatialNodeIndex {
         let node = SpatialNode::new_reference_frame(
             parent_index,
@@ -557,7 +560,7 @@ impl ClipScrollTree {
             origin_in_parent_reference_frame,
             pipeline_id,
         );
-        self.add_spatial_node(node)
+        self.add_spatial_node(node, device_pixel_scale)
     }
 
     pub fn add_sticky_frame(
@@ -565,25 +568,26 @@ impl ClipScrollTree {
         parent_index: SpatialNodeIndex,
         sticky_frame_info: StickyFrameInfo,
         pipeline_id: PipelineId,
+        device_pixel_scale: DevicePixelScale,
     ) -> SpatialNodeIndex {
         let node = SpatialNode::new_sticky_frame(
             parent_index,
             sticky_frame_info,
             pipeline_id,
         );
-        self.add_spatial_node(node)
+        self.add_spatial_node(node, device_pixel_scale)
     }
 
-    pub fn add_spatial_node(&mut self, mut node: SpatialNode) -> SpatialNodeIndex {
+    pub fn add_spatial_node(&mut self, mut node: SpatialNode, device_pixel_scale: DevicePixelScale) -> SpatialNodeIndex {
         let index = SpatialNodeIndex::new(self.spatial_nodes.len());
 
         // When the parent node is None this means we are adding the root.
         if let Some(parent_index) = node.parent {
             let parent_node = &mut self.spatial_nodes[parent_index.0 as usize];
             parent_node.add_child(index);
-            node.update_snapping(Some(parent_node));
+            node.update_snapping(Some(parent_node), device_pixel_scale);
         } else {
-            node.update_snapping(None);
+            node.update_snapping(None, device_pixel_scale);
         }
 
         self.spatial_nodes.push(node);
@@ -769,7 +773,8 @@ fn test_cst_simple_translation() {
         LayoutVector2D::zero(),
     );
 
-    cst.update_tree(WorldPoint::zero(), &SceneProperties::new());
+    let device_pixel_scale = DevicePixelScale::new(1.0);
+    cst.update_tree(WorldPoint::zero(), &SceneProperties::new(), device_pixel_scale);
 
     test_pt(100.0, 100.0, &cst, child1, root, 200.0, 100.0);
     test_pt(100.0, 100.0, &cst, child2, root, 200.0, 150.0);
@@ -811,7 +816,8 @@ fn test_cst_simple_scale() {
         LayoutVector2D::zero(),
     );
 
-    cst.update_tree(WorldPoint::zero(), &SceneProperties::new());
+    let device_pixel_scale = DevicePixelScale::new(1.0);
+    cst.update_tree(WorldPoint::zero(), &SceneProperties::new(), device_pixel_scale);
 
     test_pt(100.0, 100.0, &cst, child1, root, 400.0, 100.0);
     test_pt(100.0, 100.0, &cst, child2, root, 400.0, 200.0);
@@ -861,7 +867,8 @@ fn test_cst_scale_translation() {
         LayoutVector2D::zero(),
     );
 
-    cst.update_tree(WorldPoint::zero(), &SceneProperties::new());
+    let device_pixel_scale = DevicePixelScale::new(1.0);
+    cst.update_tree(WorldPoint::zero(), &SceneProperties::new(), device_pixel_scale);
 
     test_pt(100.0, 100.0, &cst, child1, root, 200.0, 150.0);
     test_pt(100.0, 100.0, &cst, child2, root, 300.0, 450.0);
@@ -895,7 +902,8 @@ fn test_cst_translation_rotate() {
         LayoutVector2D::zero(),
     );
 
-    cst.update_tree(WorldPoint::zero(), &SceneProperties::new());
+    let device_pixel_scale = DevicePixelScale::new(1.0);
+    cst.update_tree(WorldPoint::zero(), &SceneProperties::new(), device_pixel_scale);
 
     test_pt(100.0, 0.0, &cst, child1, root, 0.0, -100.0);
 }

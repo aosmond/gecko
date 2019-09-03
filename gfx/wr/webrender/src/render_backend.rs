@@ -590,6 +590,7 @@ impl Document {
             self.clip_scroll_tree.update_tree(
                 pan,
                 &self.dynamic_properties,
+                accumulated_scale_factor,
             );
 
             self.hit_tester = Some(frame_builder.create_hit_tester(

@@ -1603,7 +1603,7 @@ random-if(/^Windows\x20NT\x206\.1/.test(http.oscpu)) == 600974-2.html 600974-1-r
 random-if(/^Windows\x20NT\x206\.1/.test(http.oscpu)) == 600974-3.html 600974-1-ref.html # Bug 1392106
 == 602200-1.html 602200-1-ref.html
 == 602200-2.html 602200-2-ref.html
-fuzzy-if(Android,0-8,0-20) == 602200-3.html 602200-3-ref.html
+wr-capture wr-capture-ref fuzzy-if(Android,0-8,0-20) == 602200-3.html 602200-3-ref.html
 == 602200-4.html 602200-4-ref.html
 == 603423-1.html 603423-1-ref.html
 == 604737.html 604737-ref.html

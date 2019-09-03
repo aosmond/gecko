@@ -255,6 +255,7 @@ impl SpatialNode {
         coord_systems: &mut Vec<CoordinateSystem>,
         scene_properties: &SceneProperties,
         previous_spatial_nodes: &[SpatialNode],
+        device_pixel_scale: DevicePixelScale,
     ) {
         // If any of our parents was not rendered, we are not rendered either and can just
         // quit here.
@@ -263,7 +264,7 @@ impl SpatialNode {
             return;
         }
 
-        self.update_transform(state, coord_systems, scene_properties, previous_spatial_nodes);
+        self.update_transform(state, coord_systems, scene_properties, previous_spatial_nodes, device_pixel_scale);
         //TODO: remove the field entirely?
         self.transform_kind = if self.coordinate_system_id.0 == 0 {
             TransformedRectKind::AxisAligned
@@ -295,6 +296,7 @@ impl SpatialNode {
         coord_systems: &mut Vec<CoordinateSystem>,
         scene_properties: &SceneProperties,
         previous_spatial_nodes: &[SpatialNode],
+        device_pixel_scale: DevicePixelScale,
     ) {
         match self.node_type {
             SpatialNodeType::ReferenceFrame(ref mut info) => {
@@ -355,7 +357,8 @@ impl SpatialNode {
                                     Some(ScaleOffset::from_offset(origin_offset.to_untyped())
                                         .accumulate(&parent_scale_offset)
                                         .accumulate(&scale_offset)
-                                        .offset(state.parent_accumulated_scroll_offset.to_untyped()))
+                                        .offset(state.parent_accumulated_scroll_offset.to_untyped())
+                                        .snap_offset(device_pixel_scale))
                                 }
                                 None => None,
                             }
@@ -684,6 +687,7 @@ impl SpatialNode {
     pub fn update_snapping(
         &mut self,
         parent: Option<&SpatialNode>,
+        device_pixel_scale: DevicePixelScale,
     ) {
         // We need to incorporate the parent scale/offset with the child.
         // If the parent does not have a scale/offset, then we know we are
@@ -709,6 +713,7 @@ impl SpatialNode {
                             let origin_offset = info.origin_in_parent_reference_frame;
                             ScaleOffset::from_offset(origin_offset.to_untyped())
                                 .accumulate(&scale_offset)
+                                .snap_offset(device_pixel_scale)
                         }
                         None => return,
                     }

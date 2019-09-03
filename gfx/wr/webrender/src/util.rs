@@ -220,6 +220,14 @@ impl ScaleOffset {
         }
     }
 
+    pub fn snap_offset(&self, device_pixel_scale: DevicePixelScale) -> Self {
+        let dps = device_pixel_scale.0;
+        ScaleOffset {
+            scale: self.scale,
+            offset: (self.offset * dps).round() / dps,
+        }
+    }
+
     pub fn map_rect<F, T>(&self, rect: &Rect<f32, F>) -> Rect<f32, T> {
         Rect::new(
             Point2D::new(

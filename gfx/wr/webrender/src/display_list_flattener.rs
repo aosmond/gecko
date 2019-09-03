@@ -756,6 +756,7 @@ impl<'a> DisplayListFlattener<'a> {
             parent_node_index,
             sticky_frame_info,
             info.id.pipeline_id(),
+            self.sc_stack.last().unwrap().snap_to_raster.device_pixel_scale,
         );
         self.id_to_index_mapper.map_spatial_node(info.id, index);
     }
@@ -793,6 +794,7 @@ impl<'a> DisplayListFlattener<'a> {
             info.scroll_sensitivity,
             ScrollFrameKind::Explicit,
             info.external_scroll_offset,
+            self.sc_stack.last().unwrap().snap_to_raster.device_pixel_scale,
         );
     }
 
@@ -814,6 +816,7 @@ impl<'a> DisplayListFlattener<'a> {
             reference_frame.transform,
             reference_frame.kind,
             current_offset + origin.to_vector(),
+            self.sc_stack.last().unwrap().snap_to_raster.device_pixel_scale,
         );
 
         self.rf_mapper.push_scope();
@@ -947,6 +950,7 @@ impl<'a> DisplayListFlattener<'a> {
             PropertyBinding::Value(LayoutTransform::identity()),
             ReferenceFrameKind::Transform,
             bounds.origin.to_vector(),
+            self.sc_stack.last().unwrap().snap_to_raster.device_pixel_scale,
         );
 
         let iframe_rect = LayoutRect::new(LayoutPoint::zero(), bounds.size);
@@ -960,6 +964,7 @@ impl<'a> DisplayListFlattener<'a> {
             ScrollSensitivity::ScriptAndInputEvents,
             ScrollFrameKind::PipelineRoot,
             LayoutVector2D::zero(),
+            self.sc_stack.last().unwrap().snap_to_raster.device_pixel_scale,
         );
 
         self.rf_mapper.push_scope();
@@ -2190,6 +2195,7 @@ impl<'a> DisplayListFlattener<'a> {
         source_transform: PropertyBinding<LayoutTransform>,
         kind: ReferenceFrameKind,
         origin_in_parent_reference_frame: LayoutVector2D,
+        device_pixel_scale: DevicePixelScale,
     ) -> SpatialNodeIndex {
         let index = self.clip_scroll_tree.add_reference_frame(
             parent_index,
@@ -2198,6 +2204,7 @@ impl<'a> DisplayListFlattener<'a> {
             kind,
             origin_in_parent_reference_frame,
             pipeline_id,
+            device_pixel_scale,
         );
         self.id_to_index_mapper.map_spatial_node(reference_frame_id, index);
 
@@ -2226,6 +2233,7 @@ impl<'a> DisplayListFlattener<'a> {
             PropertyBinding::Value(LayoutTransform::identity()),
             ReferenceFrameKind::Transform,
             LayoutVector2D::zero(),
+            device_pixel_scale,
         );
 
         // We can't use this with the stacking context because it does not exist
@@ -2252,6 +2260,7 @@ impl<'a> DisplayListFlattener<'a> {
             ScrollSensitivity::ScriptAndInputEvents,
             ScrollFrameKind::PipelineRoot,
             LayoutVector2D::zero(),
+            device_pixel_scale,
         );
     }
 
@@ -2364,6 +2373,7 @@ impl<'a> DisplayListFlattener<'a> {
         scroll_sensitivity: ScrollSensitivity,
         frame_kind: ScrollFrameKind,
         external_scroll_offset: LayoutVector2D,
+        device_pixel_scale: DevicePixelScale,
     ) -> SpatialNodeIndex {
         let node_index = self.clip_scroll_tree.add_scroll_frame(
             parent_node_index,
@@ -2374,6 +2384,7 @@ impl<'a> DisplayListFlattener<'a> {
             scroll_sensitivity,
             frame_kind,
             external_scroll_offset,
+            device_pixel_scale,
         );
         self.id_to_index_mapper.map_spatial_node(new_node_id, node_index);
         node_index
