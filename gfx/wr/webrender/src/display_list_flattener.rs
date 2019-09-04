@@ -1046,7 +1046,7 @@ impl<'a> DisplayListFlattener<'a> {
 
         (layout, rect, clip_and_scroll)
     }
-
+/*
     fn process_stretch_size_and_tiling(
         &self,
         snapped_rect: &LayoutRect,
@@ -1073,6 +1073,30 @@ impl<'a> DisplayListFlattener<'a> {
             LayoutSize::new(spacing_width, spacing_height),
         )
     }
+*/
+    fn process_stretch_size_and_tiling(
+        &self,
+        snapped_rect: &LayoutRect,
+        unsnapped_rect: &LayoutRect,
+        stretch_size: LayoutSize,
+        tile_spacing: LayoutSize,
+    ) -> (LayoutSize, LayoutSize) {
+        (
+            LayoutSize::new(
+                if stretch_size.width == unsnapped_rect.size.width {
+                    snapped_rect.size.width
+                } else {
+                    stretch_size.width
+                },
+                if stretch_size.height == unsnapped_rect.size.height {
+                    snapped_rect.size.height
+                } else {
+                    stretch_size.height
+                },
+            ),
+            tile_spacing,
+        )
+    }
 
     pub fn snap_or_self(
         &mut self,
@@ -1095,6 +1119,25 @@ impl<'a> DisplayListFlattener<'a> {
     ) -> Option<BuiltDisplayListIter<'a>> {
         match *item.item() {
             DisplayItem::Image(ref info) => {
+                let (layout, clip_and_scroll) = self.process_common_properties_with_bounds(
+                    &info.common,
+                    &info.bounds,
+                    apply_pipeline_clip,
+                );
+
+                self.add_image(
+                    clip_and_scroll,
+                    &layout,
+                    layout.rect.size,
+                    LayoutSize::zero(),
+                    None,
+                    info.image_key,
+                    info.image_rendering,
+                    info.alpha_type,
+                    info.color,
+                );
+            }
+            DisplayItem::RepeatingImage(ref info) => {
                 let (layout, unsnapped_rect, clip_and_scroll) = self.process_common_properties_with_bounds_ex(
                     &info.common,
                     &info.bounds,
