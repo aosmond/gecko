@@ -435,12 +435,29 @@ impl<Src, Dst> MatrixHelpers<Src, Dst> for Transform3D<f32, Src, Dst> {
     }
 }
 
+pub trait PointHelpers<U>
+where
+    Self: Sized,
+{
+    fn snap(&self) -> Self;
+}
+
+impl<U> PointHelpers<U> for Point2D<f32, U> {
+    fn snap(&self) -> Self {
+        Point2D::new(
+            (self.x + 0.5).floor(),
+            (self.y + 0.5).floor(),
+        )
+    }
+}
+
 pub trait RectHelpers<U>
 where
     Self: Sized,
 {
     fn from_floats(x0: f32, y0: f32, x1: f32, y1: f32) -> Self;
     fn is_well_formed_and_nonempty(&self) -> bool;
+    fn snap(&self) -> Self;
 }
 
 impl<U> RectHelpers<U> for Rect<f32, U> {
@@ -453,6 +470,20 @@ impl<U> RectHelpers<U> for Rect<f32, U> {
 
     fn is_well_formed_and_nonempty(&self) -> bool {
         self.size.width > 0.0 && self.size.height > 0.0
+    }
+
+    fn snap(&self) -> Self {
+        let origin = Point2D::new(
+            (self.origin.x + 0.5).floor(),
+            (self.origin.y + 0.5).floor(),
+        );
+        Rect::new(
+            origin,
+            Size2D::new(
+                (self.origin.x + self.size.width + 0.5).floor() - origin.x,
+                (self.origin.y + self.size.height + 0.5).floor() - origin.y,
+            ),
+        )
     }
 }
 

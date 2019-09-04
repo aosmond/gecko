@@ -1054,17 +1054,23 @@ impl<'a> DisplayListFlattener<'a> {
         stretch_size: LayoutSize,
         tile_spacing: LayoutSize,
     ) -> (LayoutSize, LayoutSize) {
-        let width_ratio = snapped_rect.size.width / unsnapped_rect.size.width;
-        let height_ratio = snapped_rect.size.height / unsnapped_rect.size.height;
+        let (stretch_width, spacing_width) = if (stretch_size.width + tile_spacing.width) <= unsnapped_rect.size.width {
+            let scale = snapped_rect.size.width / unsnapped_rect.size.width;
+            (stretch_size.width * scale, tile_spacing.width * scale)
+        } else {
+            (stretch_size.width, tile_spacing.width)
+        };
+
+        let (stretch_height, spacing_height) = if (stretch_size.height + tile_spacing.height) <= unsnapped_rect.size.height {
+            let scale = snapped_rect.size.height / unsnapped_rect.size.height;
+            (stretch_size.height * scale, tile_spacing.height * scale)
+        } else {
+            (stretch_size.height, tile_spacing.height)
+        };
+
         (
-            LayoutSize::new(
-                stretch_size.width * width_ratio,
-                stretch_size.height * height_ratio,
-            ),
-            LayoutSize::new(
-                tile_spacing.width * width_ratio,
-                tile_spacing.height * height_ratio,
-            ),
+            LayoutSize::new(stretch_width, stretch_height),
+            LayoutSize::new(spacing_width, spacing_height),
         )
     }
 
