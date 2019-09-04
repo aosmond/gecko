@@ -160,7 +160,7 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 0.0, 64.0, 64.0));
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(64.0, 64.0),
@@ -189,7 +189,7 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 0.0, 1024.0, 1024.0));
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(1024.0, 1024.0),
@@ -215,7 +215,7 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 0.0, 1024.0, 1024.0));
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(1024.0, 1024.0),
@@ -255,7 +255,7 @@ impl<'a> RawtestHarness<'a> {
         let info = self.make_common_properties(rect(448.899994, 74.0, 151.000031, 56.));
 
         // setup some malicious image size parameters
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(151., 56.0),
@@ -335,7 +335,7 @@ impl<'a> RawtestHarness<'a> {
         };
 
         // setup some malicious image size parameters
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             image_size * 2.,
@@ -440,7 +440,7 @@ impl<'a> RawtestHarness<'a> {
             Some(100),
         );
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             image_size,
@@ -477,7 +477,7 @@ impl<'a> RawtestHarness<'a> {
             Some(100),
         );
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             image_size,
@@ -532,7 +532,7 @@ impl<'a> RawtestHarness<'a> {
         let image_size = size2(1510., 1510.);
 
         // setup some malicious image size parameters
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             image_size,
@@ -558,7 +558,7 @@ impl<'a> RawtestHarness<'a> {
         let image_size = size2(1510., 1510.);
 
         // setup some malicious image size parameters
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             image_size,
@@ -590,7 +590,7 @@ impl<'a> RawtestHarness<'a> {
         let image_size = size2(1510., 1510.);
 
         // setup some malicious image size parameters
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             image_size,
@@ -653,7 +653,7 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 60.0, 200.0, 200.0));
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(200.0, 200.0),
@@ -677,7 +677,7 @@ impl<'a> RawtestHarness<'a> {
         // make a new display list that refers to the first image
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(1.0, 60.0, 200.0, 200.0));
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(200.0, 200.0),
@@ -763,8 +763,8 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 60.0, 200.0, 200.0));
         let info2 = self.make_common_properties(rect(200.0, 60.0, 200.0, 200.0));
-        let push_images = |builder: &mut DisplayListBuilder| {
-            builder.push_image(
+        let push_repeating_images = |builder: &mut DisplayListBuilder| {
+            builder.push_repeating_image(
                 &info,
                 info.clip_rect,
                 size2(200.0, 200.0),
@@ -774,7 +774,7 @@ impl<'a> RawtestHarness<'a> {
                 blob_img.as_image(),
                 ColorF::WHITE,
             );
-            builder.push_image(
+            builder.push_repeating_image(
                 &info2,
                 info2.clip_rect,
                 size2(200.0, 200.0),
@@ -786,7 +786,7 @@ impl<'a> RawtestHarness<'a> {
             );
         };
 
-        push_images(&mut builder);
+        push_repeating_images(&mut builder);
 
         let mut epoch = Epoch(0);
 
@@ -811,7 +811,7 @@ impl<'a> RawtestHarness<'a> {
         );
 
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
-        push_images(&mut builder);
+        push_repeating_images(&mut builder);
         self.submit_dl(&mut epoch, layout_size, builder, &txn.resource_updates);
         let _pixels_second = self.render_and_get_pixels(window_rect);
 
@@ -826,7 +826,7 @@ impl<'a> RawtestHarness<'a> {
         );
 
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
-        push_images(&mut builder);
+        push_repeating_images(&mut builder);
         self.submit_dl(&mut epoch, layout_size, builder, &txn.resource_updates);
         let _pixels_third = self.render_and_get_pixels(window_rect);
 
@@ -867,7 +867,7 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 60.0, 200.0, 200.0));
 
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(200.0, 200.0),
@@ -896,7 +896,7 @@ impl<'a> RawtestHarness<'a> {
         // make a new display list that refers to the first image
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 60.0, 200.0, 200.0));
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(200.0, 200.0),
@@ -923,7 +923,7 @@ impl<'a> RawtestHarness<'a> {
         // make a new display list that refers to the first image
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
         let info = self.make_common_properties(rect(0.0, 60.0, 200.0, 200.0));
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(200.0, 200.0),
@@ -1123,7 +1123,7 @@ impl<'a> RawtestHarness<'a> {
         let mut builder = DisplayListBuilder::new(self.wrench.root_pipeline_id, layout_size);
 
         let info = self.make_common_properties(rect(300.0, 70.0, 150.0, 50.0));
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             info.clip_rect,
             size2(150.0, 50.0),

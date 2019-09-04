@@ -144,7 +144,7 @@ impl Example for App {
                 space_and_clip,
             );
 
-            builder.push_image(
+            builder.push_repeating_image(
                 &info,
                 bounds,
                 image_size,
@@ -165,8 +165,6 @@ impl Example for App {
             builder.push_image(
                 &info,
                 bounds,
-                image_size,
-                LayoutSize::zero(),
                 ImageRendering::Auto,
                 AlphaType::PremultipliedAlpha,
                 image_key,
@@ -180,7 +178,7 @@ impl Example for App {
             LayoutRect::new(LayoutPoint::new(100.0, 400.0), image_size),
             space_and_clip,
         );
-        builder.push_image(
+        builder.push_repeating_image(
             &info,
             bounds,
             image_size,
