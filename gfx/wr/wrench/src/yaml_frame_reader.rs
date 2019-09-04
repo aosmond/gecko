@@ -1268,7 +1268,7 @@ impl YamlFrameReader {
                 item
             ),
         };
-        dl.push_image(
+        dl.push_repeating_image(
             &info,
             bounds,
             stretch_size,

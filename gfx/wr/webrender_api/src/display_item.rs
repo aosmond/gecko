@@ -104,6 +104,7 @@ pub enum DisplayItem {
     Gradient(GradientDisplayItem),
     RadialGradient(RadialGradientDisplayItem),
     Image(ImageDisplayItem),
+    RepeatingImage(RepeatingImageDisplayItem),
     YuvImage(YuvImageDisplayItem),
     BackdropFilter(BackdropFilterDisplayItem),
 
@@ -148,6 +149,7 @@ pub enum DebugDisplayItem {
     Gradient(GradientDisplayItem),
     RadialGradient(RadialGradientDisplayItem),
     Image(ImageDisplayItem),
+    RepeatingImage(RepeatingImageDisplayItem),
     YuvImage(YuvImageDisplayItem),
     BackdropFilter(BackdropFilterDisplayItem),
 
@@ -1080,6 +1082,22 @@ pub struct ImageDisplayItem {
     // FIXME: this should ideally just be `tile_origin` here, with the clip_rect
     // defining the bounds of the item. Needs non-trivial backend changes.
     pub bounds: LayoutRect,
+    pub image_key: ImageKey,
+    pub image_rendering: ImageRendering,
+    pub alpha_type: AlphaType,
+    /// A hack used by gecko to color a simple bitmap font used for tofu glyphs
+    pub color: ColorF,
+}
+
+/// This describes an image or, more generally, a background-image and its tiling.
+/// (A background-image repeats in a grid to fill the specified area).
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
+pub struct RepeatingImageDisplayItem {
+    pub common: CommonItemProperties,
+    /// The area to tile the image over (first tile starts at origin of this rect)
+    // FIXME: this should ideally just be `tile_origin` here, with the clip_rect
+    // defining the bounds of the item. Needs non-trivial backend changes.
+    pub bounds: LayoutRect,
     /// How large to make a single tile of the image (common case: bounds.size)
     pub stretch_size: LayoutSize,
     /// The space between tiles (common case: 0)
@@ -1406,6 +1424,7 @@ impl DisplayItem {
             DisplayItem::Gradient(..) => "gradient",
             DisplayItem::Iframe(..) => "iframe",
             DisplayItem::Image(..) => "image",
+            DisplayItem::RepeatingImage(..) => "repeating_image",
             DisplayItem::Line(..) => "line",
             DisplayItem::PopAllShadows => "pop_all_shadows",
             DisplayItem::PopReferenceFrame => "pop_reference_frame",
