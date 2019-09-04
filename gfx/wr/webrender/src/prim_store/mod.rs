@@ -52,7 +52,7 @@ use std::{cmp, fmt, hash, ops, u32, usize, mem};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::storage;
 use crate::texture_cache::TEXTURE_REGION_DIMENSIONS;
-use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset};
+use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset, RectHelpers, PointHelpers};
 use crate::util::{clamp_to_scale_factor, pack_as_float, project_rect, raster_rect_to_device_pixels};
 use crate::internal_types::{LayoutPrimitiveInfo, Filter};
 use smallvec::SmallVec;
@@ -228,7 +228,7 @@ impl SpaceSnapper {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
             Some(ref scale_offset) => {
-                let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round();
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).snap();
                 scale_offset.unmap_rect(&snapped_device_rect)
             }
             None => *rect,
@@ -250,7 +250,7 @@ impl SpaceSnapper {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
             Some(ref scale_offset) => {
-                let snapped_device_point : DevicePoint = scale_offset.map_point(point).round();
+                let snapped_device_point : DevicePoint = scale_offset.map_point(point).snap();
                 scale_offset.unmap_point(&snapped_device_point)
             }
             None => *point,
@@ -262,7 +262,7 @@ impl SpaceSnapper {
         match self.snapping_transform {
             Some(ref scale_offset) => {
                 let device_rect : DeviceRect = scale_offset.map_rect(rect);
-                let snapped_device_rect = DeviceRect::new(device_rect.origin.round(), device_rect.size);
+                let snapped_device_rect = DeviceRect::new(device_rect.origin.snap(), device_rect.size);
                 scale_offset.unmap_rect(&snapped_device_rect)
             }
             None => *rect,
@@ -274,7 +274,7 @@ impl SpaceSnapper {
         match self.snapping_transform {
             Some(ref scale_offset) => {
                 let rect = Rect::<f32, F>::new(Point2D::<f32, F>::zero(), *size);
-                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).round();
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(&rect).snap();
                 scale_offset.unmap_rect(&snapped_device_rect).size
             }
             None => *size,
