@@ -41,10 +41,12 @@ pub struct SpatialNode {
     /// Snapping scale/offset relative to the coordinate system. If None, then
     /// we should not snap entities bound to this spatial node.
     pub snapping_transform: Option<ScaleOffset>,
+    pub unsnapped_snapping_transform: Option<ScaleOffset>,
 
     /// Same as snapping_transform, but incorporates the current snapped scroll
     /// offsets given during frame building.
     pub scrolling_snapping_transform: Option<ScaleOffset>,
+    pub unsnapped_scrolling_snapping_transform: Option<ScaleOffset>,
 
     /// The axis-aligned coordinate system id of this node.
     pub coordinate_system_id: CoordinateSystemId,
@@ -120,7 +122,9 @@ impl SpatialNode {
             viewport_transform: ScaleOffset::identity(),
             content_transform: ScaleOffset::identity(),
             snapping_transform: None,
+            unsnapped_snapping_transform: None,
             scrolling_snapping_transform: None,
+            unsnapped_scrolling_snapping_transform: None,
             coordinate_system_id: CoordinateSystemId(0),
             transform_kind: TransformedRectKind::AxisAligned,
             parent: parent_index,
@@ -357,8 +361,7 @@ impl SpatialNode {
                                     Some(ScaleOffset::from_offset(origin_offset.to_untyped())
                                         .accumulate(&parent_scale_offset)
                                         .accumulate(&scale_offset)
-                                        .offset(state.parent_accumulated_scroll_offset.to_untyped())
-                                        .snap_offset(device_pixel_scale))
+                                        .offset(state.parent_accumulated_scroll_offset.to_untyped()))
                                 }
                                 None => None,
                             }
@@ -423,7 +426,8 @@ impl SpatialNode {
                 self.coordinate_system_id = state.current_coordinate_system_id;
                 self.viewport_transform = cs_scale_offset;
                 self.content_transform = cs_scale_offset;
-                self.scrolling_snapping_transform = ss_scale_offset;
+                self.scrolling_snapping_transform = ss_scale_offset.and_then(|ref so| Some(so.snap_offset(device_pixel_scale)));
+                self.unsnapped_scrolling_snapping_transform = ss_scale_offset;
                 self.invertible = info.invertible;
             }
             _ => {
@@ -604,7 +608,7 @@ impl SpatialNode {
                 state.preserves_3d = info.transform_style == TransformStyle::Preserve3D;
                 state.parent_accumulated_scroll_offset = LayoutVector2D::zero();
                 state.coordinate_system_relative_scale_offset = self.content_transform;
-                state.scrolling_snapping_scale_offset = self.scrolling_snapping_transform;
+                state.scrolling_snapping_scale_offset = self.unsnapped_scrolling_snapping_transform;
                 let translation = -info.origin_in_parent_reference_frame;
                 state.nearest_scrolling_ancestor_viewport =
                     state.nearest_scrolling_ancestor_viewport
@@ -695,7 +699,7 @@ impl SpatialNode {
         // either.
         let parent_scale_offset = match parent {
             Some(parent) => {
-                match parent.snapping_transform {
+                match parent.unsnapped_snapping_transform {
                     Some(scale_offset) => scale_offset,
                     None => return,
                 }
@@ -713,7 +717,6 @@ impl SpatialNode {
                             let origin_offset = info.origin_in_parent_reference_frame;
                             ScaleOffset::from_offset(origin_offset.to_untyped())
                                 .accumulate(&scale_offset)
-                                .snap_offset(device_pixel_scale)
                         }
                         None => return,
                     }
@@ -727,7 +730,8 @@ impl SpatialNode {
             ScaleOffset::identity()
         };
 
-        self.snapping_transform = Some(parent_scale_offset.accumulate(&scale_offset));
+        self.unsnapped_snapping_transform = Some(parent_scale_offset.accumulate(&scale_offset));
+        self.snapping_transform = Some(self.unsnapped_snapping_transform.as_ref().unwrap().snap_offset(device_pixel_scale));
     }
 
     /// Returns true for ReferenceFrames whose source_transform is
