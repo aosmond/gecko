@@ -728,6 +728,7 @@ impl<'de> Deserialize<'de> for BuiltDisplayList {
                 Debug::HitTest(v) => Real::HitTest(v),
                 Debug::Line(v) => Real::Line(v),
                 Debug::Image(v) => Real::Image(v),
+                Debug::RepeatingImage(v) => Real::RepeatingImage(v),
                 Debug::YuvImage(v) => Real::YuvImage(v),
                 Debug::Border(v) => Real::Border(v),
                 Debug::BoxShadow(v) => Real::BoxShadow(v),
