@@ -166,6 +166,21 @@ impl ScaleOffset {
         })
     }
 
+    // Construct a ScaleOffset from a transform. Returns
+    // None if the matrix is not a pure scale / translation.
+    pub fn from_2d_axis_aligned_transform<F, T>(
+        m: &Transform3D<f32, F, T>,
+    ) -> Option<ScaleOffset> {
+        if m.preserves_2d_axis_alignment() {
+            Some(ScaleOffset {
+                scale: Vector2D::new(m.m11, m.m22),
+                offset: Vector2D::new(m.m41, m.m42),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn from_offset(offset: default::Vector2D<f32>) -> Self {
         ScaleOffset {
             scale: Vector2D::new(1.0, 1.0),

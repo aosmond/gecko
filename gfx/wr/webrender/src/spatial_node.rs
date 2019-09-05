@@ -345,7 +345,7 @@ impl SpatialNode {
                     ss_scale_offset = match state.scrolling_snapping_scale_offset {
                         Some(ref parent_scale_offset) => {
                             let local_scale_offset = match info.source_transform {
-                                PropertyBinding::Value(ref value) => ScaleOffset::from_transform(value),
+                                PropertyBinding::Value(ref value) => ScaleOffset::from_2d_axis_aligned_transform(value),
                                 PropertyBinding::Binding(..) => Some(ScaleOffset::identity()),
                             };
 
@@ -704,7 +704,7 @@ impl SpatialNode {
                 PropertyBinding::Value(ref value) => {
                     // We can only get a ScaleOffset if the transform is 2d axis
                     // aligned.
-                    match ScaleOffset::from_transform(value) {
+                    match ScaleOffset::from_2d_axis_aligned_transform(value) {
                         Some(scale_offset) => {
                             let origin_offset = info.origin_in_parent_reference_frame;
                             ScaleOffset::from_offset(origin_offset.to_untyped())
