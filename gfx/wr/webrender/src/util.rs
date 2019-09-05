@@ -171,7 +171,7 @@ impl ScaleOffset {
     pub fn from_2d_axis_aligned_transform<F, T>(
         m: &Transform3D<f32, F, T>,
     ) -> Option<ScaleOffset> {
-        if m.preserves_2d_axis_alignment() {
+        if m.preserves_2d_axis_alignment() && !m.has_perspective_component() {
             Some(ScaleOffset {
                 scale: Vector2D::new(m.m11, m.m22),
                 offset: Vector2D::new(m.m41, m.m42),
