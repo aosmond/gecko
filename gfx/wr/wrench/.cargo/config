@@ -1,0 +1,8 @@
+# The top level .cargo/config switches us to use vendored-sources
+# but wrench has dependencies that are not vendored and is only
+# used for development purposes.
+[source.crates-io]
+replace-with = "actual-sources"
+
+[source.actual-sources]
+registry = "https://github.com/rust-lang/crates.io-index"
