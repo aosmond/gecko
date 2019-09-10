@@ -1524,10 +1524,6 @@ pub struct PrimitiveVisibility {
     /// A mask defining which of the dirty regions this primitive is visible in.
     pub visibility_mask: PrimitiveVisibilityMask,
 
-    /// The local position for the primitive after snapping in raster
-    /// space, if possible.
-    pub snapped_prim_origin: LayoutPoint,
-
     /// The current combined local clip for this primitive, from
     /// the primitive local clip above and the current clip chain.
     pub combined_local_clip_rect: LayoutRect,
@@ -2100,7 +2096,6 @@ impl PrimitiveStore {
                         clipped_world_rect: WorldRect::max_rect(),
                         clip_chain: ClipChainInstance::empty(),
                         clip_task_index: ClipTaskIndex::INVALID,
-                        snapped_prim_origin: LayoutPoint::zero(),
                         combined_local_clip_rect: LayoutRect::zero(),
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
@@ -2270,11 +2265,7 @@ impl PrimitiveStore {
                     snapped_prim_local_rect
                 };
 
-                let combined_visible_rect = if !prim_shadow_rect.is_empty() {
-                    visible_rect.union(&prim_shadow_rect)
-                } else {
-                    visible_rect
-                };
+                let combined_visible_rect = visible_rect.union(&prim_shadow_rect);
 
                 // Include the snapped primitive/picture local rect, including any shadows,
                 // in the area affected by the surface.
@@ -2317,7 +2308,6 @@ impl PrimitiveStore {
                         clipped_world_rect,
                         clip_chain,
                         clip_task_index: ClipTaskIndex::INVALID,
-                        snapped_prim_origin: snapped_prim_local_rect.origin,
                         combined_local_clip_rect,
                         visibility_mask: PrimitiveVisibilityMask::empty(),
                     }
@@ -2449,7 +2439,7 @@ impl PrimitiveStore {
                         // rect and we want to clip these extra parts out.
                         let prim_info = &frame_state.scratch.prim_info[prim_instance.visibility_info.0 as usize];
                         let prim_rect = LayoutRect::new(
-                            prim_info.snapped_prim_origin,
+                            prim_instance.prim_origin,
                             common_data.prim_size,
                         );
                         let tight_clip_rect = prim_info
@@ -2776,8 +2766,7 @@ impl PrimitiveStore {
             );
 
             if prim_instance.is_chased() {
-                let prim_origin = scratch
-                    .prim_info[prim_instance.visibility_info.0 as usize].snapped_prim_origin;
+                let prim_origin = prim_instance.prim_origin;
                 println!("\tconsidered visible and ready with local pos {:?}", prim_origin);
             }
         }
@@ -2938,8 +2927,7 @@ impl PrimitiveStore {
                         pic_context.raster_spatial_node_index,
                     )
                     .into_fast_transform();
-                let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
-                let prim_offset = prim_info.snapped_prim_origin.to_vector() - run.reference_frame_relative_offset;
+                let prim_offset = prim_instance.prim_origin.to_vector() - run.reference_frame_relative_offset;
 
                 let pic = &self.pictures[pic_context.pic_index.0];
                 let raster_space = pic.get_raster_space(frame_context.clip_scroll_tree);
@@ -3250,7 +3238,7 @@ impl PrimitiveStore {
 
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
                     let prim_rect = LayoutRect::new(
-                        prim_info.snapped_prim_origin,
+                        prim_instance.prim_origin,
                         prim_data.common.prim_size,
                     );
 
@@ -3312,7 +3300,7 @@ impl PrimitiveStore {
                 if prim_data.tile_spacing != LayoutSize::zero() {
                     let prim_info = &scratch.prim_info[prim_instance.visibility_info.0 as usize];
                     let prim_rect = LayoutRect::new(
-                        prim_info.snapped_prim_origin,
+                        prim_instance.prim_origin,
                         prim_data.common.prim_size,
                     );
 
@@ -3696,7 +3684,7 @@ impl PrimitiveInstance {
         // Usually, the primitive rect can be found from information
         // in the instance and primitive template.
         let mut prim_local_rect = LayoutRect::new(
-            prim_info.snapped_prim_origin,
+            self.prim_origin,
             data_stores.as_common_data(self).prim_size
         );
 
@@ -3943,7 +3931,7 @@ impl PrimitiveInstance {
                 let segment_clip_chain = frame_state
                     .clip_store
                     .build_clip_chain_instance(
-                        segment.local_rect.translate(prim_info.snapped_prim_origin.to_vector()),
+                        segment.local_rect.translate(self.prim_origin.to_vector()),
                         &pic_state.map_local_to_pic,
                         &pic_state.map_pic_to_world,
                         &frame_context.clip_scroll_tree,

@@ -706,7 +706,7 @@ impl BatchBuilder {
 
         let prim_common_data = &ctx.data_stores.as_common_data(&prim_instance);
         let prim_rect = LayoutRect::new(
-            prim_info.snapped_prim_origin,
+            prim_instance.prim_origin,
             prim_common_data.prim_size
         );
 
