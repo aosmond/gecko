@@ -23,7 +23,7 @@ use crate::gpu_cache::{GpuCache, GpuCacheAddress, GpuCacheHandle};
 use crate::gpu_types::UvRectKind;
 use plane_split::{Clipper, Polygon, Splitter};
 use crate::prim_store::{SpaceMapper, PrimitiveVisibilityMask, PointKey, PrimitiveTemplateKind};
-use crate::prim_store::{PictureIndex, PrimitiveInstance, PrimitiveInstanceKind};
+use crate::prim_store::{SpaceSnapper, PictureIndex, PrimitiveInstance, PrimitiveInstanceKind};
 use crate::prim_store::{get_raster_rects, PrimitiveScratchBuffer, RectangleKey};
 use crate::prim_store::{OpacityBindingStorage, ImageInstanceStorage, OpacityBindingIndex};
 use crate::print_tree::PrintTreePrinter;
@@ -1905,6 +1905,9 @@ pub struct SurfaceInfo {
     /// Helper structs for mapping local rects in different
     /// coordinate systems into the surface coordinates.
     pub map_local_to_surface: SpaceMapper<LayoutPixel, PicturePixel>,
+    /// Helper structs for snapping local rects according to
+    /// the surface raster space.
+    pub snap_local_to_surface: SpaceSnapper,
     /// Defines the positioning node for the surface itself,
     /// and the rasterization root for this surface.
     pub raster_spatial_node_index: SpatialNodeIndex,
@@ -1942,9 +1945,15 @@ impl SurfaceInfo {
             pic_bounds,
         );
 
+        let snap_local_to_surface = SpaceSnapper::new(
+            surface_spatial_node_index,
+            device_pixel_scale,
+        );
+
         SurfaceInfo {
             rect: PictureRect::zero(),
             map_local_to_surface,
+            snap_local_to_surface,
             render_tasks: None,
             raster_spatial_node_index,
             surface_spatial_node_index,
@@ -2384,13 +2393,7 @@ pub struct PicturePrimitive {
     /// dynamically when updating visibility. It takes
     /// into account snapping in device space for its
     /// children.
-    pub snapped_local_rect: LayoutRect,
-
-    /// The local rect of this picture. It is built
-    /// dynamically during the first picture traversal. It
-    /// does not take into account snapping in device for
-    /// its children.
-    pub unsnapped_local_rect: LayoutRect,
+    pub local_rect: LayoutRect,
 
     /// If false, this picture needs to (re)build segments
     /// if it supports segment rendering. This can occur
@@ -2415,8 +2418,7 @@ impl PicturePrimitive {
     ) {
         pt.new_level(format!("{:?}", self_index));
         pt.add_item(format!("prim_count: {:?}", self.prim_list.prim_instances.len()));
-        pt.add_item(format!("snapped_local_rect: {:?}", self.snapped_local_rect));
-        pt.add_item(format!("unsnapped_local_rect: {:?}", self.unsnapped_local_rect));
+        pt.add_item(format!("local_rect: {:?}", self.local_rect));
         pt.add_item(format!("spatial_node_index: {:?}", self.spatial_node_index));
         pt.add_item(format!("raster_config: {:?}", self.raster_config));
         pt.add_item(format!("requested_composite_mode: {:?}", self.requested_composite_mode));
@@ -2525,8 +2527,7 @@ impl PicturePrimitive {
             is_backface_visible,
             requested_raster_space,
             spatial_node_index,
-            snapped_local_rect: LayoutRect::zero(),
-            unsnapped_local_rect: LayoutRect::zero(),
+            local_rect: LayoutRect::zero(),
             tile_cache,
             options,
             segments_are_valid: false,
@@ -2630,7 +2631,7 @@ impl PicturePrimitive {
 
         match self.raster_config {
             Some(ref raster_config) => {
-                let pic_rect = PictureRect::from_untyped(&self.snapped_local_rect.to_untyped());
+                let pic_rect = PictureRect::from_untyped(&self.local_rect.to_untyped());
 
                 let device_pixel_scale = frame_state
                     .surfaces[raster_config.surface_index.0]
@@ -3445,11 +3446,6 @@ impl PicturePrimitive {
             let surface_index = state.pop_surface();
             debug_assert_eq!(surface_index, raster_config.surface_index);
 
-            // Snapping may change the local rect slightly, and as such should just be
-            // considered an estimated size for determining if we need raster roots and
-            // preparing the tile cache.
-            self.unsnapped_local_rect = surface_rect;
-
             // Check if any of the surfaces can't be rasterized in local space but want to.
             if raster_config.establishes_raster_root {
                 if surface_rect.size.width > MAX_SURFACE_SIZE ||
@@ -3459,6 +3455,15 @@ impl PicturePrimitive {
                     state.are_raster_roots_assigned = false;
                 }
             }
+
+            let parent_surface = state.current_surface_mut();
+            parent_surface.snap_local_to_surface.set_target_spatial_node(
+                self.spatial_node_index,
+                frame_context.clip_scroll_tree,
+            );
+
+            surface_rect = parent_surface.snap_local_to_surface.snap_rect(&surface_rect);
+            self.local_rect = surface_rect;
 
             // Drop shadows draw both a content and shadow rect, so need to expand the local
             // rect of any surfaces to be composited in parent surfaces correctly.
@@ -3474,7 +3479,6 @@ impl PicturePrimitive {
             }
 
             // Propagate up to parent surface, now that we know this surface's static rect
-            let parent_surface = state.current_surface_mut();
             parent_surface.map_local_to_surface.set_target_spatial_node(
                 self.spatial_node_index,
                 frame_context.clip_scroll_tree,
@@ -3528,14 +3532,14 @@ impl PicturePrimitive {
                         // Basic brush primitive header is (see end of prepare_prim_for_render_inner in prim_store.rs)
                         //  [brush specific data]
                         //  [segment_rect, segment data]
-                        let shadow_rect = self.snapped_local_rect.translate(shadow.offset);
+                        let shadow_rect = self.local_rect.translate(shadow.offset);
 
                         // ImageBrush colors
                         request.push(shadow.color.premultiplied());
                         request.push(PremultipliedColorF::WHITE);
                         request.push([
-                            self.snapped_local_rect.size.width,
-                            self.snapped_local_rect.size.height,
+                            self.local_rect.size.width,
+                            self.local_rect.size.height,
                             0.0,
                             0.0,
                         ]);
