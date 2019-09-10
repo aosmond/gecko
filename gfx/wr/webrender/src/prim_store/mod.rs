@@ -2021,43 +2021,6 @@ impl PrimitiveStore {
 
                     (pic.raster_config.is_none(), pic.local_rect, shadow_rect)
                 }
-                PrimitiveInstanceKind::Backdrop { data_handle } => {
-                    // The actual size and clip rect of this primitive are determined by computing the bounding
-                    // box of the projected rect of the backdrop-filter element onto the backdrop.
-                    let prim_data = &mut frame_state.data_stores.backdrop[data_handle];
-                    let spatial_node_index = prim_data.kind.spatial_node_index;
-
-                    // We cannot use the relative transform between the backdrop and the element because
-                    // that doesn't take into account any projection transforms that both spatial nodes are children of.
-                    // Instead, we first project from the element to the world space and get a flattened 2D bounding rect
-                    // in the screen space, we then map this rect from the world space to the backdrop space to get the
-                    // proper bounding box where the backdrop-filter needs to be processed.
-
-                    let prim_to_world_mapper = SpaceMapper::new_with_target(
-                        ROOT_SPATIAL_NODE_INDEX,
-                        spatial_node_index,
-                        LayoutRect::max_rect(),
-                        frame_context.clip_scroll_tree,
-                    );
-
-                    let backdrop_to_world_mapper = SpaceMapper::new_with_target(
-                        ROOT_SPATIAL_NODE_INDEX,
-                        prim_instance.spatial_node_index,
-                        LayoutRect::max_rect(),
-                        frame_context.clip_scroll_tree,
-                    );
-
-                    // First map to the screen and get a flattened rect
-                    let prim_rect = prim_to_world_mapper.map(&prim_data.kind.border_rect).unwrap_or_else(LayoutRect::zero);
-                    // Backwards project the flattened rect onto the backdrop
-                    let prim_rect = backdrop_to_world_mapper.unmap(&prim_rect).unwrap_or_else(LayoutRect::zero);
-
-                    prim_instance.prim_origin = prim_rect.origin;
-                    prim_data.common.prim_size = prim_rect.size;
-                    prim_instance.local_clip_rect = prim_rect;
-
-                    (false, prim_rect, LayoutRect::zero())
-                }
                 _ => {
                     let prim_data = &frame_state.data_stores.as_common_data(&prim_instance);
 

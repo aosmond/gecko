@@ -7,7 +7,7 @@ use api::{PropertyBinding, PropertyBindingId, FilterPrimitive, FontRenderMode};
 use api::{DebugFlags, RasterSpace, ImageKey, ColorF};
 use api::units::*;
 use crate::box_shadow::{BLUR_SAMPLE_SCALE};
-use crate::clip::{ClipStore, ClipDataStore, ClipChainInstance, ClipDataHandle};
+use crate::clip::{ClipStore, ClipChainInstance, ClipDataHandle};
 use crate::clip_scroll_tree::{ROOT_SPATIAL_NODE_INDEX,
     ClipScrollTree, CoordinateSpaceMapping, SpatialNodeIndex, VisibleFace, CoordinateSystemId
 };
@@ -1738,7 +1738,7 @@ impl<'a> PictureUpdateState<'a> {
         frame_context: &FrameBuildingContext,
         gpu_cache: &mut GpuCache,
         clip_store: &ClipStore,
-        clip_data_store: &ClipDataStore,
+        data_stores: &mut DataStores,
     ) {
         profile_marker!("UpdatePictures");
 
@@ -1755,7 +1755,7 @@ impl<'a> PictureUpdateState<'a> {
             frame_context,
             gpu_cache,
             clip_store,
-            clip_data_store,
+            data_stores,
         );
 
         if !state.are_raster_roots_assigned {
@@ -1818,7 +1818,7 @@ impl<'a> PictureUpdateState<'a> {
         frame_context: &FrameBuildingContext,
         gpu_cache: &mut GpuCache,
         clip_store: &ClipStore,
-        clip_data_store: &ClipDataStore,
+        data_stores: &mut DataStores,
     ) {
         if let Some(prim_list) = picture_primitives[pic_index.0].pre_update(
             self,
@@ -1831,7 +1831,7 @@ impl<'a> PictureUpdateState<'a> {
                     frame_context,
                     gpu_cache,
                     clip_store,
-                    clip_data_store,
+                    data_stores,
                 );
             }
 
@@ -1839,6 +1839,7 @@ impl<'a> PictureUpdateState<'a> {
                 prim_list,
                 self,
                 frame_context,
+                data_stores,
             );
         }
     }
@@ -2162,6 +2163,10 @@ pub struct PrimitiveClusterIndex(pub u32);
 #[cfg_attr(feature = "capture", derive(Serialize))]
 pub struct ClusterIndex(pub u16);
 
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "capture", derive(Serialize))]
+pub struct PrimitiveIndex(pub u32);
+
 impl ClusterIndex {
     pub const INVALID: ClusterIndex = ClusterIndex(u16::MAX);
 }
@@ -2183,6 +2188,9 @@ pub struct PrimitiveList {
     pub pictures: PictureList,
     /// List of primitives grouped into clusters.
     pub clusters: SmallVec<[PrimitiveCluster; 4]>,
+    /// List of primitive indicies that can only update
+    /// the cluster during frame building.
+    pub deferred_prims: Vec<PrimitiveIndex>,
 }
 
 impl PrimitiveList {
@@ -2195,6 +2203,7 @@ impl PrimitiveList {
             prim_instances: Vec::new(),
             pictures: SmallVec::new(),
             clusters: SmallVec::new(),
+            deferred_prims: Vec::new(),
         }
     }
 
@@ -2209,10 +2218,11 @@ impl PrimitiveList {
         let mut pictures = SmallVec::new();
         let mut clusters_map = FastHashMap::default();
         let mut clusters: SmallVec<[PrimitiveCluster; 4]> = SmallVec::new();
+        let mut deferred_prims = Vec::new();
 
         // Walk the list of primitive instances and extract any that
         // are pictures.
-        for prim_instance in &mut prim_instances {
+        for (prim_index, prim_instance) in &mut prim_instances.iter_mut().enumerate() {
             // Check if this primitive is a picture. In future we should
             // remove this match and embed this info directly in the primitive instance.
             let is_pic = match prim_instance.kind {
@@ -2268,8 +2278,12 @@ impl PrimitiveList {
                     (data.is_backface_visible, data.prim_size)
                 }
                 PrimitiveInstanceKind::Backdrop { data_handle, .. } => {
+                    // We don't know the actual size of the backdrop until frame
+                    // building, so use an empty rect for now and add it to the
+                    // deferred primitive list.
                     let data = &interners.backdrop[data_handle];
-                    (data.is_backface_visible, data.prim_size)
+                    deferred_prims.push(PrimitiveIndex(prim_index as u32));
+                    (data.is_backface_visible, LayoutSize::zero())
                 }
                 PrimitiveInstanceKind::PushClipChain |
                 PrimitiveInstanceKind::PopClipChain => {
@@ -2324,6 +2338,7 @@ impl PrimitiveList {
             prim_instances,
             pictures,
             clusters,
+            deferred_prims,
         }
     }
 }
@@ -3380,12 +3395,69 @@ impl PicturePrimitive {
         prim_list: PrimitiveList,
         state: &mut PictureUpdateState,
         frame_context: &FrameBuildingContext,
+        data_stores: &mut DataStores,
     ) {
         // Restore the pictures list used during recursion.
         self.prim_list = prim_list;
 
         // Pop the state information about this picture.
         state.pop_picture();
+
+        // Update any primitives/cluster bounding rects that can only be done
+        // with information available during frame building.
+        for prim_index in &self.prim_list.deferred_prims {
+            let prim_instance = &mut self.prim_list.prim_instances[prim_index.0 as usize];
+            match prim_instance.kind {
+                PrimitiveInstanceKind::Backdrop { data_handle, .. } => {
+                    // The actual size and clip rect of this primitive are determined by computing the bounding
+                    // box of the projected rect of the backdrop-filter element onto the backdrop.
+                    let prim_data = &mut data_stores.backdrop[data_handle];
+                    let spatial_node_index = prim_data.kind.spatial_node_index;
+
+                    // We cannot use the relative transform between the backdrop and the element because
+                    // that doesn't take into account any projection transforms that both spatial nodes are children of.
+                    // Instead, we first project from the element to the world space and get a flattened 2D bounding rect
+                    // in the screen space, we then map this rect from the world space to the backdrop space to get the
+                    // proper bounding box where the backdrop-filter needs to be processed.
+
+                    let prim_to_world_mapper = SpaceMapper::new_with_target(
+                        ROOT_SPATIAL_NODE_INDEX,
+                        spatial_node_index,
+                        LayoutRect::max_rect(),
+                        frame_context.clip_scroll_tree,
+                    );
+
+                    let backdrop_to_world_mapper = SpaceMapper::new_with_target(
+                        ROOT_SPATIAL_NODE_INDEX,
+                        prim_instance.spatial_node_index,
+                        LayoutRect::max_rect(),
+                        frame_context.clip_scroll_tree,
+                    );
+
+                    // First map to the screen and get a flattened rect
+                    let prim_rect = prim_to_world_mapper.map(&prim_data.kind.border_rect).unwrap_or_else(LayoutRect::zero);
+                    // Backwards project the flattened rect onto the backdrop
+                    let prim_rect = backdrop_to_world_mapper.unmap(&prim_rect).unwrap_or_else(LayoutRect::zero);
+
+                    // TODO(aosmond): Is this safe? Updating the primitive size during
+                    // frame building is usually problematic since scene building will cache
+                    // the primitive information in the GPU already.
+                    prim_instance.prim_origin = prim_rect.origin;
+                    prim_data.common.prim_size = prim_rect.size;
+                    prim_instance.local_clip_rect = prim_rect;
+
+                    // Update the cluster bounding rect now that we have the backdrop rect.
+                    let culling_rect = prim_instance.local_clip_rect
+                        .intersection(&prim_rect)
+                        .unwrap_or_else(LayoutRect::zero);
+                    let cluster = &mut self.prim_list.clusters[prim_instance.cluster_index.0 as usize];
+                    cluster.bounding_rect = cluster.bounding_rect.union(&culling_rect);
+                }
+                _ => {
+                    panic!("BUG: unexpected deferred primitive kind for cluster updates");
+                }
+            }
+        }
 
         for cluster in &mut self.prim_list.clusters {
             // Skip the cluster if backface culled.
