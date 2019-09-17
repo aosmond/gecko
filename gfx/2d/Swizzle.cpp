@@ -856,7 +856,7 @@ static void PackToA8(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
   PACK_ALPHA_CASE(SurfaceFormat::A8R8G8B8, aDstFormat, aPackFunc)
 
 template <bool aSwapRB>
-static void UnpackRowRGB24(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+void UnpackRowRGB24(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
   const uint8_t* end = aSrc + 3 * aLength;
   do {
     uint8_t r = aSrc[aSwapRB ? 2 : 0];

@@ -13,9 +13,19 @@ namespace mozilla {
 namespace gfx {
 
 template <bool aSwapRB>
+void UnpackRowRGB24(const uint8_t*, uint8_t*, int32_t);
+
+template <bool aSwapRB>
 void UnpackRowRGB24_SSSE3(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
-  int32_t alignedRow = 3 * (aLength & ~3);
-  int32_t remainder = aLength & 3;
+  int32_t alignedRow;
+  int32_t remainder;
+  if (aLength) {
+    alignedRow = (aLength - 1) & ~3;
+    remainder = aLength - alignedRow;
+    alignedRow *= 3;
+  } else {
+    alignedRow = remainder = 0;
+  }
 
   __m128i mask;
   if (aSwapRB) {
@@ -36,12 +46,9 @@ void UnpackRowRGB24_SSSE3(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
     aDst += 4 * 4;
   }
 
-  // Handle any 1-3 remaining pixels.
+  // Handle any 1-4 remaining pixels.
   if (remainder) {
-    __m128i px = LoadRemainder_SSE2(aSrc, remainder);
-    _mm_shuffle_epi8(px, mask);
-    _mm_or_si128(px, alpha);
-    StoreRemainder_SSE2(aDst, remainder, px);
+    UnpackRowRGB24<aSwapRB>(aSrc, aDst, remainder);
   }
 }
 

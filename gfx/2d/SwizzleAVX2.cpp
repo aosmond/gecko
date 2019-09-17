@@ -13,9 +13,19 @@ namespace mozilla {
 namespace gfx {
 
 template <bool aSwapRB>
+void UnpackRowRGB24_SSSE3(const uint8_t*, uint8_t*, int32_t);
+
+template <bool aSwapRB>
 void UnpackRowRGB24_AVX2(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
-  const int32_t alignedRow = 3 * (aLength & ~7);
-  const int32_t remainder = aLength & 7;
+  int32_t alignedRow;
+  int32_t remainder;
+  if (aLength) {
+    alignedRow = (aLength - 1) & ~7;
+    remainder = aLength - alignedRow;
+    alignedRow *= 3;
+  } else {
+    alignedRow = remainder = 0;
+  }
 
   // Used to shuffle the two final 32-bit words which we ignore into the last
   // 32-bit word of each 128-bit lane, such that
@@ -54,13 +64,9 @@ void UnpackRowRGB24_AVX2(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
     aDst += 8 * 4;
   }
 
-  // Handle any 1-7 remaining pixels.
+  // Handle any 1-8 remaining pixels.
   if (remainder) {
-    __m256i px = LoadRemainder_AVX2(aSrc, remainder);
-    px = _mm256_permutevar8x32_epi32(px, discardMask);
-    px = _mm256_shuffle_epi8(px, colorMask);
-    px = _mm256_or_si256(px, alphaMask);
-    StoreRemainder_AVX2(aDst, remainder, px);
+    UnpackRowRGB24_SSSE3<aSwapRB>(aSrc, aDst, remainder);
   }
 }
 
