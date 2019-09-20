@@ -649,6 +649,7 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
   }
 #endif
 
+  auto transparency = decoder->GetTransparencyType(frameRect);
   if (decoder->IsMetadataDecode()) {
     // If we are animated then the first frame rect is either:
     // 1) the whole image if the IDAT chunk is part of the animation
@@ -657,7 +658,6 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     // PostHasTransparency in the metadata decode if we need to. So it's
     // okay to pass IntRect(0, 0, width, height) here for animated images;
     // they will call with the proper first frame rect in the full decode.
-    auto transparency = decoder->GetTransparencyType(frameRect);
     decoder->PostHasTransparencyIfNeeded(transparency);
 
     // We have the metadata we're looking for, so stop here, before we allocate
@@ -672,9 +672,17 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     uint32_t profileSpace = qcms_profile_get_color_space(decoder->mInProfile);
     decoder->mUsePipeTransform = profileSpace != icSigGrayData;
     if (decoder->mUsePipeTransform) {
-      // If the transform happens with SurfacePipe, it will always be in BGRA.
-      inType = QCMS_DATA_BGRA_8;
-      outType = QCMS_DATA_BGRA_8;
+      // If the transform happens with SurfacePipe, it will be in RGBA if we
+      // have an alpha channel, because the swizzle and premultiplication
+      // happens after color management. Otherwise it will be in BGRA because
+      // the swizzle happens at the start.
+      if (transparency == TransparencyType::eAlpha) {
+        inType = QCMS_DATA_RGBA_8;
+        outType = QCMS_DATA_RGBA_8;
+      } else {
+        inType = QCMS_DATA_BGRA_8;
+        outType = QCMS_DATA_BGRA_8;
+      }
     } else {
       if (color_type & PNG_COLOR_MASK_ALPHA) {
         inType = QCMS_DATA_GRAYA_8;
@@ -689,7 +697,15 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
         decoder->mInProfile, inType, gfxPlatform::GetCMSOutputProfile(),
         outType, (qcms_intent)intent);
   } else if (decoder->mCMSMode == eCMSMode_All) {
-    decoder->mTransform = gfxPlatform::GetCMSBGRATransform();
+    // If the transform happens with SurfacePipe, it will be in RGBA if we
+    // have an alpha channel, because the swizzle and premultiplication
+    // happens after color management. Otherwise it will be in BGRA because
+    // the swizzle happens at the start.
+    if (transparency == TransparencyType::eAlpha) {
+      decoder->mTransform = gfxPlatform::GetCMSRGBATransform();
+    } else {
+      decoder->mTransform = gfxPlatform::GetCMSBGRATransform();
+    }
     decoder->mUsePipeTransform = true;
   }
 
