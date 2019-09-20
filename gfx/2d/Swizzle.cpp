@@ -213,6 +213,16 @@ void SwizzleRow_NEON(const uint8_t*, uint8_t*, int32_t);
         aSrcFormat, aDstFormat,                               \
         SwizzleRow_NEON<ShouldSwapRB(aSrcFormat, aDstFormat), \
                         ShouldForceOpaque(aSrcFormat, aDstFormat)>)
+
+#ifdef __aarch64__
+template <bool aSwapRB>
+void UnpackRowRGB24_NEON(const uint8_t*, uint8_t*, int32_t);
+
+#define UNPACK_ROW_RGB_NEON(aDstFormat)              \
+  FORMAT_CASE_ROW(SurfaceFormat::R8G8B8, aDstFormat, \
+                  UnpackRowRGB24_NEON<ShouldSwapRB(SurfaceFormat::R8G8B8, aDstFormat)>)
+#endif
+
 #endif
 
 /**
@@ -1018,6 +1028,9 @@ SwizzleRowFn SwizzleRow(SurfaceFormat aSrcFormat, SurfaceFormat aDstFormat) {
 
 #ifdef USE_NEON
   if (mozilla::supports_neon()) switch (FORMAT_KEY(aSrcFormat, aDstFormat)) {
+#ifdef __aarch64__
+      UNPACK_ROW_RGB_NEON(SurfaceFormat::B8G8R8X8)
+#endif
       SWIZZLE_ROW_NEON(SurfaceFormat::B8G8R8A8, SurfaceFormat::R8G8B8A8)
       SWIZZLE_ROW_NEON(SurfaceFormat::B8G8R8X8, SurfaceFormat::R8G8B8X8)
       SWIZZLE_ROW_NEON(SurfaceFormat::B8G8R8A8, SurfaceFormat::R8G8B8X8)

@@ -5,6 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Swizzle.h"
+#ifdef __aarch64__
+#include "SwizzleImpl.h"
+#endif
 
 #include <arm_neon.h>
 
@@ -353,8 +356,7 @@ void Swizzle_NEON(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
   aDstGap += 4 * remainder;
 
   for (int32_t height = aSize.height; height > 0; height--) {
-    SwizzleChunk_NEON<aSwapRB, aOpaqueAlpha>(aSrc, aDst, alignedRow,
-                                             remainder);
+    SwizzleChunk_NEON<aSwapRB, aOpaqueAlpha>(aSrc, aDst, alignedRow, remainder);
     aSrc += aSrcGap;
     aDst += aDstGap;
   }
@@ -367,6 +369,58 @@ template void Swizzle_NEON<true, false>(const uint8_t*, int32_t, uint8_t*,
                                         int32_t, IntSize);
 template void Swizzle_NEON<true, true>(const uint8_t*, int32_t, uint8_t*,
                                        int32_t, IntSize);
+
+#ifdef __aarch64__
+template <bool aSwapRB>
+void UnpackRowRGB24_NEON(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+  // Because this implementation will read an additional 4 bytes of data that
+  // is ignored and masked over, we cannot use the accelerated version for the
+  // last 1-4 bytes to guarantee we don't access memory outside the buffer.
+  if (aLength < 5) {
+    UnpackRowRGB24<aSwapRB>(aSrc, aDst, aLength);
+    return;
+  }
+
+  // Because we are expanding, we can only process the data back to front in
+  // case we are performing this in place.
+  int32_t alignedRow = (aLength - 1) & ~3;
+  int32_t remainder = aLength - alignedRow;
+
+  const uint8_t* src = aSrc + alignedRow * 3;
+  uint8_t* dst = aDst + alignedRow * 4;
+
+  // Handle 1-4 remaining pixels.
+  UnpackRowRGB24<aSwapRB>(src, dst, remainder);
+
+  uint8x16_t mask;
+  if (aSwapRB) {
+    mask = {15, 9, 10, 11, 14, 6, 7, 8, 13, 3, 4, 5, 12, 0, 1, 2};
+  } else {
+    mask = {15, 11, 10, 9, 14, 8, 7, 6, 13, 5, 4, 3, 12, 2, 1, 0};
+  }
+
+  uint8x16_t alpha = {
+      0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff,
+      0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0xff,
+  };
+
+  // Process all 4-pixel chunks as one vector.
+  src -= 4 * 3;
+  dst -= 4 * 4;
+  while (src >= aSrc) {
+    uint8x16_t px = vld1q_u8(src);
+    px = vqtbl1q_u8(px, mask); // This instruction is aarch64 only.
+    px = vorrq_u8(px, alpha);
+    vst1q_u8(dst, px);
+    src -= 4 * 3;
+    dst -= 4 * 4;
+  }
+}
+
+// Force instantiation of swizzle variants here.
+template void UnpackRowRGB24_NEON<false>(const uint8_t*, uint8_t*, int32_t);
+template void UnpackRowRGB24_NEON<true>(const uint8_t*, uint8_t*, int32_t);
+#endif
 
 }  // namespace gfx
 }  // namespace mozilla
