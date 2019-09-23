@@ -5,13 +5,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Swizzle.h"
-#include "SwizzleImpl.h"
 
 #include <emmintrin.h>
 #include <tmmintrin.h>
 
 namespace mozilla {
 namespace gfx {
+
+template <bool aSwapRB>
+void UnpackRowRGB24(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength);
 
 template <bool aSwapRB>
 void UnpackRowRGB24_SSSE3(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {

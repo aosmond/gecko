@@ -883,8 +883,30 @@ static void PackToA8(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
   PACK_ALPHA_CASE(SurfaceFormat::R8G8B8A8, aDstFormat, aPackFunc) \
   PACK_ALPHA_CASE(SurfaceFormat::A8R8G8B8, aDstFormat, aPackFunc)
 
-// UnpackRowRGB24 is defined in SwizzleImpl.h as the accelerated variants depend
-// on it to handle the remainders.
+template <bool aSwapRB>
+void UnpackRowRGB24(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+  // Because we are expanding, we can only process the data back to front in
+  // case we are performing this in place.
+  const uint8_t* src = aSrc + 3 * (aLength - 1);
+  uint8_t* dst = aDst + 4 * (aLength - 1);
+  while (src >= aSrc) {
+    uint8_t r = src[aSwapRB ? 2 : 0];
+    uint8_t g = src[1];
+    uint8_t b = src[aSwapRB ? 0 : 2];
+
+    dst[0] = r;
+    dst[1] = g;
+    dst[2] = b;
+    dst[3] = 0xFF;
+
+    src -= 3;
+    dst -= 4;
+  }
+}
+
+// Force instantiation of swizzle variants here.
+template void UnpackRowRGB24<false>(const uint8_t*, uint8_t*, int32_t);
+template void UnpackRowRGB24<true>(const uint8_t*, uint8_t*, int32_t);
 
 #define UNPACK_ROW_RGB(aDstFormat)                   \
   FORMAT_CASE_ROW(SurfaceFormat::R8G8B8, aDstFormat, \
