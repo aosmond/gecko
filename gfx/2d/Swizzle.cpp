@@ -5,7 +5,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Swizzle.h"
-#include "SwizzleImpl.h"
 #include "Logging.h"
 #include "Tools.h"
 #include "mozilla/CheckedInt.h"
