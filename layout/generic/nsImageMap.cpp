@@ -44,7 +44,14 @@ class Area {
   virtual void Draw(nsIFrame* aFrame, DrawTarget& aDrawTarget,
                     const ColorPattern& aColor,
                     const StrokeOptions& aStrokeOptions) = 0;
+  virtual void CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) = 0;
   virtual void GetRect(nsIFrame* aFrame, nsRect& aRect) = 0;
+
+  void PushBorderRing(wr::DisplayListBuilder& aBuilder, nsDisplayItem* aItem,
+                      const wr::LayoutRect& aBounds,
+                      const wr::BorderRadius& aBorderRadius);
 
   void HasFocus(bool aHasFocus);
 
@@ -58,7 +65,7 @@ Area::Area(HTMLAreaElement* aArea) : mArea(aArea) {
   MOZ_COUNT_CTOR(Area);
   MOZ_ASSERT(mArea, "How did that happen?");
   mNumCoords = 0;
-  mHasFocus = false;
+  mHasFocus = true;//false;
 }
 
 Area::~Area() { MOZ_COUNT_DTOR(Area); }
@@ -220,7 +227,33 @@ void Area::ParseCoords(const nsAString& aSpec) {
   }
 }
 
-void Area::HasFocus(bool aHasFocus) { mHasFocus = aHasFocus; }
+void Area::HasFocus(bool aHasFocus) { mHasFocus = true;} //aHasFocus; }
+
+void Area::PushBorderRing(wr::DisplayListBuilder& aBuilder,
+                          nsDisplayItem* aItem, const wr::LayoutRect& aBounds,
+                          const wr::BorderRadius& aBorderRadius) {
+  auto borderWidths = wr::ToBorderWidths(1.0, 1.0, 1.0, 1.0);
+
+  // Solid white border
+  {
+    auto color = wr::ColorF{1.0f, 1.0f, 1.0f, 1.0f};
+    wr::BorderSide side = {color, wr::BorderStyle::Solid};
+    wr::BorderSide sides[4] = {side, side, side, side};
+    Range<const wr::BorderSide> sidesRange(sides, 4);
+    aBuilder.PushBorder(aBounds, aBounds, !aItem->BackfaceIsHidden(),
+                        borderWidths, sidesRange, aBorderRadius);
+  }
+
+  // Overlay dotted black border
+  {
+    auto color = wr::ColorF{0.0f, 0.0f, 0.0f, 1.0f};
+    wr::BorderSide side = {color, wr::BorderStyle::Dotted};
+    wr::BorderSide sides[4] = {side, side, side, side};
+    Range<const wr::BorderSide> sidesRange(sides, 4);
+    aBuilder.PushBorder(aBounds, aBounds, !aItem->BackfaceIsHidden(),
+                        borderWidths, sidesRange, aBorderRadius);
+  }
+}
 
 //----------------------------------------------------------------------
 
@@ -233,6 +266,9 @@ class DefaultArea final : public Area {
                     const ColorPattern& aColor,
                     const StrokeOptions& aStrokeOptions) override;
   virtual void GetRect(nsIFrame* aFrame, nsRect& aRect) override;
+  virtual void CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) override;
 };
 
 DefaultArea::DefaultArea(HTMLAreaElement* aArea) : Area(aArea) {}
@@ -253,6 +289,25 @@ void DefaultArea::Draw(nsIFrame* aFrame, DrawTarget& aDrawTarget,
   }
 }
 
+void DefaultArea::CreateWebRenderCommands(
+    mozilla::wr::DisplayListBuilder& aBuilder, nsDisplayItem* aItem,
+    nsIFrame* aFrame, const nsPoint& aOrigin) {
+  if (!mHasFocus) {
+    printf_stderr("[AO][%p] DefaultArea -- not focused\n", this);
+    return;
+  }
+
+  nsRect rect(aOrigin, aFrame->GetSize());
+  const nscoord kOnePixel = nsPresContext::CSSPixelsToAppUnits(1);
+  rect.width -= kOnePixel;
+  rect.height -= kOnePixel;
+  const int32_t auPerDevPixel = aFrame->PresContext()->AppUnitsPerDevPixel();
+  LayoutDeviceRect bounds(LayoutDeviceRect::FromAppUnits(rect, auPerDevPixel));
+
+  PushBorderRing(aBuilder, aItem, wr::ToLayoutRect(bounds),
+                 wr::EmptyBorderRadius());
+}
+
 void DefaultArea::GetRect(nsIFrame* aFrame, nsRect& aRect) {
   aRect = aFrame->GetRect();
   aRect.MoveTo(0, 0);
@@ -270,6 +325,9 @@ class RectArea final : public Area {
                     const ColorPattern& aColor,
                     const StrokeOptions& aStrokeOptions) override;
   virtual void GetRect(nsIFrame* aFrame, nsRect& aRect) override;
+  virtual void CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) override;
 };
 
 RectArea::RectArea(HTMLAreaElement* aArea) : Area(aArea) {}
@@ -344,6 +402,32 @@ void RectArea::Draw(nsIFrame* aFrame, DrawTarget& aDrawTarget,
   }
 }
 
+void RectArea::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) {
+  if (!mHasFocus || mNumCoords < 4) {
+    printf_stderr("[AO][%p] RectArea -- not focused\n", this);
+    return;
+  }
+
+  nscoord x1 = nsPresContext::CSSPixelsToAppUnits(mCoords[0]);
+  nscoord y1 = nsPresContext::CSSPixelsToAppUnits(mCoords[1]);
+  nscoord x2 = nsPresContext::CSSPixelsToAppUnits(mCoords[2]);
+  nscoord y2 = nsPresContext::CSSPixelsToAppUnits(mCoords[3]);
+  NS_ASSERTION(x1 <= x2 && y1 <= y2,
+               "Someone screwed up RectArea::ParseCoords");
+  nsRect rect(aOrigin.x + x1, aOrigin.y + y1, x2 - x1, y2 - y1);
+
+  const nscoord kOnePixel = nsPresContext::CSSPixelsToAppUnits(1);
+  rect.width -= kOnePixel;
+  rect.height -= kOnePixel;
+  const int32_t auPerDevPixel = aFrame->PresContext()->AppUnitsPerDevPixel();
+  LayoutDeviceRect bounds(LayoutDeviceRect::FromAppUnits(rect, auPerDevPixel));
+
+  PushBorderRing(aBuilder, aItem, wr::ToLayoutRect(bounds),
+                 wr::EmptyBorderRadius());
+}
+
 void RectArea::GetRect(nsIFrame* aFrame, nsRect& aRect) {
   if (mNumCoords >= 4) {
     nscoord x1 = nsPresContext::CSSPixelsToAppUnits(mCoords[0]);
@@ -369,6 +453,9 @@ class PolyArea final : public Area {
                     const ColorPattern& aColor,
                     const StrokeOptions& aStrokeOptions) override;
   virtual void GetRect(nsIFrame* aFrame, nsRect& aRect) override;
+  virtual void CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) override;
 };
 
 PolyArea::PolyArea(HTMLAreaElement* aArea) : Area(aArea) {}
@@ -488,6 +575,18 @@ void PolyArea::Draw(nsIFrame* aFrame, DrawTarget& aDrawTarget,
   }
 }
 
+void PolyArea::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) {
+  if (!mHasFocus || mNumCoords < 6) {
+    printf_stderr("[AO][%p] PolyArea -- not focused\n", this);
+    return;
+  }
+
+  // TODO: If the line is vertical or horizontal, we could use PushLine
+  // but if it is diagonal we have no such abstraction in WebRender.
+}
+
 void PolyArea::GetRect(nsIFrame* aFrame, nsRect& aRect) {
   if (mNumCoords >= 6) {
     nscoord x1, x2, y1, y2, xtmp, ytmp;
@@ -518,6 +617,9 @@ class CircleArea final : public Area {
                     const ColorPattern& aColor,
                     const StrokeOptions& aStrokeOptions) override;
   virtual void GetRect(nsIFrame* aFrame, nsRect& aRect) override;
+  virtual void CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                       nsDisplayItem* aItem, nsIFrame* aFrame,
+                                       const nsPoint& aOrigin) override;
 };
 
 CircleArea::CircleArea(HTMLAreaElement* aArea) : Area(aArea) {}
@@ -583,6 +685,32 @@ void CircleArea::Draw(nsIFrame* aFrame, DrawTarget& aDrawTarget,
       aDrawTarget.Stroke(circle, aColor, aStrokeOptions);
     }
   }
+}
+
+void CircleArea::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                         nsDisplayItem* aItem, nsIFrame* aFrame,
+                                         const nsPoint& aOrigin) {
+  if (!mHasFocus || mNumCoords < 3) {
+    printf_stderr("[AO][%p] CircleArea -- not focused\n", this);
+    return;
+  }
+
+  float radius = aFrame->PresContext()->CSSPixelsToDevPixels(mCoords[2]);
+  if (radius <= 0) {
+    return;
+  }
+
+  float diameter = 2.0 * radius;
+  const int32_t auPerDevPixel = aFrame->PresContext()->AppUnitsPerDevPixel();
+  nsPoint appCenter(aOrigin.x + aFrame->PresContext()->CSSPixelsToAppUnits(mCoords[0]), aOrigin.y + aFrame->PresContext()->CSSPixelsToAppUnits(mCoords[1]));
+  LayoutDevicePoint center(LayoutDevicePoint::FromAppUnits(
+      appCenter, auPerDevPixel));
+  LayoutDeviceRect bounds(center.x - radius, center.y - radius, diameter,
+                          diameter);
+  LayoutDeviceSize radiusSize(radius, radius);
+  auto borderRadius =
+      wr::ToBorderRadius(radiusSize, radiusSize, radiusSize, radiusSize);
+  PushBorderRing(aBuilder, aItem, wr::ToLayoutRect(bounds), borderRadius);
 }
 
 void CircleArea::GetRect(nsIFrame* aFrame, nsRect& aRect) {
@@ -757,6 +885,15 @@ void nsImageMap::Draw(nsIFrame* aFrame, DrawTarget& aDrawTarget,
                       const StrokeOptions& aStrokeOptions) {
   for (auto& area : mAreas) {
     area->Draw(aFrame, aDrawTarget, aColor, aStrokeOptions);
+  }
+}
+
+void nsImageMap::CreateWebRenderCommands(wr::DisplayListBuilder& aBuilder,
+                                         nsDisplayItem* aItem, nsIFrame* aFrame,
+                                         const nsPoint& aOrigin) {
+  for (auto& area : mAreas) {
+    printf_stderr("[AO][%p] area %p\n", this, area.get());
+    area->CreateWebRenderCommands(aBuilder, aItem, aFrame, aOrigin);
   }
 }
 

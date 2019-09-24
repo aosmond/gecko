@@ -1907,11 +1907,7 @@ bool nsDisplayImage::CreateWebRenderCommands(
   }
 
   MOZ_ASSERT(mFrame->IsImageFrame() || mFrame->IsImageControlFrame());
-  // Image layer doesn't support draw focus ring for image map.
   auto* frame = static_cast<nsImageFrame*>(mFrame);
-  if (frame->HasImageMap()) {
-    return false;
-  }
 
   const bool oldImageIsDifferent =
       OldImageHasDifferentRatio(*frame, *mImage, mPrevImage);
@@ -1924,9 +1920,11 @@ bool nsDisplayImage::CreateWebRenderCommands(
     flags |= imgIContainer::FLAG_HIGH_QUALITY_SCALING;
   }
 
+  auto appDestRect = GetDestRect();
+
   const int32_t factor = mFrame->PresContext()->AppUnitsPerDevPixel();
   LayoutDeviceRect destRect(
-      LayoutDeviceRect::FromAppUnits(GetDestRect(), factor));
+      LayoutDeviceRect::FromAppUnits(appDestRect, factor));
 
   Maybe<SVGImageContext> svgContext;
   IntSize decodeSize = nsLayoutUtils::ComputeImageContainerDrawingParameters(
@@ -1983,6 +1981,12 @@ bool nsDisplayImage::CreateWebRenderCommands(
   }
 
   nsDisplayItemGenericImageGeometry::UpdateDrawResult(this, drawResult);
+
+  if (nsImageMap* map = frame->GetImageMap()) {
+    printf_stderr("[AO][%p] image map %p\n", this, map);
+    map->CreateWebRenderCommands(aBuilder, this, frame, appDestRect.TopLeft());
+  }
+
   return true;
 }
 

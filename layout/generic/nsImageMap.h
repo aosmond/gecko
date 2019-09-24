@@ -59,6 +59,9 @@ class nsImageMap final : public nsStubMutationObserver,
             const ColorPattern& aColor,
             const StrokeOptions& aStrokeOptions = StrokeOptions());
 
+  void CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
+                               nsDisplayItem* aItem, nsIFrame* aFrame,
+                               const nsPoint& aOrigin);
   /**
    * Called just before the nsImageFrame releases us.
    * Used to break the cycle caused by the DOM listener.
