@@ -356,8 +356,8 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
           mInfo.out_color_space != JCS_GRAYSCALE ? mTransform : nullptr;
 
       Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-          this, Size(), OutputSize(), FullFrame(), SurfaceFormat::B8G8R8X8,
-          SurfaceFormat::B8G8R8X8, Nothing(), pipeTransform,
+          this, Size(), OutputSize(), FullFrame(), SurfaceFormat::OS_RGBX,
+          SurfaceFormat::OS_RGBX, Nothing(), pipeTransform,
           SurfacePipeFlags());
       if (!pipe) {
         mState = JPEG_ERROR;

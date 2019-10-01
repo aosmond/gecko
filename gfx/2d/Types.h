@@ -49,6 +49,8 @@ enum class SurfaceFormat : int8_t {
   R8G8B8X8,  // [RR, GG, BB, 00]     0x00BBGGRR        0xRRGGBB00
   A8R8G8B8,  // [AA, RR, GG, BB]     0xBBGGRRAA        0xAARRGGBB
   X8R8G8B8,  // [00, RR, GG, BB]     0xBBGGRR00        0x00RRGGBB
+  A8B8G8R8,  // [AA, BB, GG, RR]     0xRRGGBBAA        0xAABBGGRR
+  X8B8G8R8,  // [00, BB, GG, RR]     0xRRGGBB00        0x00BBGGRR
 
   R8G8B8,
   B8G8R8,
@@ -81,6 +83,37 @@ enum class SurfaceFormat : int8_t {
 
   // This represents the unknown format.
   UNKNOWN,
+
+  // This following values are endian-independent and platform-independent
+  // synonyms. These should be used for everything that does not have an
+  // opinion on the most desired format (e.g. when requesting or producing
+  // some resource).
+  OS_RGBA = B8G8R8A8,
+  OS_RGBX = B8G8R8X8,
+
+  // TODO(aosmond): This is what OS_RGBA/OS_RGBX should be when everything
+  // is updated to support these configurations.
+  /*
+#if MOZ_LITTLE_ENDIAN
+#  if XP_WIN
+  OS_RGBA = B8G8R8A8,
+  OS_RGBX = B8G8R8X8,
+#  else
+  OS_RGBA = R8G8B8A8,
+  OS_RGBX = R8G8B8X8,
+#  endif
+#elif MOZ_BIG_ENDIAN
+#  if XP_WIN
+  OS_RGBA = A8R8G8B8,
+  OS_RGBX = X8R8G8B8,
+#  else
+  OS_RGBA = A8B8G8R8,
+  OS_RGBX = X8B8G8R8,
+#  endif
+#else
+#  error "bad endianness"
+#endif
+  */
 
 // The following values are endian-independent synonyms. The _UINT32 suffix
 // indicates that the name reflects the layout when viewed as a uint32_t

@@ -187,9 +187,9 @@ nsresult nsGIFDecoder2::BeginImageFrame(const IntRect& aFrameRect,
     pipeFlags |= SurfacePipeFlags::PROGRESSIVE_DISPLAY;
 
     format =
-        hasTransparency ? SurfaceFormat::B8G8R8A8 : SurfaceFormat::B8G8R8X8;
+        hasTransparency ? SurfaceFormat::OS_RGBA : SurfaceFormat::OS_RGBX;
   } else {
-    format = SurfaceFormat::B8G8R8A8;
+    format = SurfaceFormat::OS_RGBA;
   }
 
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(

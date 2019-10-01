@@ -8,6 +8,7 @@
 
 #include "mozilla/Attributes.h"   // for MOZ_ALWAYS_INLINE
 #include "mozilla/EndianUtils.h"  // for mozilla::NativeEndian::swapToBigEndian
+#include "mozilla/gfx/Types.h"    // for SurfaceFormat
 
 /**
  * GFX_BLOCK_RGB_TO_FRGB(from,to)
@@ -60,7 +61,15 @@ uint8_t MOZ_ALWAYS_INLINE gfxPreMultiply(uint8_t c, uint8_t a) {
  */
 uint32_t MOZ_ALWAYS_INLINE gfxPackedPixelNoPreMultiply(uint8_t a, uint8_t r,
                                                        uint8_t g, uint8_t b) {
-  return (((a) << 24) | ((r) << 16) | ((g) << 8) | (b));
+  switch (mozilla::gfx::SurfaceFormat::OS_RGBA) {
+    case mozilla::gfx::SurfaceFormat::B8G8R8A8:
+    case mozilla::gfx::SurfaceFormat::A8R8G8B8:
+      return (((a) << 24) | ((r) << 16) | ((g) << 8) | (b));
+    case mozilla::gfx::SurfaceFormat::R8G8B8A8:
+    case mozilla::gfx::SurfaceFormat::A8B8G8R8:
+    default:
+      return (((a) << 24) | ((b) << 16) | ((g) << 8) | (r));
+  }
 }
 
 /**
@@ -74,8 +83,17 @@ uint32_t MOZ_ALWAYS_INLINE gfxPackedPixel(uint8_t a, uint8_t r, uint8_t g,
   else if (a == 0xFF) {
     return gfxPackedPixelNoPreMultiply(a, r, g, b);
   } else {
-    return ((a) << 24) | (gfxPreMultiply(r, a) << 16) |
-           (gfxPreMultiply(g, a) << 8) | (gfxPreMultiply(b, a));
+    switch (mozilla::gfx::SurfaceFormat::OS_RGBA) {
+      case mozilla::gfx::SurfaceFormat::B8G8R8A8:
+      case mozilla::gfx::SurfaceFormat::A8R8G8B8:
+        return ((a) << 24) | (gfxPreMultiply(r, a) << 16) |
+             (gfxPreMultiply(g, a) << 8) | (gfxPreMultiply(b, a));
+      case mozilla::gfx::SurfaceFormat::R8G8B8A8:
+      case mozilla::gfx::SurfaceFormat::A8B8G8R8:
+      default:
+        return ((a) << 24) | (gfxPreMultiply(b, a) << 16) |
+             (gfxPreMultiply(g, a) << 8) | (gfxPreMultiply(r, a));
+    }
   }
 }
 

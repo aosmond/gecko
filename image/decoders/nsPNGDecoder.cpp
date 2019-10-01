@@ -175,8 +175,8 @@ nsresult nsPNGDecoder::CreateFrame(const FrameInfo& aFrameInfo) {
   // Check if we have transparency, and send notifications if needed.
   auto transparency = GetTransparencyType(aFrameInfo.mFrameRect);
   PostHasTransparencyIfNeeded(transparency);
-  mFormat = transparency == TransparencyType::eNone ? SurfaceFormat::B8G8R8X8
-                                                    : SurfaceFormat::B8G8R8A8;
+  mFormat = transparency == TransparencyType::eNone ? SurfaceFormat::OS_RGBX
+                                                    : SurfaceFormat::OS_RGBA;
 
   // Make sure there's no animation or padding if we're downscaling.
   MOZ_ASSERT_IF(Size() != OutputSize(), mNumFrames == 0);
@@ -263,7 +263,7 @@ void nsPNGDecoder::EndImageFrame() {
 
   mNumFrames++;
 
-  Opacity opacity = mFormat == SurfaceFormat::B8G8R8X8
+  Opacity opacity = mFormat == SurfaceFormat::OS_RGBX
                         ? Opacity::FULLY_OPAQUE
                         : Opacity::SOME_TRANSPARENCY;
 

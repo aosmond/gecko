@@ -67,9 +67,9 @@ LexerTransition<nsIconDecoder::State> nsIconDecoder::ReadHeader(
 
   MOZ_ASSERT(!mImageData, "Already have a buffer allocated?");
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-      this, Size(), OutputSize(), FullFrame(), SurfaceFormat::B8G8R8A8,
-      SurfaceFormat::B8G8R8A8,
-      /* aAnimParams */ Nothing(), mTransform, SurfacePipeFlags());
+      this, Size(), OutputSize(), FullFrame(), SurfaceFormat::OS_RGBA,
+      SurfaceFormat::OS_RGBA, /* aAnimParams */ Nothing(), mTransform,
+      SurfacePipeFlags());
   if (!pipe) {
     return Transition::TerminateFailure();
   }
