@@ -15,6 +15,7 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/Vector.h"
 #include "mozilla/StaticPrefs_print.h"
+#include "mozilla/gfx/Swizzle.h"
 
 #include "cairo.h"
 #include "cairo-tee.h"
@@ -206,8 +207,23 @@ static cairo_surface_t* CopyToImageSurface(unsigned char* aData,
   auto aRectWidth = aRect.Width();
   auto aRectHeight = aRect.Height();
 
+  // We may also need to do a swizzle as part of this copy, if we are given
+  // RGBA, as Cairo only understands BGRA.
+  SurfaceFormat format;
+  switch (aFormat) {
+    case SurfaceFormat::A8B8G8R8_UINT32:
+      format = SurfaceFormat::A8R8G8B8_UINT32;
+      break;
+    case SurfaceFormat::X8B8G8R8_UINT32:
+      format = SurfaceFormat::X8R8G8B8_UINT32;
+      break;
+    default:
+      format = aFormat;
+      break;
+  }
+
   cairo_surface_t* surf = cairo_image_surface_create(
-      GfxFormatToCairoFormat(aFormat), aRectWidth, aRectHeight);
+      GfxFormatToCairoFormat(format), aRectWidth, aRectHeight);
   // In certain scenarios, requesting larger than 8k image fails.  Bug 803568
   // covers the details of how to run into it, but the full detailed
   // investigation hasn't been done to determine the underlying cause.  We
@@ -224,10 +240,8 @@ static cairo_surface_t* CopyToImageSurface(unsigned char* aData,
   unsigned char* source = aData + aRect.Y() * aStride + aRect.X() * pixelWidth;
 
   MOZ_ASSERT(aStride >= aRectWidth * pixelWidth);
-  for (int32_t y = 0; y < aRectHeight; ++y) {
-    memcpy(surfData + y * surfStride, source + y * aStride,
-           aRectWidth * pixelWidth);
-  }
+  SwizzleData(source, aStride, aFormat, surfData, surfStride, format,
+              aRect.Size());
   cairo_surface_mark_dirty(surf);
   return surf;
 }
@@ -356,8 +370,25 @@ static cairo_surface_t* GetCairoSurfaceForSourceSurface(
     return nullptr;
   }
 
-  cairo_surface_t* surf = CreateSubImageForData(map.mData, subimage,
-                                                map.mStride, data->GetFormat());
+  // We may be given RGBA instead of BGRA, which Cairo does not understand.
+  // Given that Cairo is only used on the non-critical path for printing, we
+  // just do the copy here instead. In an ideal world Cairo would be updated
+  // to support RGBA.
+  SurfaceFormat format = data->GetFormat();
+  switch (format) {
+    case SurfaceFormat::A8B8G8R8_UINT32:
+    case SurfaceFormat::X8B8G8R8_UINT32: {
+      cairo_surface_t* result =
+          CopyToImageSurface(map.mData, subimage, map.mStride, format);
+      data->Unmap();
+      return result;
+    }
+    default:
+      break;
+  }
+
+  cairo_surface_t* surf =
+      CreateSubImageForData(map.mData, subimage, map.mStride, format);
 
   // In certain scenarios, requesting larger than 8k image fails.  Bug 803568
   // covers the details of how to run into it, but the full detailed
@@ -369,8 +400,8 @@ static cairo_surface_t* GetCairoSurfaceForSourceSurface(
       // a new surface with a stride that cairo chooses. No need to
       // set user data since we're not dependent on the original
       // data.
-      cairo_surface_t* result = CopyToImageSurface(
-          map.mData, subimage, map.mStride, data->GetFormat());
+      cairo_surface_t* result =
+          CopyToImageSurface(map.mData, subimage, map.mStride, format);
       data->Unmap();
       return result;
     }
