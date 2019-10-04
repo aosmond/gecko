@@ -7,7 +7,6 @@
 #define mozilla_image_test_gtest_Common_h
 
 #include <vector>
-#include <utility>
 
 #include "gtest/gtest.h"
 
@@ -42,15 +41,28 @@ struct BGRAColor {
         mRed(aRed),
         mAlpha(aAlpha),
         mPremultiplied(aPremultiplied) {
-    if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
-      std::swap(mBlue, mRed);
-    }
   }
 
   static BGRAColor Green() { return BGRAColor(0x00, 0xFF, 0x00, 0xFF); }
   static BGRAColor Red() { return BGRAColor(0x00, 0x00, 0xFF, 0xFF); }
   static BGRAColor Blue() { return BGRAColor(0xFF, 0x00, 0x00, 0xFF); }
   static BGRAColor Transparent() { return BGRAColor(0x00, 0x00, 0x00, 0x00); }
+
+  static BGRAColor FromPixel(uint32_t aPixel) {
+    uint8_t r, g, b, a;
+    if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
+      r = aPixel & 0xFF;
+      g = (aPixel >> 8) & 0xFF;
+      b = (aPixel >> 16) & 0xFF;
+      a = aPixel >> 24;
+    } else {
+      b = aPixel & 0xFF;
+      g = (aPixel >> 8) & 0xFF;
+      r = (aPixel >> 16) & 0xFF;
+      a = aPixel >> 24;
+    }
+    return BGRAColor(b, g, r, a, true);
+  }
 
   BGRAColor Premultiply() const {
     if (!mPremultiplied) {
@@ -63,9 +75,18 @@ struct BGRAColor {
 
   uint32_t AsPixel() const {
     if (!mPremultiplied) {
-      return gfxPackedPixel(mAlpha, mRed, mGreen, mBlue);
+      if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
+        return gfxPackedPixel(mAlpha, mBlue, mGreen, mRed);
+      } else {
+        return gfxPackedPixel(mAlpha, mRed, mGreen, mBlue);
+      }
     }
-    return gfxPackedPixelNoPreMultiply(mAlpha, mRed, mGreen, mBlue);
+
+    if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
+      return gfxPackedPixelNoPreMultiply(mAlpha, mBlue, mGreen, mRed);
+    } else {
+      return gfxPackedPixelNoPreMultiply(mAlpha, mRed, mGreen, mBlue);
+    }
   }
 
   uint8_t mBlue;
