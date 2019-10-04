@@ -456,7 +456,7 @@ bool PremultiplyData(const uint8_t* aSrc, int32_t aSrcStride,
 SwizzleRowFn PremultiplyRow(SurfaceFormat aSrcFormat,
                             SurfaceFormat aDstFormat) {
 #ifdef USE_SSE2
-  if (mozilla::supports_sse2()) switch (FORMAT_KEY(aSrcFormat, aDstFormat)) {
+  if (mozilla::supports_avx2()) switch (FORMAT_KEY(aSrcFormat, aDstFormat)) {
       PREMULTIPLY_ROW_AVX2(SurfaceFormat::B8G8R8A8, SurfaceFormat::B8G8R8A8)
       PREMULTIPLY_ROW_AVX2(SurfaceFormat::B8G8R8A8, SurfaceFormat::B8G8R8X8)
       PREMULTIPLY_ROW_AVX2(SurfaceFormat::B8G8R8A8, SurfaceFormat::R8G8B8A8)
