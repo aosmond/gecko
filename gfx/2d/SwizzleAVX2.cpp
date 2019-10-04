@@ -5,12 +5,191 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Swizzle.h"
+#include "SwizzleAVX.h"
 
 #include <immintrin.h>
 #include <tmmintrin.h>
 
 namespace mozilla {
 namespace gfx {
+
+// Premultiply vector of 8 pixels using splayed math.
+template <bool aSwapRB, bool aOpaqueAlpha>
+static MOZ_ALWAYS_INLINE __m256i PremultiplyVector_AVX2(const __m256i& aSrc) {
+  // Isolate R and B with mask.
+  const __m256i mask = _mm256_set1_epi32(0x00FF00FF);
+  __m256i rb = _mm256_and_si256(mask, aSrc);
+  // Swap R and B if necessary.
+  if (aSwapRB) {
+    rb = _mm256_shufflelo_epi16(rb, _MM_SHUFFLE(2, 3, 0, 1));
+    rb = _mm256_shufflehi_epi16(rb, _MM_SHUFFLE(2, 3, 0, 1));
+  }
+  // Isolate G and A by shifting down to bottom of word.
+  __m256i ga = _mm256_srli_epi16(aSrc, 8);
+
+  // Duplicate alphas to get vector of A1 A1 A2 A2 A3 A3 A4 A4
+  __m256i alphas = _mm256_shufflelo_epi16(ga, _MM_SHUFFLE(3, 3, 1, 1));
+  alphas = _mm256_shufflehi_epi16(alphas, _MM_SHUFFLE(3, 3, 1, 1));
+
+  // rb = rb*a + 255; rb += rb >> 8;
+  rb = _mm256_add_epi16(_mm256_mullo_epi16(rb, alphas), mask);
+  rb = _mm256_add_epi16(rb, _mm256_srli_epi16(rb, 8));
+
+  // If format is not opaque, force A to 255 so that A*alpha/255 = alpha
+  if (!aOpaqueAlpha) {
+    ga = _mm256_or_si256(ga, _mm256_set1_epi32(0x00FF0000));
+  }
+  // ga = ga*a + 255; ga += ga >> 8;
+  ga = _mm256_add_epi16(_mm256_mullo_epi16(ga, alphas), mask);
+  ga = _mm256_add_epi16(ga, _mm256_srli_epi16(ga, 8));
+  // If format is opaque, force output A to be 255.
+  if (aOpaqueAlpha) {
+    ga = _mm256_or_si256(ga, _mm256_set1_epi32(0xFF000000));
+  }
+
+  // Combine back to final pixel with (rb >> 8) | (ga & 0xFF00FF00)
+  rb = _mm256_srli_epi16(rb, 8);
+  ga = _mm256_andnot_si256(mask, ga);
+  return _mm256_or_si256(rb, ga);
+}
+
+// Premultiply vector of aAlignedRow + aRemainder pixels.
+template <bool aSwapRB, bool aOpaqueAlpha>
+static MOZ_ALWAYS_INLINE void PremultiplyChunk_AVX2(const uint8_t*& aSrc,
+                                                    uint8_t*& aDst,
+                                                    int32_t aAlignedRow,
+                                                    int32_t aRemainder) {
+  // Process all 8-pixel chunks as one vector.
+  for (const uint8_t* end = aSrc + aAlignedRow; aSrc < end;) {
+    __m256i px = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(aSrc));
+    px = PremultiplyVector_AVX2<aSwapRB, aOpaqueAlpha>(px);
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(aDst), px);
+    aSrc += 8 * 4;
+    aDst += 8 * 4;
+  }
+
+  // Handle any 1-7 remaining pixels.
+  if (aRemainder) {
+    __m256i px = LoadRemainder_AVX(aSrc, aRemainder);
+    px = PremultiplyVector_AVX2<aSwapRB, aOpaqueAlpha>(px);
+    StoreRemainder_AVX(aDst, aRemainder, px);
+  }
+}
+
+// Premultiply vector of aLength pixels.
+template <bool aSwapRB, bool aOpaqueAlpha>
+void PremultiplyRow_AVX2(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+  int32_t alignedRow = 4 * (aLength & ~7);
+  int32_t remainder = aLength & 7;
+  PremultiplyChunk_AVX2<aSwapRB, aOpaqueAlpha>(aSrc, aDst, alignedRow,
+                                               remainder);
+}
+
+template <bool aSwapRB, bool aOpaqueAlpha>
+void Premultiply_AVX2(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
+                      int32_t aDstGap, IntSize aSize) {
+  int32_t alignedRow = 4 * (aSize.width & ~7);
+  int32_t remainder = aSize.width & 7;
+  // Fold remainder into stride gap.
+  aSrcGap += 4 * remainder;
+  aDstGap += 4 * remainder;
+
+  for (int32_t height = aSize.height; height > 0; height--) {
+    PremultiplyChunk_AVX2<aSwapRB, aOpaqueAlpha>(aSrc, aDst, alignedRow,
+                                                 remainder);
+    aSrc += aSrcGap;
+    aDst += aDstGap;
+  }
+}
+
+// Force instantiation of premultiply variants here.
+template void PremultiplyRow_AVX2<false, false>(const uint8_t*, uint8_t*,
+                                                int32_t);
+template void PremultiplyRow_AVX2<false, true>(const uint8_t*, uint8_t*,
+                                               int32_t);
+template void PremultiplyRow_AVX2<true, false>(const uint8_t*, uint8_t*,
+                                               int32_t);
+template void PremultiplyRow_AVX2<true, true>(const uint8_t*, uint8_t*,
+                                              int32_t);
+template void Premultiply_AVX2<false, false>(const uint8_t*, int32_t, uint8_t*,
+                                             int32_t, IntSize);
+template void Premultiply_AVX2<false, true>(const uint8_t*, int32_t, uint8_t*,
+                                            int32_t, IntSize);
+template void Premultiply_AVX2<true, false>(const uint8_t*, int32_t, uint8_t*,
+                                            int32_t, IntSize);
+template void Premultiply_AVX2<true, true>(const uint8_t*, int32_t, uint8_t*,
+                                           int32_t, IntSize);
+
+// Swizzle a vector of 8 pixels providing swaps and opaquifying.
+template <bool aSwapRB, bool aOpaqueAlpha>
+static MOZ_ALWAYS_INLINE __m256i SwizzleVector_AVX2(const __m256i& aSrc) {
+  // Isolate R and B.
+  __m256i rb = _mm256_and_si256(aSrc, _mm256_set1_epi32(0x00FF00FF));
+  // Swap R and B.
+  rb = _mm256_shufflelo_epi16(rb, _MM_SHUFFLE(2, 3, 0, 1));
+  rb = _mm256_shufflehi_epi16(rb, _MM_SHUFFLE(2, 3, 0, 1));
+  // Isolate G and A.
+  __m256i ga = _mm256_and_si256(aSrc, _mm256_set1_epi32(0xFF00FF00));
+  // Force alpha to 255 if necessary.
+  if (aOpaqueAlpha) {
+    ga = _mm256_or_si256(ga, _mm256_set1_epi32(0xFF000000));
+  }
+  // Combine everything back together.
+  return _mm256_or_si256(rb, ga);
+}
+
+template <bool aSwapRB, bool aOpaqueAlpha>
+static MOZ_ALWAYS_INLINE void SwizzleChunk_AVX2(const uint8_t*& aSrc,
+                                                uint8_t*& aDst,
+                                                int32_t aAlignedRow,
+                                                int32_t aRemainder) {
+  // Process all 4-pixel chunks as one vector.
+  for (const uint8_t* end = aSrc + aAlignedRow; aSrc < end;) {
+    __m256i px = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(aSrc));
+    px = SwizzleVector_AVX2<aSwapRB, aOpaqueAlpha>(px);
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(aDst), px);
+    aSrc += 8 * 4;
+    aDst += 8 * 4;
+  }
+
+  // Handle any 1-7 remaining pixels.
+  if (aRemainder) {
+    __m256i px = LoadRemainder_AVX(aSrc, aRemainder);
+    px = SwizzleVector_AVX2<aSwapRB, aOpaqueAlpha>(px);
+    StoreRemainder_AVX(aDst, aRemainder, px);
+  }
+}
+
+template <bool aSwapRB, bool aOpaqueAlpha>
+void SwizzleRow_AVX2(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength) {
+  int32_t alignedRow = 4 * (aLength & ~7);
+  int32_t remainder = aLength & 7;
+  SwizzleChunk_AVX2<aSwapRB, aOpaqueAlpha>(aSrc, aDst, alignedRow, remainder);
+}
+
+template <bool aSwapRB, bool aOpaqueAlpha>
+void Swizzle_AVX2(const uint8_t* aSrc, int32_t aSrcGap, uint8_t* aDst,
+                  int32_t aDstGap, IntSize aSize) {
+  int32_t alignedRow = 4 * (aSize.width & ~7);
+  int32_t remainder = aSize.width & 7;
+  // Fold remainder into stride gap.
+  aSrcGap += 4 * remainder;
+  aDstGap += 4 * remainder;
+
+  for (int32_t height = aSize.height; height > 0; height--) {
+    SwizzleChunk_AVX2<aSwapRB, aOpaqueAlpha>(aSrc, aDst, alignedRow, remainder);
+    aSrc += aSrcGap;
+    aDst += aDstGap;
+  }
+}
+
+// Force instantiation of swizzle variants here.
+template void SwizzleRow_AVX2<true, false>(const uint8_t*, uint8_t*, int32_t);
+template void SwizzleRow_AVX2<true, true>(const uint8_t*, uint8_t*, int32_t);
+template void Swizzle_AVX2<true, false>(const uint8_t*, int32_t, uint8_t*,
+                                        int32_t, IntSize);
+template void Swizzle_AVX2<true, true>(const uint8_t*, int32_t, uint8_t*,
+                                       int32_t, IntSize);
 
 template <bool aSwapRB>
 void UnpackRowRGB24_SSSE3(const uint8_t* aSrc, uint8_t* aDst, int32_t aLength);
