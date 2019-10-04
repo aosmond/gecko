@@ -132,10 +132,8 @@ class SurfacePipeFactory {
                aInFormat == gfx::SurfaceFormat::B8G8R8A8 ||
                aInFormat == gfx::SurfaceFormat::B8G8R8X8);
 
-    MOZ_ASSERT(aOutFormat == gfx::SurfaceFormat::R8G8B8A8 ||
-               aOutFormat == gfx::SurfaceFormat::R8G8B8X8 ||
-               aOutFormat == gfx::SurfaceFormat::B8G8R8A8 ||
-               aOutFormat == gfx::SurfaceFormat::B8G8R8X8);
+    MOZ_ASSERT(aOutFormat == gfx::SurfaceFormat::OS_RGBA ||
+               aOutFormat == gfx::SurfaceFormat::OS_RGBX);
 
     if (unpackOrMaskSwizzle && swapOrAlphaSwizzle) {
       MOZ_ASSERT_UNREACHABLE("Early and late swizzles not supported");
