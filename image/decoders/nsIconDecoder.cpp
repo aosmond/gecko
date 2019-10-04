@@ -67,7 +67,7 @@ LexerTransition<nsIconDecoder::State> nsIconDecoder::ReadHeader(
 
   MOZ_ASSERT(!mImageData, "Already have a buffer allocated?");
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-      this, Size(), OutputSize(), FullFrame(), SurfaceFormat::OS_RGBA,
+      this, Size(), OutputSize(), FullFrame(), SurfaceFormat::B8G8R8A8,
       SurfaceFormat::OS_RGBA,
       /* aAnimParams */ Nothing(), mTransform, SurfacePipeFlags());
   if (!pipe) {
@@ -85,19 +85,7 @@ LexerTransition<nsIconDecoder::State> nsIconDecoder::ReadRowOfPixels(
     const char* aData, size_t aLength) {
   MOZ_ASSERT(aLength % 4 == 0, "Rows should contain a multiple of four bytes");
 
-  auto result = mPipe.WritePixels<uint32_t>([&]() -> NextPixel<uint32_t> {
-    if (aLength == 0) {
-      return AsVariant(WriteState::NEED_MORE_DATA);  // Done with this row.
-    }
-
-    uint32_t pixel;
-    memcpy(&pixel, aData, 4);
-    aData += 4;
-    aLength -= 4;
-
-    return AsVariant(pixel);
-  });
-
+  auto result = mPipe.WriteBuffer(reinterpret_cast<const uint32_t*>(aData));
   MOZ_ASSERT(result != WriteState::FAILURE);
 
   Maybe<SurfaceInvalidRect> invalidRect = mPipe.TakeInvalidRect();
