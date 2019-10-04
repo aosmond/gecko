@@ -7,6 +7,7 @@
 #define mozilla_image_test_gtest_Common_h
 
 #include <vector>
+#include <utility>
 
 #include "gtest/gtest.h"
 
@@ -40,7 +41,11 @@ struct BGRAColor {
         mGreen(aGreen),
         mRed(aRed),
         mAlpha(aAlpha),
-        mPremultiplied(aPremultiplied) {}
+        mPremultiplied(aPremultiplied) {
+    if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
+      std::swap(mBlue, mRed);
+    }
+  }
 
   static BGRAColor Green() { return BGRAColor(0x00, 0xFF, 0x00, 0xFF); }
   static BGRAColor Red() { return BGRAColor(0x00, 0x00, 0xFF, 0xFF); }
