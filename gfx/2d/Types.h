@@ -107,8 +107,8 @@ enum class SurfaceFormat : int8_t {
   // TODO(aosmond): When everything blocking bug 1581828 has been resolved, we
   // can make this use A8B8G8R8_UINT32 and X8B8G8R8_UINT32 for non-Windows
   // platforms.
-  OS_RGBA = A8R8G8B8_UINT32,
-  OS_RGBX = X8R8G8B8_UINT32
+  OS_RGBA = A8B8G8R8_UINT32,
+  OS_RGBX = X8B8G8R8_UINT32
 };
 
 static inline int BytesPerPixel(SurfaceFormat aFormat) {
