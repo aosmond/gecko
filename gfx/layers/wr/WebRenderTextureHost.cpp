@@ -198,7 +198,7 @@ int32_t WebRenderTextureHost::GetRGBStride() {
     // XXX this stride is used until yuv image rendering by webrender is used.
     // Software converted RGB buffers strides are aliened to 16
     return gfx::GetAlignedStride<16>(
-        GetSize().width, BytesPerPixel(gfx::SurfaceFormat::B8G8R8A8));
+        GetSize().width, BytesPerPixel(gfx::SurfaceFormat::OS_RGBA));
   }
   return ImageDataSerializer::ComputeRGBStride(format, GetSize().width);
 }

@@ -244,7 +244,7 @@ nsresult SharedSurfacesChild::ShareInternal(SourceSurfaceSharedData* aSurface,
 
   SurfaceFormat format = aSurface->GetFormat();
   MOZ_RELEASE_ASSERT(
-      format == SurfaceFormat::B8G8R8X8 || format == SurfaceFormat::B8G8R8A8,
+      format == SurfaceFormat::OS_RGBX || format == SurfaceFormat::OS_RGBA,
       "bad format");
 
   data->MarkShared();

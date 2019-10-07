@@ -621,7 +621,7 @@ struct DIGroup {
       return;
     }
 
-    gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
+    gfx::SurfaceFormat format = gfx::SurfaceFormat::OS_RGBA;
     std::vector<RefPtr<ScaledFont>> fonts;
     bool validFonts = true;
     RefPtr<WebRenderDrawEventRecorder> recorder =
@@ -2213,7 +2213,7 @@ WebRenderCommandBuilder::GenerateFallbackData(
 
     gfx::SurfaceFormat format = aItem->GetType() == DisplayItemType::TYPE_MASK
                                     ? gfx::SurfaceFormat::A8
-                                    : gfx::SurfaceFormat::B8G8R8A8;
+                                    : gfx::SurfaceFormat::OS_RGBA;
     if (useBlobImage) {
       bool snapped;
       nsRegion opaqueRegion =
