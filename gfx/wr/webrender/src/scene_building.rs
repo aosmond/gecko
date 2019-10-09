@@ -1096,7 +1096,7 @@ impl<'a> SceneBuilder<'a> {
                 );
             }
             DisplayItem::Text(ref info) => {
-                let (layout, _, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, unsnapped_rect, clip_and_scroll) = self.process_common_properties_with_bounds(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
@@ -1105,6 +1105,7 @@ impl<'a> SceneBuilder<'a> {
                 self.add_text(
                     clip_and_scroll,
                     &layout,
+                    unsnapped_rect.origin,
                     &info.font_key,
                     &info.color,
                     item.glyphs(),
@@ -2922,6 +2923,7 @@ impl<'a> SceneBuilder<'a> {
         &mut self,
         clip_and_scroll: ScrollNodeAndClipChain,
         prim_info: &LayoutPrimitiveInfo,
+        prim_unsnapped_origin: LayoutPoint,
         font_instance_key: &FontInstanceKey,
         text_color: &ColorF,
         glyph_range: ItemRange<GlyphInstance>,
@@ -2968,7 +2970,7 @@ impl<'a> SceneBuilder<'a> {
             //           the primitive key, when the common case is that the
             //           hash will match and we won't end up creating a new
             //           primitive template.
-            let prim_offset = prim_info.rect.origin.to_vector() - offset;
+            let prim_offset = prim_unsnapped_origin.to_vector() - offset;
             let glyphs = glyph_range
                 .iter()
                 .map(|glyph| {
