@@ -1028,12 +1028,18 @@ impl<'a> SceneBuilder<'a> {
 
         let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
 
+        let snap_to_device = &mut self.sc_stack.last_mut().unwrap().snap_to_device;
+        snap_to_device.set_target_spatial_node(
+            clip_and_scroll.spatial_node_index,
+            &self.clip_scroll_tree
+        );
+
         let clip_rect = common.clip_rect.translate(current_offset);
         let rect = bounds.translate(current_offset);
 
         let layout = LayoutPrimitiveInfo {
-            rect,
-            clip_rect,
+            rect: snap_to_device.round_out_rect(&rect),
+            clip_rect: snap_to_device.round_out_rect(&clip_rect),
             flags: common.flags,
             hit_info: common.hit_info,
         };
