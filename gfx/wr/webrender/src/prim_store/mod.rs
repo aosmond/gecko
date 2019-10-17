@@ -16,7 +16,7 @@ use crate::clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, 
 use crate::debug_colors;
 use crate::debug_render::DebugItem;
 use crate::scene_building::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Point2D};
+use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Point2D, Vector2D};
 use euclid::approxeq::ApproxEq;
 use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use crate::frame_builder::{FrameVisibilityContext, FrameVisibilityState};
@@ -52,7 +52,7 @@ use std::{cmp, fmt, hash, ops, u32, usize, mem};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::storage;
 use crate::texture_cache::TEXTURE_REGION_DIMENSIONS;
-use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset, RectHelpers};
+use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset, RectHelpers, VectorHelpers};
 use crate::util::{clamp_to_scale_factor, pack_as_float, project_rect, raster_rect_to_device_pixels};
 use crate::internal_types::{LayoutPrimitiveInfo, Filter};
 use smallvec::SmallVec;
@@ -202,6 +202,28 @@ impl SpaceSnapper {
                 scale_offset.unmap_rect(&snapped_device_rect)
             }
             None => *rect,
+        }
+    }
+
+    pub fn snap_rect_out<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let snapped_device_rect : DeviceRect = scale_offset.map_rect(rect).round_out();
+                scale_offset.unmap_rect(&snapped_device_rect)
+            }
+            None => *rect,
+        }
+    }
+
+    pub fn snap_vector<F>(&self, vector: &Vector2D<f32, F>) -> Vector2D<f32, F> where F: fmt::Debug {
+        debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
+        match self.snapping_transform {
+            Some(ref scale_offset) => {
+                let snapped_device_vector : DeviceVector2D = scale_offset.map_vector(&vector).snap();
+                scale_offset.unmap_vector(&snapped_device_vector)
+            }
+            None => *vector,
         }
     }
 
