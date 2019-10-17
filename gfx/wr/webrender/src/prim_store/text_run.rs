@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use api::{ColorF, GlyphInstance, RasterSpace, Shadow};
-use api::units::{DevicePixelScale, LayoutToWorldTransform, LayoutVector2D};
+use api::units::*;
 use crate::scene_building::{CreateShadow, IsVisible};
 use crate::frame_builder::FrameBuildingState;
 use crate::glyph_rasterizer::{FontInstance, FontTransform, GlyphKey, FONT_SIZE_LIMIT};
@@ -32,6 +32,7 @@ pub struct TextRunKey {
     pub font: FontInstance,
     pub glyphs: PrimaryArc<Vec<GlyphInstance>>,
     pub shadow: bool,
+    pub reference_frame_relative_offset: LayoutVector2DAu,
 }
 
 impl TextRunKey {
@@ -46,6 +47,7 @@ impl TextRunKey {
             font: text_run.font,
             glyphs: PrimaryArc(text_run.glyphs),
             shadow: text_run.shadow,
+            reference_frame_relative_offset: text_run.reference_frame_relative_offset.to_au(),
         }
     }
 }
@@ -145,6 +147,7 @@ pub struct TextRun {
     #[ignore_malloc_size_of = "Measured via PrimaryArc"]
     pub glyphs: Arc<Vec<GlyphInstance>>,
     pub shadow: bool,
+    pub reference_frame_relative_offset: LayoutVector2D,
 }
 
 impl intern::Internable for TextRun {
@@ -168,12 +171,12 @@ impl InternablePrimitive for TextRun {
         key: TextRunKey,
         data_handle: TextRunDataHandle,
         prim_store: &mut PrimitiveStore,
-        reference_frame_relative_offset: LayoutVector2D,
+        _: LayoutVector2D,
     ) -> PrimitiveInstanceKind {
         let run_index = prim_store.text_runs.push(TextRunPrimitive {
             used_font: key.font.clone(),
             glyph_keys_range: storage::Range::empty(),
-            reference_frame_relative_offset,
+            reference_frame_relative_offset: LayoutVector2D::from_au(key.reference_frame_relative_offset),
             shadow: key.shadow,
             raster_space: RasterSpace::Screen,
         });
@@ -196,6 +199,7 @@ impl CreateShadow for TextRun {
             font,
             glyphs: self.glyphs.clone(),
             shadow: true,
+            reference_frame_relative_offset: self.reference_frame_relative_offset,
         }
     }
 }
