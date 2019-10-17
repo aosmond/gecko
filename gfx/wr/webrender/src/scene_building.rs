@@ -1014,6 +1014,33 @@ impl<'a> SceneBuilder<'a> {
         (layout, rect, clip_and_scroll)
     }
 
+    fn process_common_properties_without_snapping(
+        &mut self,
+        common: &CommonItemProperties,
+        bounds: &LayoutRect,
+        apply_pipeline_clip: bool
+    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain) {
+        let clip_and_scroll = self.get_clip_and_scroll(
+            &common.clip_id,
+            &common.spatial_id,
+            apply_pipeline_clip
+        );
+
+        let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
+
+        let clip_rect = common.clip_rect.translate(current_offset);
+        let rect = bounds.translate(current_offset);
+
+        let layout = LayoutPrimitiveInfo {
+            rect,
+            clip_rect,
+            flags: common.flags,
+            hit_info: common.hit_info,
+        };
+
+        (layout, clip_and_scroll)
+    }
+
     pub fn snap_rect(
         &mut self,
         rect: &LayoutRect,
@@ -1096,7 +1123,7 @@ impl<'a> SceneBuilder<'a> {
                 );
             }
             DisplayItem::Text(ref info) => {
-                let (layout, _, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, clip_and_scroll) = self.process_common_properties_without_snapping(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
