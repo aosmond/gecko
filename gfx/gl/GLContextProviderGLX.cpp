@@ -169,8 +169,11 @@ bool GLXLibrary::EnsureInitialized() {
   const SymLoadStruct symbols_videosync[] = {
       SYMBOL(GetVideoSyncSGI), SYMBOL(WaitVideoSyncSGI), END_OF_SYMBOLS};
 
-  const SymLoadStruct symbols_swapcontrol[] = {SYMBOL(SwapIntervalEXT),
-                                               END_OF_SYMBOLS};
+  const SymLoadStruct symbols_swapcontrolext[] = {SYMBOL(SwapIntervalEXT),
+                                                  END_OF_SYMBOLS};
+
+  const SymLoadStruct symbols_swapcontrolmesa[] = {SYMBOL(SwapIntervalMESA),
+                                                   END_OF_SYMBOLS};
 
   const auto fnLoadSymbols = [&](const SymLoadStruct* symbols) {
     if (pfnLoader.LoadSymbols(symbols)) return true;
@@ -212,10 +215,13 @@ bool GLXLibrary::EnsureInitialized() {
   }
 
   if (!HasExtension(extensionsStr, "GLX_EXT_swap_control") ||
-      !fnLoadSymbols(symbols_swapcontrol)) {
-    NS_WARNING(
-        "GLX_swap_control unsupported, ASAP mode may still block on buffer "
-        "swaps.");
+      !fnLoadSymbols(symbols_swapcontrolext)) {
+    if (!HasExtension(extensionsStr, "GLX_MESA_swap_control") ||
+        !fnLoadSymbols(symbols_swapcontrolmesa)) {
+      NS_WARNING(
+          "GLX_swap_control unsupported, ASAP mode may still block on buffer "
+          "swaps.");
+    }
   }
 
   mIsATI = serverVendor && DoesStringMatch(serverVendor, "ATI");
@@ -594,12 +600,16 @@ bool GLContextGLX::MakeCurrentImpl() const {
   const bool succeeded = mGLX->fMakeCurrent(mDisplay, mDrawable, mContext);
   NS_ASSERTION(succeeded, "Failed to make GL context current!");
 
-  if (!IsOffscreen() && mGLX->SupportsSwapControl()) {
+  if (!IsOffscreen()) {
     // Many GLX implementations default to blocking until the next
     // VBlank when calling glXSwapBuffers. We want to run unthrottled
     // in ASAP mode. See bug 1280744.
-    const bool isASAP = (StaticPrefs::layout_frame_rate() == 0);
-    mGLX->fSwapInterval(mDisplay, mDrawable, isASAP ? 0 : 1);
+    const int interval = (StaticPrefs::layout_frame_rate() == 0) ? 0 : 1;
+    if (mGLX->SupportsSwapControlEXT()) {
+      mGLX->fSwapInterval(mDisplay, mDrawable, interval);
+    } else if (mGLX->SupportsSwapControlMESA()) {
+      mGLX->fSwapInterval(interval);
+    }
   }
   return succeeded;
 }

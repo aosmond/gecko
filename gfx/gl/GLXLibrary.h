@@ -154,6 +154,9 @@ class GLXLibrary final {
                              int interval) const
       VOID_WRAP(fSwapIntervalEXT(dpy, drawable, interval))
 
+          void fSwapInterval(int interval) const
+      VOID_WRAP(fSwapIntervalMESA(interval))
+
 #undef WRAP
 #undef VOID_WRAP
 #undef BEFORE_CALL
@@ -175,7 +178,8 @@ class GLXLibrary final {
   bool HasCreateContextAttribs() { return mHasCreateContextAttribs; }
   bool SupportsTextureFromPixmap(gfxASurface* aSurface);
   bool SupportsVideoSync();
-  bool SupportsSwapControl() const { return bool(mSymbols.fSwapIntervalEXT); }
+  bool SupportsSwapControlEXT() const { return bool(mSymbols.fSwapIntervalEXT); }
+  bool SupportsSwapControlMESA() const { return bool(mSymbols.fSwapIntervalMESA); }
   bool IsATI() { return mIsATI; }
   bool IsMesa() { return mClientIsMesa; }
 
@@ -214,6 +218,7 @@ class GLXLibrary final {
     int(GLAPIENTRY* fGetVideoSyncSGI)(unsigned int*);
     int(GLAPIENTRY* fWaitVideoSyncSGI)(int, int, unsigned int*);
     void(GLAPIENTRY* fSwapIntervalEXT)(Display*, GLXDrawable, int);
+    void(GLAPIENTRY* fSwapIntervalMESA)(int);
   } mSymbols = {};
 
 #ifdef DEBUG
