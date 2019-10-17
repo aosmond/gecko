@@ -2991,13 +2991,26 @@ impl<'a> SceneBuilder<'a> {
                 flags,
             );
 
+            let snap_to_device = &mut self.sc_stack.last_mut().unwrap().snap_to_device;
+            snap_to_device.set_target_spatial_node(
+                clip_and_scroll.spatial_node_index,
+                &self.clip_scroll_tree,
+            );
+
             // TODO(gw): It'd be nice not to have to allocate here for creating
             //           the primitive key, when the common case is that the
             //           hash will match and we won't end up creating a new
             //           primitive template.
-            let prim_offset = prim_info.rect.origin.to_vector() - offset;
-            let glyphs = glyph_range
-                .iter()
+            let mut glyph_iter = glyph_range.iter().peekable();
+            let initial_glyph_origin = match glyph_iter.peek() {
+                Some(ref glyph) => glyph.point + offset,
+                None => return,
+            };
+            let snapped_glyph_origin = snap_to_device.snap_point(&initial_glyph_origin);
+            let snap_offset = snapped_glyph_origin.to_vector() - initial_glyph_origin.to_vector();
+
+            let prim_offset = prim_info.rect.origin.to_vector() - offset - snap_offset;
+            let glyphs = glyph_iter
                 .map(|glyph| {
                     GlyphInstance {
                         index: glyph.index,
