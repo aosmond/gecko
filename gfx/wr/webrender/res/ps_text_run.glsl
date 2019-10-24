@@ -103,8 +103,8 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
 
                 // Ensure the transformed text offset does not contain a subpixel translation
                 // such that glyph snapping is stable for equivalent glyph subpixel positions.
-                vec2 device_text_pos = glyph_transform * text_offset + transform.m[3].xy * device_scale;
-                snap_offset = floor(device_text_pos + 0.5) - device_text_pos;
+                //vec2 device_text_pos = glyph_transform * text_offset + transform.m[3].xy * device_scale;
+                //snap_offset = floor(device_text_pos + 0.5) - device_text_pos;
 
                 // Snap the glyph offset to a device pixel, using an appropriate bias depending
                 // on whether subpixel positioning is required.
@@ -124,7 +124,7 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
             default: {
                 // Otherwise, when in local raster space, the transform may be animated, so avoid
                 // snapping with the transform to avoid oscillation.
-                snap_offset = floor(text_offset + 0.5) - text_offset;
+                //snap_offset = floor(text_offset + 0.5) - text_offset;
                 snap_offset += floor(glyph_offset + snap_bias) - glyph_offset;
                 break;
             }

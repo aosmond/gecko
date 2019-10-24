@@ -1019,7 +1019,7 @@ impl<'a> SceneBuilder<'a> {
         common: &CommonItemProperties,
         bounds: &LayoutRect,
         apply_pipeline_clip: bool
-    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain) {
+    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain, LayoutVector2D) {
         let clip_and_scroll = self.get_clip_and_scroll(
             &common.clip_id,
             &common.spatial_id,
@@ -1028,8 +1028,16 @@ impl<'a> SceneBuilder<'a> {
 
         let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
 
-        let clip_rect = common.clip_rect.translate(current_offset);
-        let rect = bounds.translate(current_offset);
+        let snap_to_device = &mut self.sc_stack.last_mut().unwrap().snap_to_device;
+        snap_to_device.set_target_spatial_node(
+            clip_and_scroll.spatial_node_index,
+            &self.clip_scroll_tree
+        );
+
+        let snapped_current_offset = snap_to_device.snap_point(&current_offset.to_point()).to_vector();
+
+        let clip_rect = common.clip_rect.translate(snapped_current_offset);
+        let rect = bounds.translate(snapped_current_offset);
 
         let layout = LayoutPrimitiveInfo {
             rect,
@@ -1038,7 +1046,7 @@ impl<'a> SceneBuilder<'a> {
             hit_info: common.hit_info,
         };
 
-        (layout, clip_and_scroll)
+        (layout, clip_and_scroll, snapped_current_offset)
     }
 
     pub fn snap_rect(
@@ -1123,7 +1131,7 @@ impl<'a> SceneBuilder<'a> {
                 );
             }
             DisplayItem::Text(ref info) => {
-                let (layout, clip_and_scroll) = self.process_common_properties_without_snapping(
+                let (layout, clip_and_scroll, current_offset) = self.process_common_properties_without_snapping(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
@@ -1136,6 +1144,7 @@ impl<'a> SceneBuilder<'a> {
                     &info.color,
                     item.glyphs(),
                     info.glyph_options,
+                    current_offset,
                 );
             }
             DisplayItem::Rectangle(ref info) => {
@@ -2953,9 +2962,8 @@ impl<'a> SceneBuilder<'a> {
         text_color: &ColorF,
         glyph_range: ItemRange<GlyphInstance>,
         glyph_options: Option<GlyphOptions>,
+        offset: LayoutVector2D,
     ) {
-        let offset = self.current_offset(clip_and_scroll.spatial_node_index);
-
         let text_run = {
             let instance_map = self.font_instances.read().unwrap();
             let font_instance = match instance_map.get(font_instance_key) {
@@ -3010,6 +3018,7 @@ impl<'a> SceneBuilder<'a> {
                 glyphs: Arc::new(glyphs),
                 font,
                 shadow: false,
+                relative_offset: offset,
             }
         };
 
