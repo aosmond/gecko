@@ -1036,12 +1036,12 @@ impl<'a> SceneBuilder<'a> {
 
         let snapped_current_offset = snap_to_device.snap_point(&current_offset.to_point()).to_vector();
 
-        let clip_rect = common.clip_rect.translate(snapped_current_offset);
-        let rect = bounds.translate(snapped_current_offset);
+        let clip_rect = common.clip_rect.translate(current_offset);
+        let rect = bounds.translate(current_offset);
 
         let layout = LayoutPrimitiveInfo {
-            rect,
-            clip_rect,
+            rect: snap_to_device.snap_rect_out(&rect),
+            clip_rect: snap_to_device.snap_rect_out(&clip_rect),
             flags: common.flags,
             hit_info: common.hit_info,
         };
