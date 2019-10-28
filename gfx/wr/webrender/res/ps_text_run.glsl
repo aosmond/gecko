@@ -99,10 +99,15 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
         // Be careful to only snap with the transform when in screen raster space.
         switch (raster_space) {
             case RASTER_SCREEN: {
+                // Ensure the transformed text offset does not contain a subpixel translation
+                // such that glyph snapping is stable for equivalent glyph subpixel positions.
+                vec2 device_text_offset = glyph_transform * text_offset + transform.m[3].xy * device_scale;
+                snap_offset = floor(device_text_offset + 0.5) - device_text_offset;
+
                 // Snap the glyph offset to a device pixel, using an appropriate bias depending
                 // on whether subpixel positioning is required.
                 vec2 device_glyph_offset = glyph_transform * glyph_offset;
-                snap_offset = floor(device_glyph_offset + snap_bias) - device_glyph_offset;
+                snap_offset += floor(device_glyph_offset + snap_bias) - device_glyph_offset;
                 break;
             }
             default: {
@@ -187,7 +192,7 @@ void main(void) {
     float raster_scale = 1.0;
 
     // Transform from local space to glyph space.
-    mat2 glyph_transform = mat2(transform.m) * task.device_pixel_scale;
+    mat2 glyph_transform = mat2(transform.m) * task.device_pixel_scale / transform.m[3].w;
 
     // Compute the glyph rect in glyph space.
     RectWithSize glyph_rect = RectWithSize(res.offset + glyph_transform * (text_offset + glyph.offset),
