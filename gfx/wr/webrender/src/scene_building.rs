@@ -1019,7 +1019,7 @@ impl<'a> SceneBuilder<'a> {
         common: &CommonItemProperties,
         bounds: &LayoutRect,
         apply_pipeline_clip: bool
-    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain, LayoutVector2D) {
+    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain) {
         let clip_and_scroll = self.get_clip_and_scroll(
             &common.clip_id,
             &common.spatial_id,
@@ -1028,24 +1028,17 @@ impl<'a> SceneBuilder<'a> {
 
         let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
 
-        let snap_to_device = &mut self.sc_stack.last_mut().unwrap().snap_to_device;
-        snap_to_device.set_target_spatial_node(
-            clip_and_scroll.spatial_node_index,
-            &self.clip_scroll_tree
-        );
-
         let clip_rect = common.clip_rect.translate(current_offset);
         let rect = bounds.translate(current_offset);
 
         let layout = LayoutPrimitiveInfo {
-            rect: snap_to_device.snap_rect_out(&rect),
-            clip_rect: snap_to_device.snap_rect_out(&clip_rect),
+            rect,
+            clip_rect,
             flags: common.flags,
             hit_info: common.hit_info,
         };
 
-        let snapped_current_offset = snap_to_device.snap_vector(&current_offset);
-        (layout, clip_and_scroll, snapped_current_offset)
+        (layout, clip_and_scroll)
     }
 
     pub fn snap_rect(
@@ -1130,12 +1123,13 @@ impl<'a> SceneBuilder<'a> {
                 );
             }
             DisplayItem::Text(ref info) => {
-                let (layout, clip_and_scroll, current_offset) = self.process_common_properties_for_text(
+                let (layout, clip_and_scroll) = self.process_common_properties_for_text(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
                 );
 
+                let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
                 self.add_text(
                     clip_and_scroll,
                     &layout,
