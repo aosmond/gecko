@@ -75,8 +75,9 @@ TextRun fetch_text_run(int address) {
 
 VertexInfo write_text_vertex(RectWithSize local_clip_rect,
                              float z,
+#ifndef WR_FEATURE_GLYPH_TRANSFORM
                              float raster_scale,
-                             int raster_space,
+#endif
                              Transform transform,
                              PictureTask task,
                              vec2 text_offset,
@@ -192,7 +193,6 @@ void main(void) {
     int glyph_index = aData.y & 0xffff;
     int render_task_index = aData.y >> 16;
     int resource_address = aData.z;
-    int raster_space = aData.w >> 16;
     int subpx_dir = (aData.w >> 8) & 0xff;
     int color_mode = aData.w & 0xff;
 
@@ -214,8 +214,6 @@ void main(void) {
     GlyphResource res = fetch_glyph_resource(resource_address);
 
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
-    float raster_scale = 1.0;
-
     // Transform from local space to glyph space.
     mat2 glyph_transform = mat2(transform.m) * task.device_pixel_scale / transform.m[3].w;
 
@@ -260,8 +258,9 @@ void main(void) {
 
     VertexInfo vi = write_text_vertex(ph.local_clip_rect,
                                       ph.z,
+#ifndef WR_FEATURE_GLYPH_TRANSFORM
                                       raster_scale,
-                                      raster_space,
+#endif
                                       transform,
                                       task,
                                       text_offset,

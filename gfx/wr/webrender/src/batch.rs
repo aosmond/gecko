@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use api::{AlphaType, ClipMode, ExternalImageType, ImageRendering};
-use api::{YuvColorSpace, YuvFormat, ColorDepth, ColorRange, PremultipliedColorF, RasterSpace};
+use api::{YuvColorSpace, YuvFormat, ColorDepth, ColorRange, PremultipliedColorF};
 use api::units::*;
 use crate::clip::{ClipDataStore, ClipNodeFlags, ClipNodeRange, ClipItemKind, ClipStore};
 use crate::clip_scroll_tree::{ClipScrollTree, ROOT_SPATIAL_NODE_INDEX, SpatialNodeIndex, CoordinateSystemId};
@@ -879,10 +879,6 @@ impl BatchBuilder {
                 };
 
                 let glyph_keys = &ctx.scratch.glyph_keys[run.glyph_keys_range];
-                let rasterization_space = match run.raster_space {
-                    RasterSpace::Screen => RasterizationSpace::Screen,
-                    RasterSpace::Local(..) => RasterizationSpace::Local,
-                };
                 let raster_scale = run.raster_space.local_scale().unwrap_or(1.0).max(0.001);
                 let prim_header_index = prim_headers.push(
                     &prim_header,
@@ -981,7 +977,6 @@ impl BatchBuilder {
                                     batch.push(base_instance.build(
                                         glyph.index_in_text_run | ((render_task_address.0 as i32) << 16),
                                         glyph.uv_rect_address.as_int(),
-                                        (rasterization_space as i32) << 16 |
                                         (subpx_dir as u32 as i32) << 8 |
                                         (color_mode as u32 as i32),
                                     ));
