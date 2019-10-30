@@ -884,8 +884,8 @@ impl BatchBuilder {
                     &prim_header,
                     z_id,
                     [
-                        (run.reference_frame_relative_offset.x * 256.0) as i32,
-                        (run.reference_frame_relative_offset.y * 256.0) as i32,
+                        (run.snapped_reference_frame_relative_offset.x * 256.0) as i32,
+                        (run.snapped_reference_frame_relative_offset.y * 256.0) as i32,
                         (raster_scale * 65535.0).round() as i32,
                         clip_task_address.unwrap().0 as i32,
                     ],

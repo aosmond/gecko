@@ -128,20 +128,12 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
     // we want to eliminate any subpixel translation in device space to ensure glyph
     // snapping is stable for equivalent glyph subpixel positions. Note that we must use
     // device pixels, and not glyph raster pixels for this purpose.
-    vec2 device_snap_offset = vec2(0.0);
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
-    // The transform is either axis aligned or contains a simple 2d rotation.
-    bool snappable_transform = true;
+    vec2 device_text_pos = (transform.m * vec4(text_offset, 0.0, 1.0)).xy * task.device_pixel_scale;
+    vec2 device_snap_offset = floor(device_text_pos + 0.5) - device_text_pos;
 #else
-    // We can assume nothing about the transform.
-    // TODO(aosmond): We only snap if it is axis aligned. Shouldn't we permit rotations?
-    // TODO(aosmond): We should only snap in scene building if animated.
-    bool snappable_transform = transform.is_axis_aligned;
+    vec2 device_snap_offset = vec2(0.0);
 #endif
-    if (snappable_transform) {
-        vec2 device_text_pos = (transform.m * vec4(text_offset, 0.0, 1.0)).xy * task.device_pixel_scale;
-        device_snap_offset = floor(device_text_pos + 0.5) - device_text_pos;
-    }
 
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
     // The glyph rect is in device space, so transform it back to local space.

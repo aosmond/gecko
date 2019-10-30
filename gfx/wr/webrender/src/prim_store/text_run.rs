@@ -17,7 +17,7 @@ use crate::render_task_graph::RenderTaskGraph;
 use crate::renderer::{MAX_VERTEX_TEXTURE_WIDTH};
 use crate::resource_cache::{ResourceCache};
 use crate::util::{MatrixHelpers};
-use crate::prim_store::{InternablePrimitive, PrimitiveInstanceKind};
+use crate::prim_store::{InternablePrimitive, PrimitiveInstanceKind, SpaceSnapper};
 use std::ops;
 use std::sync::Arc;
 use crate::storage;
@@ -174,6 +174,7 @@ impl InternablePrimitive for TextRun {
             used_font: key.font.clone(),
             glyph_keys_range: storage::Range::empty(),
             reference_frame_relative_offset,
+            snapped_reference_frame_relative_offset: reference_frame_relative_offset,
             shadow: key.shadow,
             raster_space: RasterSpace::Screen,
         });
@@ -212,6 +213,7 @@ pub struct TextRunPrimitive {
     pub used_font: FontInstance,
     pub glyph_keys_range: storage::Range<GlyphKey>,
     pub reference_frame_relative_offset: LayoutVector2D,
+    pub snapped_reference_frame_relative_offset: LayoutVector2D,
     pub shadow: bool,
     pub raster_space: RasterSpace,
 }
@@ -222,6 +224,7 @@ impl TextRunPrimitive {
         specified_font: &FontInstance,
         device_pixel_scale: DevicePixelScale,
         transform: &LayoutToWorldTransform,
+        snap_to_device: &SpaceSnapper,
         subpixel_mode: SubpixelMode,
         raster_space: RasterSpace,
     ) -> bool {
@@ -266,6 +269,15 @@ impl TextRunPrimitive {
         // Record the raster space the text needs to be snapped in.
         self.raster_space = raster_space;
 
+        self.snapped_reference_frame_relative_offset = if transform_glyphs {
+            // Let the shader do the snapping in device pixels
+            self.reference_frame_relative_offset
+        } else {
+            // Snap without the impact of the animation
+            // TODO(aosmond): shouldn't this be passed into the shader to adjust the clip?
+            snap_to_device.snap_vector(&self.reference_frame_relative_offset)
+        };
+
         // If the transform or device size is different, then the caller of
         // this method needs to know to rebuild the glyphs.
         let cache_dirty =
@@ -298,6 +310,7 @@ impl TextRunPrimitive {
         specified_font: &FontInstance,
         glyphs: &[GlyphInstance],
         transform: &LayoutToWorldTransform,
+        snap_to_device: &SpaceSnapper,
         surface: &SurfaceInfo,
         raster_space: RasterSpace,
         subpixel_mode: SubpixelMode,
@@ -312,6 +325,7 @@ impl TextRunPrimitive {
             specified_font,
             device_pixel_scale,
             transform,
+            snap_to_device,
             subpixel_mode,
             raster_space,
         );
