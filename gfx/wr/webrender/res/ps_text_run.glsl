@@ -75,7 +75,9 @@ TextRun fetch_text_run(int address) {
 
 VertexInfo write_text_vertex(RectWithSize local_clip_rect,
                              float z,
-#ifndef WR_FEATURE_GLYPH_TRANSFORM
+#ifdef WR_FEATURE_GLYPH_TRANSFORM
+                             mat2 glyph_transform,
+#else
                              float raster_scale,
 #endif
                              Transform transform,
@@ -84,8 +86,6 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
                              vec2 glyph_offset,
                              RectWithSize glyph_rect,
                              vec2 snap_bias) {
-    // The offset to snap the glyph rect to a device pixel
-
     // Ensure that we create a snap offset for the glyph using the same raster pixels
     // as used during glyph rasterization during frame building. If a non-identity,
     // transform was used, WR_FEATURE_GLYPH_TRANSFORM will be set. Otherwise,
@@ -93,10 +93,6 @@ VertexInfo write_text_vertex(RectWithSize local_clip_rect,
     // transform during frame building, and need to snap just using the device pixel
     // scale and the raster scale.
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
-    // Transform from local space to glyph space.
-    float device_scale = task.device_pixel_scale / transform.m[3].w;
-    mat2 glyph_transform = mat2(transform.m) * device_scale;
-
     // Transform from glyph space back to local space.
     mat2 glyph_transform_inv = inverse(glyph_transform);
 
@@ -258,7 +254,9 @@ void main(void) {
 
     VertexInfo vi = write_text_vertex(ph.local_clip_rect,
                                       ph.z,
-#ifndef WR_FEATURE_GLYPH_TRANSFORM
+#ifdef WR_FEATURE_GLYPH_TRANSFORM
+                                      glyph_transform,
+#else
                                       raster_scale,
 #endif
                                       transform,
