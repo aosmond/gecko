@@ -200,12 +200,12 @@ static already_AddRefed<DataSourceSurface> CropAndCopyDataSourceSurface(
 
   // Calculate the size of the new SourceSurface.
   // We cannot keep using aSurface->GetFormat() to create new DataSourceSurface,
-  // since it might be SurfaceFormat::B8G8R8X8 which does not handle opacity,
+  // since it might be SurfaceFormat::OS_RGBX which does not handle opacity,
   // however the specification explicitly define that "If any of the pixels on
   // this rectangle are outside the area where the input bitmap was placed, then
   // they will be transparent black in output."
-  // So, instead, we force the output format to be SurfaceFormat::B8G8R8A8.
-  const SurfaceFormat format = SurfaceFormat::B8G8R8A8;
+  // So, instead, we force the output format to be SurfaceFormat::OS_RGBA.
+  const SurfaceFormat format = SurfaceFormat::OS_RGBA;
   const int bytesPerPixel = BytesPerPixel(format);
   const IntSize dstSize =
       IntSize(positiveCropRect.width, positiveCropRect.height);
@@ -317,7 +317,7 @@ static already_AddRefed<layers::Image> CreateImageFromRawData(
     return nullptr;
   }
 
-  // Convert RGBA to BGRA
+  // Convert RGBA to OS_RGBA
   RefPtr<DataSourceSurface> rgbaDataSurface = rgbaSurface->GetDataSurface();
   DataSourceSurface::ScopedMap rgbaMap(rgbaDataSurface,
                                        DataSourceSurface::READ);
@@ -327,7 +327,7 @@ static already_AddRefed<layers::Image> CreateImageFromRawData(
 
   RefPtr<DataSourceSurface> bgraDataSurface =
       Factory::CreateDataSourceSurfaceWithStride(rgbaDataSurface->GetSize(),
-                                                 SurfaceFormat::B8G8R8A8,
+                                                 SurfaceFormat::OS_RGBA,
                                                  rgbaMap.GetStride());
   if (NS_WARN_IF(!bgraDataSurface)) {
     return nullptr;
@@ -340,7 +340,7 @@ static already_AddRefed<layers::Image> CreateImageFromRawData(
   }
 
   SwizzleData(rgbaMap.GetData(), rgbaMap.GetStride(), SurfaceFormat::R8G8B8A8,
-              bgraMap.GetData(), bgraMap.GetStride(), SurfaceFormat::B8G8R8A8,
+              bgraMap.GetData(), bgraMap.GetStride(), SurfaceFormat::OS_RGBA,
               bgraDataSurface->GetSize());
 
   // Create an Image from the BGRA SourceSurface.
@@ -481,7 +481,7 @@ void ImageBitmap::SetPictureRect(const IntRect& aRect, ErrorResult& aRv) {
 /*
  * The functionality of PrepareForDrawTarget method:
  * (1) Get a SourceSurface from the mData (which is a layers::Image).
- * (2) Convert the SourceSurface to format B8G8R8A8 if the original format is
+ * (2) Convert the SourceSurface to format OS_RGBA if the original format is
  *     R8G8B8, B8G8R8, HSV or Lab.
  *     Note: if the original format is A8 or Depth, then return null directly.
  * (3) Do cropping if the size of SourceSurface does not equal to the

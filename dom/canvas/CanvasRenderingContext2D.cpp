@@ -359,7 +359,7 @@ class AdjustedTargetForFilter {
     }
 
     if (!mFinalTarget->CanCreateSimilarDrawTarget(mSourceGraphicRect.Size(),
-                                                  SurfaceFormat::B8G8R8A8)) {
+                                                  SurfaceFormat::OS_RGBA)) {
       mTarget = mFinalTarget;
       mCtx = nullptr;
       mFinalTarget = nullptr;
@@ -367,7 +367,7 @@ class AdjustedTargetForFilter {
     }
 
     mTarget = mFinalTarget->CreateSimilarDrawTarget(mSourceGraphicRect.Size(),
-                                                    SurfaceFormat::B8G8R8A8);
+                                                    SurfaceFormat::OS_RGBA);
 
     if (mTarget) {
       // See bug 1524554.
@@ -395,7 +395,7 @@ class AdjustedTargetForFilter {
     }
 
     RefPtr<DrawTarget> dt = mFinalTarget->CreateSimilarDrawTarget(
-        aRect.Size(), SurfaceFormat::B8G8R8A8);
+        aRect.Size(), SurfaceFormat::OS_RGBA);
 
     if (dt) {
       // See bug 1524554.
@@ -489,7 +489,7 @@ class AdjustedTargetForShadow {
     bounds.ToIntRect(&mTempRect);
 
     if (!mFinalTarget->CanCreateSimilarDrawTarget(mTempRect.Size(),
-                                                  SurfaceFormat::B8G8R8A8)) {
+                                                  SurfaceFormat::OS_RGBA)) {
       mTarget = mFinalTarget;
       mCtx = nullptr;
       mFinalTarget = nullptr;
@@ -497,7 +497,7 @@ class AdjustedTargetForShadow {
     }
 
     mTarget = mFinalTarget->CreateShadowDrawTarget(
-        mTempRect.Size(), SurfaceFormat::B8G8R8A8, mSigma);
+        mTempRect.Size(), SurfaceFormat::OS_RGBA, mSigma);
 
     if (mTarget) {
       // See bug 1524554.
@@ -1706,7 +1706,7 @@ CanvasRenderingContext2D::GetSurfaceSnapshot(gfxAlphaType* aOutAlphaType) {
 }
 
 SurfaceFormat CanvasRenderingContext2D::GetSurfaceFormat() const {
-  return mOpaque ? SurfaceFormat::B8G8R8X8 : SurfaceFormat::B8G8R8A8;
+  return mOpaque ? SurfaceFormat::OS_RGBX : SurfaceFormat::OS_RGBA;
 }
 
 //
@@ -4220,7 +4220,7 @@ static already_AddRefed<SourceSurface> ExtractSubrect(SourceSurface* aSurface,
   }
 
   RefPtr<DrawTarget> subrectDT = aTargetDT->CreateSimilarDrawTarget(
-      roundedOutSourceRectInt.Size(), SurfaceFormat::B8G8R8A8);
+      roundedOutSourceRectInt.Size(), SurfaceFormat::OS_RGBA);
 
   if (subrectDT) {
     // See bug 1524554.
@@ -4802,7 +4802,7 @@ void CanvasRenderingContext2D::DrawWindow(nsGlobalWindowInner& aWindow,
       }
     }
     drawDT = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
-        dtSize, SurfaceFormat::B8G8R8A8);
+        dtSize, SurfaceFormat::OS_RGBA);
     if (!drawDT || !drawDT->IsValid()) {
       aError.Throw(NS_ERROR_FAILURE);
       return;
@@ -5024,15 +5024,15 @@ nsresult CanvasRenderingContext2D::GetImageDataArray(
       break;
     }
 
+    SurfaceFormat srcFormat = readback->GetFormat();
     uint8_t* dst = data + dstWriteRect.y * (aWidth * 4) + dstWriteRect.x * 4;
 
     if (mOpaque) {
-      SwizzleData(src, srcStride, SurfaceFormat::X8R8G8B8_UINT32, dst,
-                  aWidth * 4, SurfaceFormat::R8G8B8A8, dstWriteRect.Size());
+      SwizzleData(src, srcStride, srcFormat, dst, aWidth * 4,
+                  SurfaceFormat::R8G8B8X8, dstWriteRect.Size());
     } else {
-      UnpremultiplyData(src, srcStride, SurfaceFormat::A8R8G8B8_UINT32, dst,
-                        aWidth * 4, SurfaceFormat::R8G8B8A8,
-                        dstWriteRect.Size());
+      UnpremultiplyData(src, srcStride, srcFormat, dst, aWidth * 4,
+                        SurfaceFormat::R8G8B8A8, dstWriteRect.Size());
     }
   } while (false);
 
@@ -5048,7 +5048,7 @@ void CanvasRenderingContext2D::EnsureErrorTarget() {
 
   RefPtr<DrawTarget> errorTarget =
       gfxPlatform::GetPlatform()->CreateOffscreenCanvasDrawTarget(
-          IntSize(1, 1), SurfaceFormat::B8G8R8A8);
+          IntSize(1, 1), SurfaceFormat::OS_RGBA);
   MOZ_ASSERT(errorTarget, "Failed to allocate the error target!");
 
   sErrorTarget = errorTarget;
@@ -5169,8 +5169,9 @@ nsresult CanvasRenderingContext2D::PutImageData_explicit(
   if (mTarget->LockBits(&lockedBits, &dstSize, &dstStride, &dstFormat)) {
     dstData = lockedBits + dirtyRect.y * dstStride + dirtyRect.x * 4;
   } else {
+    dstFormat = mOpaque ? SurfaceFormat::OS_RGBX : SurfaceFormat::OS_RGBA;
     sourceSurface = Factory::CreateDataSourceSurface(
-        dirtyRect.Size(), SurfaceFormat::B8G8R8A8, false);
+        dirtyRect.Size(), dstFormat, false);
 
     // In certain scenarios, requesting larger than 8k image fails.  Bug 803568
     // covers the details of how to run into it, but the full detailed
@@ -5188,15 +5189,13 @@ nsresult CanvasRenderingContext2D::PutImageData_explicit(
       return NS_ERROR_OUT_OF_MEMORY;
     }
     dstStride = map.mStride;
-    dstFormat = sourceSurface->GetFormat();
   }
 
   IntRect srcRect = dirtyRect - IntPoint(aX, aY);
   uint8_t* srcData = aArray->Data() + srcRect.y * (aW * 4) + srcRect.x * 4;
 
   PremultiplyData(
-      srcData, aW * 4, SurfaceFormat::R8G8B8A8, dstData, dstStride,
-      mOpaque ? SurfaceFormat::X8R8G8B8_UINT32 : SurfaceFormat::A8R8G8B8_UINT32,
+      srcData, aW * 4, SurfaceFormat::R8G8B8A8, dstData, dstStride, dstFormat,
       dirtyRect.Size());
 
   if (lockedBits) {

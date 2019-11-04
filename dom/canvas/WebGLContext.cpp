@@ -1704,7 +1704,7 @@ already_AddRefed<mozilla::gfx::SourceSurface> WebGLContext::GetSurfaceSnapshot(
   if (!BindDefaultFBForRead()) return nullptr;
 
   const auto surfFormat =
-      mOptions.alpha ? SurfaceFormat::B8G8R8A8 : SurfaceFormat::B8G8R8X8;
+      mOptions.alpha ? SurfaceFormat::OS_RGBA : SurfaceFormat::OS_RGBX;
   const auto& size = mDefaultFB->mSize;
   RefPtr<DataSourceSurface> surf;
   surf = Factory::CreateDataSourceSurfaceWithStride(size, surfFormat,
@@ -1733,7 +1733,7 @@ already_AddRefed<mozilla::gfx::SourceSurface> WebGLContext::GetSurfaceSnapshot(
 
   RefPtr<DrawTarget> dt = Factory::CreateDrawTarget(
       gfxPlatform::GetPlatform()->GetSoftwareBackend(), size,
-      SurfaceFormat::B8G8R8A8);
+      SurfaceFormat::OS_RGBA);
   if (!dt) return nullptr;
 
   dt->SetTransform(Matrix::Translation(0.0, size.height).PreScale(1.0, -1.0));
