@@ -98,9 +98,9 @@
 
 // On all platforms we have this byte order
 #define SK_A32_SHIFT 24
-#define SK_R32_SHIFT 16
+#define SK_R32_SHIFT 0
 #define SK_G32_SHIFT 8
-#define SK_B32_SHIFT 0
+#define SK_B32_SHIFT 16
 
 #define SK_ALLOW_STATIC_GLOBAL_INITIALIZERS 0
 
