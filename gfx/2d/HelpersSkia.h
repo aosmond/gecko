@@ -40,6 +40,9 @@ static inline SurfaceFormat SkiaColorTypeToGfxFormat(
     case kBGRA_8888_SkColorType:
       return aAlphaType == kOpaque_SkAlphaType ? SurfaceFormat::B8G8R8X8
                                                : SurfaceFormat::B8G8R8A8;
+    case kRGBA_8888_SkColorType:
+      return aAlphaType == kOpaque_SkAlphaType ? SurfaceFormat::R8G8B8X8
+                                               : SurfaceFormat::R8G8B8A8;
     case kRGB_565_SkColorType:
       return SurfaceFormat::R5G6B5_UINT16;
     case kAlpha_8_SkColorType:
@@ -52,6 +55,7 @@ static inline SurfaceFormat SkiaColorTypeToGfxFormat(
 static inline SkAlphaType GfxFormatToSkiaAlphaType(SurfaceFormat format) {
   switch (format) {
     case SurfaceFormat::B8G8R8X8:
+    case SurfaceFormat::R8G8B8X8:
     case SurfaceFormat::R5G6B5_UINT16:
       return kOpaque_SkAlphaType;
     default:
