@@ -51,10 +51,14 @@ static mozilla::LazyLogModule sJPEGDecoderAccountingLog(
 
 static J_COLOR_SPACE GetFormatRGBA() {
   switch (SurfaceFormat::OS_RGBX) {
-    case SurfaceFormat::B8G8R8X8: return JCS_EXT_BGRX;
-    case SurfaceFormat::R8G8B8X8: return JCS_EXT_RGBX;
-    case SurfaceFormat::A8R8G8B8: return JCS_EXT_XRGB;
-    case SurfaceFormat::A8B8G8R8: return JCS_EXT_XBGR;
+    case SurfaceFormat::B8G8R8X8:
+      return JCS_EXT_BGRX;
+    case SurfaceFormat::R8G8B8X8:
+      return JCS_EXT_RGBX;
+    case SurfaceFormat::A8R8G8B8:
+      return JCS_EXT_XRGB;
+    case SurfaceFormat::A8B8G8R8:
+      return JCS_EXT_XBGR;
     default:
       MOZ_ASSERT_UNREACHABLE("Unknown OS_RGBX");
       return JCS_EXT_BGRX;
@@ -370,8 +374,7 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
 
       Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
           this, Size(), OutputSize(), FullFrame(), SurfaceFormat::OS_RGBX,
-          SurfaceFormat::OS_RGBX, Nothing(), pipeTransform,
-          SurfacePipeFlags());
+          SurfaceFormat::OS_RGBX, Nothing(), pipeTransform, SurfacePipeFlags());
       if (!pipe) {
         mState = JPEG_ERROR;
         MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
@@ -906,12 +909,9 @@ static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
     const uint8_t g = iM * iK / 255;
     const uint8_t b = iY * iK / 255;
 
-    if (SurfaceFormat::OS_RGBX == SurfaceFormat::X8R8G8B8_UINT32) {
-      *output++ = 0xFF000000 | (r << 16) | (g << 8) | b;
-    } else {
-      *output++ = 0xFF000000 | (b << 16) | (g << 8) | r;
-    }
-
+    *output++ = (0xFF << SurfaceFormatBit::OS_A) |
+                (r << SurfaceFormatBit::OS_R) | (g << SurfaceFormatBit::OS_G) |
+                (b << SurfaceFormatBit::OS_B);
     input += 4;
   }
 }
