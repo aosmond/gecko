@@ -130,7 +130,7 @@ void CopySurfaceDataToPackedArray(uint8_t* aSrc, uint8_t* aDst,
 
 UniquePtr<uint8_t[]> SurfaceToPackedBGRA(DataSourceSurface* aSurface) {
   SurfaceFormat format = aSurface->GetFormat();
-  if (format != SurfaceFormat::B8G8R8A8 && format != SurfaceFormat::B8G8R8X8) {
+  if (format != SurfaceFormat::OS_RGBA && format != SurfaceFormat::OS_RGBX) {
     return nullptr;
   }
 
@@ -160,10 +160,10 @@ UniquePtr<uint8_t[]> SurfaceToPackedBGRA(DataSourceSurface* aSurface) {
 
   aSurface->Unmap();
 
-  if (format == SurfaceFormat::B8G8R8X8) {
+  if (format == SurfaceFormat::OS_RGBX) {
     // Convert BGRX to BGRA by setting a to 255.
-    SwizzleData(imageBuffer.get(), stride, SurfaceFormat::X8R8G8B8_UINT32,
-                imageBuffer.get(), stride, SurfaceFormat::A8R8G8B8_UINT32,
+    SwizzleData(imageBuffer.get(), stride, SurfaceFormat::OS_RGBX,
+                imageBuffer.get(), stride, SurfaceFormat::OS_RGBA,
                 size);
   }
 
@@ -172,10 +172,10 @@ UniquePtr<uint8_t[]> SurfaceToPackedBGRA(DataSourceSurface* aSurface) {
 
 uint8_t* SurfaceToPackedBGR(DataSourceSurface* aSurface) {
   SurfaceFormat format = aSurface->GetFormat();
-  MOZ_ASSERT(format == SurfaceFormat::B8G8R8X8, "Format not supported");
+  MOZ_ASSERT(format == SurfaceFormat::OS_RGBX, "Format not supported");
 
-  if (format != SurfaceFormat::B8G8R8X8) {
-    // To support B8G8R8A8 we'd need to un-pre-multiply alpha
+  if (format != SurfaceFormat::OS_RGBX) {
+    // To support OS_RGBA we'd need to un-pre-multiply alpha
     return nullptr;
   }
 
@@ -200,7 +200,7 @@ uint8_t* SurfaceToPackedBGR(DataSourceSurface* aSurface) {
     return nullptr;
   }
 
-  SwizzleData(map.mData, map.mStride, SurfaceFormat::B8G8R8X8, imageBuffer,
+  SwizzleData(map.mData, map.mStride, SurfaceFormat::OS_RGBX, imageBuffer,
               stride, SurfaceFormat::B8G8R8, size);
 
   aSurface->Unmap();

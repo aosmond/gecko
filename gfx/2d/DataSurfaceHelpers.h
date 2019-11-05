@@ -54,7 +54,7 @@ UniquePtr<uint8_t[]> SurfaceToPackedBGRA(DataSourceSurface* aSurface);
  * ownership of the buffer and is responsible for delete[]'ing it.
  *
  * This function is currently only intended for use with surfaces of format
- * SurfaceFormat::B8G8R8X8 since the X components of the pixel data (if any)
+ * SurfaceFormat::OS_RGBX since the X components of the pixel data (if any)
  * are simply dropped (no attempt is made to un-pre-multiply alpha from the
  * color components).
  */
@@ -62,7 +62,7 @@ uint8_t* SurfaceToPackedBGR(DataSourceSurface* aSurface);
 
 /**
  * Clears all the bytes in a DataSourceSurface's data array to zero (so to
- * transparent black for SurfaceFormat::B8G8R8A8, for example).
+ * transparent black for SurfaceFormat::OS_RGBA, for example).
  * Note that DataSourceSurfaces can be initialized to zero, which is
  * more efficient than zeroing the surface after initialization.
  */

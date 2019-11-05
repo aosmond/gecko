@@ -1083,8 +1083,8 @@ already_AddRefed<DataSourceSurface> Factory::CreateDataSourceSurface(
   }
 
   // Skia doesn't support RGBX, so memset RGBX to 0xFF
-  bool clearSurface = aZero || aFormat == SurfaceFormat::B8G8R8X8;
-  uint8_t clearValue = aFormat == SurfaceFormat::B8G8R8X8 ? 0xFF : 0;
+  bool clearSurface = aZero || aFormat == SurfaceFormat::OS_RGBX;
+  uint8_t clearValue = aFormat == SurfaceFormat::OS_RGBX ? 0xFF : 0;
 
   RefPtr<SourceSurfaceAlignedRawData> newSurf =
       new SourceSurfaceAlignedRawData();
@@ -1107,8 +1107,8 @@ already_AddRefed<DataSourceSurface> Factory::CreateDataSourceSurfaceWithStride(
   }
 
   // Skia doesn't support RGBX, so memset RGBX to 0xFF
-  bool clearSurface = aZero || aFormat == SurfaceFormat::B8G8R8X8;
-  uint8_t clearValue = aFormat == SurfaceFormat::B8G8R8X8 ? 0xFF : 0;
+  bool clearSurface = aZero || aFormat == SurfaceFormat::OS_RGBX;
+  uint8_t clearValue = aFormat == SurfaceFormat::OS_RGBX ? 0xFF : 0;
 
   RefPtr<SourceSurfaceAlignedRawData> newSurf =
       new SourceSurfaceAlignedRawData();
