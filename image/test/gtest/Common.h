@@ -50,17 +50,10 @@ struct BGRAColor {
 
   static BGRAColor FromPixel(uint32_t aPixel) {
     uint8_t r, g, b, a;
-    if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
-      r = aPixel & 0xFF;
-      g = (aPixel >> 8) & 0xFF;
-      b = (aPixel >> 16) & 0xFF;
-      a = aPixel >> 24;
-    } else {
-      b = aPixel & 0xFF;
-      g = (aPixel >> 8) & 0xFF;
-      r = (aPixel >> 16) & 0xFF;
-      a = aPixel >> 24;
-    }
+    r = (aPixel >> gfx::SurfaceFormatBit::OS_R) & 0xFF;
+    g = (aPixel >> gfx::SurfaceFormatBit::OS_G) & 0xFF;
+    b = (aPixel >> gfx::SurfaceFormatBit::OS_B) & 0xFF;
+    a = (aPixel >> gfx::SurfaceFormatBit::OS_A) & 0xFF;
     return BGRAColor(b, g, r, a, true);
   }
 
@@ -75,18 +68,10 @@ struct BGRAColor {
 
   uint32_t AsPixel() const {
     if (!mPremultiplied) {
-      if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
-        return gfxPackedPixel(mAlpha, mBlue, mGreen, mRed);
-      } else {
-        return gfxPackedPixel(mAlpha, mRed, mGreen, mBlue);
-      }
+      return gfxPackedPixel(mAlpha, mRed, mGreen, mBlue);
     }
 
-    if (gfx::SurfaceFormat::OS_RGBA == gfx::SurfaceFormat::A8B8G8R8_UINT32) {
-      return gfxPackedPixelNoPreMultiply(mAlpha, mBlue, mGreen, mRed);
-    } else {
-      return gfxPackedPixelNoPreMultiply(mAlpha, mRed, mGreen, mBlue);
-    }
+    return gfxPackedPixelNoPreMultiply(mAlpha, mRed, mGreen, mBlue);
   }
 
   uint8_t mBlue;

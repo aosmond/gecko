@@ -137,12 +137,7 @@ using namespace bmp;
 /// the next pixel.
 static void SetPixel(uint32_t*& aDecoded, uint8_t aRed, uint8_t aGreen,
                      uint8_t aBlue, uint8_t aAlpha = 0xFF) {
-  // gfxPackedPixel assumes BGRA, so for RGBA we need to swap the order.
-  if (SurfaceFormat::OS_RGBA == SurfaceFormat::A8R8G8B8_UINT32) {
-    *aDecoded++ = gfxPackedPixel(aAlpha, aRed, aGreen, aBlue);
-  } else {
-    *aDecoded++ = gfxPackedPixel(aAlpha, aBlue, aGreen, aRed);
-  }
+  *aDecoded++ = gfxPackedPixel(aAlpha, aRed, aGreen, aBlue);
 }
 
 static void SetPixel(uint32_t*& aDecoded, uint8_t idx,
