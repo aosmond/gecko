@@ -28,6 +28,7 @@ if not(CONFIG['OS_TARGET'] == 'WINNT' and CONFIG['CPU_ARCH'] == 'aarch64'):
         'TestDecoders.cpp',
         'TestDecodersPerf.cpp',
         'TestDecodeToSurface.cpp',
+        'TestEncoders.cpp',
         'TestMetadata.cpp',
         'TestSourceBuffer.cpp',
         'TestSurfaceCache.cpp',
