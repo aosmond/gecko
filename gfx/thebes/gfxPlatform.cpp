@@ -2690,12 +2690,6 @@ static void UpdateWRQualificationForNvidia(FeatureState& aFeature,
     } else if (aScreenPixels > kMaxPixelsBattery) {
       aFeature.Disable(FeatureStatus::BlockedHasBattery, "Has battery",
                        NS_LITERAL_CSTRING("FEATURE_FAILURE_WR_HAS_BATTERY"));
-    } else {  // <= kMaxPixelsBattery
-#    if defined(EARLY_BETA_OR_EARLIER)
-      // Battery and small screen, it should be on by default in early beta and
-      // nightly.
-      *aOutGuardedByQualifiedPref = false;
-#    endif
     }
   } else {
     // No battery, it should be on by default.
@@ -2756,10 +2750,7 @@ static void UpdateWRQualificationForAMD(FeatureState& aFeature,
           FeatureStatus::BlockedScreenUnknown, "Screen size unknown",
           NS_LITERAL_CSTRING("FEATURE_FAILURE_SCREEN_SIZE_UNKNOWN"));
     } else if (aScreenPixels <= kMaxPixelsBattery) {
-#    ifdef NIGHTLY_BUILD
-      // Battery and small screen, it should be on by default in nightly.
-      *aOutGuardedByQualifiedPref = false;
-#    else
+#    ifndef NIGHTLY_BUILD
       aFeature.Disable(
           FeatureStatus::BlockedReleaseChannelBattery,
           "Release channel and battery",
@@ -2913,9 +2904,6 @@ static void UpdateWRQualificationForIntel(FeatureState& aFeature,
                        NS_LITERAL_CSTRING("FEATURE_FAILURE_WR_HAS_BATTERY"));
       return;
     }
-
-    // Battery and small screen, it should be on by default in nightly.
-    *aOutGuardedByQualifiedPref = false;
   }
 #  else
   // Windows release, Linux nightly, Linux release. Do screen size
@@ -2947,10 +2935,7 @@ static void UpdateWRQualificationForIntel(FeatureState& aFeature,
     MOZ_ASSERT(false);
 #    endif
     if (aScreenPixels <= kMaxPixelsBattery) {
-#    ifdef NIGHTLY_BUILD
-      // Battery and small screen, it should be on by default in nightly.
-      *aOutGuardedByQualifiedPref = false;
-#    else
+#    ifndef NIGHTLY_BUILD
       aFeature.Disable(
           FeatureStatus::BlockedReleaseChannelBattery,
           "Release channel and battery",
@@ -2965,11 +2950,11 @@ static void UpdateWRQualificationForIntel(FeatureState& aFeature,
   }
 #  endif
 
-#  if (defined(XP_WIN) || (defined(MOZ_WIDGET_GTK) && defined(NIGHTLY_BUILD)))
-  // Qualify Intel graphics cards on Windows to release and on Linux nightly
-  // (subject to device whitelist and screen size checks above).
-  // Leave *aOutGuardedByQualifiedPref as true to indicate no existing
-  // release users have this yet, and it's still guarded by the qualified pref.
+#  if defined(XP_WIN)
+  // No battery on Windows, it should be on by default.
+  if (!aHasBattery) {
+    *aOutGuardedByQualifiedPref = false;
+  }
 #  else
   // Disqualify everywhere else
   aFeature.Disable(FeatureStatus::BlockedReleaseChannelIntel,
