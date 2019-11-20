@@ -2162,12 +2162,13 @@ WebRenderCommandBuilder::GenerateFallbackData(
     return nullptr;
   }
 
+  auto layoutDtRect = dtRect / layerScale;
   if (useBlobImage) {
     // Display item bounds should be unscaled
     aImageRect = visibleRect / layerScale;
   } else {
     // Display item bounds should be unscaled
-    aImageRect = dtRect / layerScale;
+    aImageRect = layoutDtRect;
   }
 
   // We always paint items at 0,0 so the visibleRect that we use inside the blob
@@ -2211,17 +2212,23 @@ WebRenderCommandBuilder::GenerateFallbackData(
     newGeometry = aItem->AllocateGeometry(aDisplayListBuilder);
     fallbackData->mGeometry = std::move(newGeometry);
 
+    nsRect appDtRect =
+        LayoutDevicePixel::ToAppUnits(layoutDtRect, appUnitsPerDevPixel);
+
+    bool snapped;
+    nsRegion opaqueRegion =
+        aItem->GetOpaqueRegion(aDisplayListBuilder, &snapped);
+    MOZ_ASSERT(!opaqueRegion.IsComplex());
+    wr::OpacityType opacity = opaqueRegion.Contains(appDtRect)
+                                  ? wr::OpacityType::Opaque
+                                  : wr::OpacityType::HasAlphaChannel;
+
     gfx::SurfaceFormat format = aItem->GetType() == DisplayItemType::TYPE_MASK
                                     ? gfx::SurfaceFormat::A8
-                                    : gfx::SurfaceFormat::B8G8R8A8;
+                                    : (opacity == wr::OpacityType::Opaque
+                                           ? gfx::SurfaceFormat::B8G8R8X8
+                                           : gfx::SurfaceFormat::B8G8R8A8);
     if (useBlobImage) {
-      bool snapped;
-      nsRegion opaqueRegion =
-          aItem->GetOpaqueRegion(aDisplayListBuilder, &snapped);
-      MOZ_ASSERT(!opaqueRegion.IsComplex());
-      wr::OpacityType opacity = opaqueRegion.Contains(paintBounds)
-                                    ? wr::OpacityType::Opaque
-                                    : wr::OpacityType::HasAlphaChannel;
       std::vector<RefPtr<ScaledFont>> fonts;
       bool validFonts = true;
       RefPtr<WebRenderDrawEventRecorder> recorder =
