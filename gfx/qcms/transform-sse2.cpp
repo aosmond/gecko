@@ -1,6 +1,7 @@
 #include <emmintrin.h>
 
 #include "qcmsint.h"
+#include "transform_util.h"
 
 /* pre-shuffled: just load these into XMM reg instead of load-scalar/shufps sequence */
 static const ALIGN float floatScaleX4[4] =
@@ -157,4 +158,152 @@ void qcms_transform_data_bgra_out_lut_sse2(const qcms_transform *transform,
                                            size_t length)
 {
   qcms_transform_data_template_lut_sse2<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
+}
+
+// Using lcms' tetra interpolation algorithm.
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
+static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+	const unsigned int components = A_INDEX_COMPONENTS(kAIndex);
+	unsigned int i;
+	int xy_len = 1;
+	int x_len = transform->grid_size;
+	int len = x_len * x_len;
+	float* r_table = transform->r_clut;
+	float* g_table = transform->g_clut;
+	float* b_table = transform->b_clut;
+	float c0_r, c1_r, c2_r, c3_r;
+	float c0_g, c1_g, c2_g, c3_g;
+	float c0_b, c1_b, c2_b, c3_b;
+	float clut_r, clut_g, clut_b;
+	for (i = 0; i < length; i++) {
+		unsigned char in_r = src[kRIndex];
+		unsigned char in_g = src[kGIndex];
+		unsigned char in_b = src[kBIndex];
+		unsigned char in_a;
+		if (kAIndex != NO_A_INDEX) {
+			in_a = src[kAIndex];
+		}
+		src += components;
+		float linear_r = in_r/255.0f, linear_g=in_g/255.0f, linear_b = in_b/255.0f;
+
+		int x = in_r * (transform->grid_size-1) / 255;
+		int y = in_g * (transform->grid_size-1) / 255;
+		int z = in_b * (transform->grid_size-1) / 255;
+		int x_n = int_div_ceil(in_r * (transform->grid_size-1), 255);
+		int y_n = int_div_ceil(in_g * (transform->grid_size-1), 255);
+		int z_n = int_div_ceil(in_b * (transform->grid_size-1), 255);
+		float rx = linear_r * (transform->grid_size-1) - x;
+		float ry = linear_g * (transform->grid_size-1) - y;
+		float rz = linear_b * (transform->grid_size-1) - z;
+
+		c0_r = CLU(r_table, x, y, z);
+		c0_g = CLU(g_table, x, y, z);
+		c0_b = CLU(b_table, x, y, z);
+
+		if( rx >= ry ) {
+			if (ry >= rz) { //rx >= ry && ry >= rz
+				c1_r = CLU(r_table, x_n, y, z) - c0_r;
+				c2_r = CLU(r_table, x_n, y_n, z) - CLU(r_table, x_n, y, z);
+				c3_r = CLU(r_table, x_n, y_n, z_n) - CLU(r_table, x_n, y_n, z);
+				c1_g = CLU(g_table, x_n, y, z) - c0_g;
+				c2_g = CLU(g_table, x_n, y_n, z) - CLU(g_table, x_n, y, z);
+				c3_g = CLU(g_table, x_n, y_n, z_n) - CLU(g_table, x_n, y_n, z);
+				c1_b = CLU(b_table, x_n, y, z) - c0_b;
+				c2_b = CLU(b_table, x_n, y_n, z) - CLU(b_table, x_n, y, z);
+				c3_b = CLU(b_table, x_n, y_n, z_n) - CLU(b_table, x_n, y_n, z);
+			} else {
+				if (rx >= rz) { //rx >= rz && rz >= ry
+					c1_r = CLU(r_table, x_n, y, z) - c0_r;
+					c2_r = CLU(r_table, x_n, y_n, z_n) - CLU(r_table, x_n, y, z_n);
+					c3_r = CLU(r_table, x_n, y, z_n) - CLU(r_table, x_n, y, z);
+					c1_g = CLU(g_table, x_n, y, z) - c0_g;
+					c2_g = CLU(g_table, x_n, y_n, z_n) - CLU(g_table, x_n, y, z_n);
+					c3_g = CLU(g_table, x_n, y, z_n) - CLU(g_table, x_n, y, z);
+					c1_b = CLU(b_table, x_n, y, z) - c0_b;
+					c2_b = CLU(b_table, x_n, y_n, z_n) - CLU(b_table, x_n, y, z_n);
+					c3_b = CLU(b_table, x_n, y, z_n) - CLU(b_table, x_n, y, z);
+				} else { //rz > rx && rx >= ry
+					c1_r = CLU(r_table, x_n, y, z_n) - CLU(r_table, x, y, z_n);
+					c2_r = CLU(r_table, x_n, y_n, z_n) - CLU(r_table, x_n, y, z_n);
+					c3_r = CLU(r_table, x, y, z_n) - c0_r;
+					c1_g = CLU(g_table, x_n, y, z_n) - CLU(g_table, x, y, z_n);
+					c2_g = CLU(g_table, x_n, y_n, z_n) - CLU(g_table, x_n, y, z_n);
+					c3_g = CLU(g_table, x, y, z_n) - c0_g;
+					c1_b = CLU(b_table, x_n, y, z_n) - CLU(b_table, x, y, z_n);
+					c2_b = CLU(b_table, x_n, y_n, z_n) - CLU(b_table, x_n, y, z_n);
+					c3_b = CLU(b_table, x, y, z_n) - c0_b;
+				}
+			}
+		} else {
+			if (rx >= rz) { //ry > rx && rx >= rz
+				c1_r = CLU(r_table, x_n, y_n, z) - CLU(r_table, x, y_n, z);
+				c2_r = CLU(r_table, x, y_n, z) - c0_r;
+				c3_r = CLU(r_table, x_n, y_n, z_n) - CLU(r_table, x_n, y_n, z);
+				c1_g = CLU(g_table, x_n, y_n, z) - CLU(g_table, x, y_n, z);
+				c2_g = CLU(g_table, x, y_n, z) - c0_g;
+				c3_g = CLU(g_table, x_n, y_n, z_n) - CLU(g_table, x_n, y_n, z);
+				c1_b = CLU(b_table, x_n, y_n, z) - CLU(b_table, x, y_n, z);
+				c2_b = CLU(b_table, x, y_n, z) - c0_b;
+				c3_b = CLU(b_table, x_n, y_n, z_n) - CLU(b_table, x_n, y_n, z);
+			} else {
+				if (ry >= rz) { //ry >= rz && rz > rx
+					c1_r = CLU(r_table, x_n, y_n, z_n) - CLU(r_table, x, y_n, z_n);
+					c2_r = CLU(r_table, x, y_n, z) - c0_r;
+					c3_r = CLU(r_table, x, y_n, z_n) - CLU(r_table, x, y_n, z);
+					c1_g = CLU(g_table, x_n, y_n, z_n) - CLU(g_table, x, y_n, z_n);
+					c2_g = CLU(g_table, x, y_n, z) - c0_g;
+					c3_g = CLU(g_table, x, y_n, z_n) - CLU(g_table, x, y_n, z);
+					c1_b = CLU(b_table, x_n, y_n, z_n) - CLU(b_table, x, y_n, z_n);
+					c2_b = CLU(b_table, x, y_n, z) - c0_b;
+					c3_b = CLU(b_table, x, y_n, z_n) - CLU(b_table, x, y_n, z);
+				} else { //rz > ry && ry > rx
+					c1_r = CLU(r_table, x_n, y_n, z_n) - CLU(r_table, x, y_n, z_n);
+					c2_r = CLU(r_table, x, y_n, z_n) - CLU(r_table, x, y, z_n);
+					c3_r = CLU(r_table, x, y, z_n) - c0_r;
+					c1_g = CLU(g_table, x_n, y_n, z_n) - CLU(g_table, x, y_n, z_n);
+					c2_g = CLU(g_table, x, y_n, z_n) - CLU(g_table, x, y, z_n);
+					c3_g = CLU(g_table, x, y, z_n) - c0_g;
+					c1_b = CLU(b_table, x_n, y_n, z_n) - CLU(b_table, x, y_n, z_n);
+					c2_b = CLU(b_table, x, y_n, z_n) - CLU(b_table, x, y, z_n);
+					c3_b = CLU(b_table, x, y, z_n) - c0_b;
+				}
+			}
+		}
+
+		clut_r = c0_r + c1_r*rx + c2_r*ry + c3_r*rz;
+		clut_g = c0_g + c1_g*rx + c2_g*ry + c3_g*rz;
+		clut_b = c0_b + c1_b*rx + c2_b*ry + c3_b*rz;
+
+		dest[kRIndex] = clamp_u8(clut_r*255.0f);
+		dest[kGIndex] = clamp_u8(clut_g*255.0f);
+		dest[kBIndex] = clamp_u8(clut_b*255.0f);
+		if (kAIndex != NO_A_INDEX) {
+			dest[kAIndex] = in_a;
+		}
+		dest += components;
+	}
+}
+
+void qcms_transform_data_tetra_clut_rgb_sse2(const qcms_transform *transform,
+                                             const unsigned char *src,
+                                             unsigned char *dest,
+                                             size_t length)
+{
+  qcms_transform_data_template_tetra_clut_sse2<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX>(transform, src, dest, length);
+}
+
+void qcms_transform_data_tetra_clut_rgba_sse2(const qcms_transform *transform,
+                                              const unsigned char *src,
+                                              unsigned char *dest,
+                                              size_t length)
+{
+  qcms_transform_data_template_tetra_clut_sse2<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX, RGBA_A_INDEX>(transform, src, dest, length);
+}
+
+void qcms_transform_data_tetra_clut_bgra_sse2(const qcms_transform *transform,
+                                              const unsigned char *src,
+                                              unsigned char *dest,
+                                              size_t length)
+{
+  qcms_transform_data_template_tetra_clut_sse2<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
 }

@@ -586,10 +586,6 @@ static void qcms_transform_data_clut(const qcms_transform *transform, const unsi
 }
 */
 
-static int int_div_ceil(int value, int div) {
-	return ((value  + div - 1) / div);
-}
-
 // Using lcms' tetra interpolation algorithm.
 template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
 static void qcms_transform_data_tetra_clut_template(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
@@ -1103,6 +1099,17 @@ qcms_transform* qcms_transform_precacheLUT_float(qcms_transform *transform, qcms
 			transform->g_clut = &lut[1];
 			transform->b_clut = &lut[2];
 			transform->grid_size = samples;
+#ifdef X86
+			if (sse_version_available() >= 2) {
+				if (in_type == QCMS_DATA_RGBA_8) {
+					transform->transform_fn = qcms_transform_data_tetra_clut_rgba_sse2;
+				} else if (in_type == QCMS_DATA_BGRA_8) {
+					transform->transform_fn = qcms_transform_data_tetra_clut_bgra_sse2;
+				} else if (in_type == QCMS_DATA_RGB_8) {
+					transform->transform_fn = qcms_transform_data_tetra_clut_rgb_sse2;
+				}
+			} else
+#endif
 			if (in_type == QCMS_DATA_RGBA_8) {
 				transform->transform_fn = qcms_transform_data_tetra_clut_rgba;
 			} else if (in_type == QCMS_DATA_BGRA_8) {

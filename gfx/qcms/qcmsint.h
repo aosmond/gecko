@@ -263,6 +263,9 @@ static inline float uInt16Number_to_float(uInt16Number a)
 	return ((int32_t)a)/65535.f;
 }
 
+static inline int int_div_ceil(int value, int div) {
+	return ((value  + div - 1) / div);
+}
 
 void precache_release(struct precache_output *p);
 bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries);
@@ -318,6 +321,18 @@ void qcms_transform_data_bgra_out_lut_sse2(const qcms_transform *transform,
                                           const unsigned char *src,
                                           unsigned char *dest,
                                           size_t length);
+void qcms_transform_data_tetra_clut_rgb_sse2(const qcms_transform *transform,
+                                             const unsigned char *src,
+                                             unsigned char *dest,
+                                             size_t length);
+void qcms_transform_data_tetra_clut_rgba_sse2(const qcms_transform *transform,
+                                              const unsigned char *src,
+                                              unsigned char *dest,
+                                              size_t length);
+void qcms_transform_data_tetra_clut_bgra_sse2(const qcms_transform *transform,
+                                              const unsigned char *src,
+                                              unsigned char *dest,
+                                              size_t length);
 void qcms_transform_data_rgb_out_lut_sse1(const qcms_transform *transform,
                                           const unsigned char *src,
                                           unsigned char *dest,
