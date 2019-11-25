@@ -164,16 +164,16 @@ void qcms_transform_data_bgra_out_lut_sse2(const qcms_transform *transform,
 	offset_##x[0] + offset_##y[1] + offset_##z[2]
 
 // Using lcms' tetra interpolation algorithm.
-template <size_t kSwapRB, size_t kAIndex = NO_A_INDEX>
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
 static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
 	const unsigned int components = A_INDEX_COMPONENTS(kAIndex);
 	unsigned int i;
 	int xy_len = 1;
 	int x_len = transform->grid_size;
 	int len = x_len * x_len;
-	float* r_table = kSwapRB ? transform->b_clut : transform->r_clut;
+	float* r_table = transform->r_clut;
 	float* g_table = transform->g_clut;
-	float* b_table = kSwapRB ? transform->r_clut : transform->b_clut;
+	float* b_table = transform->b_clut;
 
 	uint32_t offset_l[4];
 	uint32_t offset_h[4];
@@ -183,6 +183,7 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 
 	__m128i px, xx, xn;
 	__m128 rr, rrcmp;
+	//__m128 ra0, ra1, rb0, rb1, rc0, rc1;
 	__m128 cr0, cr1, cg0, cg1, cb0, cb1;
 	for (i = 0; i < length; i++) {
 		// Load in a single pixel and place each component into the
@@ -192,35 +193,53 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 			in_a = src[kAIndex];
 		}
 
-		src += components;
-		px = _mm_unpacklo_epi8(px, px);
-		px = _mm_srli_epi16(px, 8);
+		// Make each component 16-bits wide.
+		px = _mm_unpacklo_epi8(px, _mm_setzero_si128());
 
-		// xx = in_c * (transform->grid - 1 ), placed into 32-bit words
+		if (kBIndex == BGRA_B_INDEX) {
+			// XX R G B as 32 bit words.
+			px = _mm_unpacklo_epi16(px, _mm_setzero_si128());
+			// XX B G R as 32 bit words.
+			px = _mm_shuffle_epi32(px, _MM_SHUFFLE(3, 0, 1, 2));
+			// 0 0 0 0 XX B G R as 32 bit words.
+			px = _mm_packs_epi32(px, _mm_setzero_si128());
+		}
+
+		// xx = in_c * (transform->grid - 1 ), placed into 16-bit words
 		px = _mm_mullo_epi16(px, _mm_set1_epi16(transform->grid_size - 1));
+		// xx = as 32-bit words
+		px = _mm_unpacklo_epi16(px, _mm_setzero_si128());
 
 		// rr = (in_c * (transform->grid_size - 1)) / 255.0f 
 		rr = _mm_cvtepi32_ps(px);
 		rr = _mm_div_ps(px, _mm_set1_ps(255.0f));
 
-		// Effectively compute the floor by truncating the float.
+		// Compute the floor by truncation.
+		//   XX z y x
 		xx = _mm_cvttps_epi32(rr);
+
+		// Compute the ceil by truncation and addition.
+		//   XX zn yn xn
 		xn = _mm_cvttps_epi32(_mm_add_ps(rr, _mm_set1_ps(254.0f / 255.0f)));
 
-		// Calculate fractional component.
+		// Calculate fractional component. rr = XX rz ry rx
 		rr = _mm_sub_ps(rr, _mm_cvtepi32_ps(xx));
 
 		// Compare components.
-		rrcmp  = _mm_cmpge_ps(_mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 0, 1, 0)), _mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 2, 2, 1)));
+		//  (XX >= XX) (rx >= rz) (ry >= rz) (rx >= ry)
+		rrcmp  = _mm_cmpge_ps(
+			_mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 0, 1, 0)), // XX rx ry rx
+			_mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 2, 2, 1))  // XX rz rz ry
+		);
 
-		// pack xyz back into 16-bit words
+		// Pack from 32-bit words into 16-bit words; XX z y x XX z y x
 		xx = _mm_packs_epi32(xx, xx);
 		xn = _mm_packs_epi32(xn, xn);
 
-		// assumes RGBA (r = lowest 16-bit, g next, b next, alpha next)
+		// Setup table index conversion vector.
 		px = _mm_set_epi16(0, 0, 0, 0, 0, xy_len, x_len, len);
 
-		// x * len, y * x_len, z * xy_len
+		// XX, z * xy_len, y * x_len, x * len
 		xx = _mm_mullo_epi16(xx, px);
 		xn = _mm_mullo_epi16(xn, px);
 		_mm_storeu_si128((__m128i*)&offset_l[0], xx);
@@ -232,75 +251,89 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 			case 8: // rx < ry && ry < rz && rx < rz
 				p1 = CLU_OFFSET(l, h, h);
 				p2 = CLU_OFFSET(l, l, h);
-				cr0 = _mm_set_ps(0.0f, r_table[p3], r_table[p1], r_table[p2]);
-				cr1 = _mm_set_ps(0.0f, r_table[p1], r_table[p2], r_table[p0]);
-				cg0 = _mm_set_ps(0.0f, g_table[p3], g_table[p1], g_table[p2]);
-				cg1 = _mm_set_ps(0.0f, g_table[p1], g_table[p2], g_table[p0]);
-				cb0 = _mm_set_ps(0.0f, b_table[p3], b_table[p1], b_table[p2]);
-				cb1 = _mm_set_ps(0.0f, b_table[p1], b_table[p2], b_table[p0]);
+				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p1], r_table[p3]);
+				cr1 = _mm_set_ps(0.0f, r_table[p0], r_table[p2], r_table[p1]);
+				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p1], g_table[p3]);
+				cg1 = _mm_set_ps(0.0f, g_table[p0], g_table[p2], g_table[p1]);
+				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p1], b_table[p3]);
+				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p2], b_table[p1]);
 				break;
 			case 10: // rx < ry && ry >= rz && rx < rz
 				p1 = CLU_OFFSET(l, h, h);
 				p2 = CLU_OFFSET(l, h, l);
-				cr0 = _mm_set_ps(0.0f, r_table[p3], r_table[p2], r_table[p1]);
-				cr1 = _mm_set_ps(0.0f, r_table[p1], r_table[p0], r_table[p2]);
-				cg0 = _mm_set_ps(0.0f, g_table[p3], g_table[p2], g_table[p1]);
-				cg1 = _mm_set_ps(0.0f, g_table[p1], g_table[p0], g_table[p2]);
-				cb0 = _mm_set_ps(0.0f, b_table[p3], b_table[p2], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f, b_table[p1], b_table[p0], b_table[p2]);
+				cr0 = _mm_set_ps(r_table[p0], r_table[p1], r_table[p2], r_table[p3]);
+				cr1 = _mm_set_ps(0.0f, r_table[p2], r_table[p0], r_table[p1]);
+				cg0 = _mm_set_ps(g_table[p0], g_table[p1], g_table[p2], g_table[p3]);
+				cg1 = _mm_set_ps(0.0f, g_table[p2], g_table[p0], g_table[p1]);
+				cb0 = _mm_set_ps(b_table[p0], b_table[p1], b_table[p2], b_table[p3]);
+				cb1 = _mm_set_ps(0.0f, b_table[p2], b_table[p0], b_table[p1]);
 				break;
 			case 12: // rx < ry && ry < rz && rx >= rz
 			case 14: // rx < ry && ry >= rz && rx >= rz
 				p1 = CLU_OFFSET(h, h, l);
 				p2 = CLU_OFFSET(l, h, l);
-				cr0 = _mm_set_ps(0.0f, r_table[p1], r_table[p2], r_table[p3]);
-				cr1 = _mm_set_ps(0.0f, r_table[p2], r_table[p0], r_table[p1]);
-				cg0 = _mm_set_ps(0.0f, g_table[p1], g_table[p2], g_table[p3]);
-				cg1 = _mm_set_ps(0.0f, g_table[p2], g_table[p0], g_table[p1]);
-				cb0 = _mm_set_ps(0.0f, b_table[p1], b_table[p2], b_table[p3]);
-				cb1 = _mm_set_ps(0.0f, b_table[p2], b_table[p0], b_table[p1]);
+				cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
+				cr1 = _mm_set_ps(0.0f, r_table[p1], r_table[p0], r_table[p2]);
+				cg0 = _mm_set_ps(g_table[p0], g_table[p3], g_table[p2], g_table[p1]);
+				cg1 = _mm_set_ps(0.0f, g_table[p1], g_table[p0], g_table[p2]);
+				cb0 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f, b_table[p1], b_table[p0], b_table[p2]);
 				break;
 			case 9: // rx >= ry && ry < rz && rx < rz
 				p1 = CLU_OFFSET(h, l, h);
 				p2 = CLU_OFFSET(l, l, h);
-				cr0 = _mm_set_ps(0.0f, r_table[p1], r_table[p3], r_table[p2]);
-				cr1 = _mm_set_ps(0.0f, r_table[p2], r_table[p1], r_table[p0]);
-				cg0 = _mm_set_ps(0.0f, g_table[p1], g_table[p3], g_table[p2]);
-				cg1 = _mm_set_ps(0.0f, g_table[p2], g_table[p1], g_table[p0]);
-				cb0 = _mm_set_ps(0.0f, b_table[p1], b_table[p3], b_table[p2]);
-				cb1 = _mm_set_ps(0.0f, b_table[p2], b_table[p1], b_table[p0]);
+				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
+				cr1 = _mm_set_ps(0.0f, r_table[p0], r_table[p1], r_table[p2]);
+				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p3], g_table[p1]);
+				cg1 = _mm_set_ps(0.0f, g_table[p0], g_table[p1], g_table[p2]);
+				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p3], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p1], b_table[p2]);
 				break;
 			case 13: // rx >= ry && ry < rz && rx >= rz
 				p1 = CLU_OFFSET(h, l, l);
 				p2 = CLU_OFFSET(h, l, h);
-				cr0 = _mm_set_ps(0.0f, r_table[p1], r_table[p3], r_table[p2]);
-				cr1 = _mm_set_ps(0.0f, r_table[p0], r_table[p2], r_table[p1]);
-				cg0 = _mm_set_ps(0.0f, g_table[p1], g_table[p3], g_table[p2]);
-				cg1 = _mm_set_ps(0.0f, g_table[p0], g_table[p2], g_table[p1]);
-				cb0 = _mm_set_ps(0.0f, b_table[p1], b_table[p3], b_table[p2]);
-				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p2], b_table[p1]);
+				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
+				cr1 = _mm_set_ps(0.0f, r_table[p1], r_table[p2], r_table[p0]);
+				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p3], g_table[p1]);
+				cg1 = _mm_set_ps(0.0f, g_table[p1], g_table[p2], g_table[p0]);
+				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p3], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f, b_table[p1], b_table[p2], b_table[p0]);
 				break;
 			default: // Can never happen
 			case 11: // rx >= ry && ry >= rz && rx < rz
 			case 15: // rx >= ry && ry >= rz && rx >= rz
 				p1 = CLU_OFFSET(h, l, l);
 				p2 = CLU_OFFSET(h, h, l);
-				cr0 = _mm_set_ps(0.0f, r_table[p1], r_table[p2], r_table[p3]);
-				cr1 = _mm_set_ps(0.0f, r_table[p0], r_table[p1], r_table[p2]);
-				cg0 = _mm_set_ps(0.0f, g_table[p1], g_table[p2], g_table[p3]);
-				cg0 = _mm_set_ps(0.0f, g_table[p1], g_table[p2], g_table[p3]);
-				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p1], b_table[p2]);
-				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p1], b_table[p2]);
+				cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
+				cr1 = _mm_set_ps(0.0f, r_table[p2], r_table[p1], r_table[p0]);
+				cg0 = _mm_set_ps(g_table[p0], g_table[p3], g_table[p2], g_table[p1]);
+				cg0 = _mm_set_ps(0.0f, g_table[p2], g_table[p1], g_table[p0]);
+				cb1 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f, b_table[p2], b_table[p1], b_table[p0]);
 				break;
 		}
 
-		// xx c0_r c0_g c0b
-		// xx c1_r 
-		// sum 
+		// ra0 = 0, c0_b, c0_g, c0_r
+		// rb0 = 0, c1_b, c1_g, c1_r
+		// rc0 = 0, c2_b, c2_g, c2_r
+		// rd0 = 0, c3_b, c3_g, c3_r
+		//
+		// rb0 *= (rx, rx, rx, rx)
+		// rc0 *= (ry, ry, ry, ry)
+		// rd0 *= (rz, rz, rz, rz)
+		//
+		// ra0 += rb0
+		// ra0 += rc0
+		// ra0 += rd0
+		//
+		// ra *= (255.0f, 255.0, 255.0f, 255.0f)
+		// ra += (0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
+		// ra0 = min(ra0, 255.0f)
+		// ra0 = max(ra0, 0.0f)
 
 		// highest register needs to be 1.0
-		rr = _mm_mul_ps(rr, _mm_set_ps(0.0, 1.0, 1.0, 1.0));
-		rr = _mm_add_ps(rr, _mm_set_ps(1.0, 0.0, 0.0, 0.0));
+		rr = _mm_mul_ps(rr, _mm_set_ps(0.0f, 1.0f, 1.0f, 1.0f));
+		rr = _mm_add_ps(rr, _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f));
 
 		// clut_r = c0_r + c1_r*rx + c2_r*ry + c3_r*rz;
 		// clut_g = c0_g + c1_g*rx + c2_g*ry + c3_g*rz;
@@ -313,21 +346,25 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 		cg0 = _mm_mul_ps(cg0, rr);
 		cb0 = _mm_mul_ps(cb0, rr);
 
-		// add 32-bits into lowest 32-bit register
+		// Add bottom two 32-bit words to upper two 32-bit words.
 		cr0 = _mm_add_ps(cr0, _mm_movehl_ps(cr0, cr0));
 		cg0 = _mm_add_ps(cg0, _mm_movehl_ps(cg0, cg0));
 		cb0 = _mm_add_ps(cb0, _mm_movehl_ps(cb0, cb0));
 
+		// Add lowest 32-bit word to second lowest 32-bit word.
 		cr0 = _mm_add_ss(cr0, _mm_shuffle_ps(cr0, cr0, _MM_SHUFFLE(0, 0, 0, 1)));
 		cg0 = _mm_add_ss(cg0, _mm_shuffle_ps(cg0, cg0, _MM_SHUFFLE(0, 0, 0, 1)));
 		cb0 = _mm_add_ss(cb0, _mm_shuffle_ps(cb0, cb0, _MM_SHUFFLE(0, 0, 0, 1)));
 
-		// combine components into single 128-bit register
+		// Combine lowest 32-bit words from each component register into 128-bits.
+		// XX clut_g clut_r clut_r
 		rr = _mm_shuffle_ps(cr0, cg0, _MM_SHUFFLE(0, 0, 0, 0));
+		// XX clut_r clut_g clut_r
 		rr = _mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 0, 2, 0));
+		// XX clut_b clut_g clut_r
 		rr = _mm_shuffle_ps(rr, cb0, _MM_SHUFFLE(0, 0, 1, 0));
 
-		// clamp components from 0 - 255
+		// Clamp components from 0 - 255
 		rr = _mm_mul_ss(rr, _mm_set1_ps(255.0f));
 		rr = _mm_add_ss(rr, _mm_set1_ps(0.5f));
 		rr = _mm_min_ss(rr, _mm_set1_ps(255.0f));
@@ -354,7 +391,7 @@ void qcms_transform_data_tetra_clut_rgb_sse2(const qcms_transform *transform,
                                              unsigned char *dest,
                                              size_t length)
 {
-  qcms_transform_data_template_tetra_clut_sse2<false>(transform, src, dest, length);
+  qcms_transform_data_template_tetra_clut_sse2<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX>(transform, src, dest, length);
 }
 
 void qcms_transform_data_tetra_clut_rgba_sse2(const qcms_transform *transform,
@@ -362,7 +399,7 @@ void qcms_transform_data_tetra_clut_rgba_sse2(const qcms_transform *transform,
                                               unsigned char *dest,
                                               size_t length)
 {
-  qcms_transform_data_template_tetra_clut_sse2<false, RGBA_A_INDEX>(transform, src, dest, length);
+  qcms_transform_data_template_tetra_clut_sse2<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX, RGBA_A_INDEX>(transform, src, dest, length);
 }
 
 void qcms_transform_data_tetra_clut_bgra_sse2(const qcms_transform *transform,
@@ -370,5 +407,5 @@ void qcms_transform_data_tetra_clut_bgra_sse2(const qcms_transform *transform,
                                               unsigned char *dest,
                                               size_t length)
 {
-  qcms_transform_data_template_tetra_clut_sse2<true, BGRA_A_INDEX>(transform, src, dest, length);
+  qcms_transform_data_template_tetra_clut_sse2<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
 }
