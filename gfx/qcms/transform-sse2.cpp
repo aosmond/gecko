@@ -2,6 +2,8 @@
 
 #include "qcmsint.h"
 #include "transform_util.h"
+#include <stdio.h>
+#include <unistd.h>
 
 /* pre-shuffled: just load these into XMM reg instead of load-scalar/shufps sequence */
 static const ALIGN float floatScaleX4[4] =
@@ -166,21 +168,25 @@ void qcms_transform_data_bgra_out_lut_sse2(const qcms_transform *transform,
 // Using lcms' tetra interpolation algorithm.
 template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
 static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+	fprintf(stderr, "[AO] pid = %lu\n", size_t(getpid()));
 	const unsigned int components = A_INDEX_COMPONENTS(kAIndex);
 	unsigned int i;
-	int xy_len = 1;
-	int x_len = transform->grid_size;
-	int len = x_len * x_len;
+	int xy_len = 3;
+	int x_len = 3 * transform->grid_size;
+	int len = 3 * transform->grid_size * transform->grid_size;
 	float* r_table = transform->r_clut;
 	float* g_table = transform->g_clut;
 	float* b_table = transform->b_clut;
 
 	uint32_t offset_l[4];
 	uint32_t offset_h[4];
+	uint32_t debug[4];
+	float debugf[4];
 
 	unsigned char in_a;
 	int p0, p1, p2, p3;
 
+	bool first = true;
 	__m128i px, xx, xn;
 	__m128 rr, rrcmp;
 	//__m128 ra0, ra1, rb0, rb1, rc0, rc1;
@@ -193,8 +199,17 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 			in_a = src[kAIndex];
 		}
 
+		if (first) {
+			fprintf(stderr, "[AO] src = 0x%02X%02X%02X%02X\n", src[3], src[2], src[1], src[0]);
+		}
+
 		// Make each component 16-bits wide.
 		px = _mm_unpacklo_epi8(px, _mm_setzero_si128());
+
+		if (first) {
+			_mm_storeu_si128((__m128i*)&debug[0], px);
+			fprintf(stderr, "[AO] unpack px = 0x%08X %08X %08X %08X\n", debug[3], debug[2], debug[1], debug[0]);
+		}
 
 		if (kBIndex == BGRA_B_INDEX) {
 			// XX R G B as 32 bit words.
@@ -205,25 +220,65 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 			px = _mm_packs_epi32(px, _mm_setzero_si128());
 		}
 
+		if (first) {
+			_mm_storeu_si128((__m128i*)&debug[0], px);
+			fprintf(stderr, "[AO] bgra fixup px = 0x%08X %08X %08X %08X\n", debug[3], debug[2], debug[1], debug[0]);
+		}
+
 		// xx = in_c * (transform->grid - 1 ), placed into 16-bit words
 		px = _mm_mullo_epi16(px, _mm_set1_epi16(transform->grid_size - 1));
 		// xx = as 32-bit words
 		px = _mm_unpacklo_epi16(px, _mm_setzero_si128());
 
+		if (first) {
+			_mm_storeu_si128((__m128i*)&debug[0], px);
+			fprintf(stderr, "[AO] px mul = 0x%08X %08X %08X %08X\n", debug[3], debug[2], debug[1], debug[0]);
+		}
+
 		// rr = (in_c * (transform->grid_size - 1)) / 255.0f 
 		rr = _mm_cvtepi32_ps(px);
-		rr = _mm_div_ps(px, _mm_set1_ps(255.0f));
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] rr cvt = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+
+		rr = _mm_div_ps(rr, _mm_set1_ps(255.0f));
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] rr div = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
 
 		// Compute the floor by truncation.
 		//   XX z y x
 		xx = _mm_cvttps_epi32(rr);
 
+		if (first) {
+			_mm_storeu_si128((__m128i*)&debug[0], xx);
+			fprintf(stderr, "[AO] xx = 0x%08X %08X %08X %08X\n", debug[3], debug[2], debug[1], debug[0]);
+		}
+
 		// Compute the ceil by truncation and addition.
 		//   XX zn yn xn
 		xn = _mm_cvttps_epi32(_mm_add_ps(rr, _mm_set1_ps(254.0f / 255.0f)));
 
+		if (first) {
+			_mm_storeu_si128((__m128i*)&debug[0], xn);
+			fprintf(stderr, "[AO] xn = 0x%08X %08X %08X %08X\n", debug[3], debug[2], debug[1], debug[0]);
+		}
+
 		// Calculate fractional component. rr = XX rz ry rx
 		rr = _mm_sub_ps(rr, _mm_cvtepi32_ps(xx));
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] rr frac = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+
+		// XX, z * xy_len, y * x_len, x * len
+		_mm_storeu_si128((__m128i*)&offset_l[0], xx);
+		_mm_storeu_si128((__m128i*)&offset_h[0], xn);
 
 		// Compare components.
 		//  (XX >= XX) (rx >= rz) (ry >= rz) (rx >= ry)
@@ -232,21 +287,31 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 			_mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 2, 2, 1))  // XX rz rz ry
 		);
 
-		// Pack from 32-bit words into 16-bit words; XX z y x XX z y x
-		xx = _mm_packs_epi32(xx, xx);
-		xn = _mm_packs_epi32(xn, xn);
+		if (first) {
+			__m128i d = _mm_cvtps_epi32(rrcmp);
+			_mm_storeu_si128((__m128i*)&debug[0], d);
+			fprintf(stderr, "[AO] rrcmp = 0x%08X %08X %08X %08X\n", debug[3], debug[2], debug[1], debug[0]);
+		}
 
-		// Setup table index conversion vector.
-		px = _mm_set_epi16(0, 0, 0, 0, 0, xy_len, x_len, len);
+		offset_l[0] *= len;
+		offset_h[0] *= len;
+		offset_l[1] *= x_len;
+		offset_h[1] *= x_len;
+		offset_l[2] *= xy_len;
+		offset_h[2] *= xy_len;
 
-		// XX, z * xy_len, y * x_len, x * len
-		xx = _mm_mullo_epi16(xx, px);
-		xn = _mm_mullo_epi16(xn, px);
-		_mm_storeu_si128((__m128i*)&offset_l[0], xx);
-		_mm_storeu_si128((__m128i*)&offset_h[0], xn);
+		if (first) {
+			fprintf(stderr, "[AO] xx %08X %08X %08X\n", offset_l[2], offset_l[1], offset_l[0]);
+			fprintf(stderr, "[AO] xn %08X %08X %08X\n", offset_h[2], offset_h[1], offset_h[0]);
+		}
 
 		p0 = CLU_OFFSET(l, l, l);
 		p3 = CLU_OFFSET(h, h, h);
+
+		if (first) {
+		        int mask = _mm_movemask_ps(rrcmp);
+			fprintf(stderr, "[AO] mask = %d\n", mask);
+		}
 		switch (_mm_movemask_ps(rrcmp)) {
 			case 8: // rx < ry && ry < rz && rx < rz
 				p1 = CLU_OFFSET(l, h, h);
@@ -313,6 +378,10 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 				break;
 		}
 
+		if (first) {
+			fprintf(stderr, "[AO] pn %08X %08X %08X %08X\n", p3, p2, p1, p0);
+		}
+
 		// ra0 = 0, c0_b, c0_g, c0_r
 		// rb0 = 0, c1_b, c1_g, c1_r
 		// rc0 = 0, c2_b, c2_g, c2_r
@@ -332,8 +401,27 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 		// ra0 = max(ra0, 0.0f)
 
 		// highest register needs to be 1.0
-		rr = _mm_mul_ps(rr, _mm_set_ps(0.0f, 1.0f, 1.0f, 1.0f));
 		rr = _mm_add_ps(rr, _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f));
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] rr mul = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], cr0);
+			fprintf(stderr, "[AO] cr0 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cr1);
+			fprintf(stderr, "[AO] cr1 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cg0);
+			fprintf(stderr, "[AO] cg0 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cg1);
+			fprintf(stderr, "[AO] cg1 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cb0);
+			fprintf(stderr, "[AO] cb0 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cb1);
+			fprintf(stderr, "[AO] cb1 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
 
 		// clut_r = c0_r + c1_r*rx + c2_r*ry + c3_r*rz;
 		// clut_g = c0_g + c1_g*rx + c2_g*ry + c3_g*rz;
@@ -342,9 +430,27 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 		cg0 = _mm_sub_ps(cg0, cg1);
 		cb0 = _mm_sub_ps(cb0, cb1);
 
+		if (first) {
+			_mm_storeu_ps(&debugf[0], cr0);
+			fprintf(stderr, "[AO] cr sub = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cg0);
+			fprintf(stderr, "[AO] cg sub = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cb0);
+			fprintf(stderr, "[AO] cb sub = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+
 		cr0 = _mm_mul_ps(cr0, rr);
 		cg0 = _mm_mul_ps(cg0, rr);
 		cb0 = _mm_mul_ps(cb0, rr);
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], cr0);
+			fprintf(stderr, "[AO] cr * rr = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cg0);
+			fprintf(stderr, "[AO] cg * rr = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			_mm_storeu_ps(&debugf[0], cb0);
+			fprintf(stderr, "[AO] cb * rr = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
 
 		// Add bottom two 32-bit words to upper two 32-bit words.
 		cr0 = _mm_add_ps(cr0, _mm_movehl_ps(cr0, cr0));
@@ -356,6 +462,15 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 		cg0 = _mm_add_ss(cg0, _mm_shuffle_ps(cg0, cg0, _MM_SHUFFLE(0, 0, 0, 1)));
 		cb0 = _mm_add_ss(cb0, _mm_shuffle_ps(cb0, cb0, _MM_SHUFFLE(0, 0, 0, 1)));
 
+		if (first) {
+			_mm_storeu_ps(&debugf[0], cr0);
+			fprintf(stderr, "[AO] cr sum = %f\n", debugf[0]);
+			_mm_storeu_ps(&debugf[0], cg0);
+			fprintf(stderr, "[AO] cg sum = %f\n", debugf[0]);
+			_mm_storeu_ps(&debugf[0], cb0);
+			fprintf(stderr, "[AO] cb sum = %f\n", debugf[0]);
+		}
+
 		// Combine lowest 32-bit words from each component register into 128-bits.
 		// XX clut_g clut_r clut_r
 		rr = _mm_shuffle_ps(cr0, cg0, _MM_SHUFFLE(0, 0, 0, 0));
@@ -364,15 +479,43 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 		// XX clut_b clut_g clut_r
 		rr = _mm_shuffle_ps(rr, cb0, _MM_SHUFFLE(0, 0, 1, 0));
 
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] clut rgb = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+
 		// Clamp components from 0 - 255
-		rr = _mm_mul_ss(rr, _mm_set1_ps(255.0f));
-		rr = _mm_add_ss(rr, _mm_set1_ps(0.5f));
-		rr = _mm_min_ss(rr, _mm_set1_ps(255.0f));
-		rr = _mm_max_ss(rr, _mm_set1_ps(0.0f));
+		rr = _mm_mul_ps(rr, _mm_set1_ps(255.0f));
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] clut mul 1 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+			cr0 = _mm_set1_ps(255.0f);
+			_mm_storeu_ps(&debugf[0], cr0);
+			fprintf(stderr, "[AO] clut mul 2 = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+		rr = _mm_add_ps(rr, _mm_set1_ps(0.5f));
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] clut add = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+		rr = _mm_min_ps(rr, _mm_set1_ps(255.0f));
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] clut min = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
+		rr = _mm_max_ps(rr, _mm_set1_ps(0.0f));
+
+		if (first) {
+			_mm_storeu_ps(&debugf[0], rr);
+			fprintf(stderr, "[AO] clut max = %f %f %f %f\n", debugf[3], debugf[2], debugf[1], debugf[0]);
+		}
 
 		// convert final result into RGB component values
 		xx = _mm_cvtps_epi32(rr);
 		_mm_storeu_si128((__m128i*)&offset_l[0], xx);
+		if (first) {
+			fprintf(stderr, "[AO] rgb %08X %08X %08X\n", offset_l[2], offset_l[1], offset_l[0]);
+		}
 
 		dest[kRIndex] = offset_l[0];
 		dest[kGIndex] = offset_l[1];
@@ -381,8 +524,13 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 			dest[kAIndex] = in_a;
 		}
 
+		if (first) {
+			fprintf(stderr, "[AO] dst = 0x%02X%02X%02X%02X\n", dest[3], dest[2], dest[1], dest[0]);
+		}
+
 		src += components;
 		dest += components;
+		first = false;
 	}
 }
 
