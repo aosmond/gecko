@@ -182,9 +182,9 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 	int p0, p1, p2, p3;
 
 	__m128i px, xx, xn;
-	__m128 rr, rrcmp;
+	__m128 rr, rrcmp, tmp;
 	//__m128 ra0, ra1, rb0, rb1, rc0, rc1;
-	__m128 cr0, cr1, cg0, cg1, cb0, cb1;
+	__m128 cp0, cp1, cp2, cp3;
 	for (i = 0; i < length; i++) {
 		// Load in a single pixel and place each component into the
 		// lower 16-bit words. 
@@ -245,126 +245,144 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 
 		p0 = CLU_OFFSET(l, l, l);
 		p3 = CLU_OFFSET(h, h, h);
+		cp0 = _mm_load_ps(&r_table[p0]);
+		cp3 = _mm_load_ps(&r_table[p3]);
 
 		switch (_mm_movemask_ps(rrcmp)) {
 			case 8: // rx < ry && ry < rz && rx < rz
 				p1 = CLU_OFFSET(l, h, h);
 				p2 = CLU_OFFSET(l, l, h);
+				cp1 = _mm_load_ps(&r_table[p1]);
+				cp2 = _mm_load_ps(&r_table[p2]);
+				tmp = _mm_sub_ps(cp3, cp1); // cp1
+				cp3 = _mm_sub_ps(cp2, cp0);
+				cp2 = _mm_sub_ps(cp1, cp2);
+				cp1 = tmp;
+				// c0 = cp0
+				// c1 = cp3 - cp1
+				// c2 = cp1 - cp2
+				// c3 = cp2 - cp0
+				/*
 				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p1], r_table[p3]);
 				cr1 = _mm_set_ps(0.0f,        r_table[p0], r_table[p2], r_table[p1]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p1], g_table[p3]);
 				cg1 = _mm_set_ps(0.0f,        g_table[p0], g_table[p2], g_table[p1]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p1], b_table[p3]);
-				cb1 = _mm_set_ps(0.0f,        b_table[p0], b_table[p2], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p0], b_table[p2], b_table[p1]);*/
 				break;
 			case 10: // rx < ry && ry >= rz && rx < rz
 				p1 = CLU_OFFSET(l, h, h);
 				p2 = CLU_OFFSET(l, h, l);
-				cr0 = _mm_set_ps(r_table[p0], r_table[p1], r_table[p2], r_table[p3]);
+				cp1 = _mm_load_ps(&r_table[p1]);
+				cp2 = _mm_load_ps(&r_table[p2]);
+				tmp = _mm_sub_ps(cp3, cp1); // cp1
+				cp2 = _mm_sub_ps(cp2, cp0);
+				cp3 = _mm_sub_ps(cp1, cp2);
+				cp1 = tmp;
+				/*cr0 = _mm_set_ps(r_table[p0], r_table[p1], r_table[p2], r_table[p3]);
 				cr1 = _mm_set_ps(0.0f,        r_table[p2], r_table[p0], r_table[p1]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p1], g_table[p2], g_table[p3]);
 				cg1 = _mm_set_ps(0.0f,        g_table[p2], g_table[p0], g_table[p1]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p1], b_table[p2], b_table[p3]);
-				cb1 = _mm_set_ps(0.0f,        b_table[p2], b_table[p0], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p2], b_table[p0], b_table[p1]);*/
 				break;
 			case 12: // rx < ry && ry < rz && rx >= rz
 			case 14: // rx < ry && ry >= rz && rx >= rz
 				p1 = CLU_OFFSET(h, h, l);
 				p2 = CLU_OFFSET(l, h, l);
-				cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
+				cp1 = _mm_load_ps(&r_table[p1]);
+				cp2 = _mm_load_ps(&r_table[p2]);
+				cp3 = _mm_sub_ps(cp3, cp1);
+				tmp = _mm_sub_ps(cp1, cp2); // cp1
+				cp2 = _mm_sub_ps(cp2, cp0);
+				cp1 = tmp;
+				/*cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
 				cr1 = _mm_set_ps(0.0f,        r_table[p1], r_table[p0], r_table[p2]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p3], g_table[p2], g_table[p1]);
 				cg1 = _mm_set_ps(0.0f,        g_table[p1], g_table[p0], g_table[p2]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f,        b_table[p1], b_table[p0], b_table[p2]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p1], b_table[p0], b_table[p2]);*/
 				break;
 			case 9: // rx >= ry && ry < rz && rx < rz
 				p1 = CLU_OFFSET(h, l, h);
 				p2 = CLU_OFFSET(l, l, h);
-				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
+				cp1 = _mm_load_ps(&r_table[p1]);
+				cp2 = _mm_load_ps(&r_table[p2]);
+				tmp = _mm_sub_ps(cp3, cp1); // cp2
+				cp1 = _mm_sub_ps(cp1, cp2);
+				cp3 = _mm_sub_ps(cp2, cp0);
+				cp2 = tmp;
+				/*cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
 				cr1 = _mm_set_ps(0.0f,        r_table[p0], r_table[p1], r_table[p2]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p3], g_table[p1]);
 				cg1 = _mm_set_ps(0.0f,        g_table[p0], g_table[p1], g_table[p2]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p3], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f,        b_table[p0], b_table[p1], b_table[p2]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p0], b_table[p1], b_table[p2]);*/
 				break;
 			case 13: // rx >= ry && ry < rz && rx >= rz
-				p1 = CLU_OFFSET(h, l, l);
 				p2 = CLU_OFFSET(h, l, h);
-				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
+				p1 = CLU_OFFSET(h, l, l);
+				cp2 = _mm_load_ps(&r_table[p2]);
+				cp1 = _mm_load_ps(&r_table[p1]);
+				tmp = _mm_sub_ps(cp3, cp2); // cp2
+				cp1 = _mm_sub_ps(cp1, cp0);
+				cp3 = _mm_sub_ps(cp2, cp1);
+				cp2 = tmp;
+				/*cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
 				cr1 = _mm_set_ps(0.0f,        r_table[p1], r_table[p2], r_table[p0]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p3], g_table[p1]);
 				cg1 = _mm_set_ps(0.0f,        g_table[p1], g_table[p2], g_table[p0]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p3], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f,        b_table[p1], b_table[p2], b_table[p0]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p1], b_table[p2], b_table[p0]);*/
 				break;
 			case 11: // rx >= ry && ry >= rz && rx < rz
 			case 15: // rx >= ry && ry >= rz && rx >= rz
-				p1 = CLU_OFFSET(h, l, l);
 				p2 = CLU_OFFSET(h, h, l);
-				cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
+				p1 = CLU_OFFSET(h, l, l);
+				cp2 = _mm_load_ps(&r_table[p2]);
+				cp1 = _mm_load_ps(&r_table[p1]);
+				cp3 = _mm_sub_ps(cp3, cp2);
+				tmp = _mm_sub_ps(cp1, cp0); // cp1
+				cp2 = _mm_sub_ps(cp2, cp1);
+				cp1 = tmp;
+				/*cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
 				cr1 = _mm_set_ps(0.0f,        r_table[p2], r_table[p1], r_table[p0]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p3], g_table[p2], g_table[p1]);
 				cg1 = _mm_set_ps(0.0f,        g_table[p2], g_table[p1], g_table[p0]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f,        b_table[p2], b_table[p1], b_table[p0]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p2], b_table[p1], b_table[p0]);*/
 				break;
 			default: // Can never happen
 				break;
 		}
 
-		// ra0 = 0, c0_b, c0_g, c0_r
-		// rb0 = 0, c1_b, c1_g, c1_r
-		// rc0 = 0, c2_b, c2_g, c2_r
-		// rd0 = 0, c3_b, c3_g, c3_r
+		// cp0 = 0, c0_b, c0_g, c0_r
+		// cp1 = 0, c1_b, c1_g, c1_r
+		// cp2 = 0, c2_b, c2_g, c2_r
+		// cp3 = 0, c3_b, c3_g, c3_r
 		//
-		// rb0 *= (rx, rx, rx, rx)
-		// rc0 *= (ry, ry, ry, ry)
-		// rd0 *= (rz, rz, rz, rz)
+		// cp1 *= (rx, rx, rx, rx)
+		// cp2 *= (ry, ry, ry, ry)
+		// cp3 *= (rz, rz, rz, rz)
+		cp1 = _mm_mul_ps(cp1, _mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 0, 0, 0)));
+		cp2 = _mm_mul_ps(cp2, _mm_shuffle_ps(rr, rr, _MM_SHUFFLE(1, 1, 1, 1)));
+		cp3 = _mm_mul_ps(cp3, _mm_shuffle_ps(rr, rr, _MM_SHUFFLE(2, 2, 2, 2)));
+
 		//
-		// ra0 += rb0
-		// ra0 += rc0
-		// ra0 += rd0
+		// cp0 += cp1
+		// cp0 += cp2
+		// cp0 += cp3
+		cp0 = _mm_add_ps(cp0, cp1);
+		cp0 = _mm_add_ps(cp0, cp2);
+		cp0 = _mm_add_ps(cp0, cp3);
 		//
-		// ra *= (255.0f, 255.0, 255.0f, 255.0f)
-		// ra += (0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
-		// ra0 = min(ra0, 255.0f)
-		// ra0 = max(ra0, 0.0f)
-
-		// highest register needs to be 1.0
-		rr = _mm_add_ps(rr, _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f));
-
-		// clut_r = c0_r + c1_r*rx + c2_r*ry + c3_r*rz;
-		// clut_g = c0_g + c1_g*rx + c2_g*ry + c3_g*rz;
-		// clut_b = c0_b + c1_b*rx + c2_b*ry + c3_b*rz;
-		cr0 = _mm_sub_ps(cr0, cr1);
-		cg0 = _mm_sub_ps(cg0, cg1);
-		cb0 = _mm_sub_ps(cb0, cb1);
-
-		cr0 = _mm_mul_ps(cr0, rr);
-		cg0 = _mm_mul_ps(cg0, rr);
-		cb0 = _mm_mul_ps(cb0, rr);
-
-		// Add bottom two 32-bit words to upper two 32-bit words.
-		cr0 = _mm_add_ps(cr0, _mm_movehl_ps(cr0, cr0));
-		cg0 = _mm_add_ps(cg0, _mm_movehl_ps(cg0, cg0));
-		cb0 = _mm_add_ps(cb0, _mm_movehl_ps(cb0, cb0));
-
-		// Add lowest 32-bit word to second lowest 32-bit word.
-		cr0 = _mm_add_ss(cr0, _mm_shuffle_ps(cr0, cr0, _MM_SHUFFLE(0, 0, 0, 1)));
-		cg0 = _mm_add_ss(cg0, _mm_shuffle_ps(cg0, cg0, _MM_SHUFFLE(0, 0, 0, 1)));
-		cb0 = _mm_add_ss(cb0, _mm_shuffle_ps(cb0, cb0, _MM_SHUFFLE(0, 0, 0, 1)));
-
-		// Combine lowest 32-bit words from each component register into 128-bits.
-		// XX clut_g clut_r clut_r
-		rr = _mm_shuffle_ps(cr0, cg0, _MM_SHUFFLE(0, 0, 0, 0));
-		// XX clut_r clut_g clut_r
-		rr = _mm_shuffle_ps(rr, rr, _MM_SHUFFLE(0, 0, 2, 0));
-		// XX clut_b clut_g clut_r
-		rr = _mm_shuffle_ps(rr, cb0, _MM_SHUFFLE(0, 0, 1, 0));
+		// cp0 *= (255.0f, 255.0, 255.0f, 255.0f)
+		// cp0 += (0.5f, 0.5f, 0.5f, 0.5f, 0.5f)
+		// cp0 = min(ra0, 255.0f)
+		// c0p = max(ra0, 0.0f)
 
 		// Clamp components from 0 - 255
-		rr = _mm_mul_ps(rr, _mm_set1_ps(255.0f));
+		rr = _mm_mul_ps(cp0, _mm_set1_ps(255.0f));
 		rr = _mm_add_ps(rr, _mm_set1_ps(0.5f));
 		rr = _mm_min_ps(rr, _mm_set1_ps(255.0f));
 		rr = _mm_max_ps(rr, _mm_set1_ps(0.0f));
