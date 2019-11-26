@@ -197,10 +197,14 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 		px = _mm_loadu_si32(src);
 		if (kAIndex != NO_A_INDEX) {
 			in_a = src[kAIndex];
+			if (in_a != 0xFF) {
+				fprintf(stderr, "[AO] alpha not opaque 0x%02X\n", in_a);
+				first = true;
+			}
 		}
 
 		if (first) {
-			fprintf(stderr, "[AO] src = 0x%02X%02X%02X%02X\n", src[3], src[2], src[1], src[0]);
+			fprintf(stderr, "[AO] i = %d / %d, src = 0x%02X%02X%02X%02X\n", i, length, src[3], src[2], src[1], src[0]);
 		}
 
 		// Make each component 16-bits wide.
@@ -317,64 +321,74 @@ static void qcms_transform_data_template_tetra_clut_sse2(const qcms_transform *t
 				p1 = CLU_OFFSET(l, h, h);
 				p2 = CLU_OFFSET(l, l, h);
 				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p1], r_table[p3]);
-				cr1 = _mm_set_ps(0.0f, r_table[p0], r_table[p2], r_table[p1]);
+				cr1 = _mm_set_ps(0.0f,        r_table[p0], r_table[p2], r_table[p1]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p1], g_table[p3]);
-				cg1 = _mm_set_ps(0.0f, g_table[p0], g_table[p2], g_table[p1]);
+				cg1 = _mm_set_ps(0.0f,        g_table[p0], g_table[p2], g_table[p1]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p1], b_table[p3]);
-				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p2], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p0], b_table[p2], b_table[p1]);
 				break;
 			case 10: // rx < ry && ry >= rz && rx < rz
 				p1 = CLU_OFFSET(l, h, h);
 				p2 = CLU_OFFSET(l, h, l);
 				cr0 = _mm_set_ps(r_table[p0], r_table[p1], r_table[p2], r_table[p3]);
-				cr1 = _mm_set_ps(0.0f, r_table[p2], r_table[p0], r_table[p1]);
+				cr1 = _mm_set_ps(0.0f,        r_table[p2], r_table[p0], r_table[p1]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p1], g_table[p2], g_table[p3]);
-				cg1 = _mm_set_ps(0.0f, g_table[p2], g_table[p0], g_table[p1]);
+				cg1 = _mm_set_ps(0.0f,        g_table[p2], g_table[p0], g_table[p1]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p1], b_table[p2], b_table[p3]);
-				cb1 = _mm_set_ps(0.0f, b_table[p2], b_table[p0], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p2], b_table[p0], b_table[p1]);
 				break;
 			case 12: // rx < ry && ry < rz && rx >= rz
 			case 14: // rx < ry && ry >= rz && rx >= rz
 				p1 = CLU_OFFSET(h, h, l);
 				p2 = CLU_OFFSET(l, h, l);
 				cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
-				cr1 = _mm_set_ps(0.0f, r_table[p1], r_table[p0], r_table[p2]);
+				cr1 = _mm_set_ps(0.0f,        r_table[p1], r_table[p0], r_table[p2]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p3], g_table[p2], g_table[p1]);
-				cg1 = _mm_set_ps(0.0f, g_table[p1], g_table[p0], g_table[p2]);
+				cg1 = _mm_set_ps(0.0f,        g_table[p1], g_table[p0], g_table[p2]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f, b_table[p1], b_table[p0], b_table[p2]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p1], b_table[p0], b_table[p2]);
 				break;
 			case 9: // rx >= ry && ry < rz && rx < rz
 				p1 = CLU_OFFSET(h, l, h);
 				p2 = CLU_OFFSET(l, l, h);
 				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
-				cr1 = _mm_set_ps(0.0f, r_table[p0], r_table[p1], r_table[p2]);
+				cr1 = _mm_set_ps(0.0f,        r_table[p0], r_table[p1], r_table[p2]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p3], g_table[p1]);
-				cg1 = _mm_set_ps(0.0f, g_table[p0], g_table[p1], g_table[p2]);
+				cg1 = _mm_set_ps(0.0f,        g_table[p0], g_table[p1], g_table[p2]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p3], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f, b_table[p0], b_table[p1], b_table[p2]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p0], b_table[p1], b_table[p2]);
 				break;
 			case 13: // rx >= ry && ry < rz && rx >= rz
 				p1 = CLU_OFFSET(h, l, l);
 				p2 = CLU_OFFSET(h, l, h);
 				cr0 = _mm_set_ps(r_table[p0], r_table[p2], r_table[p3], r_table[p1]);
-				cr1 = _mm_set_ps(0.0f, r_table[p1], r_table[p2], r_table[p0]);
+				cr1 = _mm_set_ps(0.0f,        r_table[p1], r_table[p2], r_table[p0]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p2], g_table[p3], g_table[p1]);
-				cg1 = _mm_set_ps(0.0f, g_table[p1], g_table[p2], g_table[p0]);
+				cg1 = _mm_set_ps(0.0f,        g_table[p1], g_table[p2], g_table[p0]);
 				cb0 = _mm_set_ps(b_table[p0], b_table[p2], b_table[p3], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f, b_table[p1], b_table[p2], b_table[p0]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p1], b_table[p2], b_table[p0]);
 				break;
-			default: // Can never happen
 			case 11: // rx >= ry && ry >= rz && rx < rz
 			case 15: // rx >= ry && ry >= rz && rx >= rz
 				p1 = CLU_OFFSET(h, l, l);
 				p2 = CLU_OFFSET(h, h, l);
 				cr0 = _mm_set_ps(r_table[p0], r_table[p3], r_table[p2], r_table[p1]);
-				cr1 = _mm_set_ps(0.0f, r_table[p2], r_table[p1], r_table[p0]);
+				cr1 = _mm_set_ps(0.0f,        r_table[p2], r_table[p1], r_table[p0]);
 				cg0 = _mm_set_ps(g_table[p0], g_table[p3], g_table[p2], g_table[p1]);
-				cg0 = _mm_set_ps(0.0f, g_table[p2], g_table[p1], g_table[p0]);
-				cb1 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
-				cb1 = _mm_set_ps(0.0f, b_table[p2], b_table[p1], b_table[p0]);
+				cg1 = _mm_set_ps(0.0f,        g_table[p2], g_table[p1], g_table[p0]);
+				cb0 = _mm_set_ps(b_table[p0], b_table[p3], b_table[p2], b_table[p1]);
+				cb1 = _mm_set_ps(0.0f,        b_table[p2], b_table[p1], b_table[p0]);
+				break;
+			default: // Can never happen
+				fprintf(stderr, "[AO] bad things happening\n");
+				p1 = 0;
+				p2 = 0;
+				cr0 = _mm_setzero_ps();
+				cr1 = _mm_setzero_ps();
+				cg0 = _mm_setzero_ps();
+				cg1 = _mm_setzero_ps();
+				cb0 = _mm_setzero_ps();
+				cb1 = _mm_setzero_ps();
 				break;
 		}
 
