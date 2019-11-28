@@ -7066,6 +7066,18 @@ void nsTextFrame::DrawText(Range aRange, const gfx::Point& aTextBaselinePt,
                      aParams.callbacks ? eUnresolvedColors : eResolvedColors,
                      decorations);
 
+  if (XRE_IsContentProcess()) {
+  const nsTextFragment* frag = TextFragment();
+  printf_stderr("[AO][%d][%p] DrawText '%.6s' (%f,%f)\n", base::GetCurrentProcId(), this,
+    frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+    aTextBaselinePt.x, aTextBaselinePt.y);
+  gfxRect clipExtents = aParams.context->GetClipExtents();
+  printf_stderr("[AO][%d][%p] DrawText '%.6s' clipExtents (%f,%f) %fx%f\n", base::GetCurrentProcId(), this,
+    frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+    clipExtents.X(), clipExtents.Y(), clipExtents.Width(), clipExtents.Height());
+  aParams.context->DumpClips(frag && !frag->Is2b() ? frag->Get1b() : nullptr);
+  }
+
   // Hide text decorations if we're currently hiding @font-face fallback text
   const bool drawDecorations =
       !aParams.provider->GetFontGroup()->ShouldSkipDrawing() &&
@@ -9366,6 +9378,14 @@ void nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   aMetrics.SetOverflowAreasToDesiredBounds();
   aMetrics.VisualOverflow().UnionRect(aMetrics.VisualOverflow(), boundingBox);
 
+  if (XRE_IsContentProcess()) {
+  nsRect& vis = aMetrics.VisualOverflow();
+  printf_stderr("[AO][%d][%p] ReflowText '%.6s' (%d,%d) %dx%d    (%d,%d) %dx%d\n", base::GetCurrentProcId(), this,
+    frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+    boundingBox.X(), boundingBox.Y(), boundingBox.Width(), boundingBox.Height(),
+    vis.X(), vis.Y(), vis.Width(), vis.Height());
+  }
+
   // When we have text decorations, we don't need to compute their overflow now
   // because we're guaranteed to do it later
   // (see nsLineLayout::RelativePositionFrames)
@@ -9609,6 +9629,13 @@ nsOverflowAreas nsTextFrame::RecomputeOverflow(nsIFrame* aBlockFrame,
   }
   nsRect& vis = result.VisualOverflow();
   vis.UnionRect(vis, boundingBox);
+  if (XRE_IsContentProcess()) {
+  const nsTextFragment* frag = TextFragment();
+  printf_stderr("[AO][%d][%p] RecomputeOverflow '%.6s' (%d,%d) %dx%d    (%d,%d) %dx%d\n", base::GetCurrentProcId(), this,
+    frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+    boundingBox.X(), boundingBox.Y(), boundingBox.Width(), boundingBox.Height(),
+    vis.X(), vis.Y(), vis.Width(), vis.Height());
+  }
   UnionAdditionalOverflow(PresContext(), aBlockFrame, provider, &vis, true,
                           aIncludeShadows);
   return result;

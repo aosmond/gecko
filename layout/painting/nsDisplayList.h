@@ -2909,16 +2909,20 @@ class nsDisplayItem : public nsDisplayItemBase {
       return;
     }
     mPaintRect = mBuildingRect = aBuildingRect;
+    UpdatePaintRect();
     mItemFlags -= ItemFlag::PaintRectValid;
   }
 
   void SetPaintRect(const nsRect& aPaintRect) {
     mPaintRect = aPaintRect;
+    UpdatePaintRect();
     mItemFlags += ItemFlag::PaintRectValid;
   }
   bool HasPaintRect() const {
     return mItemFlags.contains(ItemFlag::PaintRectValid);
   }
+
+  void UpdatePaintRect();
 
   /**
    * Returns the building rect for the children, relative to their

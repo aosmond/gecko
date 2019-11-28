@@ -26,6 +26,12 @@ void DisplayItemClip::SetTo(const nsRect& aRect) { SetTo(aRect, nullptr); }
 void DisplayItemClip::SetTo(const nsRect& aRect, const nscoord* aRadii) {
   mHaveClipRect = true;
   mClipRect = aRect;
+  if (aRect.IsEqualEdges(nsRect(88941,1905,2918,1200))) {
+    printf_stderr("[AO] BREAK ME 3");
+  }
+  if (aRect.IsEqualEdges(nsRect(88461,1890,17013,1230))) {
+    printf_stderr("[AO] BREAK ME 4");
+  }
   if (aRadii) {
     mRoundedClipRects.SetLength(1);
     mRoundedClipRects[0].mRect = aRect;
@@ -37,6 +43,12 @@ void DisplayItemClip::SetTo(const nsRect& aRect, const nscoord* aRadii) {
 
 void DisplayItemClip::SetTo(const nsRect& aRect, const nsRect& aRoundedRect,
                             const nscoord* aRadii) {
+  if (aRect.IsEqualEdges(nsRect(88941,1905,2918,1200))) {
+    printf_stderr("[AO] BREAK ME 1");
+  }
+  if (aRoundedRect.IsEqualEdges(nsRect(88461,1890,17013,1230))) {
+    printf_stderr("[AO] BREAK ME 2");
+  }
   mHaveClipRect = true;
   mClipRect = aRect;
   mRoundedClipRects.SetLength(1);
@@ -98,7 +110,15 @@ void DisplayItemClip::ApplyRoundedRectClipsTo(gfxContext* aContext, int32_t A2D,
   for (uint32_t i = aBegin; i < aEnd; ++i) {
     RefPtr<Path> roundedRect =
         MakeRoundedRectPath(aDrawTarget, A2D, mRoundedClipRects[i]);
-    aContext->Clip(roundedRect);
+    if (roundedRect) {
+      aContext->Clip(roundedRect);
+    } else {
+      auto rect = NSRectToSnappedRect(mRoundedClipRects[i].mRect, A2D, aDrawTarget);
+      gfxRect clip(gfxFloat(rect.x), gfxFloat(rect.y), gfxFloat(rect.width), gfxFloat(rect.height));
+      aContext->NewPath();
+      aContext->SnappedRectangle(clip);
+      aContext->Clip();
+    }
   }
 }
 
@@ -133,7 +153,6 @@ already_AddRefed<Path> DisplayItemClip::MakeRoundedRectPath(
   nsCSSRendering::ComputePixelRadii(aRoundRect.mRadii, A2D, &pixelRadii);
 
   Rect rect = NSRectToSnappedRect(aRoundRect.mRect, A2D, aDrawTarget);
-
   return MakePathForRoundedRect(aDrawTarget, rect, pixelRadii);
 }
 

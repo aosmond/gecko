@@ -83,6 +83,7 @@ class TextDrawTarget : public DrawTarget {
         aItem->Frame()->PresContext()->AppUnitsPerDevPixel();
     LayoutDeviceRect layoutBoundsRect =
         LayoutDeviceRect::FromAppUnits(aBounds, appUnitsPerDevPixel);
+    //layoutBoundsRect.Round();
     LayoutDeviceRect layoutClipRect = layoutBoundsRect;
     mBoundsRect = wr::ToLayoutRect(layoutBoundsRect);
 
@@ -224,7 +225,12 @@ class TextDrawTarget : public DrawTarget {
     mClipStack.AppendElement(rect);
   }
 
-  void PopClip() override { mClipStack.RemoveLastElement(); }
+  void PopClip() override {
+    if (mClipStack.IsEmpty()) {
+      return;
+    }
+    mClipStack.RemoveLastElement();
+  }
 
   IntSize GetSize() const override { return mSize; }
 
@@ -592,7 +598,6 @@ class TextDrawTarget : public DrawTarget {
 
   already_AddRefed<PathBuilder> CreatePathBuilder(
       FillRule aFillRule) const override {
-    MOZ_CRASH("TextDrawTarget: Method shouldn't be called");
     return nullptr;
   }
 

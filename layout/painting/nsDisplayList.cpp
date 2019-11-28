@@ -3621,6 +3621,14 @@ nsDisplayItem::nsDisplayItem(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
   }
 }
 
+void nsDisplayItem::UpdatePaintRect() {
+  if (mPaintRect.IsEqualEdges(nsRect(49753,1910,2918,1200))) {
+    //printf_stderr("[AO] 'SHHHHS' hack paint rect\n");
+    //mPaintRect = nsRect(49753,2010,2918,1000);
+  }
+
+}
+
 /* static */
 bool nsDisplayItem::ForceActiveLayers() {
   return StaticPrefs::layers_force_active();
@@ -9454,9 +9462,25 @@ bool nsDisplayText::CreateWebRenderCommands(
   auto* f = static_cast<nsTextFrame*>(mFrame);
   auto appUnitsPerDevPixel = f->PresContext()->AppUnitsPerDevPixel();
 
-  nsRect bounds = f->WebRenderBounds() + ToReferenceFrame();
+  nsPoint framePt = ToReferenceFrame();
+  //framePt.Round();
+  nsRect bounds = f->WebRenderBounds() + framePt;
   // Bug 748228
   bounds.Inflate(appUnitsPerDevPixel);
+  if (XRE_IsContentProcess()) {
+    if (!bounds.IsEqualEdges(mBounds)) {
+    const nsTextFragment* frag = f->TextFragment();
+    printf_stderr("[AO][%d][%p] '%.6s' (%d,%d) %dx%d    (%d,%d) %dx%d\n", base::GetCurrentProcId(), this,
+      frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+      bounds.X(), bounds.Y(), bounds.Width(), bounds.Height(),
+      mBounds.X(), mBounds.Y(), mBounds.Width(), mBounds.Height());
+    } else {
+    const nsTextFragment* frag = f->TextFragment();
+    printf_stderr("[AO][%d][%p] Text::CreateWebRender Commands '%.6s' (%d,%d) %dx%d\n", base::GetCurrentProcId(), this,
+      frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+      bounds.X(), bounds.Y(), bounds.Width(), bounds.Height());
+    }
+  }
 
   if (bounds.IsEmpty()) {
     return true;
@@ -9465,6 +9489,7 @@ bool nsDisplayText::CreateWebRenderCommands(
   gfx::Point deviceOffset =
       LayoutDevicePoint::FromAppUnits(bounds.TopLeft(), appUnitsPerDevPixel)
           .ToUnknownPoint();
+  //deviceOffset.Round();
 
   // Clipping the bounds to the PaintRect (factoring in what's covered by parent
   // frames) let's us early reject a bunch of things, but it can produce
@@ -9480,6 +9505,12 @@ bool nsDisplayText::CreateWebRenderCommands(
 
   RefPtr<gfxContext> textDrawer = aBuilder.GetTextContext(
       aResources, aSc, aManager, this, bounds, deviceOffset);
+  /*GetClip().ApplyTo(textDrawer, appUnitsPerDevPixel);
+  auto chain = GetClipChain();
+  while (chain) {
+    chain->mClip.ApplyTo(textDrawer, appUnitsPerDevPixel);
+    chain = chain->mParent;
+  }*/
 
   RenderToContext(textDrawer, aDisplayListBuilder, true);
 
@@ -9504,6 +9535,26 @@ void nsDisplayText::RenderToContext(gfxContext* aCtx,
                        extraVisible.height);
   pixelVisible.Inflate(2);
   pixelVisible.RoundOut();
+
+  if (XRE_IsContentProcess()) {
+    const nsTextFragment* frag = f->TextFragment();
+    printf_stderr("[AO][%d][%p] Text::RenderToContext '%.6s' (%d,%d) %dx%d\n", base::GetCurrentProcId(), this,
+      frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+      mBounds.X(), mBounds.Y(), mBounds.Width(), mBounds.Height());
+    printf_stderr("[AO][%d][%p] Text::RenderToContext '%.6s' edge start %d end %d\n", base::GetCurrentProcId(), this,
+      frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+      mVisIStartEdge, mVisIEndEdge);
+    printf_stderr("[AO][%d][%p] Text::RenderToContext '%.6s' extraV (%f,%f) %fx%f\n", base::GetCurrentProcId(), this,
+      frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+      extraVisible.X(), extraVisible.Y(), extraVisible.Width(), extraVisible.Height());
+    printf_stderr("[AO][%d][%p] Text::RenderToContext '%.6s' pixelV (%f,%f) %fx%f\n", base::GetCurrentProcId(), this,
+      frag && !frag->Is2b() ? frag->Get1b() : nullptr,
+      pixelVisible.X(), pixelVisible.Y(), pixelVisible.Width(), pixelVisible.Height());
+
+    std::stringstream ss;
+    nsFrame::PrintDisplayItem(aBuilder, this, ss, 1);
+    printf_stderr("[AO][%d][%p] '%.6s' %s", base::GetCurrentProcId(), this, frag && !frag->Is2b() ? frag->Get1b() : nullptr, ss.str().c_str());
+  }
 
   bool willClip = !aBuilder->IsForGenerateGlyphMask() && !aIsRecording;
   if (willClip) {

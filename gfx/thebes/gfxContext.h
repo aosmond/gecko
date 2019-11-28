@@ -394,6 +394,7 @@ class gfxContext final {
    * the clip region in user space or device space.
    */
   gfxRect GetClipExtents(ClipExtentsSpace aSpace = eUserSpace) const;
+  void DumpClips(const char *text) const;
 
   /**
    * Returns true if the given rectangle is fully contained in the current clip.

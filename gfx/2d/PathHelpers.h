@@ -233,6 +233,9 @@ inline already_AddRefed<Path> MakePathForRoundedRect(
     const DrawTarget& aDrawTarget, const Rect& aRect,
     const RectCornerRadii& aRadii, bool aDrawClockwise = true) {
   RefPtr<PathBuilder> builder = aDrawTarget.CreatePathBuilder();
+  if (!builder) {
+    return nullptr;
+  }
   AppendRoundedRectToPath(builder, aRect, aRadii, aDrawClockwise);
   return builder->Finish();
 }

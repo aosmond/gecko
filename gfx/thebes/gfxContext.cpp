@@ -539,6 +539,28 @@ gfxRect gfxContext::GetClipExtents(ClipExtentsSpace aSpace) const {
   return ThebesRect(rect);
 }
 
+void gfxContext::DumpClips(const char* text) const {
+  Rect rect(CurrentState().deviceOffset.x + Float(mDT->GetRect().x),
+            CurrentState().deviceOffset.y + Float(mDT->GetRect().y),
+            Float(mDT->GetSize().width), Float(mDT->GetSize().height));
+  printf_stderr("[AO]     '%.6s' (%f,%f) %fx%f\n", text,
+    rect.x, rect.y, rect.width, rect.height);
+  for (unsigned int i = 0; i < mStateStack.Length(); i++) {
+    for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {
+      const AzureState::PushedClip& clip = mStateStack[i].pushedClips[c];
+      if (clip.path) {
+        Rect bounds = clip.path->GetBounds(clip.transform);
+        printf_stderr("[AO]     '%.6s' (%f,%f) %fx%f\n", text,
+          bounds.x, bounds.y, bounds.width, bounds.height);
+      } else {
+        Rect bounds = clip.transform.TransformBounds(clip.rect);
+        printf_stderr("[AO]     '%.6s' (%f,%f) %fx%f\n", text,
+          bounds.x, bounds.y, bounds.width, bounds.height);
+      }
+    }
+  }
+}
+
 bool gfxContext::ExportClip(ClipExporter& aExporter) {
   for (unsigned int i = 0; i < mStateStack.Length(); i++) {
     for (unsigned int c = 0; c < mStateStack[i].pushedClips.Length(); c++) {

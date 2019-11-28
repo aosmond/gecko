@@ -1032,6 +1032,32 @@ impl<'a> SceneBuilder<'a> {
         (layout, rect, clip_and_scroll)
     }
 
+    fn process_common_properties_without_snapping(
+        &mut self,
+        common: &CommonItemProperties,
+        bounds: &LayoutRect,
+        apply_pipeline_clip: bool
+    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain) {
+        let clip_and_scroll = self.get_clip_and_scroll(
+            &common.clip_id,
+            &common.spatial_id,
+            apply_pipeline_clip
+        );
+
+        let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
+        let clip_rect = common.clip_rect.translate(current_offset);
+        let rect = bounds.translate(current_offset);
+
+        let layout = LayoutPrimitiveInfo {
+            rect,
+            clip_rect,
+            flags: common.flags,
+            hit_info: common.hit_info,
+        };
+
+        (layout, clip_and_scroll)
+    }
+
     pub fn snap_rect(
         &mut self,
         rect: &LayoutRect,
@@ -1120,7 +1146,7 @@ impl<'a> SceneBuilder<'a> {
                 // are subtle interactions between the primitive origin and the glyph offset
                 // which appear to be significant (presumably due to some sort of accumulated
                 // error throughout the layers). We should fix this at some point.
-                let (layout, _, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, clip_and_scroll) = self.process_common_properties_without_snapping(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
@@ -2262,6 +2288,7 @@ impl<'a> SceneBuilder<'a> {
         );
 
         let snapped_clip_rect = snap_to_device.snap_rect(&clip_region.main);
+        //let snapped_clip_rect = clip_region.main;//snap_to_device.snap_rect(&clip_region.main);
 
         let mut clip_count = 0;
 
@@ -2295,6 +2322,7 @@ impl<'a> SceneBuilder<'a> {
 
         if let Some(ref image_mask) = clip_region.image_mask {
             let snapped_mask_rect = snap_to_device.snap_rect(&image_mask.rect);
+            //let snapped_mask_rect = image_mask.rect;//snap_to_device.snap_rect(&image_mask.rect);
             let item = ClipItemKey {
                 kind: ClipItemKeyKind::image_mask(image_mask, snapped_mask_rect),
                 spatial_node_index,
@@ -2320,7 +2348,8 @@ impl<'a> SceneBuilder<'a> {
         }
 
         for region in clip_region.complex_clips {
-            let snapped_region_rect = snap_to_device.snap_rect(&region.rect);
+            //let snapped_region_rect = snap_to_device.snap_rect(&region.rect);
+            let snapped_region_rect = region.rect;//snap_to_device.snap_rect(&region.rect);
             let item = ClipItemKey {
                 kind: ClipItemKeyKind::rounded_rect(
                     snapped_region_rect,

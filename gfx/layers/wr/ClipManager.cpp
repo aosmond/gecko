@@ -154,12 +154,14 @@ wr::WrSpaceAndClipChain ClipManager::SwitchItem(nsDisplayItem* aItem) {
   // of the display item. This reduces the number of clip items, which avoids
   // some overhead further down the pipeline.
   bool separateLeaf = false;
+#if 0
   if (clip && clip->mASR == asr && clip->mClip.GetRoundedRectCount() == 0) {
     // Container display items are not currently supported because the clip
     // rect of a stacking context is not handled the same as normal display
     // items.
     separateLeaf = aItem->GetChildren() == nullptr;
   }
+#endif
 
   ItemClips clips(asr, clip, separateLeaf);
   MOZ_ASSERT(!mItemClipStack.empty());
