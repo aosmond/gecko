@@ -248,6 +248,8 @@ pub struct FontTransform {
     pub skew_x: f32,
     pub skew_y: f32,
     pub scale_y: f32,
+    pub translate_x: f32,
+    pub translate_y: f32,
 }
 
 // Floats don't impl Hash/Eq/Ord...
@@ -270,12 +272,12 @@ impl Hash for FontTransform {
 impl FontTransform {
     const QUANTIZE_SCALE: f32 = 1024.0;
 
-    pub fn new(scale_x: f32, skew_x: f32, skew_y: f32, scale_y: f32) -> Self {
-        FontTransform { scale_x, skew_x, skew_y, scale_y }
+    pub fn new(scale_x: f32, skew_x: f32, skew_y: f32, scale_y: f32, translate_x: f32, translate_y: f32) -> Self {
+        FontTransform { scale_x, skew_x, skew_y, scale_y, translate_x, translate_y }
     }
 
     pub fn identity() -> Self {
-        FontTransform::new(1.0, 0.0, 0.0, 1.0)
+        FontTransform::new(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
     }
 
     pub fn is_identity(&self) -> bool {
@@ -288,6 +290,7 @@ impl FontTransform {
             (self.skew_x * Self::QUANTIZE_SCALE).round() / Self::QUANTIZE_SCALE,
             (self.skew_y * Self::QUANTIZE_SCALE).round() / Self::QUANTIZE_SCALE,
             (self.scale_y * Self::QUANTIZE_SCALE).round() / Self::QUANTIZE_SCALE,
+            self.translate_x, self.translate_y,
         )
     }
 
@@ -315,6 +318,8 @@ impl FontTransform {
             self.skew_x * scale_y,
             self.skew_y * scale_x,
             self.scale_y * scale_y,
+            self.translate_x * scale_x,
+            self.translate_y * scale_y,
         )
     }
 
@@ -330,25 +335,27 @@ impl FontTransform {
             self.skew_x - self.scale_x * skew_factor,
             self.skew_y,
             self.scale_y - self.skew_y * skew_factor,
+            self.translate_x,
+            self.translate_y,
         )
     }
 
     pub fn swap_xy(&self) -> Self {
-        FontTransform::new(self.skew_x, self.scale_x, self.scale_y, self.skew_y)
+        FontTransform::new(self.skew_x, self.scale_x, self.scale_y, self.skew_y, self.translate_y, self.translate_x)
     }
 
     pub fn flip_x(&self) -> Self {
-        FontTransform::new(-self.scale_x, self.skew_x, -self.skew_y, self.scale_y)
+        FontTransform::new(-self.scale_x, self.skew_x, -self.skew_y, self.scale_y, -self.translate_x, self.translate_y)
     }
 
     pub fn flip_y(&self) -> Self {
-        FontTransform::new(self.scale_x, -self.skew_x, self.skew_y, -self.scale_y)
+        FontTransform::new(self.scale_x, -self.skew_x, self.skew_y, -self.scale_y, self.translate_x, -self.translate_y)
     }
 
     pub fn transform(&self, point: &LayoutPoint) -> WorldPoint {
         WorldPoint::new(
-            self.scale_x * point.x + self.skew_x * point.y,
-            self.skew_y * point.x + self.scale_y * point.y,
+            self.scale_x * point.x + self.skew_x * point.y + self.translate_x,
+            self.skew_y * point.x + self.scale_y * point.y + self.translate_y,
         )
     }
 
@@ -368,7 +375,7 @@ impl FontTransform {
 
 impl<'a> From<&'a LayoutToWorldTransform> for FontTransform {
     fn from(xform: &'a LayoutToWorldTransform) -> Self {
-        FontTransform::new(xform.m11, xform.m21, xform.m12, xform.m22)
+        FontTransform::new(xform.m11, xform.m21, xform.m12, xform.m22, xform.m41, xform.m42)
     }
 }
 

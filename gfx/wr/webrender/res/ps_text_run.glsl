@@ -19,8 +19,8 @@ varying vec4 vUvClip;
 #define GLYPHS_PER_GPU_BLOCK        2U
 
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
-RectWithSize transform_rect(RectWithSize rect, mat2 transform) {
-    vec2 center = transform * (rect.p0 + rect.size * 0.5);
+RectWithSize transform_rect(RectWithSize rect, mat2 transform, vec2 translation) {
+    vec2 center = transform * (rect.p0 + translation + rect.size * 0.5);
     vec2 radius = mat2(abs(transform[0]), abs(transform[1])) * (rect.size * 0.5);
     return RectWithSize(center - radius, radius * 2.0);
 }
@@ -131,6 +131,7 @@ void main(void) {
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
     // Transform from local space to glyph space.
     mat2 glyph_transform = mat2(transform.m) * task.device_pixel_scale;
+    vec2 glyph_translation = transform.m[3].xy;
 
     // Transform from glyph space back to local space.
     mat2 glyph_transform_inv = inverse(glyph_transform);
@@ -139,14 +140,14 @@ void main(void) {
     // entered for 3d transforms that can be coerced into a 2d transform; they have no
     // perspective, and have a 2d inverse. This is a looser condition than axis aligned
     // transforms because it also allows 2d rotations.
-    vec2 raster_glyph_offset = floor(glyph_transform * glyph.offset + snap_bias);
+    vec2 raster_glyph_offset = floor(glyph_transform * glyph.offset + glyph_translation + snap_bias);
 
     // Compute the glyph rect in glyph space.
     RectWithSize glyph_rect = RectWithSize(res.offset + raster_glyph_offset,
                                            res.uv_rect.zw - res.uv_rect.xy);
 
     // The glyph rect is in device space, so transform it back to local space.
-    RectWithSize local_rect = transform_rect(glyph_rect, glyph_transform_inv);
+    RectWithSize local_rect = transform_rect(glyph_rect, glyph_transform_inv, -glyph_translation);
 
     // Select the corner of the glyph's local space rect that we are processing.
     vec2 local_pos = local_rect.p0 + local_rect.size * aPosition.xy;
@@ -155,7 +156,7 @@ void main(void) {
     // the device space glyph rect to reduce overdraw of clipped pixels in the fragment shader.
     // Otherwise, fall back to clamping the glyph's local rect to the local clip rect.
     if (rect_inside_rect(local_rect, ph.local_clip_rect)) {
-        local_pos = glyph_transform_inv * (glyph_rect.p0 + glyph_rect.size * aPosition.xy);
+        local_pos = glyph_transform_inv * (glyph_rect.p0 - glyph_translation + glyph_rect.size * aPosition.xy);
     }
 #else
     float raster_scale = float(ph.user_data.z) / 65535.0;
@@ -201,7 +202,7 @@ void main(void) {
     gl_Position = uTransform * vec4(device_pos + final_offset * world_pos.w, ph.z * world_pos.w, world_pos.w);
 
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
-    vec2 f = (glyph_transform * local_pos - glyph_rect.p0) / glyph_rect.size;
+    vec2 f = (glyph_transform * local_pos + glyph_translation - glyph_rect.p0) / glyph_rect.size;
     vUvClip = vec4(f, 1.0 - f);
 #else
     vec2 f = (local_pos - glyph_rect.p0) / glyph_rect.size;
