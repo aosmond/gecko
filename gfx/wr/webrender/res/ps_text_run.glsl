@@ -131,7 +131,7 @@ void main(void) {
 #ifdef WR_FEATURE_GLYPH_TRANSFORM
     // Transform from local space to glyph space.
     mat2 glyph_transform = mat2(transform.m) * task.device_pixel_scale;
-    vec2 glyph_translation = transform.m[3].xy;
+    vec2 glyph_translation = transform.m[3].xy * task.device_pixel_scale;
 
     // Transform from glyph space back to local space.
     mat2 glyph_transform_inv = inverse(glyph_transform);
