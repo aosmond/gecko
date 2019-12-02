@@ -1054,6 +1054,41 @@ impl<'a> SceneBuilder<'a> {
         (layout, rect, clip_and_scroll)
     }
 
+    fn process_common_properties_without_snapping(
+        &mut self,
+        common: &CommonItemProperties,
+        bounds: &LayoutRect,
+        apply_pipeline_clip: bool
+    ) -> (LayoutPrimitiveInfo, ScrollNodeAndClipChain) {
+        let clip_and_scroll = self.get_clip_and_scroll(
+            &common.clip_id,
+            &common.spatial_id,
+            apply_pipeline_clip
+        );
+
+        let current_offset = self.current_offset(clip_and_scroll.spatial_node_index);
+
+        // We need to do this so that the create_primitive calls will have
+        // the right spatial node.
+        let snap_to_device = &mut self.sc_stack.last_mut().unwrap().snap_to_device;
+        snap_to_device.set_target_spatial_node(
+            clip_and_scroll.spatial_node_index,
+            &self.clip_scroll_tree
+        );
+
+        let clip_rect = common.clip_rect.translate(current_offset);
+        let rect = bounds.translate(current_offset);
+
+        let layout = LayoutPrimitiveInfo {
+            rect,
+            clip_rect,
+            flags: common.flags,
+            hit_info: common.hit_info,
+        };
+
+        (layout, clip_and_scroll)
+    }
+
     pub fn snap_rect(
         &mut self,
         rect: &LayoutRect,
@@ -1136,13 +1171,7 @@ impl<'a> SceneBuilder<'a> {
                 );
             }
             DisplayItem::Text(ref info) => {
-                // TODO(aosmond): Snapping text primitives does not make much sense, given the
-                // primitive bounds and clip are supposed to be conservative, not definitive.
-                // E.g. they should be able to grow and not impact the output. However there
-                // are subtle interactions between the primitive origin and the glyph offset
-                // which appear to be significant (presumably due to some sort of accumulated
-                // error throughout the layers). We should fix this at some point.
-                let (layout, _, clip_and_scroll) = self.process_common_properties_with_bounds(
+                let (layout, clip_and_scroll) = self.process_common_properties_without_snapping(
                     &info.common,
                     &info.bounds,
                     apply_pipeline_clip,
