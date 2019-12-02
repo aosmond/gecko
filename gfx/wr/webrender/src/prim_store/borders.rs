@@ -15,7 +15,7 @@ use crate::prim_store::{
     BorderSegmentInfo, BrushSegment, NinePatchDescriptor, PrimKey,
     PrimKeyCommonData, PrimTemplate, PrimTemplateCommonData,
     PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData,
-    PrimitiveStore, InternablePrimitive,
+    PrimitiveStore, InternablePrimitive, SpaceSnapper,
 };
 use crate::resource_cache::{ImageRequest, ResourceCache};
 use crate::storage;
@@ -165,6 +165,7 @@ impl InternablePrimitive for NormalBorderPrim {
         data_handle: NormalBorderDataHandle,
         _: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         PrimitiveInstanceKind::NormalBorder {
             data_handle,
@@ -340,6 +341,7 @@ impl InternablePrimitive for ImageBorder {
         data_handle: ImageBorderDataHandle,
         _: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         PrimitiveInstanceKind::ImageBorder {
             data_handle

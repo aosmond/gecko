@@ -9,7 +9,7 @@ use crate::intern::{Internable, InternDebug, Handle as InternHandle};
 use crate::internal_types::LayoutPrimitiveInfo;
 use crate::prim_store::{
     InternablePrimitive, PictureIndex, PrimitiveInstanceKind, PrimKey, PrimKeyCommonData, PrimTemplate,
-    PrimTemplateCommonData, PrimitiveStore, PrimitiveSceneData, RectangleKey,
+    PrimTemplateCommonData, PrimitiveStore, PrimitiveSceneData, RectangleKey, SpaceSnapper,
 };
 
 #[cfg_attr(feature = "capture", derive(Serialize))]
@@ -98,6 +98,7 @@ impl InternablePrimitive for Backdrop {
         data_handle: BackdropDataHandle,
         _prim_store: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         PrimitiveInstanceKind::Backdrop {
             data_handle,

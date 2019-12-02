@@ -13,7 +13,7 @@ use crate::frame_builder::FrameBuildingState;
 use crate::gpu_cache::{GpuCacheHandle, GpuDataRequest};
 use crate::intern::{Internable, InternDebug, Handle as InternHandle};
 use crate::internal_types::LayoutPrimitiveInfo;
-use crate::prim_store::{BrushSegment, GradientTileRange, VectorKey};
+use crate::prim_store::{BrushSegment, GradientTileRange, VectorKey, SpaceSnapper};
 use crate::prim_store::{PrimitiveInstanceKind, PrimitiveOpacity, PrimitiveSceneData};
 use crate::prim_store::{PrimKeyCommonData, PrimTemplateCommonData, PrimitiveStore};
 use crate::prim_store::{NinePatchDescriptor, PointKey, SizeKey, InternablePrimitive};
@@ -316,6 +316,7 @@ impl InternablePrimitive for LinearGradient {
         data_handle: LinearGradientDataHandle,
         prim_store: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         let gradient_index = prim_store.linear_gradients.push(LinearGradientPrimitive {
             cache_handle: None,
@@ -546,6 +547,7 @@ impl InternablePrimitive for RadialGradient {
         data_handle: RadialGradientDataHandle,
         _prim_store: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         PrimitiveInstanceKind::RadialGradient {
             data_handle,

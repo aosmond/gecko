@@ -1546,11 +1546,15 @@ impl<'a> SceneBuilder<'a> {
                 }
             });
 
+        let snap_to_device = &self.sc_stack.last().unwrap().snap_to_device;
+        debug_assert!(snap_to_device.current_target_spatial_node_index == spatial_node_index, "Spatial node mismatch");
+
         let instance_kind = P::make_instance_kind(
             prim_key,
             prim_data_handle,
             &mut self.prim_store,
             current_offset,
+            &snap_to_device,
         );
 
         PrimitiveInstance::new(

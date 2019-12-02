@@ -903,14 +903,23 @@ impl BatchBuilder {
                     transform_id,
                 };
 
+                // Select the correct relative offset depending on whether or not
+                // we are snapping the offset in the shader or depend on it already
+                // have been snapped.
+                let reference_frame_relative_offset = if run.used_font.transform.is_identity() {
+                    run.snapped_reference_frame_relative_offset
+                } else {
+                    run.reference_frame_relative_offset
+                };
+
                 let glyph_keys = &ctx.scratch.glyph_keys[run.glyph_keys_range];
                 let raster_scale = run.raster_space.local_scale().unwrap_or(1.0).max(0.001);
                 let prim_header_index = prim_headers.push(
                     &prim_header,
                     z_id,
                     [
-                        (run.snapped_reference_frame_relative_offset.x * 256.0) as i32,
-                        (run.snapped_reference_frame_relative_offset.y * 256.0) as i32,
+                        (reference_frame_relative_offset.x * 256.0) as i32,
+                        (reference_frame_relative_offset.y * 256.0) as i32,
                         (raster_scale * 65535.0).round() as i32,
                         0,
                     ],

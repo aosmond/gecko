@@ -18,7 +18,6 @@ use crate::renderer::{MAX_VERTEX_TEXTURE_WIDTH};
 use crate::resource_cache::{ResourceCache};
 use crate::util::{MatrixHelpers};
 use crate::prim_store::{InternablePrimitive, PrimitiveInstanceKind, SpaceSnapper};
-use crate::clip_scroll_tree::{ClipScrollTree, SpatialNodeIndex};
 use std::ops;
 use std::sync::Arc;
 use crate::storage;
@@ -170,12 +169,13 @@ impl InternablePrimitive for TextRun {
         data_handle: TextRunDataHandle,
         prim_store: &mut PrimitiveStore,
         reference_frame_relative_offset: LayoutVector2D,
+        snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         let run_index = prim_store.text_runs.push(TextRunPrimitive {
             used_font: key.font.clone(),
             glyph_keys_range: storage::Range::empty(),
             reference_frame_relative_offset,
-            snapped_reference_frame_relative_offset: reference_frame_relative_offset,
+            snapped_reference_frame_relative_offset: snap_to_device.snap_vector(&reference_frame_relative_offset),
             shadow: key.shadow,
             raster_space: RasterSpace::Screen,
         });
@@ -224,11 +224,9 @@ impl TextRunPrimitive {
         &mut self,
         specified_font: &FontInstance,
         surface: &SurfaceInfo,
-        spatial_node_index: SpatialNodeIndex,
         transform: &LayoutToWorldTransform,
         subpixel_mode: SubpixelMode,
         raster_space: RasterSpace,
-        clip_scroll_tree: &ClipScrollTree,
     ) -> bool {
         // If local raster space is specified, include that in the scale
         // of the glyphs that get rasterized.
@@ -273,30 +271,6 @@ impl TextRunPrimitive {
         // Record the raster space the text needs to be snapped in.
         self.raster_space = raster_space;
 
-        // TODO(aosmond): Snapping really ought to happen during scene building
-        // as much as possible. This will allow clips to be already adjusted
-        // based on the snapping requirements of the primitive. This may affect
-        // complex clips that create a different task, and when we rasterize
-        // glyphs without the transform (because the shader doesn't have the
-        // snap offsets to adjust its clip). These rects are fairly conservative
-        // to begin with and do not appear to be causing significant issues at
-        // this time.
-        self.snapped_reference_frame_relative_offset = if !font_transform.is_identity() {
-            // Don't touch the reference frame relative offset. We'll let the
-            // shader do the snapping in device pixels.
-            self.reference_frame_relative_offset
-        } else {
-            // There may be an animation, so snap the reference frame relative
-            // offset such that it excludes the impact, if any.
-            let snap_to_device = SpaceSnapper::new_with_target(
-                surface.raster_spatial_node_index,
-                spatial_node_index,
-                surface.device_pixel_scale,
-                clip_scroll_tree,
-            );
-            snap_to_device.snap_vector(&self.reference_frame_relative_offset)
-        };
-
         // If the transform or device size is different, then the caller of
         // this method needs to know to rebuild the glyphs.
         let cache_dirty =
@@ -339,23 +313,19 @@ impl TextRunPrimitive {
         glyphs: &[GlyphInstance],
         transform: &LayoutToWorldTransform,
         surface: &SurfaceInfo,
-        spatial_node_index: SpatialNodeIndex,
         raster_space: RasterSpace,
         subpixel_mode: SubpixelMode,
         resource_cache: &mut ResourceCache,
         gpu_cache: &mut GpuCache,
         render_tasks: &mut RenderTaskGraph,
-        clip_scroll_tree: &ClipScrollTree,
         scratch: &mut PrimitiveScratchBuffer,
     ) {
         let cache_dirty = self.update_font_instance(
             specified_font,
             surface,
-            spatial_node_index,
             transform,
             subpixel_mode,
             raster_space,
-            clip_scroll_tree,
         );
 
         if self.glyph_keys_range.is_empty() || cache_dirty {

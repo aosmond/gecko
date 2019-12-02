@@ -16,7 +16,7 @@ use crate::picture::PictureCompositeMode;
 use crate::prim_store::{
     PrimKey, PrimKeyCommonData, PrimTemplate, PrimTemplateCommonData,
     PrimitiveInstanceKind, PrimitiveSceneData, PrimitiveStore, VectorKey,
-    InternablePrimitive,
+    InternablePrimitive, SpaceSnapper,
 };
 
 #[cfg_attr(feature = "capture", derive(Serialize))]
@@ -299,6 +299,7 @@ impl InternablePrimitive for Picture {
         _: PictureDataHandle,
         _: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         // Should never be hit as this method should not be
         // called for pictures.

@@ -14,7 +14,7 @@ use crate::intern;
 use crate::internal_types::LayoutPrimitiveInfo;
 use crate::prim_store::{
     PrimKey, PrimKeyCommonData, PrimTemplate, PrimTemplateCommonData,
-    InternablePrimitive, PrimitiveSceneData, PrimitiveStore,
+    InternablePrimitive, PrimitiveSceneData, PrimitiveStore, SpaceSnapper,
 };
 use crate::prim_store::PrimitiveInstanceKind;
 
@@ -144,6 +144,7 @@ impl InternablePrimitive for LineDecoration {
         data_handle: LineDecorationDataHandle,
         _: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         PrimitiveInstanceKind::LineDecoration {
             data_handle,

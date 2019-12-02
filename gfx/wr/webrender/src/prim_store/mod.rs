@@ -135,7 +135,7 @@ impl PrimitiveOpacity {
 #[derive(Clone, Debug)]
 pub struct SpaceSnapper {
     pub ref_spatial_node_index: SpatialNodeIndex,
-    current_target_spatial_node_index: SpatialNodeIndex,
+    pub current_target_spatial_node_index: SpatialNodeIndex,
     snapping_transform: Option<ScaleOffset>,
     pub device_pixel_scale: DevicePixelScale,
 }
@@ -875,6 +875,7 @@ impl InternablePrimitive for PrimitiveKeyKind {
         data_handle: PrimitiveDataHandle,
         _: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         match key.kind {
             PrimitiveKeyKind::Clear => {
@@ -2935,13 +2936,11 @@ impl PrimitiveStore {
                     &prim_data.glyphs,
                     &transform.to_transform().with_destination::<_>(),
                     surface,
-                    prim_spatial_node_index,
                     raster_space,
                     pic_context.subpixel_mode,
                     frame_state.resource_cache,
                     frame_state.gpu_cache,
                     frame_state.render_tasks,
-                    frame_context.clip_scroll_tree,
                     scratch,
                 );
 
@@ -4206,6 +4205,7 @@ pub trait InternablePrimitive: intern::Internable<InternData = PrimitiveSceneDat
         data_handle: intern::Handle<Self>,
         prim_store: &mut PrimitiveStore,
         reference_frame_relative_offset: LayoutVector2D,
+        snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind;
 }
 

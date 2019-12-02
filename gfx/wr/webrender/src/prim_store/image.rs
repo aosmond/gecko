@@ -17,7 +17,7 @@ use crate::prim_store::{
     EdgeAaSegmentMask, OpacityBindingIndex, PrimitiveInstanceKind,
     PrimitiveOpacity, PrimitiveSceneData, PrimKey, PrimKeyCommonData,
     PrimTemplate, PrimTemplateCommonData, PrimitiveStore, SegmentInstanceIndex,
-    SizeKey, InternablePrimitive,
+    SizeKey, InternablePrimitive, SpaceSnapper,
 };
 use crate::render_target::RenderTargetKind;
 use crate::render_task::{BlitSource, RenderTask};
@@ -338,6 +338,7 @@ impl InternablePrimitive for Image {
         data_handle: ImageDataHandle,
         prim_store: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         // TODO(gw): Refactor this to not need a separate image
         //           instance (see ImageInstance struct).
@@ -520,6 +521,7 @@ impl InternablePrimitive for YuvImage {
         data_handle: YuvImageDataHandle,
         _prim_store: &mut PrimitiveStore,
         _reference_frame_relative_offset: LayoutVector2D,
+        _snap_to_device: &SpaceSnapper,
     ) -> PrimitiveInstanceKind {
         PrimitiveInstanceKind::YuvImage {
             data_handle,
