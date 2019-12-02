@@ -25,6 +25,7 @@ use euclid::approxeq::ApproxEq;
 use euclid::size2;
 use std::cmp;
 use std::cell::Cell;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::Deref;
@@ -608,7 +609,7 @@ impl Into<f64> for SubpixelOffset {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug, Ord, PartialOrd)]
+#[derive(Clone, Hash, PartialEq, Eq, Ord, PartialOrd)]
 #[cfg_attr(feature = "capture", derive(Serialize))]
 #[cfg_attr(feature = "replay", derive(Deserialize))]
 pub struct GlyphKey(u32);
@@ -642,6 +643,12 @@ impl GlyphKey {
         unsafe {
             (mem::transmute(x), mem::transmute(y))
         }
+    }
+}
+
+impl fmt::Debug for GlyphKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GlyphKey {{ index: {}, subpixel_offset: {:?} }}", self.index(), self.subpixel_offset())
     }
 }
 
