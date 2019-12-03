@@ -529,8 +529,9 @@ void qcms_transform_data_bgra_out_lut_precache(const qcms_transform *transform, 
 }
 
 // Not used
-/* 
-static void qcms_transform_data_clut(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
+static void qcms_transform_data_clut_template(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+	const unsigned int components = A_INDEX_COMPONENTS(kAIndex);
 	unsigned int i;
 	int xy_len = 1;
 	int x_len = transform->grid_size;
@@ -540,9 +541,14 @@ static void qcms_transform_data_clut(const qcms_transform *transform, const unsi
 	const float* b_table = transform->b_clut;
   
 	for (i = 0; i < length; i++) {
-		unsigned char in_r = *src++;
-		unsigned char in_g = *src++;
-		unsigned char in_b = *src++;
+		unsigned char in_r = src[kRIndex];
+		unsigned char in_g = src[kGIndex];
+		unsigned char in_b = src[kBIndex];
+		unsigned char alpha;
+		if (kAIndex != NO_A_INDEX) {
+			alpha = src[kAIndex];
+		}
+		src += components;
 		float linear_r = in_r/255.0f, linear_g=in_g/255.0f, linear_b = in_b/255.0f;
 
 		int x = floorf(linear_r * (transform->grid_size-1));
@@ -579,12 +585,27 @@ static void qcms_transform_data_clut(const qcms_transform *transform, const unsi
 		float b_y2 = lerp(b_x3, b_x4, y_d);
 		float clut_b = lerp(b_y1, b_y2, z_d);
 
-		*dest++ = clamp_u8(clut_r*255.0f);
-		*dest++ = clamp_u8(clut_g*255.0f);
-		*dest++ = clamp_u8(clut_b*255.0f);
+		dest[kRIndex] = clamp_u8(clut_r*255.0f);
+		dest[kGIndex] = clamp_u8(clut_g*255.0f);
+		dest[kBIndex] = clamp_u8(clut_b*255.0f);
+		if (kAIndex != NO_A_INDEX) {
+			dest[kAIndex] = alpha;
+		}
+		dest += components;
 	}	
 }
-*/
+
+static void qcms_transform_data_clut_rgb(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+	qcms_transform_data_clut_template<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX>(transform, src, dest, length);
+}
+
+static void qcms_transform_data_clut_rgba(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+	qcms_transform_data_clut_template<RGBA_R_INDEX, RGBA_G_INDEX, RGBA_B_INDEX, RGBA_A_INDEX>(transform, src, dest, length);
+}
+
+static void qcms_transform_data_clut_bgra(const qcms_transform *transform, const unsigned char *src, unsigned char *dest, size_t length) {
+	qcms_transform_data_clut_template<BGRA_R_INDEX, BGRA_G_INDEX, BGRA_B_INDEX, BGRA_A_INDEX>(transform, src, dest, length);
+}
 
 // Using lcms' tetra interpolation algorithm.
 template <size_t kRIndex, size_t kGIndex, size_t kBIndex, size_t kAIndex = NO_A_INDEX>
@@ -1099,6 +1120,7 @@ qcms_transform* qcms_transform_precacheLUT_float(qcms_transform *transform, qcms
 			transform->g_clut = &lut[1];
 			transform->b_clut = &lut[2];
 			transform->grid_size = samples;
+#if 0
 #ifdef X86
 			if (sse_version_available() >= 2) {
 				if (in_type == QCMS_DATA_RGBA_8) {
@@ -1117,6 +1139,15 @@ qcms_transform* qcms_transform_precacheLUT_float(qcms_transform *transform, qcms
 			} else if (in_type == QCMS_DATA_RGB_8) {
 				transform->transform_fn = qcms_transform_data_tetra_clut_rgb;
 			}
+#else
+			if (in_type == QCMS_DATA_RGBA_8) {
+				transform->transform_fn = qcms_transform_data_clut_rgba;
+			} else if (in_type == QCMS_DATA_BGRA_8) {
+				transform->transform_fn = qcms_transform_data_clut_bgra;
+			} else if (in_type == QCMS_DATA_RGB_8) {
+				transform->transform_fn = qcms_transform_data_clut_rgb;
+			}
+#endif
 			assert(transform->transform_fn);
 		}
 	}
