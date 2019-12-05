@@ -537,7 +537,7 @@ def set_defaults(config, tests):
         if "-qr/" in test['test-platform']:
             test['webrender'] = True
         else:
-            test.setdefault('webrender', False)
+            test.setdefault('webrender', True)
 
         test.setdefault('e10s', True)
         test.setdefault('try-name', test['test-name'])
