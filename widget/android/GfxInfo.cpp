@@ -142,6 +142,11 @@ GfxInfo::GetWindowProtocol(nsAString& aWindowProtocol) {
   return NS_ERROR_FAILURE;
 }
 
+NS_IMETHODIMP
+GfxInfo::GetDesktopEnvironment(nsAString& aDesktopEnvironment) {
+  return NS_ERROR_FAILURE;
+}
+
 void GfxInfo::EnsureInitialized() {
   if (mInitialized) return;
 

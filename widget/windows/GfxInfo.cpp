@@ -130,6 +130,11 @@ GfxInfo::GetWindowProtocol(nsAString& aWindowProtocol) {
   return NS_ERROR_FAILURE;
 }
 
+NS_IMETHODIMP
+GfxInfo::GetDesktopEnvironment(nsAString& aDesktopEnvironment) {
+  return NS_ERROR_FAILURE;
+}
+
 static nsresult GetKeyValue(const WCHAR* keyLocation, const WCHAR* keyName,
                             uint32_t& destValue, int type) {
   MOZ_ASSERT(type == REG_DWORD || type == REG_QWORD);

@@ -62,6 +62,8 @@ void GfxInfo::AddCrashReportAnnotations() {
                                      mIsWayland);
   CrashReporter::AnnotateCrashReport(CrashReporter::Annotation::IsWaylandDRM,
                                      mIsWaylandDRM);
+  CrashReporter::AnnotateCrashReport(
+      CrashReporter::Annotation::DesktopEnvironment, mDesktopEnvironment);
 }
 
 void GfxInfo::GetData() {
@@ -331,6 +333,59 @@ void GfxInfo::GetData() {
     mIsWaylandDRM = nsWaylandDisplay::IsDMABufEnabled();
   }
 #endif
+
+  const char* desktopEnv = getenv("XDG_CURRENT_DESKTOP");
+  if (!desktopEnv) {
+    desktopEnv = getenv("DESKTOP_SESSION");
+  }
+
+  if (desktopEnv) {
+    nsDependentCString currentDesktop(desktopEnv);
+    if (currentDesktop.EqualsIgnoreCase("gnome", sizeof("gnome") - 1)) {
+      mDesktopEnvironment.AssignLiteral("gnome");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("kde")) {
+      mDesktopEnvironment.AssignLiteral("kde");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("xfce")) {
+      mDesktopEnvironment.AssignLiteral("xfce");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("x-cinnamon") ||
+               currentDesktop.LowerCaseEqualsLiteral("cinnamon")) {
+      mDesktopEnvironment.AssignLiteral("cinnamon");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("enlightenment")) {
+      mDesktopEnvironment.AssignLiteral("enlightenment");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("lxde") ||
+               currentDesktop.LowerCaseEqualsLiteral("lubuntu")) {
+      mDesktopEnvironment.AssignLiteral("lxde");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("openbox")) {
+      mDesktopEnvironment.AssignLiteral("openbox");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("i3")) {
+      mDesktopEnvironment.AssignLiteral("i3");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("mate")) {
+      mDesktopEnvironment.AssignLiteral("mate");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("unity")) {
+      mDesktopEnvironment.AssignLiteral("unity");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("pantheon")) {
+      mDesktopEnvironment.AssignLiteral("pantheon");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("lxqt")) {
+      mDesktopEnvironment.AssignLiteral("lxqt");
+    } else if (currentDesktop.LowerCaseEqualsLiteral("deepin")) {
+      mDesktopEnvironment.AssignLiteral("deepin");
+    }
+  }
+
+  if (mDesktopEnvironment.IsEmpty()) {
+    if (getenv("GNOME_DESKTOP_SESSION_ID")) {
+      mDesktopEnvironment.AssignLiteral("gnome");
+    } else if (getenv("KDE_FULL_SESSION")) {
+      mDesktopEnvironment.AssignLiteral("kde");
+    } else if (getenv("MATE_DESKTOP_SESSION_ID")) {
+      mDesktopEnvironment.AssignLiteral("mate");
+    } else if (getenv("LXQT_SESSION_CONFIG")) {
+      mDesktopEnvironment.AssignLiteral("lxqt");
+    } else {
+      mDesktopEnvironment.AssignLiteral("unknown");
+    }
+  }
+
   AddCrashReportAnnotations();
 }
 
@@ -505,6 +560,13 @@ GfxInfo::GetWindowProtocol(nsAString& aWindowProtocol) {
   }
 
   aWindowProtocol.AssignLiteral("x11");
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+GfxInfo::GetDesktopEnvironment(nsAString& aDesktopEnvironment) {
+  GetData();
+  AppendASCIItoUTF16(mDesktopEnvironment, aDesktopEnvironment);
   return NS_OK;
 }
 

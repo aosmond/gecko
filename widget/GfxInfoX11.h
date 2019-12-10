@@ -23,6 +23,7 @@ class GfxInfo final : public GfxInfoBase {
   NS_IMETHOD GetDWriteVersion(nsAString& aDwriteVersion) override;
   NS_IMETHOD GetCleartypeParameters(nsAString& aCleartypeParams) override;
   NS_IMETHOD GetWindowProtocol(nsAString& aWindowProtocol) override;
+  NS_IMETHOD GetDesktopEnvironment(nsAString& aDesktopEnvironment) override;
   NS_IMETHOD GetAdapterDescription(nsAString& aAdapterDescription) override;
   NS_IMETHOD GetAdapterDriver(nsAString& aAdapterDriver) override;
   NS_IMETHOD GetAdapterVendorID(nsAString& aAdapterVendorID) override;
@@ -79,6 +80,7 @@ class GfxInfo final : public GfxInfoBase {
   uint32_t mAdapterRAM;
   nsCString mOS;
   nsCString mOSRelease;
+  nsAutoCStringN<16> mDesktopEnvironment;
 
   struct ScreenInfo {
     uint32_t mWidth;

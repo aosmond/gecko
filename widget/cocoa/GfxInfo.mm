@@ -125,6 +125,10 @@ GfxInfo::GetCleartypeParameters(nsAString& aCleartypeParams) { return NS_ERROR_F
 NS_IMETHODIMP
 GfxInfo::GetWindowProtocol(nsAString& aWindowProtocol) { return NS_ERROR_FAILURE; }
 
+/* readonly attribute DOMString desktopEnvironment; */
+NS_IMETHODIMP
+GfxInfo::GetDesktopEnvironment(nsAString& aDesktopEnvironment) { return NS_ERROR_FAILURE; }
+
 /* readonly attribute DOMString adapterDescription; */
 NS_IMETHODIMP
 GfxInfo::GetAdapterDescription(nsAString& aAdapterDescription) {
