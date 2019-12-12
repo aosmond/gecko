@@ -2105,12 +2105,7 @@ pub extern "C" fn wr_resource_updates_add_raw_font(
     txn.add_raw_font(key, bytes.flush_into_vec(), index);
 }
 
-#[no_mangle]
-pub extern "C" fn wr_api_capture(
-    dh: &mut DocumentHandle,
-    path: *const c_char,
-    bits_raw: u32,
-) {
+fn generate_capture_path(path: *const c_char) -> Option<PathBuf> {
     use std::fs::{File, create_dir_all};
     use std::io::Write;
 
@@ -2136,12 +2131,11 @@ pub extern "C" fn wr_api_capture(
 	}
 
     // Increment the extension until we find a fresh path
-    while path.is_dir() {
-        let count: u32 = path.extension()
-            .and_then(|x| x.to_str())
-            .and_then(|x| x.parse().ok())
-            .unwrap_or(0);
-        path.set_extension((count + 1).to_string());
+    let mut count: u32 = 0;
+    loop {
+        path.set_extension(count.to_string());
+        if !path.is_dir() { break; }
+        count += 1;
     }
 
     // Use warn! so that it gets emitted to logcat on android as well
@@ -2158,12 +2152,42 @@ pub extern "C" fn wr_api_capture(
         }
         Err(e) => {
             warn!("Unable to create path '{:?}' for capture: {:?}", path, e);
-            return
+            return None
         }
     }
 
-    let bits = CaptureBits::from_bits(bits_raw as _).unwrap();
-    dh.api.save_capture(path, bits);
+    Some(path)
+}
+
+#[no_mangle]
+pub extern "C" fn wr_api_capture(
+    dh: &mut DocumentHandle,
+    path: *const c_char,
+    bits_raw: u32,
+) {
+    if let Some(path) = generate_capture_path(path) {
+        let bits = CaptureBits::from_bits(bits_raw as _).unwrap();
+        dh.api.save_capture(path, bits);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn wr_api_start_capture_sequence(
+    dh: &mut DocumentHandle,
+    path: *const c_char,
+    bits_raw: u32,
+) {
+    if let Some(path) = generate_capture_path(path) {
+        let bits = CaptureBits::from_bits(bits_raw as _).unwrap();
+        dh.api.start_capture_sequence(path, bits);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn wr_api_stop_capture_sequence(
+    dh: &mut DocumentHandle,
+) {
+    dh.api.stop_capture_sequence();
 }
 
 #[no_mangle]
