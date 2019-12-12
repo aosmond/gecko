@@ -103,6 +103,8 @@
 
 #ifdef NIGHTLY_BUILD
     <command id="wrCaptureCmd" oncommand="gGfxUtils.webrenderCapture();"/>
+    <command id="wrStartCaptureSequenceCmd" oncommand="gGfxUtils.webrenderStartCaptureSequence();"/>
+    <command id="wrStopCaptureSequenceCmd" oncommand="gGfxUtils.webrenderStopCaptureSequence();"/>
     <command id="windowRecordingCmd" oncommand="gGfxUtils.toggleWindowRecording();"/>
     <command id="wrTransactionLoggingCmd" oncommand="gGfxUtils.toggleTransactionLogging();"/>
 #endif
@@ -335,6 +337,20 @@
     key="#" modifiers="control"
 #endif
     command="wrCaptureCmd"/>
+    <key id="key_wrStartCaptureSequenceCmd"
+#ifdef XP_MACOSX
+    key="6" modifiers="control,shift"
+#else
+    key="^" modifiers="control"
+#endif
+    command="wrStartCaptureSequenceCmd"/>
+    <key id="key_wrStopCaptureSequenceCmd"
+#ifdef XP_MACOSX
+    key="7" modifiers="control,shift"
+#else
+    key="&amp;" modifiers="control"
+#endif
+    command="wrStopCaptureSequenceCmd"/>
     <key id="key_windowRecordingCmd"
 #ifdef XP_MACOSX
     key="4" modifiers="control,shift"

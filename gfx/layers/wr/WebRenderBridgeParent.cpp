@@ -2146,6 +2146,20 @@ mozilla::ipc::IPCResult WebRenderBridgeParent::RecvCapture() {
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult WebRenderBridgeParent::RecvStartCaptureSequence() {
+  if (!mDestroyed) {
+    mApis[wr::RenderRoot::Default]->StartCaptureSequence();
+  }
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult WebRenderBridgeParent::RecvStopCaptureSequence() {
+  if (!mDestroyed) {
+    mApis[wr::RenderRoot::Default]->StopCaptureSequence();
+  }
+  return IPC_OK();
+}
+
 mozilla::ipc::IPCResult WebRenderBridgeParent::RecvSetTransactionLogging(
     const bool& aValue) {
   if (!mDestroyed) {

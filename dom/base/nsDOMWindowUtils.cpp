@@ -4079,6 +4079,22 @@ nsDOMWindowUtils::WrCapture() {
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::WrStartCaptureSequence() {
+  if (WebRenderBridgeChild* wrbc = GetWebRenderBridge()) {
+    wrbc->StartCaptureSequence();
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::WrStopCaptureSequence() {
+  if (WebRenderBridgeChild* wrbc = GetWebRenderBridge()) {
+    wrbc->StopCaptureSequence();
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::SetCompositionRecording(bool aValue, Promise** aOutPromise) {
   return aValue ? StartCompositionRecording(aOutPromise)
                 : StopCompositionRecording(true, aOutPromise);
