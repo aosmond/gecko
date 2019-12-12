@@ -15,7 +15,7 @@ use api::units::*;
 use crate::capture::ExternalCaptureImage;
 #[cfg(feature = "replay")]
 use crate::capture::PlainExternalImage;
-#[cfg(any(feature = "replay", feature = "png"))]
+#[cfg(any(feature = "replay", feature = "png", feature="capture"))]
 use crate::capture::CaptureConfig;
 use crate::composite::{NativeSurfaceId, NativeSurfaceOperation, NativeSurfaceOperationDetails};
 use crate::device::TextureFilter;
@@ -484,6 +484,9 @@ pub struct ResourceCache {
     state: State,
     current_frame_id: FrameId,
 
+    #[cfg(feature = "capture")]
+    capture_dirty: bool,
+
     pub texture_cache: TextureCache,
 
     /// TODO(gw): We should expire (parts of) this cache semi-regularly!
@@ -549,6 +552,8 @@ impl ResourceCache {
             // We want to keep three frames worth of delete blob keys
             deleted_blob_keys: vec![Vec::new(), Vec::new(), Vec::new()].into(),
             pending_native_surface_updates: Vec::new(),
+            #[cfg(feature = "capture")]
+            capture_dirty: true,
         }
     }
 
@@ -604,6 +609,9 @@ impl ResourceCache {
         // TODO, there is potential for optimization here, by processing updates in
         // bulk rather than one by one (for example by sorting allocations by size or
         // in a way that reduces fragmentation in the atlas).
+        if !updates.is_empty() {
+            self.capture_dirty = true;
+        }
 
         for update in updates {
             match update {
@@ -669,6 +677,10 @@ impl ResourceCache {
         updates: &mut Vec<ResourceUpdate>,
         profile_counters: &mut ResourceProfileCounters,
     ) {
+        if !updates.is_empty() {
+            self.capture_dirty = true;
+        }
+
         for update in updates.iter() {
             match *update {
                 ResourceUpdate::AddBlobImage(ref img) => {
@@ -2232,7 +2244,7 @@ impl ResourceCache {
         &mut self,
         resources: PlainResources,
         caches: Option<PlainCacheOwn>,
-        root: &PathBuf,
+        config: &CaptureConfig,
     ) -> Vec<PlainExternalImage> {
         use std::{fs, path::Path};
 
@@ -2274,6 +2286,7 @@ impl ResourceCache {
         res.image_templates.images.clear();
 
         info!("\tfont templates...");
+        let root = config.resource_root();
         let native_font_replacement = Arc::new(NATIVE_FONT.to_vec());
         for (key, plain_template) in resources.font_templates {
             let arc = match raw_map.entry(plain_template.data) {
@@ -2305,7 +2318,7 @@ impl ResourceCache {
         info!("\timage templates...");
         let mut external_images = Vec::new();
         for (key, template) in resources.image_templates {
-            let data = match CaptureConfig::deserialize::<PlainExternalImage, _>(root, &template.data) {
+            let data = match config.deserialize_for_resource::<PlainExternalImage, _>(&template.data) {
                 Some(plain) => {
                     let ext_data = plain.external;
                     external_images.push(plain);
@@ -2337,6 +2350,19 @@ impl ResourceCache {
         }
 
         external_images
+    }
+
+    #[cfg(feature = "capture")]
+    pub fn save_capture_sequence(&mut self, config: &mut CaptureConfig) -> Vec<ExternalCaptureImage> {
+        if self.capture_dirty {
+            self.capture_dirty = false;
+            config.prepare_resource();
+            let (resources, deferred) = self.save_capture(&config.resource_root());
+            config.serialize_for_resource(&resources, "plain-resources.ron");
+            deferred
+        } else {
+            Vec::new()
+        }
     }
 }
 

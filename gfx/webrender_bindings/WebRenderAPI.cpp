@@ -617,9 +617,19 @@ void WebRenderAPI::WaitFlushed() {
 }
 
 void WebRenderAPI::Capture() {
-  uint8_t bits = 3;                 // TODO: get from JavaScript
+  uint8_t bits = 7;                 // TODO: get from JavaScript
   const char* path = "wr-capture";  // TODO: get from JavaScript
   wr_api_capture(mDocHandle, path, bits);
+}
+
+void WebRenderAPI::StartCaptureSequence() {
+  uint8_t bits = 5;                          // TODO: get from JavaScript
+  const char* path = "wr-capture-sequence";  // TODO: get from JavaScript
+  wr_api_start_capture_sequence(mDocHandle, path, bits);
+}
+
+void WebRenderAPI::StopCaptureSequence() {
+  wr_api_stop_capture_sequence(mDocHandle);
 }
 
 void WebRenderAPI::SetTransactionLogging(bool aValue) {
