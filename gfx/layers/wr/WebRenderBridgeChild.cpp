@@ -641,6 +641,12 @@ void WebRenderBridgeChild::DeallocResourceShmem(RefCountedShmem& aShm) {
 }
 
 void WebRenderBridgeChild::Capture() { this->SendCapture(); }
+void WebRenderBridgeChild::StartCaptureSequence() {
+  this->SendStartCaptureSequence();
+}
+void WebRenderBridgeChild::StopCaptureSequence() {
+  this->SendStopCaptureSequence();
+}
 
 void WebRenderBridgeChild::SetTransactionLogging(bool aValue) {
   this->SendSetTransactionLogging(aValue);
