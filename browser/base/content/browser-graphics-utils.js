@@ -31,6 +31,19 @@ var gGfxUtils = {
   webrenderCapture() {
     window.windowUtils.wrCapture();
   },
+  /**
+   * Trigger a WebRender capture of the current state and future state
+   * into a local folder.
+   */
+  webrenderStartCaptureSequence() {
+    window.windowUtils.wrStartCaptureSequence();
+  },
+  /**
+   * Stop capturing WebRender state changes.
+   */
+  webrenderStopCaptureSequence() {
+    window.windowUtils.wrStopCaptureSequence();
+  },
 
   /**
    * Toggle transaction logging to text file.

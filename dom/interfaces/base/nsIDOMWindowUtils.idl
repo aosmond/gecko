@@ -1939,6 +1939,18 @@ interface nsIDOMWindowUtils : nsISupports {
   void wrCapture();
 
   /**
+   * Start capturing the contents of the current WebRender frame and
+   * save them to a folder relative to the current working directory,
+   * as well as any frames generated from this point onward.
+   */
+  void wrStartCaptureSequence();
+
+  /**
+   * Stop capturing WebRender frames automatically.
+   */
+  void wrStopCaptureSequence();
+
+  /**
    * Toggle recording of composition on and off.
    *
    * This is equivalent to calling |startCompositionRecorder()| or
