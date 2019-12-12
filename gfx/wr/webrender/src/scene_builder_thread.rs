@@ -8,7 +8,7 @@ use api::{BuiltDisplayList, ColorF, NotificationRequest, Checkpoint, IdNamespace
 use api::{ClipIntern, FilterDataIntern, MemoryReport, PrimitiveKeyKind};
 use api::channel::MsgSender;
 use api::units::LayoutSize;
-#[cfg(feature = "capture")]
+#[cfg(any(feature = "capture", feature = "replay"))]
 use crate::capture::CaptureConfig;
 use crate::frame_builder::FrameBuilderConfig;
 use crate::scene_building::SceneBuilder;
@@ -149,12 +149,18 @@ pub enum SceneBuilderRequest {
     SaveScene(CaptureConfig),
     #[cfg(feature = "replay")]
     LoadScenes(Vec<LoadScene>),
+    #[cfg(feature = "capture")]
+    StartCaptureSequence(CaptureConfig),
+    #[cfg(feature = "capture")]
+    StopCaptureSequence,
     DocumentsForDebugger
 }
 
 // Message from scene builder to render backend.
 pub enum SceneBuilderResult {
     Transactions(Vec<Box<BuiltTransaction>>, Option<Sender<SceneSwapResult>>),
+    #[cfg(feature = "capture")]
+    CapturedTransactions(Vec<Box<BuiltTransaction>>, CaptureConfig, Option<Sender<SceneSwapResult>>),
     ExternalEvent(ExternalEvent),
     FlushComplete(MsgSender<()>),
     ClearNamespace(IdNamespace),
@@ -255,7 +261,9 @@ pub struct SceneBuilderThread {
     size_of_ops: Option<MallocSizeOfOps>,
     hooks: Option<Box<dyn SceneBuilderHooks + Send>>,
     simulate_slow_ms: u32,
-    removed_pipelines: FastHashSet<PipelineId>
+    removed_pipelines: FastHashSet<PipelineId>,
+    #[cfg(feature = "capture")]
+    capture_config: Option<CaptureConfig>,
 }
 
 pub struct SceneBuilderThreadChannels {
@@ -301,6 +309,8 @@ impl SceneBuilderThread {
             hooks,
             simulate_slow_ms: 0,
             removed_pipelines: FastHashSet::default(),
+            #[cfg(feature = "capture")]
+            capture_config: None,
         }
     }
 
@@ -329,6 +339,11 @@ impl SceneBuilderThread {
                     let built_txns : Vec<Box<BuiltTransaction>> = txns.iter_mut()
                         .map(|txn| self.process_transaction(txn))
                         .collect();
+                    #[cfg(feature = "capture")]
+                    match built_txns.iter().any(|txn| txn.built_scene.is_some()) {
+                        true => self.save_capture_sequence(),
+                        _ => {},
+                    }
                     self.forward_built_transactions(built_txns);
                 }
                 Ok(SceneBuilderRequest::DeleteDocument(document_id)) => {
@@ -348,6 +363,16 @@ impl SceneBuilderThread {
                 #[cfg(feature = "capture")]
                 Ok(SceneBuilderRequest::SaveScene(config)) => {
                     self.save_scene(config);
+                }
+                #[cfg(feature = "capture")]
+                Ok(SceneBuilderRequest::StartCaptureSequence(config)) => {
+                    self.start_capture_sequence(config);
+                }
+                #[cfg(feature = "capture")]
+                Ok(SceneBuilderRequest::StopCaptureSequence) => {
+                    // FIXME(aosmond): clear config for frames and resource cache without scene
+                    // rebuild?
+                    self.capture_config = None;
                 }
                 Ok(SceneBuilderRequest::DocumentsForDebugger) => {
                     let json = self.get_docs_for_debugger();
@@ -390,11 +415,11 @@ impl SceneBuilderThread {
     fn save_scene(&mut self, config: CaptureConfig) {
         for (id, doc) in &self.documents {
             let interners_name = format!("interners-{}-{}", id.namespace_id.0, id.id);
-            config.serialize(&doc.interners, interners_name);
+            config.serialize_for_scene(&doc.interners, interners_name);
 
             if config.bits.contains(api::CaptureBits::SCENE) {
                 let file_name = format!("scene-{}-{}", id.namespace_id.0, id.id);
-                config.serialize(&doc.scene, file_name);
+                config.serialize_for_scene(&doc.scene, file_name);
             }
         }
     }
@@ -452,6 +477,33 @@ impl SceneBuilderThread {
 
             self.forward_built_transactions(txns);
         }
+    }
+
+    #[cfg(feature = "capture")]
+    fn save_capture_sequence(
+        &mut self,
+    ) {
+        if let Some(ref mut config) = self.capture_config {
+            config.prepare_scene();
+            for (id, doc) in &self.documents {
+                let interners_name = format!("interners-{}-{}", id.namespace_id.0, id.id);
+                config.serialize_for_scene(&doc.interners, interners_name);
+
+                if config.bits.contains(api::CaptureBits::SCENE) {
+                    let file_name = format!("scene-{}-{}", id.namespace_id.0, id.id);
+                    config.serialize_for_scene(&doc.scene, file_name);
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "capture")]
+    fn start_capture_sequence(
+        &mut self,
+        config: CaptureConfig,
+    ) {
+        self.capture_config = Some(config);
+        self.save_capture_sequence();
     }
 
     #[cfg(feature = "debugger")]
@@ -661,6 +713,13 @@ impl SceneBuilderThread {
             Vec::new()
         };
 
+        #[cfg(feature = "capture")]
+        match self.capture_config {
+            Some(ref config) => self.tx.send(SceneBuilderResult::CapturedTransactions(txns, config.clone(), result_tx)).unwrap(),
+            None => self.tx.send(SceneBuilderResult::Transactions(txns, result_tx)).unwrap(),
+        }
+
+        #[cfg(not(feature = "capture"))]
         self.tx.send(SceneBuilderResult::Transactions(txns, result_tx)).unwrap();
 
         let _ = self.api_tx.send(ApiMsg::WakeUp);

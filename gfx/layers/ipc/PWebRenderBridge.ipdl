@@ -72,6 +72,10 @@ parent:
   async ScheduleComposite();
   // Save the frame capture to disk
   async Capture();
+  // Start capturing each frame and save to disk
+  async StartCaptureSequence();
+  // Stop capturing each frame
+  async StopCaptureSequence();
 
   // Enable/Disable transaction logging
   async SetTransactionLogging(bool aValue);
