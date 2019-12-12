@@ -181,6 +181,8 @@ class WebRenderBridgeChild final : public PWebRenderBridgeChild,
   void DeallocResourceShmem(RefCountedShmem& aShm);
 
   void Capture();
+  void StartCaptureSequence();
+  void StopCaptureSequence();
   void SetTransactionLogging(bool aValue);
 
  private:
