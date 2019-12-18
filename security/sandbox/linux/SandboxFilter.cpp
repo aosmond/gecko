@@ -530,6 +530,10 @@ class SandboxPolicyCommon : public SandboxPolicyBase {
       case __NR_dup:
         return Allow();
 
+        // Used by our shm classes
+      case __NR_fallocate:
+        return Allow();
+
         // Memory mapping
       CASES_FOR_mmap:
       case __NR_munmap:
@@ -1261,9 +1265,6 @@ class ContentSandboxPolicy : public SandboxPolicyCommon {
       case __NR_fadvise64_64:
         return Allow();
 #  endif
-
-      case __NR_fallocate:
-        return Allow();
 
       case __NR_get_mempolicy:
         return Allow();
