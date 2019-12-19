@@ -18,7 +18,7 @@
  * equivalent to ((v)/255)
  */
 #define GFX_DIVIDE_BY_255(v) \
-  (((((unsigned)(v)) << 8) + ((unsigned)(v)) + 255) >> 16)
+  (((((unsigned)(v) + 128) << 8) + ((unsigned)(v))) >> 16)
 
 /**
  * Fast premultiply

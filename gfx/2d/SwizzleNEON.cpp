@@ -54,6 +54,7 @@ static MOZ_ALWAYS_INLINE uint16x8_t
 PremultiplyVector_NEON(const uint16x8_t& aSrc) {
   // Isolate R and B with mask.
   const uint16x8_t mask = vdupq_n_u16(0x00FF);
+  const uint16x8_t addMask = vdupq_n_u16(0x0080);
   uint16x8_t rb = vandq_u16(aSrc, mask);
   // Swap R and B if necessary.
   if (aSwapRB) {
@@ -66,7 +67,7 @@ PremultiplyVector_NEON(const uint16x8_t& aSrc) {
   uint16x8_t alphas = vtrnq_u16(ga, ga).val[1];
 
   // rb = rb*a + 255; rb += rb >> 8;
-  rb = vmlaq_u16(mask, rb, alphas);
+  rb = vmlaq_u16(addMask, rb, alphas);
   rb = vsraq_n_u16(rb, rb, 8);
 
   // If format is not opaque, force A to 255 so that A*alpha/255 = alpha
@@ -74,7 +75,7 @@ PremultiplyVector_NEON(const uint16x8_t& aSrc) {
     ga = vorrq_u16(ga, vreinterpretq_u16_u32(vdupq_n_u32(0x00FF0000)));
   }
   // ga = ga*a + 255; ga += ga >> 8;
-  ga = vmlaq_u16(mask, ga, alphas);
+  ga = vmlaq_u16(addMask, ga, alphas);
   ga = vsraq_n_u16(ga, ga, 8);
   // If format is opaque, force output A to be 255.
   if (aOpaqueAlpha) {
