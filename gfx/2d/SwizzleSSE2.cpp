@@ -66,17 +66,17 @@ static MOZ_ALWAYS_INLINE __m128i PremultiplyVector_SSE2(const __m128i& aSrc) {
   __m128i alphas = _mm_shufflelo_epi16(ga, _MM_SHUFFLE(3, 3, 1, 1));
   alphas = _mm_shufflehi_epi16(alphas, _MM_SHUFFLE(3, 3, 1, 1));
 
-  // rb = rb*a + 255; rb += rb >> 8;
-  rb = _mm_add_epi16(_mm_mullo_epi16(rb, alphas), mask);
-  rb = _mm_add_epi16(rb, _mm_srli_epi16(rb, 8));
+  // rb = rb*a; rb += (rb + 255) >> 8
+  rb = _mm_mullo_epi16(rb, alphas);
+  rb = _mm_add_epi16(rb, _mm_srli_epi16(_mm_add_epi16(rb, mask), 8));
 
   // If format is not opaque, force A to 255 so that A*alpha/255 = alpha
   if (!aOpaqueAlpha) {
     ga = _mm_or_si128(ga, _mm_set1_epi32(0x00FF0000));
   }
-  // ga = ga*a + 255; ga += ga >> 8;
-  ga = _mm_add_epi16(_mm_mullo_epi16(ga, alphas), mask);
-  ga = _mm_add_epi16(ga, _mm_srli_epi16(ga, 8));
+  // ga = ga*a; ga += (ga + 255) >> 8
+  ga = _mm_mullo_epi16(ga, alphas);
+  ga = _mm_add_epi16(ga, _mm_srli_epi16(_mm_add_epi16(ga, mask), 8));
   // If format is opaque, force output A to be 255.
   if (aOpaqueAlpha) {
     ga = _mm_or_si128(ga, _mm_set1_epi32(0xFF000000));
