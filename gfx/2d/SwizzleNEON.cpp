@@ -65,17 +65,17 @@ PremultiplyVector_NEON(const uint16x8_t& aSrc) {
   // Duplicate alphas to get vector of A1 A1 A2 A2 A3 A3 A4 A4
   uint16x8_t alphas = vtrnq_u16(ga, ga).val[1];
 
-  // rb = rb*a + 255; rb += rb >> 8;
-  rb = vmlaq_u16(mask, rb, alphas);
-  rb = vsraq_n_u16(rb, rb, 8);
+  // rb = rb*a; rb += (rb + 255) >> 8
+  rb = vmulq_u16(rb, alphas);
+  rb = vsraq_n_u16(rb, vaddq_u16(rb, mask), 8);
 
   // If format is not opaque, force A to 255 so that A*alpha/255 = alpha
   if (!aOpaqueAlpha) {
     ga = vorrq_u16(ga, vreinterpretq_u16_u32(vdupq_n_u32(0x00FF0000)));
   }
   // ga = ga*a + 255; ga += ga >> 8;
-  ga = vmlaq_u16(mask, ga, alphas);
-  ga = vsraq_n_u16(ga, ga, 8);
+  ga = vmulq_u16(ga, alphas);
+  ga = vsraq_n_u16(ga, vaddq_u16(ga, mask), 8);
   // If format is opaque, force output A to be 255.
   if (aOpaqueAlpha) {
     ga = vorrq_u16(ga, vreinterpretq_u16_u32(vdupq_n_u32(0xFF000000)));

@@ -253,17 +253,17 @@ static void PremultiplyChunkFallback(const uint8_t*& aSrc, uint8_t*& aDst,
     }
     // Approximate the multiply by alpha and divide by 255 which is
     // essentially:
-    // c = c*a + 255; c = (c + (c >> 8)) >> 8;
+    // c = c*a; c = (c + ((c + 255) >> 8)) >> 8;
     // However, we omit the final >> 8 to fold it with the final shift into
     // place depending on desired output format.
-    rb = rb * a + 0x00FF00FF;
-    rb = (rb + ((rb >> 8) & 0x00FF00FF)) & 0xFF00FF00;
+    rb = rb * a;
+    rb = (rb + (((rb + 0x00FF00FF) >> 8) & 0x00FF00FF)) & 0xFF00FF00;
 
     // Use same approximation as above, but G is shifted 8 bits left.
     // Alpha is left out and handled separately.
     uint32_t g = color & (0xFF00 << aSrcRGBShift);
-    g = g * a + (0xFF00 << aSrcRGBShift);
-    g = (g + (g >> 8)) & (0xFF0000 << aSrcRGBShift);
+    g = g * a;
+    g = (g + ((g + (0xFF00 << aSrcRGBShift)) >> 8)) & (0xFF0000 << aSrcRGBShift);
 
     // The above math leaves RGB shifted left by 8 bits.
     // Shift them right if required for the output format.

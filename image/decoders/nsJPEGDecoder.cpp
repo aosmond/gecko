@@ -36,9 +36,6 @@ extern "C" {
 #  define MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB JCS_EXT_BGRX
 #endif
 
-static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
-                              int32_t aWidth);
-
 using mozilla::gfx::SurfaceFormat;
 
 namespace mozilla {
@@ -369,9 +366,46 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
       qcms_transform* pipeTransform =
           mInfo.out_color_space != JCS_GRAYSCALE ? mTransform : nullptr;
 
+      SurfacePipeFlags pipeFlags = SurfacePipeFlags();
+      SurfaceFormat inFormat = SurfaceFormat::OS_RGBX;
+
+      // Converting from CMYK is the same operation as premultiplying the alpha
+      // and then setting the alpha channel to opaque. We can just pretend the
+      // input is R8G8B8A8, effectively representing C8M8Y8K8, and
+      // premultiplication will multiply K by C, M, Y and swap as necessary.
+      // The output format as OS_RGBX will force the alpha channel to be 0xFF
+      // after the premultiplication.
+      //
+      // Source is 'Inverted CMYK', output is RGB.
+      // See: http://www.easyrgb.com/math.php?MATH=M12#text12
+      // Or:  http://www.ilkeratalay.com/colorspacesfaq.php#rgb
+      //
+      // From CMYK to CMY
+      // C = ( C * ( 1 - K ) + K )
+      // M = ( M * ( 1 - K ) + K )
+      // Y = ( Y * ( 1 - K ) + K )
+      //
+      // From Inverted CMYK to CMY is thus:
+      // C = ( (1-iC) * (1 - (1-iK)) + (1-iK) ) => 1 - iC*iK
+      // Same for M and Y
+      //
+      // Convert from CMY (0..1) to RGB (0..1)
+      // R = 1 - C => 1 - (1 - iC*iK) => iC*iK
+      // G = 1 - M => 1 - (1 - iM*iK) => iM*iK
+      // B = 1 - Y => 1 - (1 - iY*iK) => iY*iK
+      //
+      // Convert from Inverted CMYK (0..255) to RGB (0..255)
+      // R = iC*iK/255
+      // G = iM*iK/255
+      // B = iY*iK/255
+      if (mInfo.out_color_space == JCS_CMYK) {
+        inFormat = SurfaceFormat::R8G8B8A8;
+        pipeFlags |= SurfacePipeFlags::PREMULTIPLY_ALPHA;
+      }
+
       Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-          this, Size(), OutputSize(), FullFrame(), SurfaceFormat::OS_RGBX,
-          SurfaceFormat::OS_RGBX, Nothing(), pipeTransform, SurfacePipeFlags());
+          this, Size(), OutputSize(), FullFrame(), inFormat,
+          SurfaceFormat::OS_RGBX, Nothing(), pipeTransform, pipeFlags);
       if (!pipe) {
         mState = JPEG_ERROR;
         MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
@@ -602,36 +636,45 @@ void nsJPEGDecoder::NotifyDone() {
 }
 
 WriteState nsJPEGDecoder::OutputScanlines() {
-  auto result = mPipe.WritePixelBlocks<uint32_t>(
-      [&](uint32_t* aPixelBlock, int32_t aBlockSize) {
-        JSAMPROW sampleRow = (JSAMPROW)(mCMSLine ? mCMSLine : aPixelBlock);
-        if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
-          return MakeTuple(/* aWritten */ 0, Some(WriteState::NEED_MORE_DATA));
-        }
+  WriteState result;
+  if (mInfo.out_color_space != JCS_CMYK) {
+    result = mPipe.WritePixelBlocks<uint32_t>([&](uint32_t* aPixelBlock,
+                                                  int32_t aBlockSize) {
+      JSAMPROW sampleRow = (JSAMPROW)(mCMSLine ? mCMSLine : aPixelBlock);
+      if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
+        return MakeTuple(/* aWritten */ 0, Some(WriteState::NEED_MORE_DATA));
+      }
 
-        switch (mInfo.out_color_space) {
-          default:
-            // Already outputted directly to aPixelBlock as BGRA.
-            MOZ_ASSERT(!mCMSLine);
-            break;
-          case JCS_GRAYSCALE:
-            // The transform here does both color management, and converts the
-            // pixels from grayscale to BGRA. This is why we do it here, instead
-            // of using ColorManagementFilter in the SurfacePipe, because the
-            // other filters (e.g. DownscalingFilter) require BGRA pixels.
-            MOZ_ASSERT(mCMSLine);
-            qcms_transform_data(mTransform, mCMSLine, aPixelBlock,
-                                mInfo.output_width);
-            break;
-          case JCS_CMYK:
-            // Convert from CMYK to BGRA
-            MOZ_ASSERT(mCMSLine);
-            cmyk_convert_bgra(mCMSLine, aPixelBlock, aBlockSize);
-            break;
-        }
+      if (mInfo.out_color_space != JCS_GRAYSCALE) {
+        // Already outputted directly to aPixelBlock as BGRA.
+        MOZ_ASSERT(!mCMSLine);
+      } else {
+        // The transform here does both color management, and converts the
+        // pixels from grayscale to BGRA. This is why we do it here, instead
+        // of using ColorManagementFilter in the SurfacePipe, because the
+        // other filters (e.g. DownscalingFilter) require BGRA pixels.
+        MOZ_ASSERT(mCMSLine);
+        qcms_transform_data(mTransform, mCMSLine, aPixelBlock,
+                            mInfo.output_width);
+      }
 
-        return MakeTuple(aBlockSize, Maybe<WriteState>());
-      });
+      return MakeTuple(aBlockSize, Maybe<WriteState>());
+    });
+  } else {
+    // We buffer the reads because we don't want the alpha channel to ever be
+    // anything but opaque with JPEG. The early swizzle will convert us from
+    // CMYK (R8G8B8A8) to OS_RGBX.
+    MOZ_ASSERT(mCMSLine);
+    JSAMPROW sampleRow = (JSAMPROW)mCMSLine;
+    do {
+      if (jpeg_read_scanlines(&mInfo, &sampleRow, 1) != 1) {
+        result = WriteState::NEED_MORE_DATA;
+        break;
+      }
+
+      result = mPipe.WriteBuffer(reinterpret_cast<uint32_t*>(mCMSLine));
+    } while (result == WriteState::NEED_MORE_DATA);
+  }
 
   Maybe<SurfaceInvalidRect> invalidRect = mPipe.TakeInvalidRect();
   if (invalidRect) {
@@ -864,50 +907,3 @@ term_source(j_decompress_ptr jd) {
 
 }  // namespace image
 }  // namespace mozilla
-
-///*************** Inverted CMYK -> RGB conversion *************************
-/// Input is (Inverted) CMYK stored as 4 bytes per pixel.
-/// Output is RGB stored as 3 bytes per pixel.
-/// @param aInput Points to row buffer containing the CMYK bytes for each pixel
-///               in the row.
-/// @param aOutput Points to row buffer to write BGRA to.
-/// @param aWidth Number of pixels in the row.
-static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
-                              int32_t aWidth) {
-  uint8_t* input = reinterpret_cast<uint8_t*>(aInput);
-
-  for (int32_t i = 0; i < aWidth; ++i) {
-    // Source is 'Inverted CMYK', output is RGB.
-    // See: http://www.easyrgb.com/math.php?MATH=M12#text12
-    // Or:  http://www.ilkeratalay.com/colorspacesfaq.php#rgb
-
-    // From CMYK to CMY
-    // C = ( C * ( 1 - K ) + K )
-    // M = ( M * ( 1 - K ) + K )
-    // Y = ( Y * ( 1 - K ) + K )
-
-    // From Inverted CMYK to CMY is thus:
-    // C = ( (1-iC) * (1 - (1-iK)) + (1-iK) ) => 1 - iC*iK
-    // Same for M and Y
-
-    // Convert from CMY (0..1) to RGB (0..1)
-    // R = 1 - C => 1 - (1 - iC*iK) => iC*iK
-    // G = 1 - M => 1 - (1 - iM*iK) => iM*iK
-    // B = 1 - Y => 1 - (1 - iY*iK) => iY*iK
-
-    // Convert from Inverted CMYK (0..255) to RGB (0..255)
-    const uint32_t iC = input[0];
-    const uint32_t iM = input[1];
-    const uint32_t iY = input[2];
-    const uint32_t iK = input[3];
-
-    const uint8_t r = iC * iK / 255;
-    const uint8_t g = iM * iK / 255;
-    const uint8_t b = iY * iK / 255;
-
-    *aOutput++ = (0xFF << SurfaceFormatBit::OS_A) |
-                 (r << SurfaceFormatBit::OS_R) | (g << SurfaceFormatBit::OS_G) |
-                 (b << SurfaceFormatBit::OS_B);
-    input += 4;
-  }
-}

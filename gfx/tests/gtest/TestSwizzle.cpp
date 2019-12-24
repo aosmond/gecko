@@ -13,64 +13,79 @@ using namespace mozilla::gfx;
 
 TEST(Moz2D, PremultiplyData)
 {
-  const uint8_t in_bgra[5 * 4] = {
+  const uint8_t in_bgra[6 * 4] = {
       255, 255, 0,   255,  // verify 255 alpha leaves RGB unchanged
       0,   0,   255, 255,
       0,   255, 255, 0,  // verify 0 alpha zeroes out RGB
       0,   0,   0,   0,
       255, 0,   0,   128,  // verify that 255 RGB maps to alpha
+      9,   53,  131, 158,
   };
-  uint8_t out[5 * 4];
-  const uint8_t check_bgra[5 * 4] = {
-      255, 255, 0, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 128,
+  uint8_t out[6 * 4];
+  const uint8_t check_bgra[6 * 4] = {
+      255, 255, 0, 255, 0,   0, 255, 255, 0, 0,  0,  0,
+      0,   0,   0, 0,   128, 0, 0,   128, 5, 32, 81, 158,
   };
   // check swizzled output
-  const uint8_t check_rgba[5 * 4] = {
-      0, 255, 255, 255, 255, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 128,
+  const uint8_t check_rgba[6 * 4] = {
+      0, 255, 255, 255, 255, 0, 0,   255, 0,  0,  0, 0,
+      0, 0,   0,   0,   0,   0, 128, 128, 81, 32, 5, 158,
   };
-  const uint8_t check_argb[5 * 4] = {
-      255, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 128,
+  const uint8_t check_argb[6 * 4] = {
+      255, 0, 255, 255, 255, 255, 0, 0,   0,   0,  0,  0,
+      0,   0, 0,   0,   128, 0,   0, 128, 158, 81, 32, 5,
   };
 
   PremultiplyData(in_bgra, sizeof(in_bgra), SurfaceFormat::B8G8R8A8, out,
-                  sizeof(in_bgra), SurfaceFormat::B8G8R8A8, IntSize(5, 1));
+                  sizeof(in_bgra), SurfaceFormat::B8G8R8A8, IntSize(6, 1));
   EXPECT_TRUE(ArrayEqual(out, check_bgra));
 
   PremultiplyData(in_bgra, sizeof(in_bgra), SurfaceFormat::B8G8R8A8, out,
-                  sizeof(in_bgra), SurfaceFormat::R8G8B8A8, IntSize(5, 1));
+                  sizeof(in_bgra), SurfaceFormat::R8G8B8A8, IntSize(6, 1));
   EXPECT_TRUE(ArrayEqual(out, check_rgba));
 
   PremultiplyData(in_bgra, sizeof(in_bgra), SurfaceFormat::B8G8R8A8, out,
-                  sizeof(in_bgra), SurfaceFormat::A8R8G8B8, IntSize(5, 1));
+                  sizeof(in_bgra), SurfaceFormat::A8R8G8B8, IntSize(6, 1));
   EXPECT_TRUE(ArrayEqual(out, check_argb));
 }
 
 TEST(Moz2D, PremultiplyRow)
 {
-  const uint8_t in_bgra[5 * 4] = {
+  const uint8_t in_bgra[6 * 4] = {
       255, 255, 0,   255,  // verify 255 alpha leaves RGB unchanged
       0,   0,   255, 255,
       0,   255, 255, 0,  // verify 0 alpha zeroes out RGB
       0,   0,   0,   0,
       255, 0,   0,   128,  // verify that 255 RGB maps to alpha
+      9,   53,  131, 158,
   };
-  uint8_t out[5 * 4];
-  const uint8_t check_bgra[5 * 4] = {
-      255, 255, 0, 255, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 128,
+  uint8_t out[6 * 4];
+  const uint8_t check_bgra[6 * 4] = {
+      255, 255, 0, 255, 0,   0, 255, 255, 0, 0,  0,  0,
+      0,   0,   0, 0,   128, 0, 0,   128, 5, 32, 81, 158,
   };
   // check swizzled output
-  const uint8_t check_rgba[5 * 4] = {
-      0, 255, 255, 255, 255, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 128,
+  const uint8_t check_rgba[6 * 4] = {
+      0, 255, 255, 255, 255, 0, 0,   255, 0,  0,  0, 0,
+      0, 0,   0,   0,   0,   0, 128, 128, 81, 32, 5, 158,
+  };
+  const uint8_t check_argb[6 * 4] = {
+      255, 0, 255, 255, 255, 255, 0, 0,   0,   0,  0,  0,
+      0,   0, 0,   0,   128, 0,   0, 128, 158, 81, 32, 5,
   };
 
   SwizzleRowFn func =
       PremultiplyRow(SurfaceFormat::B8G8R8A8, SurfaceFormat::B8G8R8A8);
-  func(in_bgra, out, 5);
+  func(in_bgra, out, 6);
   EXPECT_TRUE(ArrayEqual(out, check_bgra));
 
   func = PremultiplyRow(SurfaceFormat::B8G8R8A8, SurfaceFormat::R8G8B8A8);
-  func(in_bgra, out, 5);
+  func(in_bgra, out, 6);
   EXPECT_TRUE(ArrayEqual(out, check_rgba));
+
+  func = PremultiplyRow(SurfaceFormat::B8G8R8A8, SurfaceFormat::A8R8G8B8);
+  func(in_bgra, out, 6);
+  EXPECT_TRUE(ArrayEqual(out, check_argb));
 }
 
 TEST(Moz2D, UnpremultiplyData)

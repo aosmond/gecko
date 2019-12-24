@@ -129,8 +129,8 @@ class SurfacePipeFactory {
                                 aOutFormat == gfx::SurfaceFormat::R8G8B8X8;
 
     // Early swizzles are for unpacking RGB or forcing RGBA/BGRA_U32 to
-    // RGBX/BGRX_U32. We should never want to premultiply in either case,
-    // because the image's alpha channel will always be opaque. This must be
+    // RGBX/BGRX_U32. We may also need to premultiply before forcing the
+    // image to become opaque (e.g. for the CMYK conversion). This must be
     // done before downscaling and color management.
     bool unpackOrMaskSwizzle =
         inFormatRgb ||
@@ -140,7 +140,8 @@ class SurfacePipeFactory {
     // converting between RGBA and BGRA_U32. It must happen after color
     // management, and before downscaling.
     bool swapOrAlphaSwizzle =
-        (!inFormatRgb && inFormatOrder != outFormatOrder) || premultiplyAlpha;
+        !unpackOrMaskSwizzle &&
+        ((!inFormatRgb && inFormatOrder != outFormatOrder) || premultiplyAlpha);
 
     if (unpackOrMaskSwizzle && swapOrAlphaSwizzle) {
       MOZ_ASSERT_UNREACHABLE("Early and late swizzles not supported");

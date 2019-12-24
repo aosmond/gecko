@@ -70,7 +70,7 @@ TEST(ImageSwizzleFilter, WritePixels_RGBA_to_Premultiplied_BGRX)
       [](Decoder* aDecoder, SurfaceFilter* aFilter) {
         CheckTransformedWritePixels(aDecoder, aFilter,
                                     BGRAColor(0x26, 0x00, 0x00, 0x7F, true),
-                                    BGRAColor(0x00, 0x00, 0x13, 0xFF));
+                                    BGRAColor(0x00, 0x00, 0x12, 0xFF));
       });
 }
 
@@ -85,14 +85,14 @@ TEST(ImageSwizzleFilter, WritePixels_RGBA_to_RGBX)
       });
 }
 
-TEST(ImageSwizzleFilter, WritePixels_RGBA_to_Premultiplied_RGRX)
+TEST(ImageSwizzleFilter, WritePixels_RGBA_to_Premultiplied_RGBX)
 {
   WithSwizzleFilter(
       IntSize(100, 100), SurfaceFormat::R8G8B8A8, SurfaceFormat::R8G8B8X8, true,
       [](Decoder* aDecoder, SurfaceFilter* aFilter) {
         CheckTransformedWritePixels(aDecoder, aFilter,
                                     BGRAColor(0x00, 0x00, 0x26, 0x7F, true),
-                                    BGRAColor(0x00, 0x00, 0x13, 0xFF));
+                                    BGRAColor(0x00, 0x00, 0x12, 0xFF));
       });
 }
 
