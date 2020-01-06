@@ -143,6 +143,7 @@ impl WrenchThing for CapturedDocument {
 pub struct CapturedSequence {
     root: PathBuf,
     frame: usize,
+    scene_changed: bool,
     frame_set: Vec<(u32, u32)>,
 }
 
@@ -166,6 +167,7 @@ impl CapturedSequence {
         Self {
             root,
             frame: 0,
+            scene_changed: false,
             frame_set,
         }
     }
@@ -185,12 +187,14 @@ impl WrenchThing for CapturedSequence {
     fn next_frame(&mut self) {
         if self.frame + 1 < self.frame_set.len() {
             self.frame += 1;
+            self.scene_changed |= self.frame_set[self.frame-1].0 != self.frame_set[self.frame].0;
         }
     }
 
     fn prev_frame(&mut self) {
         if self.frame > 0 {
             self.frame -= 1;
+            self.scene_changed |= self.frame_set[self.frame+1].0 != self.frame_set[self.frame].0;
         }
     }
 
@@ -201,6 +205,10 @@ impl WrenchThing for CapturedSequence {
             self.frame_set[self.frame]);
         let captured = documents.swap_remove(0);
         wrench.document_id = captured.document_id;
+        if self.scene_changed {
+            wrench.refresh();
+            self.scene_changed = false;
+        }
         self.frame as u32
     }
 }

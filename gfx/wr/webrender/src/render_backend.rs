@@ -725,6 +725,8 @@ pub struct RenderBackend {
     capture_config: Option<CaptureConfig>,
     #[cfg(feature = "replay")]
     loaded_resource_sequence_id: u32,
+    #[cfg(feature = "replay")]
+    loaded_scene_sequence_id: u32,
 }
 
 impl RenderBackend {
@@ -770,6 +772,7 @@ impl RenderBackend {
             capture_config: None,
             #[cfg(feature = "replay")]
             loaded_resource_sequence_id: 0,
+            loaded_scene_sequence_id: 0,
         }
     }
 
@@ -1928,92 +1931,109 @@ impl RenderBackend {
             };
         }
 
-        self.documents.clear();
         self.default_device_pixel_ratio = backend.default_device_pixel_ratio;
         self.frame_config = backend.frame_config;
 
-        let mut scenes_to_build = Vec::new();
+        // If this is a capture sequence, then the ID will be non-zero.
+        let reload_scene = self.loaded_scene_sequence_id != config.scene_id || config.scene_id == 0;
+        if reload_scene {
+            self.documents.clear();
 
-        for (id, view) in backend.documents {
-            debug!("\tdocument {:?}", id);
-            let scene_name = format!("scene-{}-{}", id.namespace_id.0, id.id);
-            let scene = config.deserialize_for_scene::<Scene, _>(&scene_name)
-                .expect(&format!("Unable to open {}.ron", scene_name));
+            let mut scenes_to_build = Vec::new();
 
-            let interners_name = format!("interners-{}-{}", id.namespace_id.0, id.id);
-            let interners = config.deserialize_for_scene::<Interners, _>(&interners_name)
-                .expect(&format!("Unable to open {}.ron", interners_name));
+            for (id, view) in backend.documents {
+                debug!("\tdocument {:?}", id);
+                let scene_name = format!("scene-{}-{}", id.namespace_id.0, id.id);
+                let scene = config.deserialize_for_scene::<Scene, _>(&scene_name)
+                    .expect(&format!("Unable to open {}.ron", scene_name));
 
-            let data_stores_name = format!("data-stores-{}-{}", id.namespace_id.0, id.id);
-            let data_stores = config.deserialize_for_frame::<DataStores, _>(&data_stores_name)
-                .expect(&format!("Unable to open {}.ron", data_stores_name));
+                let interners_name = format!("interners-{}-{}", id.namespace_id.0, id.id);
+                let interners = config.deserialize_for_scene::<Interners, _>(&interners_name)
+                    .expect(&format!("Unable to open {}.ron", interners_name));
 
-            let doc = Document {
-                id,
-                scene: BuiltScene::empty(),
-                removed_pipelines: Vec::new(),
-                view: view.clone(),
-                stamp: FrameStamp::first(id),
-                frame_builder: FrameBuilder::new(),
-                output_pipelines: FastHashSet::default(),
-                dynamic_properties: SceneProperties::new(),
-                hit_tester: None,
-                frame_is_valid: false,
-                hit_tester_is_valid: false,
-                rendered_frame_is_valid: false,
-                has_built_scene: false,
-                data_stores,
-                scratch: PrimitiveScratchBuffer::new(),
-                render_task_counters: RenderTaskGraphCounters::new(),
-                loaded_scene: scene.clone(),
-                prev_composite_descriptor: CompositeDescriptor::empty(),
-            };
+                let data_stores_name = format!("data-stores-{}-{}", id.namespace_id.0, id.id);
+                let data_stores = config.deserialize_for_frame::<DataStores, _>(&data_stores_name)
+                    .expect(&format!("Unable to open {}.ron", data_stores_name));
 
-            let frame_name = format!("frame-{}-{}", id.namespace_id.0, id.id);
-            let frame = config.deserialize_for_frame::<Frame, _>(frame_name);
-            let build_frame = match frame {
-                Some(frame) => {
-                    info!("\tloaded a built frame with {} passes", frame.passes.len());
+                let doc = Document {
+                    id,
+                    scene: BuiltScene::empty(),
+                    removed_pipelines: Vec::new(),
+                    view: view.clone(),
+                    stamp: FrameStamp::first(id),
+                    frame_builder: FrameBuilder::new(),
+                    output_pipelines: FastHashSet::default(),
+                    dynamic_properties: SceneProperties::new(),
+                    hit_tester: None,
+                    frame_is_valid: false,
+                    hit_tester_is_valid: false,
+                    rendered_frame_is_valid: false,
+                    has_built_scene: false,
+                    data_stores,
+                    scratch: PrimitiveScratchBuffer::new(),
+                    render_task_counters: RenderTaskGraphCounters::new(),
+                    loaded_scene: scene.clone(),
+                    prev_composite_descriptor: CompositeDescriptor::empty(),
+                };
 
-                    let msg_update = ResultMsg::UpdateGpuCache(self.gpu_cache.extract_updates());
-                    self.result_tx.send(msg_update).unwrap();
+                let frame_name = format!("frame-{}-{}", id.namespace_id.0, id.id);
+                let frame = config.deserialize_for_frame::<Frame, _>(frame_name);
+                let build_frame = match frame {
+                    Some(frame) => {
+                        info!("\tloaded a built frame with {} passes", frame.passes.len());
 
-                    let msg_publish = ResultMsg::PublishDocument(
-                        id,
-                        RenderedDocument { frame, is_new_scene: true },
-                        self.resource_cache.pending_updates(),
-                        profile_counters.clone(),
-                    );
-                    self.result_tx.send(msg_publish).unwrap();
-                    profile_counters.reset();
+                        let msg_update = ResultMsg::UpdateGpuCache(self.gpu_cache.extract_updates());
+                        self.result_tx.send(msg_update).unwrap();
 
-                    self.notifier.new_frame_ready(id, false, true, None);
+                        let msg_publish = ResultMsg::PublishDocument(
+                            id,
+                            RenderedDocument { frame, is_new_scene: true },
+                            self.resource_cache.pending_updates(),
+                            profile_counters.clone(),
+                        );
+                        self.result_tx.send(msg_publish).unwrap();
+                        profile_counters.reset();
 
-                    // We deserialized the state of the frame so we don't want to build
-                    // it (but we do want to update the scene builder's state)
-                    false
-                }
-                None => true,
-            };
+                        self.notifier.new_frame_ready(id, false, true, None);
 
-            scenes_to_build.push(LoadScene {
-                document_id: id,
-                scene: scene,
-                view: view.clone(),
-                config: self.frame_config.clone(),
-                output_pipelines: doc.output_pipelines.clone(),
-                font_instances: self.resource_cache.get_font_instances(),
-                build_frame,
-                interners,
-            });
+                        // We deserialized the state of the frame so we don't want to build
+                        // it (but we do want to update the scene builder's state)
+                        false
+                    }
+                    None => true,
+                };
 
-            self.documents.insert(id, doc);
-        }
+                scenes_to_build.push(LoadScene {
+                    document_id: id,
+                    scene: scene,
+                    view: view.clone(),
+                    config: self.frame_config.clone(),
+                    output_pipelines: doc.output_pipelines.clone(),
+                    font_instances: self.resource_cache.get_font_instances(),
+                    build_frame,
+                    interners,
+                });
 
-        if !scenes_to_build.is_empty() {
-            self.low_priority_scene_tx.send(
-                SceneBuilderRequest::LoadScenes(scenes_to_build)
-            ).unwrap();
+                self.documents.insert(id, doc);
+            }
+
+            if !scenes_to_build.is_empty() {
+                self.low_priority_scene_tx.send(
+                    SceneBuilderRequest::LoadScenes(scenes_to_build)
+                ).unwrap();
+            }
+        } else {
+            for (id, view) in backend.documents {
+                let data_stores_name = format!("data-stores-{}-{}", id.namespace_id.0, id.id);
+                let data_stores = config.deserialize_for_frame::<DataStores, _>(&data_stores_name)
+                    .expect(&format!("Unable to open {}.ron", data_stores_name));
+
+                let doc = self.documents.get_mut(&id).expect("No document?");
+                doc.view = view;
+                doc.data_stores = data_stores;
+                doc.frame_is_valid = false;
+                doc.rendered_frame_is_valid = false;
+            }
         }
     }
 }
