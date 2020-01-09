@@ -508,9 +508,9 @@ static void UnpremultiplyFallback(const uint8_t* aSrc, int32_t aSrcGap,
       // the reciprocal and shift off the fraction bits to approximate the
       // division by alpha.
       uint32_t q = sUnpremultiplyTable[a];
-      aDst[aDstRGBIndex + 0] = (r * q) >> 16;
-      aDst[aDstRGBIndex + 1] = (g * q) >> 16;
-      aDst[aDstRGBIndex + 2] = (b * q) >> 16;
+      aDst[aDstRGBIndex + 0] = (r * q + 0x8000) >> 16;
+      aDst[aDstRGBIndex + 1] = (g * q + 0x8000) >> 16;
+      aDst[aDstRGBIndex + 2] = (b * q + 0x8000) >> 16;
       aDst[aDstAIndex] = a;
 
       aSrc += 4;

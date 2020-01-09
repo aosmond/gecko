@@ -231,10 +231,21 @@ static MOZ_ALWAYS_INLINE __m128i UnpremultiplyVector_SSE2(const __m128i& aSrc) {
   rb = _mm_mullo_epi16(rb, scale);
   ga = _mm_mullo_epi16(ga, scale);
 
+  // Multiply R, B and G by the reciprocal, only taking the low word
+  // to calculate the round up.
+  __m128i rb_carry = _mm_mullo_epi16(rb, q1234);
+  __m128i ga_carry = _mm_mullo_epi16(ga, q1234);
+
   // Multiply R, B, and G by the reciprocal, only taking the high word
-  // too effectively shift right by 16.
+  // to effectively shift right by 16.
   rb = _mm_mulhi_epu16(rb, q1234);
   ga = _mm_mulhi_epu16(ga, q1234);
+
+  // Calculate the carry bit to adjust the final R, B and G values.
+  rb_carry = _mm_srli_epi16(_mm_cmplt_epi16(rb_carry, _mm_set1_epi16(0xFF81)), 15);
+  ga_carry = _mm_srli_epi16(_mm_cmplt_epi16(ga_carry, _mm_set1_epi16(0xFF81)), 15);
+  rb = _mm_adds_epu8(rb, rb_carry);
+  ga = _mm_adds_epu8(ga, ga_carry);
 
   // Combine back to final pixel with rb | (ga << 8) | (aSrc & 0xFF000000),
   // which will add back on the original alpha value unchanged.
