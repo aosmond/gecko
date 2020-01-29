@@ -352,6 +352,7 @@ class DrawableFrameRef final {
     if (aFrame->mRawSurface) {
       mRef.emplace(aFrame->mRawSurface, DataSourceSurface::READ);
       if (!mRef->IsMapped()) {
+        printf_stderr("[AO][%p] imgFrame: failed to map surface %p\n", aFrame, aFrame->mRawSurface.get());
         mFrame = nullptr;
         mRef.reset();
       }
@@ -359,6 +360,7 @@ class DrawableFrameRef final {
       // The optimized surface has become invalid, so we need to redecode.
       // For example, on Windows, there may have been a device reset, and
       // all D2D surfaces now need to be recreated.
+      printf_stderr("[AO][%p] imgFrame: invalid opt surface %p\n", aFrame, aFrame->mOptSurface.get());
       mFrame = nullptr;
     }
   }

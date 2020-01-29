@@ -614,6 +614,7 @@ bool imgFrame::Draw(gfxContext* aContext, const ImageRegion& aRegion,
     bool temporary = !drawTarget->IsCaptureDT() && !recording;
     RefPtr<SourceSurface> surf = GetSourceSurfaceInternal(temporary);
     if (!surf) {
+      printf_stderr("[AO][%p] imgFrame: failed to get surface for drawing\n", this);
       return false;
     }
 
@@ -635,6 +636,8 @@ bool imgFrame::Draw(gfxContext* aContext, const ImageRegion& aRegion,
     gfxUtils::DrawPixelSnapped(aContext, surfaceResult.mDrawable,
                                imageRect.Size(), region, surfaceResult.mFormat,
                                aSamplingFilter, aImageFlags, aOpacity);
+  } else {
+    printf_stderr("[AO][%p] imgFrame: invalid surface result for drawing, silently fail\n", this);
   }
 
   return true;
@@ -836,6 +839,7 @@ already_AddRefed<SourceSurface> imgFrame::GetSourceSurfaceInternal(
       RefPtr<SourceSurface> surf(mOptSurface);
       return surf.forget();
     } else {
+      printf_stderr("[AO][%p] clearing invalid opt surface %p\n", this, mOptSurface.get());
       mOptSurface = nullptr;
     }
   }

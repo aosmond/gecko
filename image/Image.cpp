@@ -209,6 +209,7 @@ ImgDrawResult ImageResource::GetImageContainerImpl(
       case ImgDrawResult::INCOMPLETE:
       case ImgDrawResult::TEMPORARY_ERROR:
         // Temporary conditions where we need to rerequest the frame to recover.
+        printf_stderr("[AO][%p] Image: image container temp error, rerequest\n", this);
         break;
       case ImgDrawResult::WRONG_SIZE:
         // Unused by GetFrameInternal
@@ -296,6 +297,7 @@ ImgDrawResult ImageResource::GetImageContainerImpl(
 
   SetCurrentImage(container, surface, Nothing());
   entry->mLastDrawResult = drawResult;
+  printf_stderr("[AO][%p] Image: image container result %u\n", this, uint32_t(drawResult));
   container.forget(aOutContainer);
   return drawResult;
 }
