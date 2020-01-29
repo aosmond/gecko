@@ -614,7 +614,7 @@ bool imgFrame::Draw(gfxContext* aContext, const ImageRegion& aRegion,
     bool temporary = !drawTarget->IsCaptureDT() && !recording;
     RefPtr<SourceSurface> surf = GetSourceSurfaceInternal(temporary);
     if (!surf) {
-      gfxWarning() << "[AO][" << size_t(this) << "] imgFrame: failed to get surface for drawing";
+      gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] imgFrame: failed to get surface for drawing";
       return false;
     }
 
@@ -637,7 +637,7 @@ bool imgFrame::Draw(gfxContext* aContext, const ImageRegion& aRegion,
                                imageRect.Size(), region, surfaceResult.mFormat,
                                aSamplingFilter, aImageFlags, aOpacity);
   } else {
-    gfxWarning() << "[AO][" << size_t(this) << "] imgFrame: invalid surface result for drawing, silently fail";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] imgFrame: invalid surface result for drawing, silently fail";
   }
 
   return true;
@@ -839,7 +839,7 @@ already_AddRefed<SourceSurface> imgFrame::GetSourceSurfaceInternal(
       RefPtr<SourceSurface> surf(mOptSurface);
       return surf.forget();
     } else {
-      gfxWarning() << "[AO][" << size_t(this) << "] imgFrame: clearing invalid opt surface " << size_t(mOptSurface.get());
+      gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] imgFrame: clearing invalid opt surface " << mozilla::gfx::hexa(mOptSurface.get());
       mOptSurface = nullptr;
     }
   }

@@ -61,6 +61,7 @@ class SourceSurfaceD2D1 : public SourceSurface {
   RefPtr<ID2D1DeviceContext> mDC;
   // Keep this around to verify whether out image is still valid in the future.
   RefPtr<ID2D1Device> mDevice;
+  uint32_t mDeviceSeq;
 
   SurfaceFormat mFormat;
   IntSize mSize;

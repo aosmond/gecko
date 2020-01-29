@@ -2074,6 +2074,7 @@ already_AddRefed<ID2D1Brush> DrawTargetD2D1::CreateBrushForPattern(
     }
 
     if (!image) {
+      gfxWarning() << "Missing image, cannot create brush!";
       return CreateTransparentBlackBrush();
     }
 
@@ -2088,14 +2089,14 @@ already_AddRefed<ID2D1Brush> DrawTargetD2D1::CreateBrushForPattern(
         D2D1_EXTEND_MODE xRepeat = D2DExtend(pat->mExtendMode, Axis::X_AXIS);
         D2D1_EXTEND_MODE yRepeat = D2DExtend(pat->mExtendMode, Axis::Y_AXIS);
 
-        mDC->CreateBitmapBrush(
+        auto res = mDC->CreateBitmapBrush(
             bitmap,
             D2D1::BitmapBrushProperties(xRepeat, yRepeat,
                                         D2DFilter(pat->mSamplingFilter)),
             D2D1::BrushProperties(aAlpha, D2DMatrix(mat)),
             getter_AddRefs(bitmapBrush));
         if (!bitmapBrush) {
-          gfxWarning() << "Couldn't create bitmap brush!";
+          gfxWarning() << "Couldn't create bitmap brush! " << mozilla::gfx::hexa(res) << " " << surf->IsValid();
           return CreateTransparentBlackBrush();
         }
         return bitmapBrush.forget();
@@ -2119,7 +2120,7 @@ already_AddRefed<ID2D1Brush> DrawTargetD2D1::CreateBrushForPattern(
     D2D1_EXTEND_MODE xRepeat = D2DExtend(pat->mExtendMode, Axis::X_AXIS);
     D2D1_EXTEND_MODE yRepeat = D2DExtend(pat->mExtendMode, Axis::Y_AXIS);
 
-    mDC->CreateImageBrush(
+    auto res = mDC->CreateImageBrush(
         image,
         D2D1::ImageBrushProperties(samplingBounds, xRepeat, yRepeat,
                                    D2DInterpolationMode(pat->mSamplingFilter)),
@@ -2127,7 +2128,7 @@ already_AddRefed<ID2D1Brush> DrawTargetD2D1::CreateBrushForPattern(
         getter_AddRefs(imageBrush));
 
     if (!imageBrush) {
-      gfxWarning() << "Couldn't create image brush!";
+      gfxWarning() << "Couldn't create image brush: " << mozilla::gfx::hexa(res);
       return CreateTransparentBlackBrush();
     }
 
@@ -2158,11 +2159,6 @@ already_AddRefed<ID2D1Image> DrawTargetD2D1::GetImageForSurface(
     case SurfaceType::D2D1_1_IMAGE: {
       SourceSurfaceD2D1* surf = static_cast<SourceSurfaceD2D1*>(surface.get());
       image = surf->GetImage();
-      if (!image) {
-        gfxWarning() << "[AO] Missing image, force creation";
-        RefPtr<DataSourceSurface> tmp = surf->GetDataSurface();
-        image = surf->GetImage();
-      }
       AddDependencyOnSource(surf);
     } break;
     case SurfaceType::DUAL_DT: {

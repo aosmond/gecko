@@ -16,9 +16,11 @@ SourceSurfaceD2D1::SourceSurfaceD2D1(ID2D1Image* aImage,
                                      const IntSize& aSize, DrawTargetD2D1* aDT)
     : mImage(aImage),
       mDC(aDC),
-      mDevice(Factory::GetD2D1Device()),
+      mDevice(nullptr),
+      mDeviceSeq(0),
       mDrawTarget(aDT) {
   aImage->QueryInterface((ID2D1Bitmap1**)getter_AddRefs(mRealizedBitmap));
+  mDevice = Factory::GetD2D1Device(&mDeviceSeq);
 
   mFormat = aFormat;
   mSize = aSize;
@@ -30,7 +32,12 @@ SourceSurfaceD2D1::SourceSurfaceD2D1(ID2D1Image* aImage,
 SourceSurfaceD2D1::~SourceSurfaceD2D1() {}
 
 bool SourceSurfaceD2D1::IsValid() const {
-  return mDevice == Factory::GetD2D1Device();
+  uint32_t currentSeq = 0;
+  RefPtr<ID2D1Device> currentDevice = Factory::GetD2D1Device(&currentSeq);
+  if (mDevice != currentDevice || mDeviceSeq != currentSeq) {
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] surface not valid: od " << mozilla::gfx::hexa(mDevice.get()) << " != nd " << mozilla::gfx::hexa(currentDevice.get()) << " || os " << mDeviceSeq << " != ns " << currentSeq;
+  }
+  return true;
 }
 
 already_AddRefed<DataSourceSurface> SourceSurfaceD2D1::GetDataSurface() {
@@ -137,6 +144,8 @@ void SourceSurfaceD2D1::DrawTargetWillChange() {
     MarkIndependent();
     return;
   }
+
+  gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] draw target will change; image " << mozilla::gfx::hexa(mImage.get()) << " new " << mozilla::gfx::hexa(mRealizedBitmap.get());
 
   D2D1_POINT_2U point = D2D1::Point2U(0, 0);
   D2D1_RECT_U rect = D2D1::RectU(0, 0, mSize.width, mSize.height);

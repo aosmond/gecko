@@ -353,7 +353,7 @@ class DrawableFrameRef final {
     if (aFrame->mRawSurface) {
       mRef.emplace(aFrame->mRawSurface, DataSourceSurface::READ);
       if (!mRef->IsMapped()) {
-        gfxWarning() << "[AO][" << size_t(aFrame) << "] imgFrame: failed to map surface " << size_t(aFrame->mRawSurface.get());
+        gfxWarning() << "[AO][" << mozilla::gfx::hexa(aFrame) << "] imgFrame: failed to map surface " << mozilla::gfx::hexa(aFrame->mRawSurface.get());
         mFrame = nullptr;
         mRef.reset();
       }
@@ -361,7 +361,7 @@ class DrawableFrameRef final {
       // The optimized surface has become invalid, so we need to redecode.
       // For example, on Windows, there may have been a device reset, and
       // all D2D surfaces now need to be recreated.
-      gfxWarning() << "[AO][" << size_t(aFrame) << "] imgFrame: image opt surface " << size_t(aFrame->mOptSurface.get());
+      gfxWarning() << "[AO][" << mozilla::gfx::hexa(aFrame) << "] imgFrame: image opt surface " << mozilla::gfx::hexa(aFrame->mOptSurface.get());
       mFrame = nullptr;
     }
   }

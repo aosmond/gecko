@@ -1379,16 +1379,16 @@ ImgDrawResult RasterImage::DrawInternal(DrawableSurface&& aSurface,
   }
 
   if (!aSurface->Draw(aContext, region, aSamplingFilter, aFlags, aOpacity)) {
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: frame draw failed, temp error";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: frame draw failed, temp error";
     RecoverFromInvalidFrames(aSize, aFlags);
     return ImgDrawResult::TEMPORARY_ERROR;
   }
   if (!frameIsFinished) {
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: frame draw incomplete";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: frame draw incomplete";
     return ImgDrawResult::INCOMPLETE;
   }
   if (couldRedecodeForBetterFrame) {
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: frame draw wrong size";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: frame draw wrong size";
     return ImgDrawResult::WRONG_SIZE;
   }
   return ImgDrawResult::SUCCESS;
@@ -1406,7 +1406,7 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
   }
 
   if (mError) {
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " bad image";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " bad image";
     return ImgDrawResult::BAD_IMAGE;
   }
 
@@ -1414,7 +1414,7 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
   // (Disabling colorspace conversion might make sense to allow, but
   // we don't currently.)
   if (ToSurfaceFlags(aFlags) != DefaultSurfaceFlags()) {
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " bad default flags";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " bad default flags";
     return ImgDrawResult::BAD_ARGS;
   }
 
@@ -1439,7 +1439,7 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
     if (mDrawStartTime.IsNull()) {
       mDrawStartTime = TimeStamp::Now();
     }
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " not ready";
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " not ready";
     return ImgDrawResult::NOT_READY;
   }
 
@@ -1534,7 +1534,7 @@ void RasterImage::DoError() {
     return;
   }
 
-  gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: hit error";
+  gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: hit error";
 
   // Put the container in an error state.
   mError = true;
@@ -1638,8 +1638,8 @@ void RasterImage::NotifyDecodeComplete(
     DecoderFlags aDecoderFlags, SurfaceFlags aSurfaceFlags) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (mDrawStartTime.IsNull()) {
-    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: decode complete from earlier draw not ready";
+  if (!mDrawStartTime.IsNull()) {
+    gfxWarning() << "[AO][" << mozilla::gfx::hexa(this) << "] RasterImage: decode complete from earlier draw not ready";
   }
 
   // If the decoder detected an error, log it to the error console.
