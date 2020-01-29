@@ -2160,7 +2160,7 @@ already_AddRefed<ID2D1Image> DrawTargetD2D1::GetImageForSurface(
       image = surf->GetImage();
       if (!image) {
         gfxWarning() << "[AO] Missing image, force creation";
-        surf->GetDataSurface();
+        RefPtr<DataSourceSurface> tmp = surf->GetDataSurface();
         image = surf->GetImage();
       }
       AddDependencyOnSource(surf);
