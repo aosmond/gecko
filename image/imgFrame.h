@@ -15,6 +15,7 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Monitor.h"
+#include "mozilla/gfx/Logging.h"
 
 namespace mozilla {
 namespace image {
@@ -352,7 +353,7 @@ class DrawableFrameRef final {
     if (aFrame->mRawSurface) {
       mRef.emplace(aFrame->mRawSurface, DataSourceSurface::READ);
       if (!mRef->IsMapped()) {
-        printf_stderr("[AO][%p] imgFrame: failed to map surface %p\n", aFrame, aFrame->mRawSurface.get());
+        gfxWarning() << "[AO][" << size_t(aFrame) << "] imgFrame: failed to map surface " << size_t(aFrame->mRawSurface.get());
         mFrame = nullptr;
         mRef.reset();
       }
@@ -360,7 +361,7 @@ class DrawableFrameRef final {
       // The optimized surface has become invalid, so we need to redecode.
       // For example, on Windows, there may have been a device reset, and
       // all D2D surfaces now need to be recreated.
-      printf_stderr("[AO][%p] imgFrame: invalid opt surface %p\n", aFrame, aFrame->mOptSurface.get());
+      gfxWarning() << "[AO][" << size_t(aFrame) << "] imgFrame: image opt surface " << size_t(aFrame->mOptSurface.get());
       mFrame = nullptr;
     }
   }

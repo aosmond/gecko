@@ -2158,6 +2158,11 @@ already_AddRefed<ID2D1Image> DrawTargetD2D1::GetImageForSurface(
     case SurfaceType::D2D1_1_IMAGE: {
       SourceSurfaceD2D1* surf = static_cast<SourceSurfaceD2D1*>(surface.get());
       image = surf->GetImage();
+      if (!image) {
+        gfxWarning() << "[AO] Missing image, force creation";
+        surf->GetDataSurface();
+        image = surf->GetImage();
+      }
       AddDependencyOnSource(surf);
     } break;
     case SurfaceType::DUAL_DT: {

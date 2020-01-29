@@ -7,6 +7,7 @@
 // that #include prlog.h
 #include "RasterImage.h"
 
+
 #include <stdint.h>
 
 #include <algorithm>
@@ -49,6 +50,8 @@
 #include "nsProperties.h"
 #include "prenv.h"
 #include "prsystem.h"
+#include "mozilla/gfx/Logging.h"
+
 
 namespace mozilla {
 
@@ -1376,16 +1379,16 @@ ImgDrawResult RasterImage::DrawInternal(DrawableSurface&& aSurface,
   }
 
   if (!aSurface->Draw(aContext, region, aSamplingFilter, aFlags, aOpacity)) {
-    printf_stderr("[AO][%p] RasterImage: frame draw failed, temp error\n", this);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: frame draw failed, temp error";
     RecoverFromInvalidFrames(aSize, aFlags);
     return ImgDrawResult::TEMPORARY_ERROR;
   }
   if (!frameIsFinished) {
-    printf_stderr("[AO][%p] RasterImage: frame draw incomplete\n", this);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: frame draw incomplete";
     return ImgDrawResult::INCOMPLETE;
   }
   if (couldRedecodeForBetterFrame) {
-    printf_stderr("[AO][%p] RasterImage: frame draw wrong size\n", this);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: frame draw wrong size";
     return ImgDrawResult::WRONG_SIZE;
   }
   return ImgDrawResult::SUCCESS;
@@ -1403,7 +1406,7 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
   }
 
   if (mError) {
-    printf_stderr("[AO][%p] RasterImage: draw %dx%d bad image\n", this, aSize.width, aSize.height);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " bad image";
     return ImgDrawResult::BAD_IMAGE;
   }
 
@@ -1411,7 +1414,7 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
   // (Disabling colorspace conversion might make sense to allow, but
   // we don't currently.)
   if (ToSurfaceFlags(aFlags) != DefaultSurfaceFlags()) {
-    printf_stderr("[AO][%p] RasterImage: draw %dx%d bad default flags\n", this, aSize.width, aSize.height);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " bad default flags";
     return ImgDrawResult::BAD_ARGS;
   }
 
@@ -1436,7 +1439,7 @@ RasterImage::Draw(gfxContext* aContext, const IntSize& aSize,
     if (mDrawStartTime.IsNull()) {
       mDrawStartTime = TimeStamp::Now();
     }
-    printf_stderr("[AO][%p] RasterImage: draw %dx%d not ready\n", this, aSize.width, aSize.height);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: draw " << aSize.width << "x" << aSize.height << " not ready";
     return ImgDrawResult::NOT_READY;
   }
 
@@ -1531,7 +1534,7 @@ void RasterImage::DoError() {
     return;
   }
 
-  printf_stderr("[AO][%p] RasterImage: hit error\n", this);
+  gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: hit error";
 
   // Put the container in an error state.
   mError = true;
@@ -1636,7 +1639,7 @@ void RasterImage::NotifyDecodeComplete(
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mDrawStartTime.IsNull()) {
-    printf_stderr("[AO][%p] RasterImage: decode complete from earlier draw not ready\n", this);
+    gfxWarning() << "[AO][" << size_t(this) << "] RasterImage: decode complete from earlier draw not ready";
   }
 
   // If the decoder detected an error, log it to the error console.
