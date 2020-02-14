@@ -224,14 +224,11 @@ XPCOMUtils.defineLazyScriptGetter(
   "SearchOneOffs",
   "chrome://browser/content/search/search-one-offs.js"
 );
-if (AppConstants.NIGHTLY_BUILD) {
-  XPCOMUtils.defineLazyScriptGetter(
-    this,
-    "gGfxUtils",
-    "chrome://browser/content/browser-graphics-utils.js"
-  );
-}
-
+XPCOMUtils.defineLazyScriptGetter(
+  this,
+  "gGfxUtils",
+  "chrome://browser/content/browser-graphics-utils.js"
+);
 XPCOMUtils.defineLazyScriptGetter(
   this,
   "pktUI",
@@ -2032,6 +2029,8 @@ var gBrowserInit = {
     }
 
     gExtensionsNotifications.init();
+
+    gGfxUtils.init();
 
     let wasMinimized = window.windowState == window.STATE_MINIMIZED;
     window.addEventListener("sizemodechange", () => {

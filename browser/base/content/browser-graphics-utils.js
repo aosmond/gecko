@@ -11,6 +11,34 @@
 var gGfxUtils = {
   _isRecording: false,
   _isTransactionLogging: false,
+
+  init() {
+    if (Services.prefs.getBoolPref("gfx.webrender.enable-capture")) {
+      this.addWrCaptureCmd();
+    }
+  },
+
+  addWrCaptureCmd() {
+    let command = document.createXULElement("command");
+    command.setAttribute("id", "wrCaptureCmd");
+    command.addEventListener("command", this.webrenderCapture, true);
+    command.setAttribute("oncommand", "void 0;"); // Needed - bug 371900
+    document.getElementById("mainCommandSet").prepend(command);
+
+    let key = document.createXULElement("key");
+    key.setAttribute("id", "key_wrCaptureCmd");
+    if (AppConstants.platform == "macosx") {
+      key.setAttribute("key", "3");
+      key.setAttribute("modifiers", "control,shift");
+    } else {
+      key.setAttribute("key", "#");
+      key.setAttribute("modifiers", "control");
+    }
+    key.setAttribute("command", "wrCaptureCmd");
+    key.setAttribute("oncommand", "void 0;"); // Needed - bug 371900
+    document.getElementById("mainKeyset").prepend(key);
+  },
+
   /**
    * Toggle composition recording for the current window.
    */
