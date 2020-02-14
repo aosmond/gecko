@@ -621,7 +621,9 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       wr::LayoutRect clip = wr::ToLayoutRect(
           LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
 
-      if (mExtendMode == ExtendMode::CLAMP) {
+      if (mExtendMode == ExtendMode::CLAMP ||
+          (aRepeatSize.width == aDest.width &&
+           aRepeatSize.height == aDest.height)) {
         // The image is not repeating. Just push as a regular image.
         aBuilder.PushImage(dest, clip, !aItem->BackfaceIsHidden(), rendering,
                            key.value());
