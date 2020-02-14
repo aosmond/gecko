@@ -51,6 +51,7 @@
 #include "mozilla/PresShell.h"
 #include "mozilla/PresShellInlines.h"
 #include "mozilla/Span.h"
+#include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_layout.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/TextEventDispatcher.h"
@@ -4072,8 +4073,10 @@ nsTranslationNodeList::GetLength(uint32_t* aRetVal) {
 
 NS_IMETHODIMP
 nsDOMWindowUtils::WrCapture() {
-  if (WebRenderBridgeChild* wrbc = GetWebRenderBridge()) {
-    wrbc->Capture();
+  if (StaticPrefs::gfx_webrender_enable_capture()) {
+    if (WebRenderBridgeChild* wrbc = GetWebRenderBridge()) {
+      wrbc->Capture();
+    }
   }
   return NS_OK;
 }
