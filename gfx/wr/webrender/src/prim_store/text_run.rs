@@ -245,13 +245,15 @@ impl TextRunPrimitive {
         // Check there is a valid transform that doesn't exceed the font size limit.
         // Ensure the font is supposed to be rasterized in screen-space.
         // Only support transforms that can be coerced to simple 2D transforms.
-        let (transform_glyphs, oversized) = if raster_space != RasterSpace::Screen ||
-            transform.has_perspective_component() || !transform.has_2d_inverse() {
-            (false, device_font_size.to_f64_px() > FONT_SIZE_LIMIT)
+        let (transform_glyphs, disable_subpixel_aa, oversized) = if raster_space != RasterSpace::Screen {
+            let oversized = device_font_size.to_f64_px() > FONT_SIZE_LIMIT;
+            (false, oversized, oversized)
+        } else if transform.has_perspective_component() || !transform.has_2d_inverse() {
+            (false, true, device_font_size.to_f64_px() > FONT_SIZE_LIMIT)
         } else if transform.exceeds_2d_scale(FONT_SIZE_LIMIT / device_font_size.to_f64_px()) {
-            (false, true)
+            (false, true, true)
         } else {
-            (true, false)
+            (true, false, false)
         };
 
         if oversized {
@@ -310,23 +312,23 @@ impl TextRunPrimitive {
             ..specified_font.clone()
         };
 
-        // If subpixel AA is disabled due to the backing surface the glyphs
-        // are being drawn onto, disable it (unless we are using the
-        // specifial subpixel mode that estimates background color).
         if (subpixel_mode == SubpixelMode::Deny && self.used_font.bg_color.a == 0) ||
-            // If using local space glyphs, we don't want subpixel AA.
-            !transform_glyphs
+            disable_subpixel_aa
         {
+            // If subpixel AA is disabled due to the backing surface the glyphs
+            // are being drawn onto, disable it (unless we are using the
+            // specifial subpixel mode that estimates background color).
             self.used_font.disable_subpixel_aa();
+        }
 
+        if oversized {
             // Disable subpixel positioning for oversized glyphs to avoid
             // thrashing the glyph cache with many subpixel variations of
             // big glyph textures. A possible subpixel positioning error
             // is small relative to the maximum font size and thus should
             // not be very noticeable.
-            if oversized {
-                self.used_font.disable_subpixel_position();
-            }
+            debug_assert!(disable_subpixel_aa);
+            self.used_font.disable_subpixel_position();
         }
 
         cache_dirty
