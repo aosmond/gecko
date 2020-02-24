@@ -297,6 +297,9 @@ const GfxDeviceFamily* GfxDriverInfo::GetDeviceFamily(DeviceFamily id) {
     case DeviceFamily::IntelHD3000:
       APPEND_DEVICE(0x0126);
       break;
+    case DeviceFamily::IntelHD515:
+      APPEND_DEVICE(0x191e);
+      break;
     case DeviceFamily::IntelHD520:
       APPEND_DEVICE(0x1916);
       break;
@@ -665,6 +668,7 @@ const nsAString& GfxDriverInfo::GetDeviceVendor(DeviceFamily id) {
     case DeviceFamily::IntelHDGraphicsToSandyBridge:
     case DeviceFamily::IntelHDGraphicsToHaswell:
     case DeviceFamily::IntelHD3000:
+    case DeviceFamily::IntelHD515:
     case DeviceFamily::IntelHD520:
     case DeviceFamily::IntelMobileHDGraphics:
     case DeviceFamily::IntelRolloutWebRender:
