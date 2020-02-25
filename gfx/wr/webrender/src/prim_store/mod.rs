@@ -2194,22 +2194,6 @@ impl PrimitiveStore {
                         );
                     }
 
-                    // Check if the clip bounding rect (in pic space) is visible on screen
-                    // This includes both the prim bounding rect + local prim clip rect!
-                    let world_rect = match map_surface_to_world.map(&clip_chain.pic_clip_rect) {
-                        Some(world_rect) => world_rect,
-                        None => {
-                            continue;
-                        }
-                    };
-
-                    let clipped_world_rect = match world_rect.intersection(&world_culling_rect) {
-                        Some(rect) => rect,
-                        None => {
-                            continue;
-                        }
-                    };
-
                     let combined_local_clip_rect = if apply_local_clip_rect {
                         clip_chain.local_clip_rect
                     } else {
@@ -2228,10 +2212,13 @@ impl PrimitiveStore {
 
                     // Include the visible area for primitive, including any shadows, in
                     // the area affected by the surface.
-                    match combined_local_clip_rect.intersection(&local_rect) {
+                    let visible_rect = match combined_local_clip_rect.intersection(&local_rect) {
                         Some(visible_rect) => {
                             if let Some(rect) = map_local_to_surface.map(&visible_rect) {
                                 surface_rect = surface_rect.union(&rect);
+                                rect
+                            } else {
+                                continue;
                             }
                         }
                         None => {
@@ -2241,7 +2228,23 @@ impl PrimitiveStore {
                             prim_instance.visibility_info = PrimitiveVisibilityIndex::INVALID;
                             continue;
                         }
-                    }
+                    };
+
+                    // Check if the clip bounding rect (in pic space) is visible on screen
+                    // This includes both the prim bounding rect + local prim clip rect!
+                    let world_rect = match map_surface_to_world.map(&visible_rect) {
+                        Some(world_rect) => world_rect,
+                        None => {
+                            continue;
+                        }
+                    };
+
+                    let clipped_world_rect = match world_rect.intersection(&world_culling_rect) {
+                        Some(rect) => rect,
+                        None => {
+                            continue;
+                        }
+                    };
 
                     // When the debug display is enabled, paint a colored rectangle around each
                     // primitive.
