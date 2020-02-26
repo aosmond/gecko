@@ -309,13 +309,11 @@ class BulletRenderer final {
   // disclosure closed.
   RefPtr<Path> mPath;
 
-  // mText, mFontMertrics, mPoint, mFont and mGlyphs are for other
-  // list-style-type which can be drawed by text.
+  // mText, mFontMertrics, mPoint are for other list-style-type which can be
+  // drawed by text.
   nsString mText;
   RefPtr<nsFontMetrics> mFontMetrics;
   nsPoint mPoint;
-  RefPtr<ScaledFont> mFont;
-  nsTArray<layers::GlyphArray> mGlyphs;
 
   // Store the type of list-style-type.
   int32_t mListStyleType;

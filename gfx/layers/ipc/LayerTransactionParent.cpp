@@ -602,7 +602,8 @@ bool LayerTransactionParent::SetLayerAttributes(
       if (!colorLayer) {
         return false;
       }
-      colorLayer->SetColor(specific.get_ColorLayerAttributes().color().value());
+      const auto& c = specific.get_ColorLayerAttributes().color();
+      colorLayer->SetColor(gfx::Color(c.r(), c.b(), c.g(), c.a()));
       colorLayer->SetBounds(specific.get_ColorLayerAttributes().bounds());
       break;
     }

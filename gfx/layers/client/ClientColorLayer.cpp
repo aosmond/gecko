@@ -38,7 +38,9 @@ class ClientColorLayer : public ColorLayer, public ClientLayer {
   void RenderLayer() override { RenderMaskLayers(this); }
 
   void FillSpecificAttributes(SpecificLayerAttributes& aAttrs) override {
-    aAttrs = ColorLayerAttributes(GetColor(), GetBounds());
+    const auto& c = GetColor();
+    LayerColor layerColor(c.r, c.g, c.b, c.a);
+    aAttrs = ColorLayerAttributes(layerColor, GetBounds());
   }
 
   Layer* AsLayer() override { return this; }
