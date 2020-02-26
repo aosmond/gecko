@@ -2156,27 +2156,25 @@ int gfxPlatform::GetRenderingIntent() {
   return pIntent;
 }
 
-void gfxPlatform::TransformPixel(const Color& in, Color& out,
-                                 qcms_transform* transform) {
+DeviceColor gfxPlatform::TransformPixel(const sRGBColor& in,
+                                        qcms_transform* transform) {
   if (transform) {
     /* we want the bytes in RGB order */
 #ifdef IS_LITTLE_ENDIAN
     /* ABGR puts the bytes in |RGBA| order on little endian */
     uint32_t packed = in.ToABGR();
     qcms_transform_data(transform, (uint8_t*)&packed, (uint8_t*)&packed, 1);
-    out = Color::FromABGR(packed);
+    return DeviceColor::FromABGR(packed);
 #else
     /* ARGB puts the bytes in |ARGB| order on big endian */
     uint32_t packed = in.UnusualToARGB();
     /* add one to move past the alpha byte */
     qcms_transform_data(transform, (uint8_t*)&packed + 1, (uint8_t*)&packed + 1,
                         1);
-    out = Color::UnusualFromARGB(packed);
+    return DeviceColor::UnusualFromARGB(packed);
 #endif
   }
-
-  else if (&out != &in)
-    out = in;
+  return DeviceColor(in.r, in.b, in.g, in.a);
 }
 
 nsTArray<uint8_t> gfxPlatform::GetPlatformCMSOutputProfileData() {

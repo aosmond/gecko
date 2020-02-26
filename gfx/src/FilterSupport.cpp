@@ -212,7 +212,7 @@ static already_AddRefed<FilterNode> GaussianBlur(DrawTarget* aDT,
 already_AddRefed<FilterNode> Clear(DrawTarget* aDT) {
   RefPtr<FilterNode> filter = aDT->CreateFilter(FilterType::FLOOD);
   if (filter) {
-    filter->SetAttribute(ATT_FLOOD_COLOR, Color(0, 0, 0, 0));
+    filter->SetAttribute(ATT_FLOOD_COLOR, DeviceColor());
     return filter.forget();
   }
   return nullptr;
@@ -778,7 +778,7 @@ static already_AddRefed<FilterNode> FilterNodeFromPrimitiveDescription(
     }
 
     already_AddRefed<FilterNode> operator()(const FloodAttributes& aFlood) {
-      Color color = aFlood.mColor;
+      DeviceColor color = aFlood.mColor;
       RefPtr<FilterNode> filter = mDT->CreateFilter(FilterType::FLOOD);
       if (!filter) {
         return nullptr;
@@ -995,11 +995,11 @@ static already_AddRefed<FilterNode> FilterNodeFromPrimitiveDescription(
       if (!flood) {
         return nullptr;
       }
-      Color color = aDropShadow.mColor;
+      DeviceColor color = aDropShadow.mColor;
       if (mDescription.InputColorSpace(0) == ColorSpace::LinearRGB) {
-        color = Color(gsRGBToLinearRGBMap[uint8_t(color.r * 255)],
-                      gsRGBToLinearRGBMap[uint8_t(color.g * 255)],
-                      gsRGBToLinearRGBMap[uint8_t(color.b * 255)], color.a);
+        color = DeviceColor(gsRGBToLinearRGBMap[uint8_t(color.r * 255)],
+                            gsRGBToLinearRGBMap[uint8_t(color.g * 255)],
+                            gsRGBToLinearRGBMap[uint8_t(color.b * 255)], color.a);
       }
       flood->SetAttribute(ATT_FLOOD_COLOR, color);
 

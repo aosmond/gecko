@@ -223,7 +223,7 @@ class gfxUtils {
    * number. The colors will cycle after sNumFrameColors.  You can query colors
    * 0 .. sNumFrameColors-1 to get all the colors back.
    */
-  static const mozilla::gfx::Color& GetColorForFrameNumber(
+  static const mozilla::gfx::DeviceColor& GetColorForFrameNumber(
       uint64_t aFrameNumber);
   static const uint32_t sNumFrameColors;
 
@@ -333,9 +333,11 @@ namespace gfx {
  * returned unchanged (other than a type change to Moz2D Color, if
  * applicable).
  */
-Color ToDeviceColor(Color aColor);
-Color ToDeviceColor(const StyleRGBA& aColor);
-Color ToDeviceColor(nscolor aColor);
+DeviceColor ToDeviceColor(const sRGBColor& aColor);
+DeviceColor ToDeviceColor(const StyleRGBA& aColor);
+DeviceColor ToDeviceColor(nscolor aColor);
+DeviceColor ToDeviceColorF(float aR, float aG, float aB, float aA);
+DeviceColor ToDeviceColorU8(uint8_t aR, uint8_t aG, uint8_t aB, uint8_t aA);
 
 /**
  * Performs a checked multiply of the given width, height, and bytes-per-pixel

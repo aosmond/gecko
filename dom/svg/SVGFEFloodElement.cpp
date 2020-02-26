@@ -39,11 +39,11 @@ FilterPrimitiveDescription SVGFEFloodElement::GetPrimitiveDescription(
   nsIFrame* frame = GetPrimaryFrame();
   if (frame) {
     const nsStyleSVGReset* styleSVGReset = frame->Style()->StyleSVGReset();
-    Color color(Color::FromABGR(styleSVGReset->mFloodColor.CalcColor(frame)));
+    DeviceColor color = ToDeviceColor(styleSVGReset->mFloodColor.CalcColor(frame));
     color.a *= styleSVGReset->mFloodOpacity;
     atts.mColor = color;
   } else {
-    atts.mColor = Color();
+    atts.mColor = DeviceColor();
   }
   return FilterPrimitiveDescription(AsVariant(std::move(atts)));
 }

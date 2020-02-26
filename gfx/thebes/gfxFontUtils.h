@@ -1161,9 +1161,9 @@ class gfxFontUtils {
   static bool ValidateColorGlyphs(hb_blob_t* aCOLR, hb_blob_t* aCPAL);
   static bool GetColorGlyphLayers(hb_blob_t* aCOLR, hb_blob_t* aCPAL,
                                   uint32_t aGlyphId,
-                                  const mozilla::gfx::Color& aDefaultColor,
+                                  const mozilla::gfx::DeviceColor& aDefaultColor,
                                   nsTArray<uint16_t>& aGlyphs,
-                                  nsTArray<mozilla::gfx::Color>& aColors);
+                                  nsTArray<mozilla::gfx::DeviceColor>& aColors);
 
   // Helper used to implement gfxFontEntry::GetVariation{Axes,Instances} for
   // platforms where the native font APIs don't provide the info we want

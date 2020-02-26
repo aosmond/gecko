@@ -437,29 +437,30 @@ enum class LuminanceType : int8_t {
   LINEARRGB,
 };
 
-/* Color is stored in non-premultiplied form */
-struct Color {
+/* Color is stored in non-premultiplied form in sRGB color space */
+struct sRGBColor {
  public:
-  Color() : r(0.0f), g(0.0f), b(0.0f), a(0.0f) {}
-  Color(Float aR, Float aG, Float aB, Float aA) : r(aR), g(aG), b(aB), a(aA) {}
-  Color(Float aR, Float aG, Float aB) : r(aR), g(aG), b(aB), a(1.0f) {}
+  sRGBColor() : r(0.0f), g(0.0f), b(0.0f), a(0.0f) {}
+  sRGBColor(Float aR, Float aG, Float aB, Float aA)
+      : r(aR), g(aG), b(aB), a(aA) {}
+  sRGBColor(Float aR, Float aG, Float aB) : r(aR), g(aG), b(aB), a(1.0f) {}
 
-  static Color FromABGR(uint32_t aColor) {
-    Color newColor(((aColor >> 0) & 0xff) * (1.0f / 255.0f),
-                   ((aColor >> 8) & 0xff) * (1.0f / 255.0f),
-                   ((aColor >> 16) & 0xff) * (1.0f / 255.0f),
-                   ((aColor >> 24) & 0xff) * (1.0f / 255.0f));
+  static sRGBColor FromABGR(uint32_t aColor) {
+    sRGBColor newColor(((aColor >> 0) & 0xff) * (1.0f / 255.0f),
+                       ((aColor >> 8) & 0xff) * (1.0f / 255.0f),
+                       ((aColor >> 16) & 0xff) * (1.0f / 255.0f),
+                       ((aColor >> 24) & 0xff) * (1.0f / 255.0f));
 
     return newColor;
   }
 
   // The "Unusual" prefix is to avoid unintentionally using this function when
   // FromABGR(), which is much more common, is needed.
-  static Color UnusualFromARGB(uint32_t aColor) {
-    Color newColor(((aColor >> 16) & 0xff) * (1.0f / 255.0f),
-                   ((aColor >> 8) & 0xff) * (1.0f / 255.0f),
-                   ((aColor >> 0) & 0xff) * (1.0f / 255.0f),
-                   ((aColor >> 24) & 0xff) * (1.0f / 255.0f));
+  static sRGBColor UnusualFromARGB(uint32_t aColor) {
+    sRGBColor newColor(((aColor >> 16) & 0xff) * (1.0f / 255.0f),
+                       ((aColor >> 8) & 0xff) * (1.0f / 255.0f),
+                       ((aColor >> 0) & 0xff) * (1.0f / 255.0f),
+                       ((aColor >> 24) & 0xff) * (1.0f / 255.0f));
 
     return newColor;
   }
@@ -476,11 +477,62 @@ struct Color {
            uint32_t(r * 255.0f) << 16 | uint32_t(a * 255.0f) << 24;
   }
 
-  bool operator==(const Color& aColor) const {
+  bool operator==(const sRGBColor& aColor) const {
     return r == aColor.r && g == aColor.g && b == aColor.b && a == aColor.a;
   }
 
-  bool operator!=(const Color& aColor) const { return !(*this == aColor); }
+  bool operator!=(const sRGBColor& aColor) const { return !(*this == aColor); }
+
+  Float r, g, b, a;
+};
+
+/* Color is stored in non-premultiplied form in device color space */
+struct DeviceColor {
+ public:
+  DeviceColor() : r(0.0f), g(0.0f), b(0.0f), a(0.0f) {}
+  DeviceColor(Float aR, Float aG, Float aB, Float aA)
+      : r(aR), g(aG), b(aB), a(aA) {}
+  DeviceColor(Float aR, Float aG, Float aB) : r(aR), g(aG), b(aB), a(1.0f) {}
+
+  static DeviceColor FromABGR(uint32_t aColor) {
+    DeviceColor newColor(((aColor >> 0) & 0xff) * (1.0f / 255.0f),
+                         ((aColor >> 8) & 0xff) * (1.0f / 255.0f),
+                         ((aColor >> 16) & 0xff) * (1.0f / 255.0f),
+                         ((aColor >> 24) & 0xff) * (1.0f / 255.0f));
+
+    return newColor;
+  }
+
+  // The "Unusual" prefix is to avoid unintentionally using this function when
+  // FromABGR(), which is much more common, is needed.
+  static DeviceColor UnusualFromARGB(uint32_t aColor) {
+    DeviceColor newColor(((aColor >> 16) & 0xff) * (1.0f / 255.0f),
+                         ((aColor >> 8) & 0xff) * (1.0f / 255.0f),
+                         ((aColor >> 0) & 0xff) * (1.0f / 255.0f),
+                         ((aColor >> 24) & 0xff) * (1.0f / 255.0f));
+
+    return newColor;
+  }
+
+  uint32_t ToABGR() const {
+    return uint32_t(r * 255.0f) | uint32_t(g * 255.0f) << 8 |
+           uint32_t(b * 255.0f) << 16 | uint32_t(a * 255.0f) << 24;
+  }
+
+  // The "Unusual" prefix is to avoid unintentionally using this function when
+  // ToABGR(), which is much more common, is needed.
+  uint32_t UnusualToARGB() const {
+    return uint32_t(b * 255.0f) | uint32_t(g * 255.0f) << 8 |
+           uint32_t(r * 255.0f) << 16 | uint32_t(a * 255.0f) << 24;
+  }
+
+  bool operator==(const DeviceColor& aColor) const {
+    return r == aColor.r && g == aColor.g && b == aColor.b && a == aColor.a;
+  }
+
+  bool operator!=(const DeviceColor& aColor) const {
+    return !(*this == aColor);
+  }
 
   Float r, g, b, a;
 };
@@ -491,7 +543,7 @@ struct GradientStop {
   }
 
   Float offset;
-  Color color;
+  DeviceColor color;
 };
 
 enum class JobStatus { Complete, Wait, Yield, Error };

@@ -111,7 +111,7 @@ already_AddRefed<SourceSurface> nsSVGMaskFrame::GetMaskForMaskedFrame(
     surface = std::move(maskSnapshot);
   } else {
     maskDT->FillRect(maskSurfaceRect,
-                     ColorPattern(Color(1.0f, 1.0f, 1.0f, aParams.opacity)),
+                     ColorPattern(DeviceColor(1.0f, 1.0f, 1.0f, aParams.opacity)),
                      DrawOptions(1, CompositionOp::OP_IN));
     RefPtr<SourceSurface> maskSnapshot = maskDT->Snapshot();
     if (!maskSnapshot) {

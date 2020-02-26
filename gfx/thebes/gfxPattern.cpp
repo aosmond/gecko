@@ -19,8 +19,12 @@
 
 using namespace mozilla::gfx;
 
-gfxPattern::gfxPattern(const Color& aColor) : mExtend(ExtendMode::CLAMP) {
+gfxPattern::gfxPattern(const sRGBColor& aColor) : mExtend(ExtendMode::CLAMP) {
   mGfxPattern.InitColorPattern(ToDeviceColor(aColor));
+}
+
+gfxPattern::gfxPattern(const DeviceColor& aColor) : mExtend(ExtendMode::CLAMP) {
+  mGfxPattern.InitColorPattern(aColor);
 }
 
 // linear
@@ -52,7 +56,7 @@ gfxPattern::gfxPattern(SourceSurface* aSurface,
       mozilla::gfx::SamplingFilter::GOOD);
 }
 
-void gfxPattern::AddColorStop(gfxFloat offset, const Color& c) {
+void gfxPattern::AddColorStop(gfxFloat offset, const sRGBColor& c) {
   if (mGfxPattern.GetPattern()->GetType() != PatternType::LINEAR_GRADIENT &&
       mGfxPattern.GetPattern()->GetType() != PatternType::RADIAL_GRADIENT &&
       mGfxPattern.GetPattern()->GetType() != PatternType::CONIC_GRADIENT) {
@@ -64,6 +68,21 @@ void gfxPattern::AddColorStop(gfxFloat offset, const Color& c) {
   GradientStop stop;
   stop.offset = offset;
   stop.color = ToDeviceColor(c);
+  mStopsList.AppendElement(stop);
+}
+
+void gfxPattern::AddColorStop(gfxFloat offset, const DeviceColor& c) {
+  if (mGfxPattern.GetPattern()->GetType() != PatternType::LINEAR_GRADIENT &&
+      mGfxPattern.GetPattern()->GetType() != PatternType::RADIAL_GRADIENT &&
+      mGfxPattern.GetPattern()->GetType() != PatternType::CONIC_GRADIENT) {
+    return;
+  }
+
+  mStops = nullptr;
+
+  GradientStop stop;
+  stop.offset = offset;
+  stop.color = c;
   mStopsList.AppendElement(stop);
 }
 
@@ -192,7 +211,7 @@ SamplingFilter gfxPattern::SamplingFilter() const {
       ->mSamplingFilter;
 }
 
-bool gfxPattern::GetSolidColor(Color& aColorOut) {
+bool gfxPattern::GetSolidColor(DeviceColor& aColorOut) {
   if (mGfxPattern.GetPattern()->GetType() == PatternType::COLOR) {
     aColorOut = static_cast<ColorPattern*>(mGfxPattern.GetPattern())->mColor;
     return true;

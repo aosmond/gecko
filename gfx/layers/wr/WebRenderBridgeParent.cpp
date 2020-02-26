@@ -1189,7 +1189,7 @@ bool WebRenderBridgeParent::SetDisplayList(
       }
       aTxn.SetDocumentView(rect);
     }
-    gfx::Color clearColor(0.f, 0.f, 0.f, 0.f);
+    gfx::DeviceColor clearColor(0.f, 0.f, 0.f, 0.f);
     aTxn.SetDisplayList(clearColor, aWrEpoch,
                         wr::ToLayoutSize(RoundedToInt(aRect).Size()),
                         mPipelineId, aContentSize, aDLDesc, dlData);

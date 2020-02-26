@@ -603,7 +603,7 @@ bool LayerTransactionParent::SetLayerAttributes(
         return false;
       }
       const auto& c = specific.get_ColorLayerAttributes().color();
-      colorLayer->SetColor(gfx::Color(c.r(), c.b(), c.g(), c.a()));
+      colorLayer->SetColor(gfx::DeviceColor(c.r(), c.b(), c.g(), c.a()));
       colorLayer->SetBounds(specific.get_ColorLayerAttributes().bounds());
       break;
     }

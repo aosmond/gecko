@@ -103,7 +103,7 @@ void DisplayItemClip::ApplyRoundedRectClipsTo(gfxContext* aContext, int32_t A2D,
 }
 
 void DisplayItemClip::FillIntersectionOfRoundedRectClips(
-    gfxContext* aContext, const Color& aColor,
+    gfxContext* aContext, const sRGBColor& aColor,
     int32_t aAppUnitsPerDevPixel) const {
   DrawTarget& aDrawTarget = *aContext->GetDrawTarget();
 

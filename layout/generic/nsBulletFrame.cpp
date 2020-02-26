@@ -404,7 +404,7 @@ void BulletRenderer::PaintTextToContext(nsIFrame* aFrame, gfxContext* aCtx,
   DrawTargetAutoDisableSubpixelAntialiasing disable(drawTarget,
                                                     aDisableSubpixelAA);
 
-  aCtx->SetColor(Color::FromABGR(mColor));
+  aCtx->SetColor(sRGBColor::FromABGR(mColor));
 
   nsPresContext* presContext = aFrame->PresContext();
   if (!presContext->BidiEnabled() && HasRTLChars(mText)) {

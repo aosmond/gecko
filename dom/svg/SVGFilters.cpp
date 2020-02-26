@@ -426,7 +426,7 @@ bool SVGFELightingElement::AddLightingAttributes(
   }
 
   const nsStyleSVGReset* styleSVGReset = frame->Style()->StyleSVGReset();
-  Color color(Color::FromABGR(styleSVGReset->mLightingColor.CalcColor(frame)));
+  DeviceColor color = ToDeviceColor(styleSVGReset->mLightingColor.CalcColor(frame));
   color.a = 1.f;
   float surfaceScale = mNumberAttributes[SURFACE_SCALE].GetAnimValue();
   Size kernelUnitLength = GetKernelUnitLength(

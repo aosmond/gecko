@@ -250,15 +250,17 @@ bool nsFilterInstance::BuildWebRenderFilters(nsIFrame* aFilteredFrame,
         return false;
       }
 
-      Color color = shadow.mColor;
+      // FIXME(aosmond) -- This is supposed to be Device to sRGB back to Device?
+      // Can DropShadowAttributes store sRGB?
+      DeviceColor color = shadow.mColor;
       if (!primNeedsSrgb) {
-        color = Color(gsRGBToLinearRGBMap[uint8_t(color.r * 255)],
-                      gsRGBToLinearRGBMap[uint8_t(color.g * 255)],
-                      gsRGBToLinearRGBMap[uint8_t(color.b * 255)], color.a);
+        color = DeviceColor(gsRGBToLinearRGBMap[uint8_t(color.r * 255)],
+                            gsRGBToLinearRGBMap[uint8_t(color.g * 255)],
+                            gsRGBToLinearRGBMap[uint8_t(color.b * 255)], color.a);
       }
       wr::Shadow wrShadow;
       wrShadow.offset = {(float)shadow.mOffset.x, (float)shadow.mOffset.y};
-      wrShadow.color = wr::ToColorF(ToDeviceColor(color));
+      wrShadow.color = wr::ToColorF(color);
       wrShadow.blur_radius = stdDev.width;
       wr::FilterOp filterOp = wr::FilterOp::DropShadow(wrShadow);
 

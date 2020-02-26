@@ -1156,7 +1156,7 @@ void nsImageFrame::DisplayAltText(nsPresContext* aPresContext,
                                   const nsString& aAltText,
                                   const nsRect& aRect) {
   // Set font and color
-  aRenderingContext.SetColor(Color::FromABGR(StyleText()->mColor.ToColor()));
+  aRenderingContext.SetColor(sRGBColor::FromABGR(StyleText()->mColor.ToColor()));
   RefPtr<nsFontMetrics> fm =
       nsLayoutUtils::GetInflatedFontMetricsForFrame(this);
 
@@ -1433,7 +1433,7 @@ ImgDrawResult nsImageFrame::DisplayAltFeedback(gfxContext& aRenderingContext,
 
     // If we could not draw the icon, just draw some graffiti in the mean time.
     if (result == ImgDrawResult::NOT_READY) {
-      ColorPattern color(ToDeviceColor(Color(1.f, 0.f, 0.f, 1.f)));
+      ColorPattern color(ToDeviceColor(sRGBColor(1.f, 0.f, 0.f, 1.f)));
 
       nscoord iconXPos = flushRight ? inner.XMost() - size : inner.x;
 
@@ -1705,7 +1705,7 @@ static void PaintDebugImageMap(nsIFrame* aFrame, DrawTarget* aDrawTarget,
       aDrawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
   f->GetImageMap()->Draw(
       aFrame, *aDrawTarget,
-      ColorPattern(ToDeviceColor(Color(0.f, 0.f, 0.f, 1.f))));
+      ColorPattern(ToDeviceColor(sRGBColor(0.f, 0.f, 0.f, 1.f))));
 }
 #endif
 
@@ -2028,11 +2028,11 @@ ImgDrawResult nsImageFrame::PaintImage(gfxContext& aRenderingContext,
         drawTarget->GetTransform().PreTranslate(ToPoint(devPixelOffset)));
 
     // solid white stroke:
-    ColorPattern white(ToDeviceColor(Color(1.f, 1.f, 1.f, 1.f)));
+    ColorPattern white(ToDeviceColor(sRGBColor(1.f, 1.f, 1.f, 1.f)));
     map->Draw(this, *drawTarget, white);
 
     // then dashed black stroke over the top:
-    ColorPattern black(ToDeviceColor(Color(0.f, 0.f, 0.f, 1.f)));
+    ColorPattern black(ToDeviceColor(sRGBColor(0.f, 0.f, 0.f, 1.f)));
     StrokeOptions strokeOptions;
     nsLayoutUtils::InitDashPattern(strokeOptions, StyleBorderStyle::Dotted);
     map->Draw(this, *drawTarget, black, strokeOptions);
