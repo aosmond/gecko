@@ -20,43 +20,52 @@ using namespace mozilla::widget;
 namespace mozilla {
 namespace widget {
 
-static const Color sBackgroundColor(Color(1.0f, 1.0f, 1.0f));
-static const Color sBackgroundActiveColor(Color(0.88f, 0.88f, 0.9f));
-static const Color sBackgroundActiveColorDisabled(Color(0.88f, 0.88f, 0.9f,
-                                                        0.4f));
-static const Color sBorderColor(Color(0.62f, 0.62f, 0.68f));
-static const Color sBorderColorDisabled(Color(0.44f, 0.44f, 0.44f, 0.4f));
-static const Color sBorderHoverColor(Color(0.5f, 0.5f, 0.56f));
-static const Color sBorderHoverColorDisabled(Color(0.5f, 0.5f, 0.56f, 0.4f));
-static const Color sBorderFocusColor(Color(0.04f, 0.52f, 1.0f));
-static const Color sCheckBackgroundColor(Color(0.18f, 0.39f, 0.89f));
-static const Color sCheckBackgroundColorDisabled(Color(0.18f, 0.39f, 0.89f,
-                                                       0.4f));
-static const Color sCheckBackgroundHoverColor(Color(0.02f, 0.24f, 0.58f));
-static const Color sCheckBackgroundHoverColorDisabled(Color(0.02f, 0.24f, 0.58f,
-                                                            0.4f));
-static const Color sCheckBackgroundActiveColor(Color(0.03f, 0.19f, 0.45f));
-static const Color sCheckBackgroundActiveColorDisabled(Color(0.03f, 0.19f,
-                                                             0.45f, 0.4f));
-static const Color sDisabledColor(Color(0.89f, 0.89f, 0.89f));
-static const Color sActiveColor(Color(0.47f, 0.47f, 0.48f));
-static const Color sInputHoverColor(Color(0.05f, 0.05f, 0.05f, 0.5f));
-static const Color sRangeInputBackgroundColor(Color(0.89f, 0.89f, 0.89f));
-static const Color sScrollbarColor(Color(0.94f, 0.94f, 0.94f));
-static const Color sScrollbarBorderColor(Color(1.0f, 1.0f, 1.0f));
-static const Color sScrollbarThumbColor(Color(0.8f, 0.8f, 0.8f));
-static const Color sScrollbarThumbColorActive(Color(0.375f, 0.375f, 0.375f));
-static const Color sScrollbarThumbColorHover(Color(0.65f, 0.65f, 0.65f));
-static const Color sScrollbarArrowColor(Color(0.375f, 0.375f, 0.375f));
-static const Color sScrollbarArrowColorActive(Color(1.0f, 1.0f, 1.0f));
-static const Color sScrollbarArrowColorHover(Color(0.0f, 0.0f, 0.0f));
-static const Color sScrollbarButtonColor(sScrollbarColor);
-static const Color sScrollbarButtonActiveColor(Color(0.375f, 0.375f, 0.375f));
-static const Color sScrollbarButtonHoverColor(Color(0.86f, 0.86f, 0.86f));
-static const Color sButtonColor(Color(0.98f, 0.98f, 0.98f));
-static const Color sButtonHoverColor(Color(0.94f, 0.94f, 0.96f));
-static const Color sButtonActiveColor(Color(0.88f, 0.88f, 0.90f));
-static const Color sWhiteColor(Color(1.0f, 1.0f, 1.0f, 0.0f));
+static const sRGBColor sBackgroundColor(sRGBColor(1.0f, 1.0f, 1.0f));
+static const sRGBColor sBackgroundActiveColor(sRGBColor(0.88f, 0.88f, 0.9f));
+static const sRGBColor sBackgroundActiveColorDisabled(sRGBColor(0.88f, 0.88f,
+                                                                0.9f, 0.4f));
+static const sRGBColor sBorderColor(sRGBColor(0.62f, 0.62f, 0.68f));
+static const sRGBColor sBorderColorDisabled(sRGBColor(0.44f, 0.44f, 0.44f,
+                                                      0.4f));
+static const sRGBColor sBorderHoverColor(sRGBColor(0.5f, 0.5f, 0.56f));
+static const sRGBColor sBorderHoverColorDisabled(sRGBColor(0.5f, 0.5f, 0.56f,
+                                                           0.4f));
+static const sRGBColor sBorderFocusColor(sRGBColor(0.04f, 0.52f, 1.0f));
+static const sRGBColor sCheckBackgroundColor(sRGBColor(0.18f, 0.39f, 0.89f));
+static const sRGBColor sCheckBackgroundColorDisabled(sRGBColor(0.18f, 0.39f,
+                                                               0.89f, 0.4f));
+static const sRGBColor sCheckBackgroundHoverColor(sRGBColor(0.02f, 0.24f,
+                                                            0.58f));
+static const sRGBColor sCheckBackgroundHoverColorDisabled(
+    sRGBColor(0.02f, 0.24f, 0.58f, 0.4f));
+static const sRGBColor sCheckBackgroundActiveColor(sRGBColor(0.03f, 0.19f,
+                                                             0.45f));
+static const sRGBColor sCheckBackgroundActiveColorDisabled(
+    sRGBColor(0.03f, 0.19f, 0.45f, 0.4f));
+static const sRGBColor sDisabledColor(sRGBColor(0.89f, 0.89f, 0.89f));
+static const sRGBColor sActiveColor(sRGBColor(0.47f, 0.47f, 0.48f));
+static const sRGBColor sInputHoverColor(sRGBColor(0.05f, 0.05f, 0.05f, 0.5f));
+static const sRGBColor sRangeInputBackgroundColor(sRGBColor(0.89f, 0.89f,
+                                                            0.89f));
+static const sRGBColor sScrollbarColor(sRGBColor(0.94f, 0.94f, 0.94f));
+static const sRGBColor sScrollbarBorderColor(sRGBColor(1.0f, 1.0f, 1.0f));
+static const sRGBColor sScrollbarThumbColor(sRGBColor(0.8f, 0.8f, 0.8f));
+static const sRGBColor sScrollbarThumbColorActive(sRGBColor(0.375f, 0.375f,
+                                                            0.375f));
+static const sRGBColor sScrollbarThumbColorHover(sRGBColor(0.65f, 0.65f,
+                                                           0.65f));
+static const sRGBColor sScrollbarArrowColor(sRGBColor(0.375f, 0.375f, 0.375f));
+static const sRGBColor sScrollbarArrowColorActive(sRGBColor(1.0f, 1.0f, 1.0f));
+static const sRGBColor sScrollbarArrowColorHover(sRGBColor(0.0f, 0.0f, 0.0f));
+static const sRGBColor sScrollbarButtonColor(sScrollbarColor);
+static const sRGBColor sScrollbarButtonActiveColor(sRGBColor(0.375f, 0.375f,
+                                                             0.375f));
+static const sRGBColor sScrollbarButtonHoverColor(sRGBColor(0.86f, 0.86f,
+                                                            0.86f));
+static const sRGBColor sButtonColor(sRGBColor(0.98f, 0.98f, 0.98f));
+static const sRGBColor sButtonHoverColor(sRGBColor(0.94f, 0.94f, 0.96f));
+static const sRGBColor sButtonActiveColor(sRGBColor(0.88f, 0.88f, 0.90f));
+static const sRGBColor sWhiteColor(sRGBColor(1.0f, 1.0f, 1.0f, 0.0f));
 
 static const CSSIntCoord kMinimumWidgetSize = 17;
 
@@ -89,15 +98,16 @@ static bool IsDateTimeTextField(nsIFrame* aFrame) {
 }
 
 static void ComputeCheckColors(const EventStates& aState,
-                               Color& aBackgroundColor, Color& aBorderColor) {
+                               sRGBColor& aBackgroundColor,
+                               sRGBColor& aBorderColor) {
   bool isDisabled = aState.HasState(NS_EVENT_STATE_DISABLED);
   bool isPressed = !isDisabled && aState.HasAllStates(NS_EVENT_STATE_HOVER |
                                                       NS_EVENT_STATE_ACTIVE);
   bool isHovered = !isDisabled && aState.HasState(NS_EVENT_STATE_HOVER);
   bool isChecked = aState.HasState(NS_EVENT_STATE_CHECKED);
 
-  Color fillColor = sBackgroundColor;
-  Color borderColor = sBorderColor;
+  sRGBColor fillColor = sBackgroundColor;
+  sRGBColor borderColor = sBorderColor;
   if (isDisabled) {
     if (isChecked) {
       fillColor = borderColor = sCheckBackgroundColorDisabled;
@@ -170,8 +180,8 @@ struct MOZ_RAII AutoClipRect {
 
 static void PaintRoundedRectWithBorder(DrawTarget* aDrawTarget,
                                        const Rect& aRect,
-                                       const Color& aBackgroundColor,
-                                       const Color& aBorderColor,
+                                       const sRGBColor& aBackgroundColor,
+                                       const sRGBColor& aBorderColor,
                                        CSSCoord aBorderWidth, CSSCoord aRadius,
                                        uint32_t aDpi) {
   const LayoutDeviceCoord borderWidth(aBorderWidth * aDpi);
@@ -195,8 +205,8 @@ static void PaintCheckboxControl(DrawTarget* aDrawTarget, const Rect& aRect,
   const CSSCoord kBorderWidth = 2.0f;
   const CSSCoord kRadius = 4.0f;
 
-  Color backgroundColor;
-  Color borderColor;
+  sRGBColor backgroundColor;
+  sRGBColor borderColor;
   ComputeCheckColors(aState, backgroundColor, borderColor);
   PaintRoundedRectWithBorder(aDrawTarget, aRect, backgroundColor, borderColor,
                              kBorderWidth, kRadius, aDpi);
@@ -242,8 +252,8 @@ static void PaintIndeterminateMark(DrawTarget* aDrawTarget, const Rect& aRect,
 }
 
 static void PaintStrokedEllipse(DrawTarget* aDrawTarget, const Rect& aRect,
-                                const Color& aBackgroundColor,
-                                const Color& aBorderColor,
+                                const sRGBColor& aBackgroundColor,
+                                const sRGBColor& aBorderColor,
                                 const CSSCoord aBorderWidth,
                                 uint32_t aDpi) {
   const LayoutDeviceCoord borderWidth(aBorderWidth * aDpi);
@@ -264,8 +274,8 @@ static void PaintRadioControl(DrawTarget* aDrawTarget, const Rect& aRect,
                               const EventStates& aState, uint32_t aDpi) {
   const CSSCoord kBorderWidth = 2.0f;
 
-  Color backgroundColor;
-  Color borderColor;
+  sRGBColor backgroundColor;
+  sRGBColor borderColor;
   ComputeCheckColors(aState, backgroundColor, borderColor);
 
   PaintStrokedEllipse(aDrawTarget, aRect, backgroundColor, borderColor,
@@ -291,8 +301,8 @@ static void PaintTextField(DrawTarget* aDrawTarget, const Rect& aRect,
   bool isDisabled = aState.HasState(NS_EVENT_STATE_DISABLED);
   bool isHovered = !isDisabled && aState.HasState(NS_EVENT_STATE_HOVER);
 
-  const Color& backgroundColor = isDisabled ? sDisabledColor : sBackgroundColor;
-  const Color& borderColor = isHovered ? sBorderHoverColor : sBorderColor;
+  const sRGBColor& backgroundColor = isDisabled ? sDisabledColor : sBackgroundColor;
+  const sRGBColor& borderColor = isHovered ? sBorderHoverColor : sBorderColor;
 
   const CSSCoord kBorderWidth = 1.0f;
   const CSSCoord kRadius = 4.0f;
@@ -301,7 +311,7 @@ static void PaintTextField(DrawTarget* aDrawTarget, const Rect& aRect,
                              kBorderWidth, kRadius, aDpi);
 }
 
-std::pair<Color, Color> ComputeButtonColors(
+std::pair<sRGBColor, sRGBColor> ComputeButtonColors(
     const EventStates& aState,
     bool aIsDatetimeResetButton = false) {
   bool isActive =
@@ -309,7 +319,7 @@ std::pair<Color, Color> ComputeButtonColors(
   bool isDisabled = aState.HasState(NS_EVENT_STATE_DISABLED);
   bool isHovered = !isDisabled && aState.HasState(NS_EVENT_STATE_HOVER);
 
-  const Color& backgroundColor = [&] {
+  const sRGBColor& backgroundColor = [&] {
     if (isDisabled) {
       return sDisabledColor;
     }
@@ -325,7 +335,7 @@ std::pair<Color, Color> ComputeButtonColors(
     return sButtonColor;
   }();
 
-  const Color& borderColor = isHovered ? sBorderHoverColor : sBorderColor;
+  const sRGBColor& borderColor = isHovered ? sBorderHoverColor : sBorderColor;
 
   return std::make_pair(backgroundColor, borderColor);
 }
@@ -335,7 +345,7 @@ static void PaintMenulist(DrawTarget* aDrawTarget, const Rect& aRect,
   const CSSCoord kBorderWidth = 1.0f;
   const CSSCoord kRadius = 4.0f;
 
-  Color backgroundColor, borderColor;
+  sRGBColor backgroundColor, borderColor;
   std::tie(backgroundColor, borderColor) = ComputeButtonColors(aState);
 
   PaintRoundedRectWithBorder(aDrawTarget, aRect, backgroundColor, borderColor,
@@ -346,7 +356,7 @@ static void PaintArrow(DrawTarget* aDrawTarget, const Rect& aRect,
                        const int32_t aArrowPolygonX[],
                        const int32_t aArrowPolygonY[],
                        const int32_t aArrowNumPoints, const int32_t aArrowSize,
-                       const Color aFillColor, uint32_t aDpi) {
+                       const sRGBColor aFillColor, uint32_t aDpi) {
   nscoord paintScale = std::min(aRect.width, aRect.height) / aArrowSize;
   RefPtr<PathBuilder> builder = aDrawTarget->CreatePathBuilder();
   Point p = aRect.Center() + Point(aArrowPolygonX[0] * paintScale,
@@ -440,7 +450,7 @@ static void PaintRangeInputBackground(DrawTarget* aDrawTarget,
 static void PaintScrollbarthumbHorizontal(DrawTarget* aDrawTarget,
                                           const Rect& aRect,
                                           const EventStates& aState) {
-  Color thumbColor = sScrollbarThumbColor;
+  sRGBColor thumbColor = sScrollbarThumbColor;
   if (aState.HasAllStates(NS_EVENT_STATE_HOVER | NS_EVENT_STATE_ACTIVE)) {
     thumbColor = sScrollbarThumbColorActive;
   } else if (aState.HasState(NS_EVENT_STATE_HOVER)) {
@@ -452,7 +462,7 @@ static void PaintScrollbarthumbHorizontal(DrawTarget* aDrawTarget,
 static void PaintScrollbarthumbVertical(DrawTarget* aDrawTarget,
                                         const Rect& aRect,
                                         const EventStates& aState) {
-  Color thumbColor = sScrollbarThumbColor;
+  sRGBColor thumbColor = sScrollbarThumbColor;
   if (aState.HasAllStates(NS_EVENT_STATE_HOVER | NS_EVENT_STATE_ACTIVE)) {
     thumbColor = sScrollbarThumbColorActive;
   } else if (aState.HasState(NS_EVENT_STATE_HOVER)) {
@@ -555,7 +565,7 @@ static void PaintButton(nsIFrame* aFrame, DrawTarget* aDrawTarget,
   const CSSCoord kRadius = 4.0f;
 
   // FIXME: The DateTimeResetButton bit feels like a bit of a hack.
-  Color backgroundColor, borderColor;
+  sRGBColor backgroundColor, borderColor;
   std::tie(backgroundColor, borderColor) =
       ComputeButtonColors(aState, IsDateTimeResetButton(aFrame));
 
@@ -569,7 +579,7 @@ static void PaintRangeThumb(DrawTarget* aDrawTarget,
                             uint32_t aDpi) {
   const CSSCoord kBorderWidth = 2.0f;
 
-  Color backgroundColor, borderColor;
+  sRGBColor backgroundColor, borderColor;
   std::tie(backgroundColor, borderColor) = ComputeButtonColors(aState);
 
   PaintStrokedEllipse(aDrawTarget, aRect, backgroundColor, borderColor,
