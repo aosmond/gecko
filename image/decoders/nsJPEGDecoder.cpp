@@ -49,19 +49,6 @@ static mozilla::LazyLogModule sJPEGLog("JPEGDecoder");
 static mozilla::LazyLogModule sJPEGDecoderAccountingLog(
     "JPEGDecoderAccounting");
 
-static qcms_profile* GetICCProfile(struct jpeg_decompress_struct& info) {
-  JOCTET* profilebuf;
-  uint32_t profileLength;
-  qcms_profile* profile = nullptr;
-
-  if (read_icc_profile(&info, &profilebuf, &profileLength)) {
-    profile = qcms_profile_from_memory(profilebuf, profileLength);
-    free(profilebuf);
-  }
-
-  return profile;
-}
-
 METHODDEF(void) init_source(j_decompress_ptr jd);
 METHODDEF(boolean) fill_input_buffer(j_decompress_ptr jd);
 METHODDEF(void) skip_input_data(j_decompress_ptr jd, long num_bytes);
@@ -290,25 +277,30 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
           return Transition::TerminateFailure();
       }
 
-      if (mCMSMode != eCMSMode_Off) {
-        if ((mInProfile = GetICCProfile(mInfo)) != nullptr &&
-            gfxPlatform::GetCMSOutputProfile()) {
-          uint32_t profileSpace = qcms_profile_get_color_space(mInProfile);
+      JOCTET* profilebuf;
+      uint32_t profileLength;
+      if (read_icc_profile(&mInfo, &profilebuf, &profileLength)) {
+        SetQcmsProfile(profilebuf, profileLength) l free(profilebuf);
+        free(profilebuf);
+      }
 
-          qcms_data_type outputType = gfxPlatform::GetCMSOSRGBAType();
-          Maybe<qcms_data_type> inputType;
-          if (profileSpace == icSigRgbData) {
-            // We can always color manage RGB profiles since it happens at the
-            // end of the pipeline.
-            inputType.emplace(outputType);
-          } else if (profileSpace == icSigGrayData &&
-                     mInfo.jpeg_color_space == JCS_GRAYSCALE) {
-            // We can only color manage gray profiles if the original color
-            // space is grayscale. This means we must downscale after color
-            // management since the downscaler assumes BGRA.
-            mInfo.out_color_space = JCS_GRAYSCALE;
-            inputType.emplace(QCMS_DATA_GRAY_8);
-          }
+      if (mInProfile) {
+        uint32_t profileSpace = qcms_profile_get_color_space(mInProfile);
+
+        qcms_data_type outputType = gfxPlatform::GetCMSOSRGBAType();
+        Maybe<qcms_data_type> inputType;
+        if (profileSpace == icSigRgbData) {
+          // We can always color manage RGB profiles since it happens at the
+          // end of the pipeline.
+          inputType.emplace(outputType);
+        } else if (profileSpace == icSigGrayData &&
+                   mInfo.jpeg_color_space == JCS_GRAYSCALE) {
+          // We can only color manage gray profiles if the original color
+          // space is grayscale. This means we must downscale after color
+          // management since the downscaler assumes BGRA.
+          mInfo.out_color_space = JCS_GRAYSCALE;
+          inputType.emplace(QCMS_DATA_GRAY_8);
+        }
 
 #if 0
           // We don't currently support CMYK profiles. The following
@@ -321,21 +313,10 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
           }
 #endif
 
-          if (inputType) {
-            // Calculate rendering intent.
-            int intent = gfxPlatform::GetRenderingIntent();
-            if (intent == -1) {
-              intent = qcms_profile_get_rendering_intent(mInProfile);
-            }
-
-            // Create the color management transform.
-            mTransform = qcms_transform_create(
-                mInProfile, *inputType, gfxPlatform::GetCMSOutputProfile(),
-                outputType, (qcms_intent)intent);
-          }
-        } else if (mCMSMode == eCMSMode_All) {
-          mTransform = gfxPlatform::GetCMSOSRGBATransform();
-        }
+        // Create the color management transform if necessary.
+        SetQcmsTransform(*inputType, outputType);
+      } else {
+        SetQcmsOSRGBAsRGBTransform();
       }
 
       // We don't want to use the pipe buffers directly because we don't want

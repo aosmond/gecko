@@ -46,6 +46,7 @@ class MOZ_STACK_CLASS AutoRecordDecoderTelemetry final {
 Decoder::Decoder(RasterImage* aImage)
     : mInProfile(nullptr),
       mTransform(nullptr),
+      mCMSMode(gfxPlatform::GetCMSMode()),
       mImageData(nullptr),
       mImageDataLength(0),
       mImage(aImage),
@@ -65,7 +66,11 @@ Decoder::Decoder(RasterImage* aImage)
       mDecodeDone(false),
       mError(false),
       mShouldReportError(false),
-      mFinalizeFrames(true) {}
+      mFinalizeFrames(true) {
+  if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
+    mCMSMode = eCMSMode_Off;
+  }
+}
 
 Decoder::~Decoder() {
   MOZ_ASSERT(mProgress == NoProgress || !mImage,
@@ -532,6 +537,160 @@ void Decoder::PostError() {
     mInFrame = false;
     --mFrameCount;
     mHasFrameToTake = false;
+  }
+}
+
+void Decoder::SetQcmsProfile(const void* aData, size_t aLength) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata) {
+    mSurfaceMetadata->AddICCProfile(aData, aLength);
+  }
+  if (mCMSMode == eCMSMode_Off) {
+    return;
+  }
+  mInProfile = qcms_profile_from_memory(aData, aLength);
+}
+
+void Decoder::SetQcmsProfile(const qcms_CIE_xyY& aWhitePoint,
+                             const qcms_CIE_xyYTRIPLE& aPrimaries,
+                             float aGamma) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata) {
+    // Metadata stores the encoding gamma, not the decoding gamma.
+    mSurfaceMetadata->AddICCProfile(aWhitePoint, aPrimaries, 1.0 / aGamma);
+  }
+  if (mCMSMode == eCMSMode_Off) {
+    return;
+  }
+  mInProfile =
+      qcms_profile_create_rgb_with_gamma(aWhitePoint, aPrimaries, aGamma);
+}
+
+void Decoder::SetQcmsProfile(const qcms_CIE_xyYTRIPLE& aPrimaries,
+                             float aRedGamma, float aGreenGamma,
+                             float aBlueGamma) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata) {
+    // Metadata stores the encoding gamma, not the decoding gamma.
+    mSurfaceMetadata->AddICCProfile(aPrimaries, 1.0 / aRedGamma,
+                                    1.0 / aGreenGamma, 1.0 / aBlueGamma);
+  }
+
+  if (mCMSMode == eCMSMode_Off) {
+    return;
+  }
+
+  // Image does not define a white point. Use the same as sRGB. This matches
+  // what Chrome does as well for BMP.
+  qcms_CIE_xyY white_point = qcms_white_point_sRGB();
+  mInProfile = qcms_profile_create_rgb_with_gamma_set(
+      white_point, aPrimaries, aRedGamma, aGreenGamma, aBlueGamma);
+}
+
+void Decoder::SetQcmsTransform(
+    qcms_data_type aInType, qcms_data_type aOutType,
+    const Maybe<qcms_intent>& aIntent /* = Nothing() */) {
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata && aIntent) {
+    mSurfaceMetadata->AddICCIntent(aIntent.value());
+  }
+
+  if (mCMSMode == eCMSMode_Off) {
+    return;
+  }
+
+  MOZ_ASSERT(mInProfile);
+
+  qcms_profile* outputProfile = gfxPlatform::GetCMSOutputProfile();
+  if (!outputProfile) {
+    return;
+  }
+
+  qcms_intent intent = QCMS_INTENT_PERCEPTUAL;
+  int prefIntent = gfxPlatform::GetRenderingIntent();
+  if (prefIntent < 0) {
+    // Pref wants us to get it from the profile.
+    intent = qcms_profile_get_rendering_intent(mInProfile);
+  } else {
+    // Override using the pref.
+    intent = static_cast<qcms_intent>(prefIntent);
+  }
+
+  mTransform = qcms_transform_create(mInProfile, aInType,
+                                     gfxPlatform::GetCMSOutputProfile(),
+                                     aOutType, intent);
+}
+
+void Decoder::SetQcmsRGBsRGBTransform(
+    bool aExplicit, const Maybe<qcms_intent>& aIntent /* = Nothing() */) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata && aExplicit) {
+    mSurfaceMetadata->MarkICCsRGB(aIntent);
+  }
+
+  if (mCMSMode == eCMSMode_Off ||
+      (!aExplicit && mCMSMode == eCMSMode_TaggedOnly)) {
+    return;
+  }
+
+  mTransform = gfxPlatform::GetCMSRGBTransform();
+}
+
+void Decoder::SetQcmsBGRAsRGBTransform(
+    bool aExplicit, const Maybe<qcms_intent>& aIntent /* = Nothing() */) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata && aExplicit) {
+    mSurfaceMetadata->MarkICCsRGB(aIntent);
+  }
+
+  if (mCMSMode == eCMSMode_Off ||
+      (!aExplicit && mCMSMode == eCMSMode_TaggedOnly)) {
+    return;
+  }
+
+  mTransform = gfxPlatform::GetCMSBGRATransform();
+}
+
+void Decoder::SetQcmsRGBAsRGBTransform(
+    bool aExplicit, const Maybe<qcms_intent>& aIntent /* = Nothing() */) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata && aExplicit) {
+    mSurfaceMetadata->MarkICCsRGB(aIntent);
+  }
+
+  if (mCMSMode == eCMSMode_Off ||
+      (!aExplicit && mCMSMode == eCMSMode_TaggedOnly)) {
+    return;
+  }
+
+  mTransform = gfxPlatform::GetCMSRGBATransform();
+}
+
+void Decoder::SetQcmsOSRGBAsRGBTransform(
+    bool aExplicit, const Maybe<qcms_intent>& aIntent /* = Nothing() */) {
+  MOZ_ASSERT(!mInProfile);
+  MOZ_ASSERT(!mTransform);
+  if (mSurfaceMetadata && aExplicit) {
+    mSurfaceMetadata->MarkICCsRGB(aIntent);
+  }
+
+  if (mCMSMode == eCMSMode_Off ||
+      (!aExplicit && mCMSMode == eCMSMode_TaggedOnly)) {
+    return;
+  }
+
+  mTransform = gfxPlatform::GetCMSOSRGBATransform();
+}
+
+void Decoder::SetEXIF(const EXIFData& aEXIF) {
+  if (mSurfaceMetadata) {
+    mSurfaceMetadata->AddEXIF(aEXIF);
   }
 }
 

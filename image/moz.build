@@ -38,6 +38,7 @@ XPIDL_SOURCES += [
 XPIDL_MODULE = 'imglib2'
 
 EXPORTS += [
+    'EXIF.h',
     'FrameTimeout.h',
     'ImageBlocker.h',
     'ImageCacheKey.h',

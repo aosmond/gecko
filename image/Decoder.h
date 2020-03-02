@@ -14,6 +14,7 @@
 #include "AnimationParams.h"
 #include "DecoderFlags.h"
 #include "ImageMetadata.h"
+#include "SurfaceImageMetadata.h"
 #include "Orientation.h"
 #include "SourceBuffer.h"
 #include "StreamingLexer.h"
@@ -331,6 +332,9 @@ class Decoder {
   void SetSurfaceFlags(SurfaceFlags aSurfaceFlags) {
     MOZ_ASSERT(!mInitialized);
     mSurfaceFlags = aSurfaceFlags;
+    if (mSurfaceFlags & SurfaceFlags::EXPORT_METADATA) {
+      mSurfaceMetadata = MakeRefPtr<SurfaceImageMetadata>(mSurfaceFlags);
+    }
   }
   SurfaceFlags GetSurfaceFlags() const { return mSurfaceFlags; }
 
@@ -456,6 +460,23 @@ class Decoder {
   virtual nsresult FinishInternal();
   virtual nsresult FinishWithErrorInternal();
 
+  void SetQcmsProfile(const void* aData, size_t aLength);
+  void SetQcmsProfile(const qcms_CIE_xyY& aWhitePoint,
+                      const qcms_CIE_xyYTRIPLE& aPrimaries, float aGamma);
+  void SetQcmsProfile(const qcms_CIE_xyYTRIPLE& aPrimaries, float aRedGamma,
+                      float aGreenGamma, float aBlueGamma);
+  void SetQcmsRGBsRGBTransform(bool aExplicit,
+                               const Maybe<qcms_intent>& aIntent = Nothing());
+  void SetQcmsBGRAsRGBTransform(bool aExplicit,
+                                const Maybe<qcms_intent>& aIntent = Nothing());
+  void SetQcmsRGBAsRGBTransform(bool aExplicit,
+                                const Maybe<qcms_intent>& aIntent = Nothing());
+  void SetQcmsOSRGBAsRGBTransform(
+      bool aExplicit, const Maybe<qcms_intent>& aIntent = Nothing());
+  void SetQcmsTransform(qcms_data_type aInType, qcms_data_type aOutType,
+                        const Maybe<qcms_intent>& aIntent = Nothing());
+  void SetEXIF(const EXIFData& aEXIF);
+
   /**
    * @return the per-image-format telemetry ID for recording this decoder's
    * speed, or Nothing() if we don't record speed telemetry for this kind of
@@ -564,6 +585,9 @@ class Decoder {
   /// Color management transform to apply to image data.
   qcms_transform* mTransform;
 
+  /// Color management mode (includes impact of SurfaceFlags).
+  uint32_t mCMSMode;
+
   uint8_t* mImageData;  // Pointer to image data in BGRA/X
   uint32_t mImageDataLength;
 
@@ -580,6 +604,8 @@ class Decoder {
   RawAccessFrameRef mRestoreFrame;
 
   ImageMetadata mImageMetadata;
+
+  RefPtr<SurfaceImageMetadata> mSurfaceMetadata;
 
   gfx::IntRect
       mInvalidRect;  // Tracks new rows as the current frame is decoded.

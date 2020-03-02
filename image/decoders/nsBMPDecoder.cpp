@@ -751,10 +751,6 @@ LexerTransition<nsBMPDecoder::State> nsBMPDecoder::ReadBitfields(
 }
 
 void nsBMPDecoder::PrepareCalibratedColorProfile() {
-  // BMP does not define a white point. Use the same as sRGB. This matches what
-  // Chrome does as well.
-  qcms_CIE_xyY white_point = qcms_white_point_sRGB();
-
   qcms_CIE_xyYTRIPLE primaries;
   float redGamma =
       CalRbgEndpointToQcms(mH.mColorSpace.mCalibrated.mRed, primaries.red);
@@ -765,8 +761,7 @@ void nsBMPDecoder::PrepareCalibratedColorProfile() {
 
   // Explicitly verify the profile because sometimes the values from the BMP
   // header are just garbage.
-  mInProfile = qcms_profile_create_rgb_with_gamma_set(
-      white_point, primaries, redGamma, greenGamma, blueGamma);
+  SetQcmsProfile(primaries, redGamma, greenGamma, blueGamma);
   if (mInProfile && qcms_profile_is_bogus(mInProfile)) {
     // Bad profile, just use sRGB instead. Release the profile here, so that
     // our destructor doesn't assume we are the owner for the transform.
@@ -782,18 +777,14 @@ void nsBMPDecoder::PrepareCalibratedColorProfile() {
             ("failed to create calibrated RGB color profile, using sRGB\n"));
     if (mColors) {
       // We will transform the color table instead of the output pixels.
-      mTransform = gfxPlatform::GetCMSRGBTransform();
+      SetQcmsRGBsRGBTransform(/* aExplicit */ false);
     } else {
-      mTransform = gfxPlatform::GetCMSOSRGBATransform();
+      SetQcmsOSRGBAsRGBTransform(/* aExplicit */ false);
     }
   }
 }
 
 void nsBMPDecoder::PrepareColorProfileTransform() {
-  if (!mInProfile || !gfxPlatform::GetCMSOutputProfile()) {
-    return;
-  }
-
   qcms_data_type inType;
   qcms_data_type outType;
   if (mColors) {
@@ -822,8 +813,7 @@ void nsBMPDecoder::PrepareColorProfileTransform() {
       break;
   }
 
-  mTransform = qcms_transform_create(
-      mInProfile, inType, gfxPlatform::GetCMSOutputProfile(), outType, intent);
+  SetQcmsTransform(inType, outType, Some(intent));
   if (!mTransform) {
     MOZ_LOG(sBMPLog, LogLevel::Debug,
             ("failed to create color profile transform\n"));
@@ -855,7 +845,7 @@ LexerTransition<nsBMPDecoder::State> nsBMPDecoder::SeekColorProfile(
 
 LexerTransition<nsBMPDecoder::State> nsBMPDecoder::ReadColorProfile(
     const char* aData, size_t aLength) {
-  mInProfile = qcms_profile_from_memory(aData, aLength);
+  SetQcmsProfile(aData, aLength);
   if (mInProfile) {
     MOZ_LOG(sBMPLog, LogLevel::Debug, ("using embedded color profile\n"));
     PrepareColorProfileTransform();

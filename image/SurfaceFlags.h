@@ -19,7 +19,8 @@ namespace image {
  */
 enum class SurfaceFlags : uint8_t {
   NO_PREMULTIPLY_ALPHA = 1 << 0,
-  NO_COLORSPACE_CONVERSION = 1 << 1
+  NO_COLORSPACE_CONVERSION = 1 << 1,
+  EXPORT_METADATA = 2 << 2,
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(SurfaceFlags)
 

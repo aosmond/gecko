@@ -202,7 +202,7 @@ nsresult nsGIFDecoder2::BeginImageFrame(const IntRect& aFrameRect,
 
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
       this, Size(), OutputSize(), aFrameRect, format, format, animParams,
-      mTransform, pipeFlags);
+      /* qcms_transform */ nullptr, pipeFlags);
   mCurrentFrameIndex = mGIFStruct.images_decoded;
 
   if (!pipe) {
@@ -410,12 +410,9 @@ void nsGIFDecoder2::ConvertColormap(uint32_t* aColormap, uint32_t aColors) {
   }
 
   // Apply CMS transformation if enabled and available
-  if (!(GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) &&
-      gfxPlatform::GetCMSMode() == eCMSMode_All) {
-    qcms_transform* transform = gfxPlatform::GetCMSRGBTransform();
-    if (transform) {
-      qcms_transform_data(transform, aColormap, aColormap, aColors);
-    }
+  SetQcmsRGBsRGBTransform(/* aExplicit */ false);
+  if (mTransform) {
+    qcms_transform_data(mTransform, aColormap, aColormap, aColors);
   }
 
   // Expand color table from RGB to BGRA.
