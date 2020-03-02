@@ -280,7 +280,7 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
       JOCTET* profilebuf;
       uint32_t profileLength;
       if (read_icc_profile(&mInfo, &profilebuf, &profileLength)) {
-        SetQcmsProfile(profilebuf, profileLength) l free(profilebuf);
+        SetQcmsProfile(profilebuf, profileLength);
         free(profilebuf);
       }
 
@@ -316,7 +316,7 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
         // Create the color management transform if necessary.
         SetQcmsTransform(*inputType, outputType);
       } else {
-        SetQcmsOSRGBAsRGBTransform();
+        SetQcmsOSRGBAsRGBTransform(/* aExplicit */ false);
       }
 
       // We don't want to use the pipe buffers directly because we don't want

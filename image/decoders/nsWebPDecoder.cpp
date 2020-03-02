@@ -294,7 +294,7 @@ void nsWebPDecoder::ApplyColorProfile(const char* aProfile, size_t aLength) {
             ("[this=%p] nsWebPDecoder::ApplyColorProfile -- not tagged, use "
              "sRGB transform\n",
              this));
-    SetQcmsBGRAsRGBTransform();
+    SetQcmsBGRAsRGBTransform(/* aExplicit */ false);
     return;
   }
 

@@ -717,34 +717,27 @@ LexerTransition<nsBMPDecoder::State> nsBMPDecoder::ReadBitfields(
     mBytesPerColor = (mH.mBIHSize == InfoHeaderLength::WIN_V2) ? 3 : 4;
   }
 
-  auto cmsMode = gfxPlatform::GetCMSMode();
-  if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
-    cmsMode = eCMSMode_Off;
-  }
-
-  if (cmsMode != eCMSMode_Off) {
-    switch (mH.mCsType) {
-      case InfoColorSpace::PROFILE_EMBEDDED:
-        return SeekColorProfile(aLength);
-      case InfoColorSpace::CALIBRATED_RGB:
-        PrepareCalibratedColorProfile();
-        break;
-      case InfoColorSpace::SRGB:
-      case InfoColorSpace::WINDOWS:
-        MOZ_LOG(sBMPLog, LogLevel::Debug, ("using sRGB color profile\n"));
-        if (mColors) {
-          // We will transform the color table instead of the output pixels.
-          mTransform = gfxPlatform::GetCMSRGBTransform();
-        } else {
-          mTransform = gfxPlatform::GetCMSOSRGBATransform();
-        }
-        break;
-      case InfoColorSpace::PROFILE_LINKED:
-      default:
-        // Not supported, no color management.
-        MOZ_LOG(sBMPLog, LogLevel::Debug, ("color space type not provided\n"));
-        break;
-    }
+  switch (mH.mCsType) {
+    case InfoColorSpace::PROFILE_EMBEDDED:
+      return SeekColorProfile(aLength);
+    case InfoColorSpace::CALIBRATED_RGB:
+      PrepareCalibratedColorProfile();
+      break;
+    case InfoColorSpace::SRGB:
+    case InfoColorSpace::WINDOWS:
+      MOZ_LOG(sBMPLog, LogLevel::Debug, ("using sRGB color profile\n"));
+      if (mColors) {
+        // We will transform the color table instead of the output pixels.
+        SetQcmsRGBsRGBTransform(/* aExplicit */ true);
+      } else {
+        SetQcmsOSRGBAsRGBTransform(/* aExplicit */ true);
+      }
+      break;
+    case InfoColorSpace::PROFILE_LINKED:
+    default:
+      // Not supported, no color management.
+      MOZ_LOG(sBMPLog, LogLevel::Debug, ("color space type not provided\n"));
+      break;
   }
 
   return Transition::To(State::ALLOCATE_SURFACE, 0);
