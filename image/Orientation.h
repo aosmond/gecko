@@ -33,6 +33,8 @@ struct Orientation {
     return (rotation == Angle::D90) || (rotation == Angle::D270);
   }
 
+  uint16_t AsUint() const;
+
   bool operator==(const Orientation& aOther) const {
     return (rotation == aOther.rotation) && (flip == aOther.flip);
   }

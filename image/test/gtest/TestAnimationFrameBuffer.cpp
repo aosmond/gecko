@@ -19,7 +19,7 @@ static already_AddRefed<imgFrame> CreateEmptyFrame(
                              /* aFrameNum */ 1, BlendMethod::OVER,
                              DisposalMethod::NOT_SPECIFIED};
   nsresult rv = frame->InitForDecoder(aSize, SurfaceFormat::OS_RGBA, false,
-                                      Some(animParams), aCanRecycle);
+                                      Some(animParams), nullptr, aCanRecycle);
   EXPECT_TRUE(NS_SUCCEEDED(rv));
   RawAccessFrameRef frameRef = frame->RawAccessRef();
   frame->SetRawAccessOnly();

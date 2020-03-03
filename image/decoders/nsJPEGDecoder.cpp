@@ -571,6 +571,7 @@ Orientation nsJPEGDecoder::ReadOrientationFromEXIF() {
   // Extract the orientation information.
   EXIFData exif = EXIFParser::Parse(marker->data,
                                     static_cast<uint32_t>(marker->data_length));
+  SetEXIF(exif);
   return exif.orientation;
 }
 

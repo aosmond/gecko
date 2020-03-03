@@ -6,8 +6,9 @@
 #ifndef mozilla_image_ImageRegion_h
 #define mozilla_image_ImageRegion_h
 
-#include "gfxRect.h"
 #include "mozilla/gfx/Types.h"
+#include "gfxRect.h"
+#include "gfxPoint.h"
 
 namespace mozilla {
 namespace image {

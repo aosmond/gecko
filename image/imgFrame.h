@@ -23,6 +23,7 @@ namespace image {
 class ImageRegion;
 class DrawableFrameRef;
 class RawAccessFrameRef;
+class SurfaceImageMetadata;
 
 enum class Opacity : uint8_t { FULLY_OPAQUE, SOME_TRANSPARENCY };
 
@@ -53,6 +54,7 @@ class imgFrame {
   nsresult InitForDecoder(const nsIntSize& aImageSize, SurfaceFormat aFormat,
                           bool aNonPremult,
                           const Maybe<AnimationParams>& aAnimParams,
+                          SurfaceImageMetadata* aSurfaceMetadata,
                           bool aShouldRecycle);
 
   /**

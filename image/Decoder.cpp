@@ -371,7 +371,7 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
     bool nonPremult = bool(mSurfaceFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA);
     auto frame = MakeNotNull<RefPtr<imgFrame>>();
     if (NS_FAILED(frame->InitForDecoder(aOutputSize, aFormat, nonPremult,
-                                        aAnimParams, bool(mFrameRecycler)))) {
+                                        aAnimParams, mSurfaceMetadata, bool(mFrameRecycler)))) {
       NS_WARNING("imgFrame::Init should succeed");
       return RawAccessFrameRef();
     }

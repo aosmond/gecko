@@ -319,5 +319,35 @@ bool EXIFParser::ReadUInt32(uint32_t& aValue) {
   return matched;
 }
 
+uint16_t Orientation::AsUint() const {
+  switch (flip) {
+    case Flip::Unflipped:
+      switch (rotation) {
+        case Angle::D0:
+          return 1;
+        case Angle::D90:
+          return 6;
+        case Angle::D180:
+          return 3;
+        case Angle::D270:
+          return 8;
+      }
+      break;
+    case Flip::Horizontal:
+      switch (rotation) {
+        case Angle::D0:
+          return 2;
+        case Angle::D90:
+          return 5;
+        case Angle::D180:
+          return 4;
+        case Angle::D270:
+          return 7;
+      }
+      break;
+  }
+  return 0;
+}
+
 }  // namespace image
 }  // namespace mozilla

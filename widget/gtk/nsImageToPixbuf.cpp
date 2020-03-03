@@ -9,6 +9,7 @@
 
 #include "imgIContainer.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/image/SurfaceImageMetadata.h"
 #include "mozilla/RefPtr.h"
 
 using mozilla::gfx::DataSourceSurface;
@@ -28,18 +29,20 @@ nsImageToPixbuf::ConvertImageToPixbuf(imgIContainer* aImage) {
 }
 
 GdkPixbuf* nsImageToPixbuf::ImageToPixbuf(imgIContainer* aImage) {
-  RefPtr<SourceSurface> surface = aImage->GetFrame(
-      imgIContainer::FRAME_CURRENT,
-      imgIContainer::FLAG_SYNC_DECODE | imgIContainer::FLAG_ASYNC_NOTIFY);
+  uint32_t flags = imgIContainer::FLAG_DECODE_NO_PREMULTIPLY_ALPHA |
+                   imgIContainer::FLAG_DECODE_NO_COLORSPACE_CONVERSION |
+                   imgIContainer::FLAG_DECODE_EXPORT_METADATA;
+  RefPtr<SourceSurface> surface =
+      aImage->GetFrame(imgIContainer::FRAME_CURRENT,
+                       imgIContainer::FLAG_SYNC_DECODE |
+                           imgIContainer::FLAG_ASYNC_NOTIFY | flags);
 
   // If the last call failed, it was probably because our call stack originates
   // in an imgINotificationObserver event, meaning that we're not allowed
   // request a sync decode. Presumably the originating event is something
   // sensible like OnStopFrame(), so we can just retry the call without a sync
   // decode.
-  if (!surface)
-    surface = aImage->GetFrame(imgIContainer::FRAME_CURRENT,
-                               imgIContainer::FLAG_NONE);
+  if (!surface) surface = aImage->GetFrame(imgIContainer::FRAME_CURRENT, flags);
 
   NS_ENSURE_TRUE(surface, nullptr);
 
@@ -61,6 +64,28 @@ GdkPixbuf* nsImageToPixbuf::SourceSurfaceToPixbuf(SourceSurface* aSurface,
   uint32_t destStride = gdk_pixbuf_get_rowstride(pixbuf);
   guchar* destPixels = gdk_pixbuf_get_pixels(pixbuf);
 
+  RefPtr<image::SurfaceImageMetadata> metadata =
+      image::SurfaceImageMetadata::GetFromSurface(aSurface);
+
+  printf_stderr("[AO] converting image to pixbuf\n");
+  if (metadata) {
+    printf_stderr("[AO] has metadata\n");
+    if (metadata->HasICCProfile()) {
+      printf_stderr("[AO] has ICC profile\n");
+      gchar* icc_profile_base64 =
+          g_base64_encode((const guchar*)metadata->GetICCProfileData(),
+                          metadata->GetICCProfileLength());
+      gdk_pixbuf_set_option(pixbuf, "icc-profile", icc_profile_base64);
+      g_free(icc_profile_base64);
+    }
+
+    if (metadata->HasEXIF()) {
+      nsAutoCString str;
+      str.AppendInt(metadata->GetEXIF().orientation.AsUint());
+      gdk_pixbuf_set_option(pixbuf, "orientation", str.Data());
+    }
+  }
+
   RefPtr<DataSourceSurface> dataSurface = aSurface->GetDataSurface();
   DataSourceSurface::MappedSurface map;
   if (!dataSurface->Map(DataSourceSurface::MapType::READ, &map)) return nullptr;
@@ -79,9 +104,9 @@ GdkPixbuf* nsImageToPixbuf::SourceSurfaceToPixbuf(SourceSurface* aSurface,
 
       if (format == SurfaceFormat::B8G8R8A8) {
         const uint8_t a = (*srcPixel >> 24) & 0xFF;
-        const uint8_t r = unpremultiply((*srcPixel >> 16) & 0xFF, a);
-        const uint8_t g = unpremultiply((*srcPixel >> 8) & 0xFF, a);
-        const uint8_t b = unpremultiply((*srcPixel >> 0) & 0xFF, a);
+        const uint8_t r = (*srcPixel >> 16) & 0xFF;
+        const uint8_t g = (*srcPixel >> 8) & 0xFF;
+        const uint8_t b = (*srcPixel >> 0) & 0xFF;
 
         *destPixel++ = r;
         *destPixel++ = g;

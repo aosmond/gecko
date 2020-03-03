@@ -8,6 +8,7 @@
 #include "ImageRegion.h"
 #include "ShutdownTracker.h"
 #include "SurfaceCache.h"
+#include "SurfaceImageMetadata.h"
 
 #include "prenv.h"
 
@@ -27,6 +28,7 @@
 #include "mozilla/layers/SourceSurfaceVolatileData.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/StaticPrefs_image.h"
 #include "nsMargin.h"
 #include "nsRefreshDriver.h"
 #include "nsThreadUtils.h"
@@ -58,8 +60,14 @@ static already_AddRefed<DataSourceSurface> CreateLockedSurface(
       DataSourceSurface::ScopedMap smap(aSurface,
                                         DataSourceSurface::READ_WRITE);
       if (smap.IsMapped()) {
-        return MakeAndAddRef<SourceSurfaceMappedData>(std::move(smap), size,
-                                                      format);
+        auto surf =
+            MakeRefPtr<SourceSurfaceMappedData>(std::move(smap), size, format);
+        RefPtr<SurfaceImageMetadata> metadata =
+            SurfaceImageMetadata::GetFromSurface(aSurface);
+        if (metadata) {
+          metadata->Annotate(surf);
+        }
+        return surf.forget();
       }
       break;
     }
@@ -197,6 +205,7 @@ imgFrame::~imgFrame() {
 nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
                                   SurfaceFormat aFormat, bool aNonPremult,
                                   const Maybe<AnimationParams>& aAnimParams,
+                                  SurfaceImageMetadata* aMetadata,
                                   bool aShouldRecycle) {
   // Assert for properties that should be verified by decoders,
   // warn for properties related to bad content.
@@ -244,12 +253,19 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
+  if (aMetadata) {
+    aMetadata->Annotate(mRawSurface);
+  }
+
   if (StaticPrefs::browser_measurement_render_anims_and_video_solid() &&
       aAnimParams) {
     mBlankRawSurface = AllocateBufferForImage(mImageSize, mFormat);
     if (!mBlankRawSurface) {
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
+    }
+    if (aMetadata) {
+      aMetadata->Annotate(mBlankRawSurface);
     }
   }
 
@@ -260,6 +276,10 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
+  if (aMetadata) {
+    aMetadata->Annotate(mLockedSurface);
+  }
+
   if (mBlankRawSurface) {
     mBlankLockedSurface =
         CreateLockedSurface(mBlankRawSurface, mImageSize, mFormat);
@@ -267,6 +287,10 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       NS_WARNING("Failed to create BlankLockedSurface");
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (aMetadata) {
+      aMetadata->Annotate(mBlankLockedSurface);
     }
   }
 
@@ -506,6 +530,11 @@ nsresult imgFrame::Optimize(DrawTarget* aTarget) {
     // optimized surface. Release our reference to it. This will leave
     // |mLockedSurface| as the only thing keeping it alive, so it'll get freed
     // below.
+    RefPtr<SurfaceImageMetadata> metadata =
+        SurfaceImageMetadata::GetFromSurface(mRawSurface);
+    if (metadata) {
+      metadata->Annotate(mOptSurface);
+    }
     mRawSurface = nullptr;
   }
 
@@ -850,6 +879,11 @@ already_AddRefed<SourceSurface> imgFrame::GetSourceSurfaceInternal(
     if (!aTemporary && mShouldRecycle) {
       RefPtr<SourceSurface> surf =
           new RecyclingSourceSurface(this, mBlankLockedSurface);
+      RefPtr<SurfaceImageMetadata> metadata =
+          SurfaceImageMetadata::GetFromSurface(mBlankLockedSurface);
+      if (metadata) {
+        metadata->Annotate(surf);
+      }
       return surf.forget();
     }
 
@@ -863,6 +897,11 @@ already_AddRefed<SourceSurface> imgFrame::GetSourceSurfaceInternal(
     if (!aTemporary && mShouldRecycle) {
       RefPtr<SourceSurface> surf =
           new RecyclingSourceSurface(this, mLockedSurface);
+      RefPtr<SurfaceImageMetadata> metadata =
+          SurfaceImageMetadata::GetFromSurface(mLockedSurface);
+      if (metadata) {
+        metadata->Annotate(surf);
+      }
       return surf.forget();
     }
 

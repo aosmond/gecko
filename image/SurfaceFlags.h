@@ -20,7 +20,7 @@ namespace image {
 enum class SurfaceFlags : uint8_t {
   NO_PREMULTIPLY_ALPHA = 1 << 0,
   NO_COLORSPACE_CONVERSION = 1 << 1,
-  EXPORT_METADATA = 2 << 2,
+  EXPORT_METADATA = 1 << 2,
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(SurfaceFlags)
 
@@ -41,6 +41,10 @@ inline SurfaceFlags ToSurfaceFlags(uint32_t aFlags) {
   if (aFlags & imgIContainer::FLAG_DECODE_NO_COLORSPACE_CONVERSION) {
     flags |= SurfaceFlags::NO_COLORSPACE_CONVERSION;
   }
+  if (aFlags & imgIContainer::FLAG_DECODE_EXPORT_METADATA) {
+    printf_stderr("[AO] decode export metadata flag set\n");
+    flags |= SurfaceFlags::EXPORT_METADATA;
+  }
   return flags;
 }
 
@@ -55,6 +59,9 @@ inline uint32_t FromSurfaceFlags(SurfaceFlags aFlags) {
   }
   if (aFlags & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
     flags |= imgIContainer::FLAG_DECODE_NO_COLORSPACE_CONVERSION;
+  }
+  if (aFlags & SurfaceFlags::EXPORT_METADATA) {
+    flags |= imgIContainer::FLAG_DECODE_EXPORT_METADATA;
   }
   return flags;
 }

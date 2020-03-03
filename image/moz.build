@@ -63,6 +63,8 @@ EXPORTS.mozilla.image += [
     'ICOFileHeaders.h',
     'ImageMemoryReporter.h',
     'RecyclingSourceSurface.h',
+    'SurfaceFlags.h',
+    'SurfaceImageMetadata.h',
 ]
 
 UNIFIED_SOURCES += [
@@ -97,6 +99,7 @@ UNIFIED_SOURCES += [
     'SourceBuffer.cpp',
     'SurfaceCache.cpp',
     'SurfaceCacheUtils.cpp',
+    'SurfaceImageMetadata.cpp',
     'SurfacePipe.cpp',
     'SVGDocumentWrapper.cpp',
     'VectorImage.cpp',
