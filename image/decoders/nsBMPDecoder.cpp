@@ -732,12 +732,10 @@ LexerTransition<nsBMPDecoder::State> nsBMPDecoder::ReadBitfields(
       case InfoColorSpace::SRGB:
       case InfoColorSpace::WINDOWS:
         MOZ_LOG(sBMPLog, LogLevel::Debug, ("using sRGB color profile\n"));
-        if (mColors) {
-          // We will transform the color table instead of the output pixels.
-          mTransform = gfxPlatform::GetCMSRGBTransform();
-        } else {
-          mTransform = gfxPlatform::GetCMSOSRGBATransform();
-        }
+        // We want to transform the color table instead of the output pixels if
+        // present.
+        mTransform = gfxPlatform::GetCMSsRGBTransform(
+            mColors ? SurfaceFormat::R8G8B8 : SurfaceFormat::OS_RGBA);
         break;
       case InfoColorSpace::LINKED:
       default:
@@ -780,12 +778,10 @@ void nsBMPDecoder::PrepareCalibratedColorProfile() {
   } else {
     MOZ_LOG(sBMPLog, LogLevel::Debug,
             ("failed to create calibrated RGB color profile, using sRGB\n"));
-    if (mColors) {
-      // We will transform the color table instead of the output pixels.
-      mTransform = gfxPlatform::GetCMSRGBTransform();
-    } else {
-      mTransform = gfxPlatform::GetCMSOSRGBATransform();
-    }
+    // We want to transform the color table instead of the output pixels if
+    // present.
+    mTransform = gfxPlatform::GetCMSsRGBTransform(
+        mColors ? SurfaceFormat::R8G8B8 : SurfaceFormat::OS_RGBA);
   }
 }
 

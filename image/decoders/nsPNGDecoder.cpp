@@ -696,11 +696,9 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
     // have an alpha channel, because the swizzle and premultiplication
     // happens after color management. Otherwise it will be in BGRA because
     // the swizzle happens at the start.
-    if (transparency == TransparencyType::eAlpha) {
-      decoder->mTransform = gfxPlatform::GetCMSRGBATransform();
-    } else {
-      decoder->mTransform = gfxPlatform::GetCMSBGRATransform();
-    }
+    decoder->mTransform = gfxPlatform::GetCMSsRGBTransform(
+        transparency == TransparencyType::eAlpha ? SurfaceFormat::R8G8B8A8
+                                                 : SurfaceFormat::B8G8R8A8);
     decoder->mUsePipeTransform = true;
   }
 

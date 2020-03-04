@@ -890,7 +890,8 @@ gfxUtils::CopySurfaceToDataSourceSurfaceWithFormat(SourceSurface* aSurface,
 const uint32_t gfxUtils::sNumFrameColors = 8;
 
 /* static */
-const gfx::DeviceColor& gfxUtils::GetColorForFrameNumber(uint64_t aFrameNumber) {
+const gfx::DeviceColor& gfxUtils::GetColorForFrameNumber(
+    uint64_t aFrameNumber) {
   static bool initialized = false;
   static gfx::DeviceColor colors[sNumFrameColors];
 
@@ -1554,7 +1555,8 @@ DeviceColor ToDeviceColor(const sRGBColor& aColor) {
   // could declare a local Color variable and use that, but we might as well
   // just use aColor.
   if (gfxPlatform::GetCMSMode() == eCMSMode_All) {
-    qcms_transform* transform = gfxPlatform::GetCMSRGBTransform();
+    qcms_transform* transform =
+        gfxPlatform::GetCMSsRGBTransform(SurfaceFormat::R8G8B8);
     if (transform) {
       return gfxPlatform::TransformPixel(aColor, transform);
       // Use the original alpha to avoid unnecessary float->byte->float

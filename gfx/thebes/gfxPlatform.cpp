@@ -173,11 +173,13 @@ static Mutex* gGfxPlatformPrefsLock = nullptr;
 static qcms_profile* gCMSOutputProfile = nullptr;
 static qcms_profile* gCMSsRGBProfile = nullptr;
 
-static bool gCMSRGBTransformFailed = false;
+static bool gCMSsRGBTransformFailed = false;
 static qcms_transform* gCMSRGBTransform = nullptr;
-static qcms_transform* gCMSInverseRGBTransform = nullptr;
 static qcms_transform* gCMSRGBATransform = nullptr;
 static qcms_transform* gCMSBGRATransform = nullptr;
+static qcms_transform* gCMSRGBInverseTransform = nullptr;
+static qcms_transform* gCMSRGBAInverseTransform = nullptr;
+static qcms_transform* gCMSBGRAInverseTransform = nullptr;
 
 static bool gCMSInitialized = false;
 static eCMSMode gCMSMode = eCMSMode_Off;
@@ -2253,83 +2255,69 @@ qcms_profile* gfxPlatform::GetCMSsRGBProfile() {
   return gCMSsRGBProfile;
 }
 
-qcms_transform* gfxPlatform::GetCMSRGBTransform() {
-  if (!gCMSRGBTransform && !gCMSRGBTransformFailed) {
+qcms_transform* gfxPlatform::GetCMSsRGBTransformInternal(SurfaceFormat aFormat,
+                                                         bool aInvert) {
+  if (!gCMSsRGBTransformFailed) {
+    return nullptr;
+  }
+
+  qcms_transform** transform;
+  switch (aFormat) {
+    case SurfaceFormat::B8G8R8A8:
+    case SurfaceFormat::B8G8R8X8:
+      transform = !aInvert ? &gCMSBGRATransform : &gCMSBGRAInverseTransform;
+      break;
+    case SurfaceFormat::R8G8B8A8:
+    case SurfaceFormat::R8G8B8X8:
+      transform = !aInvert ? &gCMSRGBATransform : &gCMSRGBAInverseTransform;
+      break;
+    case SurfaceFormat::R8G8B8:
+      transform = !aInvert ? &gCMSRGBTransform : &gCMSRGBInverseTransform;
+      break;
+    default:
+      MOZ_ASSERT_UNREACHABLE("Unsupported surface format!");
+      return nullptr;
+  }
+
+  if (!*transform) {
     qcms_profile *inProfile, *outProfile;
     outProfile = GetCMSOutputProfile();
     inProfile = GetCMSsRGBProfile();
+    if (!inProfile || !outProfile) {
+      return nullptr;
+    }
 
-    if (!inProfile || !outProfile) return nullptr;
+    qcms_data_type dataType;
+    switch (aFormat) {
+      case SurfaceFormat::B8G8R8A8:
+      case SurfaceFormat::B8G8R8X8:
+        dataType = QCMS_DATA_BGRA_8;
+        break;
+      case SurfaceFormat::R8G8B8A8:
+      case SurfaceFormat::R8G8B8X8:
+        dataType = QCMS_DATA_RGBA_8;
+        break;
+      case SurfaceFormat::R8G8B8:
+        dataType = QCMS_DATA_RGB_8;
+        break;
+      default:
+        MOZ_ASSERT_UNREACHABLE("Unsupported surface format!");
+        return nullptr;
+    }
 
-    gCMSRGBTransform =
-        qcms_transform_create(inProfile, QCMS_DATA_RGB_8, outProfile,
-                              QCMS_DATA_RGB_8, QCMS_INTENT_PERCEPTUAL);
-    if (!gCMSRGBTransform) {
-      gCMSRGBTransformFailed = true;
+    if (aInvert) {
+      *transform = qcms_transform_create(inProfile, dataType, outProfile,
+                                         dataType, QCMS_INTENT_PERCEPTUAL);
+    } else {
+      *transform = qcms_transform_create(outProfile, dataType, inProfile,
+                                         dataType, QCMS_INTENT_PERCEPTUAL);
+    }
+    if (!*transform) {
+      gCMSsRGBTransformFailed = true;
     }
   }
 
-  return gCMSRGBTransform;
-}
-
-qcms_transform* gfxPlatform::GetCMSInverseRGBTransform() {
-  if (!gCMSInverseRGBTransform) {
-    qcms_profile *inProfile, *outProfile;
-    inProfile = GetCMSOutputProfile();
-    outProfile = GetCMSsRGBProfile();
-
-    if (!inProfile || !outProfile) return nullptr;
-
-    gCMSInverseRGBTransform =
-        qcms_transform_create(inProfile, QCMS_DATA_RGB_8, outProfile,
-                              QCMS_DATA_RGB_8, QCMS_INTENT_PERCEPTUAL);
-  }
-
-  return gCMSInverseRGBTransform;
-}
-
-qcms_transform* gfxPlatform::GetCMSRGBATransform() {
-  if (!gCMSRGBATransform) {
-    qcms_profile *inProfile, *outProfile;
-    outProfile = GetCMSOutputProfile();
-    inProfile = GetCMSsRGBProfile();
-
-    if (!inProfile || !outProfile) return nullptr;
-
-    gCMSRGBATransform =
-        qcms_transform_create(inProfile, QCMS_DATA_RGBA_8, outProfile,
-                              QCMS_DATA_RGBA_8, QCMS_INTENT_PERCEPTUAL);
-  }
-
-  return gCMSRGBATransform;
-}
-
-qcms_transform* gfxPlatform::GetCMSBGRATransform() {
-  if (!gCMSBGRATransform) {
-    qcms_profile *inProfile, *outProfile;
-    outProfile = GetCMSOutputProfile();
-    inProfile = GetCMSsRGBProfile();
-
-    if (!inProfile || !outProfile) return nullptr;
-
-    gCMSBGRATransform =
-        qcms_transform_create(inProfile, QCMS_DATA_BGRA_8, outProfile,
-                              QCMS_DATA_BGRA_8, QCMS_INTENT_PERCEPTUAL);
-  }
-
-  return gCMSBGRATransform;
-}
-
-qcms_transform* gfxPlatform::GetCMSOSRGBATransform() {
-  switch (SurfaceFormat::OS_RGBA) {
-    case SurfaceFormat::B8G8R8A8:
-      return GetCMSBGRATransform();
-    case SurfaceFormat::R8G8B8A8:
-      return GetCMSRGBATransform();
-    default:
-      // We do not support color management with big endian.
-      return nullptr;
-  }
+  return *transform;
 }
 
 qcms_data_type gfxPlatform::GetCMSOSRGBAType() {
@@ -2344,24 +2332,23 @@ qcms_data_type gfxPlatform::GetCMSOSRGBAType() {
   }
 }
 
+static void ReleaseCMSTransform(qcms_transform** aTransform) {
+  MOZ_ASSERT(aTransform);
+  if (*aTransform) {
+    qcms_transform_release(*aTransform);
+    *aTransform = nullptr;
+  }
+}
+
 /* Shuts down various transforms and profiles for CMS. */
 static void ShutdownCMS() {
-  if (gCMSRGBTransform) {
-    qcms_transform_release(gCMSRGBTransform);
-    gCMSRGBTransform = nullptr;
-  }
-  if (gCMSInverseRGBTransform) {
-    qcms_transform_release(gCMSInverseRGBTransform);
-    gCMSInverseRGBTransform = nullptr;
-  }
-  if (gCMSRGBATransform) {
-    qcms_transform_release(gCMSRGBATransform);
-    gCMSRGBATransform = nullptr;
-  }
-  if (gCMSBGRATransform) {
-    qcms_transform_release(gCMSBGRATransform);
-    gCMSBGRATransform = nullptr;
-  }
+  ReleaseCMSTransform(&gCMSRGBTransform);
+  ReleaseCMSTransform(&gCMSRGBATransform);
+  ReleaseCMSTransform(&gCMSBGRATransform);
+  ReleaseCMSTransform(&gCMSRGBInverseTransform);
+  ReleaseCMSTransform(&gCMSRGBAInverseTransform);
+  ReleaseCMSTransform(&gCMSBGRAInverseTransform);
+
   if (gCMSOutputProfile) {
     qcms_profile_release(gCMSOutputProfile);
 

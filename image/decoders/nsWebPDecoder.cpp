@@ -304,7 +304,7 @@ void nsWebPDecoder::ApplyColorProfile(const char* aProfile, size_t aLength) {
             ("[this=%p] nsWebPDecoder::ApplyColorProfile -- not tagged, use "
              "sRGB transform\n",
              this));
-    mTransform = gfxPlatform::GetCMSBGRATransform();
+    mTransform = gfxPlatform::GetCMSsRGBTransform(SurfaceFormat::B8G8R8A8);
     return;
   }
 

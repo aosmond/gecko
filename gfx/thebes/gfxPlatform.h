@@ -534,27 +534,18 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
   /**
    * Return sRGB -> output device transform.
    */
-  static qcms_transform* GetCMSRGBTransform();
+  static qcms_transform* GetCMSsRGBTransform(
+      mozilla::gfx::SurfaceFormat aFormat) {
+    return GetCMSsRGBTransformInternal(aFormat, /* aInvert */ false);
+  }
 
   /**
    * Return output -> sRGB device transform.
    */
-  static qcms_transform* GetCMSInverseRGBTransform();
-
-  /**
-   * Return sRGBA -> output device transform.
-   */
-  static qcms_transform* GetCMSRGBATransform();
-
-  /**
-   * Return sBGRA -> output device transform.
-   */
-  static qcms_transform* GetCMSBGRATransform();
-
-  /**
-   * Return OS RGBA -> output device transform.
-   */
-  static qcms_transform* GetCMSOSRGBATransform();
+  static qcms_transform* GetCMSsRGBInverseTransform(
+      mozilla::gfx::SurfaceFormat aFormat) {
+    return GetCMSsRGBTransformInternal(aFormat, /* aInvert */ false);
+  }
 
   /**
    * Return OS RGBA QCMS type.
@@ -759,6 +750,9 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
  protected:
   gfxPlatform();
   virtual ~gfxPlatform();
+
+  static qcms_transform* GetCMSsRGBTransformInternal(
+      mozilla::gfx::SurfaceFormat aFormat, bool aInvert);
 
   virtual void InitAcceleration();
   virtual void InitWebRenderConfig();

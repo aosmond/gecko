@@ -334,7 +334,7 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
                 outputType, (qcms_intent)intent);
           }
         } else if (mCMSMode == eCMSMode_All) {
-          mTransform = gfxPlatform::GetCMSOSRGBATransform();
+          mTransform = gfxPlatform::GetCMSsRGBTransform(SurfaceFormat::OS_RGBA);
         }
       }
 

@@ -915,7 +915,8 @@ nsresult nsXPLookAndFeel::GetColorImpl(ColorID aID,
       MOZ_ASSERT(NS_IsMainThread());
       if ((gfxPlatform::GetCMSMode() == eCMSMode_All) &&
           !IsSpecialColor(aID, aResult)) {
-        qcms_transform* transform = gfxPlatform::GetCMSInverseRGBTransform();
+        qcms_transform* transform =
+            gfxPlatform::GetCMSsRGBInverseTransform(gfx::SurfaceFormat::R8G8B8);
         if (transform) {
           uint8_t color[4];
           color[0] = NS_GET_R(aResult);
