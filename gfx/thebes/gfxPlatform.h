@@ -534,27 +534,12 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
   /**
    * Return sRGB -> output device transform.
    */
-  static qcms_transform* GetCMSRGBTransform();
+  static qcms_transform* GetCMSsRGBTransform(mozilla:gfx::SurfaceFormat aFormat);
 
   /**
    * Return output -> sRGB device transform.
    */
-  static qcms_transform* GetCMSInverseRGBTransform();
-
-  /**
-   * Return sRGBA -> output device transform.
-   */
-  static qcms_transform* GetCMSRGBATransform();
-
-  /**
-   * Return sBGRA -> output device transform.
-   */
-  static qcms_transform* GetCMSBGRATransform();
-
-  /**
-   * Return OS RGBA -> output device transform.
-   */
-  static qcms_transform* GetCMSOSRGBATransform();
+  static qcms_transform* GetCMSsRGBInverseTransform(mozilla::gfx::SurfaceFormat aFormat);
 
   /**
    * Return OS RGBA QCMS type.
