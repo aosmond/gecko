@@ -139,6 +139,11 @@ DynamicImage::GetFrame(uint32_t aWhichFrame, uint32_t aFlags) {
 NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 DynamicImage::GetFrameAtSize(const IntSize& aSize, uint32_t aWhichFrame,
                              uint32_t aFlags) {
+  RefPtr<SourceSurface> surf = mDrawable->Surface();
+  if (surf) {
+    return surf.forget();
+  }
+
   RefPtr<DrawTarget> dt =
       gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
           aSize, SurfaceFormat::OS_RGBA);

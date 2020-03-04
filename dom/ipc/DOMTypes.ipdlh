@@ -8,6 +8,7 @@ include "mozilla/GfxMessageUtils.h";
 include "mozilla/dom/DocShellMessageUtils.h";
 include "mozilla/dom/TabMessageUtils.h";
 include "mozilla/layers/LayersMessageUtils.h";
+include "mozilla/image/MessageUtils.h";
 
 include IPCBlob;
 include IPCStream;
@@ -42,6 +43,7 @@ using refcounted class nsIVariant from "mozilla/dom/PropertyBagUtils.h";
 using class mozilla::TimeStamp from "mozilla/TimeStamp.h";
 using refcounted class nsISHEntry from "nsISHEntry.h";
 using refcounted class mozilla::dom::CrossProcessSHEntry from "mozilla/dom/MaybeNewPSHEntry.h";
+using refcounted class mozilla::image::SurfaceImageMetadata from "mozilla/image/SurfaceImageMetadata.h";
 
 namespace mozilla {
 namespace dom {
@@ -95,6 +97,7 @@ struct IPCDataTransferImage
   uint32_t height;
   uint32_t stride;
   SurfaceFormat format;
+  SurfaceImageMetadata metadata;
 };
 
 struct IPCDataTransferItem

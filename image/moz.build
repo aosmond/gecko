@@ -62,6 +62,7 @@ EXPORTS.mozilla.image += [
     'encoders/png/nsPNGEncoder.h',
     'ICOFileHeaders.h',
     'ImageMemoryReporter.h',
+    'MessageUtils.h',
     'RecyclingSourceSurface.h',
     'SurfaceFlags.h',
     'SurfaceImageMetadata.h',

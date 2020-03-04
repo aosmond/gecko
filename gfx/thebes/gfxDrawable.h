@@ -54,6 +54,9 @@ class gfxDrawable {
 
   virtual mozilla::gfx::IntSize Size() { return mSize; }
 
+  // Access the underlying surface, if available.
+  virtual mozilla::gfx::SourceSurface* Surface() { return nullptr; }
+
  protected:
   // Protected destructor, to discourage deletion outside of Release():
   virtual ~gfxDrawable() = default;
@@ -84,6 +87,8 @@ class gfxSurfaceDrawable : public gfxDrawable {
       mozilla::gfx::ExtendMode aExtendMode,
       const mozilla::gfx::SamplingFilter aSamplingFilter,
       gfxFloat aOpacity = 1.0) override;
+
+  mozilla::gfx::SourceSurface* Surface() override { return mSourceSurface; }
 
  protected:
   void DrawInternal(DrawTarget* aDrawTarget, CompositionOp aOp,

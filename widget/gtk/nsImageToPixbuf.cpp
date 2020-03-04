@@ -71,7 +71,7 @@ GdkPixbuf* nsImageToPixbuf::SourceSurfaceToPixbuf(SourceSurface* aSurface,
   if (metadata) {
     printf_stderr("[AO] has metadata\n");
     if (metadata->HasICCProfile()) {
-      printf_stderr("[AO] has ICC profile\n");
+      printf_stderr("[AO] has ICC profile %u\n", metadata->GetICCProfileLength());
       gchar* icc_profile_base64 =
           g_base64_encode((const guchar*)metadata->GetICCProfileData(),
                           metadata->GetICCProfileLength());
@@ -82,6 +82,7 @@ GdkPixbuf* nsImageToPixbuf::SourceSurfaceToPixbuf(SourceSurface* aSurface,
     if (metadata->HasEXIF()) {
       nsAutoCString str;
       str.AppendInt(metadata->GetEXIF().orientation.AsUint());
+      printf_stderr("[AO] has orientation %s\n", str.Data());
       gdk_pixbuf_set_option(pixbuf, "orientation", str.Data());
     }
   }

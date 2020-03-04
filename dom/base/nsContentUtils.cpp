@@ -7437,6 +7437,12 @@ nsresult nsContentUtils::DataTransferItemToImage(
   RefPtr<DataSourceSurface> image = CreateDataSourceSurfaceFromData(
       size, imageDetails.format(), data.get<uint8_t>(), imageDetails.stride());
 
+  if (imageDetails.metadata()) {
+    auto metadata = const_cast<mozilla::image::SurfaceImageMetadata*>(
+        imageDetails.metadata());
+    metadata->Annotate(image);
+  }
+
   RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
   nsCOMPtr<imgIContainer> imageContainer =
       image::ImageOps::CreateFromDrawable(drawable);
@@ -7551,7 +7557,11 @@ void nsContentUtils::TransferableToIPCTransferable(
         // Images to be placed on the clipboard are imgIContainers.
         RefPtr<mozilla::gfx::SourceSurface> surface = image->GetFrame(
             imgIContainer::FRAME_CURRENT,
-            imgIContainer::FLAG_SYNC_DECODE | imgIContainer::FLAG_ASYNC_NOTIFY);
+            imgIContainer::FLAG_SYNC_DECODE | imgIContainer::FLAG_ASYNC_NOTIFY |
+                imgIContainer::FLAG_DECODE_NO_PREMULTIPLY_ALPHA |
+                imgIContainer::FLAG_DECODE_NO_COLORSPACE_CONVERSION |
+                imgIContainer::FLAG_DECODE_EXPORT_METADATA);
+
         if (!surface) {
           continue;
         }
@@ -7583,6 +7593,9 @@ void nsContentUtils::TransferableToIPCTransferable(
         imageDetails.height() = size.height;
         imageDetails.stride() = stride;
         imageDetails.format() = dataSurface->GetFormat();
+        imageDetails.metadata() =
+            mozilla::image::SurfaceImageMetadata::GetFromSurface(dataSurface);
+	printf_stderr("[AO] added metadata %p to data transfer image\n", imageDetails.metadata().get());
       } else {
         // Otherwise, handle this as a file.
         nsCOMPtr<BlobImpl> blobImpl;

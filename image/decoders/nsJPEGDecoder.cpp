@@ -96,8 +96,6 @@ nsJPEGDecoder::nsJPEGDecoder(RasterImage* aImage,
   mBackBuffer = nullptr;
   mBackBufferLen = mBackBufferSize = mBackBufferUnreadLen = 0;
 
-  mCMSMode = 0;
-
   MOZ_LOG(sJPEGDecoderAccountingLog, LogLevel::Debug,
           ("nsJPEGDecoder::nsJPEGDecoder: Creating JPEG decoder %p", this));
 }
@@ -121,11 +119,6 @@ Maybe<Telemetry::HistogramID> nsJPEGDecoder::SpeedHistogram() const {
 }
 
 nsresult nsJPEGDecoder::InitInternal() {
-  mCMSMode = gfxPlatform::GetCMSMode();
-  if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
-    mCMSMode = eCMSMode_Off;
-  }
-
   // We set up the normal JPEG error routines, then override error_exit.
   mInfo.err = jpeg_std_error(&mErr.pub);
   //   mInfo.err = jpeg_std_error(&mErr.pub);
@@ -346,6 +339,7 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
       // be optimal.
       qcms_transform* pipeTransform =
           mInfo.out_color_space != JCS_GRAYSCALE ? mTransform : nullptr;
+      printf_stderr("[AO] jpeg decoder using transform %p\n", mTransform);
 
       Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
           this, Size(), OutputSize(), FullFrame(), SurfaceFormat::OS_RGBX,

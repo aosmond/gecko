@@ -329,13 +329,7 @@ class Decoder {
    * Get or set the SurfaceFlags that select the kind of output this decoder
    * will produce.
    */
-  void SetSurfaceFlags(SurfaceFlags aSurfaceFlags) {
-    MOZ_ASSERT(!mInitialized);
-    mSurfaceFlags = aSurfaceFlags;
-    if (mSurfaceFlags & SurfaceFlags::EXPORT_METADATA) {
-      mSurfaceMetadata = MakeRefPtr<SurfaceImageMetadata>(mSurfaceFlags);
-    }
-  }
+  void SetSurfaceFlags(SurfaceFlags aSurfaceFlags);
   SurfaceFlags GetSurfaceFlags() const { return mSurfaceFlags; }
 
   /// @return true if we know the intrinsic size of the image we're decoding.

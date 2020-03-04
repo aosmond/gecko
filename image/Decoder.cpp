@@ -66,11 +66,7 @@ Decoder::Decoder(RasterImage* aImage)
       mDecodeDone(false),
       mError(false),
       mShouldReportError(false),
-      mFinalizeFrames(true) {
-  if (GetSurfaceFlags() & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
-    mCMSMode = eCMSMode_Off;
-  }
-}
+      mFinalizeFrames(true) { }
 
 Decoder::~Decoder() {
   MOZ_ASSERT(mProgress == NoProgress || !mImage,
@@ -91,6 +87,17 @@ Decoder::~Decoder() {
     // Dispatch mImage to main thread to prevent it from being destructed by the
     // decode thread.
     NS_ReleaseOnMainThreadSystemGroup(mImage.forget());
+  }
+}
+
+void Decoder::SetSurfaceFlags(SurfaceFlags aSurfaceFlags) {
+  MOZ_ASSERT(!mInitialized);
+  mSurfaceFlags = aSurfaceFlags;
+  if (mSurfaceFlags & SurfaceFlags::EXPORT_METADATA) {
+    mSurfaceMetadata = MakeRefPtr<SurfaceImageMetadata>(mSurfaceFlags);
+  }
+  if (mSurfaceFlags & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
+    //mCMSMode = eCMSMode_Off;
   }
 }
 
@@ -604,7 +611,12 @@ void Decoder::SetQcmsTransform(
 
   MOZ_ASSERT(mInProfile);
 
-  qcms_profile* outputProfile = gfxPlatform::GetCMSOutputProfile();
+  qcms_profile* outputProfile;
+  if (mSurfaceFlags & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
+    outputProfile = qcms_profile_sRGB();
+  } else {
+    outputProfile = gfxPlatform::GetCMSOutputProfile();
+  }
   if (!outputProfile) {
     return;
   }
@@ -620,8 +632,11 @@ void Decoder::SetQcmsTransform(
   }
 
   mTransform = qcms_transform_create(mInProfile, aInType,
-                                     gfxPlatform::GetCMSOutputProfile(),
+                                     outputProfile,
                                      aOutType, intent);
+  if (mSurfaceFlags & SurfaceFlags::NO_COLORSPACE_CONVERSION) {
+    qcms_profile_release(outputProfile);
+  }
 }
 
 void Decoder::SetQcmsRGBsRGBTransform(
