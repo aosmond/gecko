@@ -16,6 +16,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Monitor.h"
 #include "nsRect.h"
+#include "SurfaceFlags.h"
 
 namespace mozilla {
 namespace image {
@@ -51,7 +52,7 @@ class imgFrame {
    * backend than normal content drawing.
    */
   nsresult InitForDecoder(const nsIntSize& aImageSize, SurfaceFormat aFormat,
-                          bool aNonPremult,
+                          SurfaceFlags aSurfaceFlags,
                           const Maybe<AnimationParams>& aAnimParams,
                           bool aShouldRecycle);
 
@@ -322,7 +323,7 @@ class imgFrame {
   BlendMethod mBlendMethod;
   SurfaceFormat mFormat;
 
-  bool mNonPremult;
+  SurfaceFlags mSurfaceFlags;
 };
 
 /**

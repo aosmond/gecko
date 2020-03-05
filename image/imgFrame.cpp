@@ -60,8 +60,10 @@ static already_AddRefed<DataSourceSurface> CreateLockedSurface(
       DataSourceSurface::ScopedMap smap(aSurface,
                                         DataSourceSurface::READ_WRITE);
       if (smap.IsMapped()) {
-        return MakeAndAddRef<SourceSurfaceMappedData>(std::move(smap), size,
-                                                      format);
+        auto surf =
+            MakeRefPtr<SourceSurfaceMappedData>(std::move(smap), size, format);
+        surf->SetFlags(aSurface->Flags());
+        return surf.forget();
       }
       break;
     }
@@ -186,7 +188,7 @@ imgFrame::imgFrame()
       mDisposalMethod(DisposalMethod::NOT_SPECIFIED),
       mBlendMethod(BlendMethod::OVER),
       mFormat(SurfaceFormat::UNKNOWN),
-      mNonPremult(false) {}
+      mSurfaceFlags(DefaultSurfaceFlags()) {}
 
 imgFrame::~imgFrame() {
 #ifdef DEBUG
@@ -197,7 +199,8 @@ imgFrame::~imgFrame() {
 }
 
 nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
-                                  SurfaceFormat aFormat, bool aNonPremult,
+                                  SurfaceFormat aFormat,
+                                  SurfaceFlags aSurfaceFlags,
                                   const Maybe<AnimationParams>& aAnimParams,
                                   bool aShouldRecycle) {
   // Assert for properties that should be verified by decoders,
@@ -234,7 +237,7 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
     mFormat = aFormat;
   }
 
-  mNonPremult = aNonPremult;
+  mSurfaceFlags = aSurfaceFlags;
   mShouldRecycle = aShouldRecycle;
 
   MOZ_ASSERT(!mLockedSurface, "Called imgFrame::InitForDecoder() twice?");
@@ -246,6 +249,15 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
+  DataSurfaceFlags flags = DataSurfaceFlags::NONE;
+  if (mSurfaceFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA) {
+    flags |= DataSurfaceFlags::UNPREMULTIPLIED_ALPHA;
+  }
+  if (mSurfaceFlags & SurfaceFlags::TO_SRGB_COLORSPACE) {
+    flags |= DataSurfaceFlags::SRGB_COLORSPACE;
+  }
+  mRawSurface->SetFlags(flags);
+
   if (StaticPrefs::browser_measurement_render_anims_and_video_solid() &&
       aAnimParams) {
     mBlankRawSurface = AllocateBufferForImage(mImageSize, mFormat);
@@ -253,6 +265,7 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
     }
+    mBlankRawSurface->SetFlags(flags);
   }
 
   mLockedSurface = CreateLockedSurface(mRawSurface, mImageSize, mFormat);
@@ -262,6 +275,7 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
+  mLockedSurface->SetFlags(flags);
   if (mBlankRawSurface) {
     mBlankLockedSurface =
         CreateLockedSurface(mBlankRawSurface, mImageSize, mFormat);
@@ -270,6 +284,7 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
     }
+    mBlankLockedSurface->SetFlags(flags);
   }
 
   if (!ClearSurface(mRawSurface, mImageSize, mFormat)) {
@@ -487,9 +502,8 @@ nsresult imgFrame::Optimize(DrawTarget* aTarget) {
     return NS_OK;
   }
 
-  // XXX(seth): It's currently unclear if there's any reason why we can't
-  // optimize non-premult surfaces. We should look into removing this.
-  if (mNonPremult) {
+  if (!(mSurfaceFlags & (SurfaceFlags::NO_PREMULTIPLY_ALPHA |
+                         SurfaceFlags::TO_SRGB_COLORSPACE))) {
     return NS_OK;
   }
   if (!gfxVars::UseWebRender()) {
@@ -508,6 +522,7 @@ nsresult imgFrame::Optimize(DrawTarget* aTarget) {
     // optimized surface. Release our reference to it. This will leave
     // |mLockedSurface| as the only thing keeping it alive, so it'll get freed
     // below.
+    mOptSurface->SetFlags(mRawSurface->Flags());
     mRawSurface = nullptr;
   }
 
@@ -958,6 +973,7 @@ RecyclingSourceSurface::RecyclingSourceSurface(imgFrame* aParent,
   mParent->mMonitor.AssertCurrentThreadOwns();
   ++mParent->mRecycleLockCount;
 
+  SetFlags(aSurface->Flags());
   if (aSurface->GetType() == SurfaceType::DATA_SHARED) {
     mType = SurfaceType::DATA_RECYCLING_SHARED;
   }
