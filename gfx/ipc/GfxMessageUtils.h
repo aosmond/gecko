@@ -694,6 +694,11 @@ struct ParamTraits<mozilla::gfx::SurfaceFormat>
                                       mozilla::gfx::SurfaceFormat::UNKNOWN> {};
 
 template <>
+struct ParamTraits<mozilla::gfx::DataSurfaceFlags>
+    : public BitFlagsEnumSerializer<mozilla::gfx::DataSurfaceFlags,
+                                    mozilla::gfx::DataSurfaceFlags::ALL_BITS> {};
+
+template <>
 struct ParamTraits<mozilla::gfx::ColorDepth>
     : public ContiguousEnumSerializer<mozilla::gfx::ColorDepth,
                                       mozilla::gfx::ColorDepth::COLOR_8,

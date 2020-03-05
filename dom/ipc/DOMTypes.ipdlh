@@ -32,6 +32,7 @@ using nsSizeMode from "nsIWidgetListener.h";
 using ScrollbarPreference from "mozilla/ScrollbarPreferences.h";
 using hal::ScreenOrientation from "mozilla/HalScreenConfiguration.h";
 using mozilla::gfx::SurfaceFormat from "mozilla/gfx/Types.h";
+using mozilla::gfx::DataSurfaceFlags from "mozilla/gfx/Types.h";
 using refcounted class nsIPrincipal from "mozilla/dom/PermissionMessageUtils.h";
 using mozilla::dom::MaybeDiscardedBrowsingContext from "mozilla/dom/BrowsingContext.h";
 using refcounted class nsIURI from "mozilla/ipc/URIUtils.h";
@@ -96,6 +97,7 @@ struct IPCDataTransferImage
   uint32_t height;
   uint32_t stride;
   SurfaceFormat format;
+  DataSurfaceFlags flags;
 };
 
 struct IPCDataTransferItem

@@ -522,7 +522,6 @@ nsresult imgFrame::Optimize(DrawTarget* aTarget) {
     // optimized surface. Release our reference to it. This will leave
     // |mLockedSurface| as the only thing keeping it alive, so it'll get freed
     // below.
-    mOptSurface->SetFlags(mRawSurface->Flags());
     mRawSurface = nullptr;
   }
 

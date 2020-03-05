@@ -497,6 +497,7 @@ enum class DataSurfaceFlags : uint32_t {
   NONE = 0, // Has premultiplied alpha and is in device colorspace.
   UNPREMULTIPLIED_ALPHA = 1 << 0, // Does not have premultiplied alpha.
   SRGB_COLORSPACE = 1 << 1, // Is in sRGB colorspace.
+  ALL_BITS = (1 << 2) - 1,
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(DataSurfaceFlags)
 
