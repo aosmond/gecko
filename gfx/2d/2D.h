@@ -493,10 +493,18 @@ class SourceSurface : public external::AtomicRefCounted<SourceSurface> {
   UserData mUserData;
 };
 
+enum class DataSurfaceFlags : uint32_t {
+  NONE = 0, // Has premultiplied alpha and is in device colorspace.
+  UNPREMULTIPLIED_ALPHA = 1 << 0, // Does not have premultiplied alpha.
+  SRGB_COLORSPACE = 1 << 1, // Is in sRGB colorspace.
+};
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(DataSurfaceFlags)
+
 class DataSourceSurface : public SourceSurface {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(DataSourceSurface, override)
-  DataSourceSurface() : mMapCount(0) {}
+  DataSourceSurface()
+      : mMapCount(0), mFlags(DataSurfaceFlags::NONE) {}
 
 #ifdef DEBUG
   virtual ~DataSourceSurface() { MOZ_ASSERT(mMapCount == 0); }
@@ -647,8 +655,20 @@ class DataSourceSurface : public SourceSurface {
    */
   virtual void Invalidate(const IntRect& aDirtyRect) {}
 
+  /**
+   * The configuration of the surface. By default, consumers can assume a
+   * surface is in the device colorspace and has premultiplied alpha.
+   */
+  DataSurfaceFlags Flags() const { return mFlags; }
+
+  /**
+   * Update the surface configuration.
+   */
+  void SetFlags(DataSurfaceFlags aFlags) { mFlags = aFlags; }
+
  protected:
   Atomic<int32_t> mMapCount;
+  DataSurfaceFlags mFlags;
 };
 
 /** This is an abstract object that accepts path segments. */

@@ -402,9 +402,8 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
     // the full frame, to ensure the restore frame is fully copied.
     mRecycleRect = IntRect(IntPoint(0, 0), aOutputSize);
 
-    bool nonPremult = bool(mSurfaceFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA);
     auto frame = MakeNotNull<RefPtr<imgFrame>>();
-    if (NS_FAILED(frame->InitForDecoder(aOutputSize, aFormat, nonPremult,
+    if (NS_FAILED(frame->InitForDecoder(aOutputSize, aFormat, mSurfaceFlags,
                                         aAnimParams, bool(mFrameRecycler)))) {
       NS_WARNING("imgFrame::Init should succeed");
       return RawAccessFrameRef();
