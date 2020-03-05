@@ -213,7 +213,7 @@ var png2B = {
     },
   ],
   expected:
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZSiLoAAAAEUlEQVQImWP4z8AAQTAamQkAhpcI+DeMzFcAAAAASUVORK5CYII=",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAIAAADZSiLoAAAAFklEQVQImWP4z8CwioEhlIGBgQGTCQBfvgX7Rab22gAAAABJRU5ErkJggg==",
 };
 
 // Main test entry point.

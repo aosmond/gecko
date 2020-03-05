@@ -7,6 +7,12 @@
 #include "nsIAsyncInputStream.idl"
 #include "nsIEventTarget.idl"
 
+%{C++
+#include "mozilla/gfx/Types.h"  // for SurfaceFormat
+#include "mozilla/gfx/Point.h"  // for IntSize
+#include "mozilla/gfx/2D.h"  // for DataSurfaceFlags
+%}
+
 /**
  * imgIEncoder interface
  */
@@ -132,4 +138,31 @@ interface imgIEncoder : nsIAsyncInputStream
    */
   [noscript] unsigned long getImageBufferUsed();
   [noscript] charPtr getImageBuffer();
+
+%{C++
+  virtual nsresult InitFromSurfaceData(const uint8_t* aData,
+                                       const mozilla::gfx::IntSize& aSize,
+                                       int32_t aStride,
+                                       mozilla::gfx::SurfaceFormat aFormat,
+                                       mozilla::gfx::DataSurfaceFlags aFlags,
+                                       const nsAString& aOptions) {
+    return NS_ERROR_NOT_IMPLEMENTED;
+  }
+
+  virtual nsresult StartSurfaceDataEncode(const mozilla::gfx::IntSize& aSize,
+                                          mozilla::gfx::SurfaceFormat aFormat,
+                                          mozilla::gfx::DataSurfaceFlags aFlags,
+                                          const nsAString& aOptions) {
+    return NS_ERROR_NOT_IMPLEMENTED;
+  }
+
+  virtual nsresult AddSurfaceDataFrame(const uint8_t* aData,
+                                       const mozilla::gfx::IntSize& aSize,
+                                       int32_t aStride,
+                                       mozilla::gfx::SurfaceFormat aFormat,
+                                       mozilla::gfx::DataSurfaceFlags aFlags,
+                                       const nsAString& aOptions) {
+    return NS_ERROR_NOT_IMPLEMENTED;
+  }
+%}
 };

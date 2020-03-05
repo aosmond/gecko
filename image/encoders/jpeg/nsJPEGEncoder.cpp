@@ -6,8 +6,8 @@
 #include "nsJPEGEncoder.h"
 #include "prprf.h"
 #include "nsString.h"
-#include "nsStreamUtils.h"
 #include "gfxColor.h"
+#include "mozilla/DebugOnly.h"
 
 extern "C" {
 #include "jpeglib.h"
@@ -17,9 +17,7 @@ extern "C" {
 #include "jerror.h"
 
 using namespace mozilla;
-
-NS_IMPL_ISUPPORTS(nsJPEGEncoder, imgIEncoder, nsIInputStream,
-                  nsIAsyncInputStream)
+using namespace mozilla::gfx;
 
 class nsJPEGEncoderInternal {
   friend class nsJPEGEncoder;
@@ -66,22 +64,9 @@ struct encoder_error_mgr {
 };
 
 nsJPEGEncoder::nsJPEGEncoder()
-    : mFinished(false),
-      mImageBuffer(nullptr),
-      mImageBufferSize(0),
-      mImageBufferUsed(0),
-      mImageBufferReadPoint(0),
-      mCallback(nullptr),
-      mCallbackTarget(nullptr),
-      mNotifyThreshold(0),
-      mReentrantMonitor("nsJPEGEncoder.mReentrantMonitor") {}
+    : mReentrantMonitor("nsJPEGEncoder.mReentrantMonitor") {}
 
-nsJPEGEncoder::~nsJPEGEncoder() {
-  if (mImageBuffer) {
-    free(mImageBuffer);
-    mImageBuffer = nullptr;
-  }
-}
+nsJPEGEncoder::~nsJPEGEncoder() {}
 
 // nsJPEGEncoder::InitFromData
 //
@@ -90,44 +75,32 @@ nsJPEGEncoder::~nsJPEGEncoder() {
 //
 //    Transparency is always discarded.
 
-NS_IMETHODIMP
-nsJPEGEncoder::InitFromData(const uint8_t* aData,
-                            uint32_t aLength,  // (unused, req'd by JS)
-                            uint32_t aWidth, uint32_t aHeight, uint32_t aStride,
-                            uint32_t aInputFormat,
-                            const nsAString& aOutputOptions) {
+nsresult nsJPEGEncoder::InitFromSurfaceData(
+    const uint8_t* aData, const IntSize& aSize, int32_t aStride,
+    SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
   NS_ENSURE_ARG(aData);
 
-  // validate input format
-  if (aInputFormat != INPUT_FORMAT_RGB && aInputFormat != INPUT_FORMAT_RGBA &&
-      aInputFormat != INPUT_FORMAT_HOSTARGB)
-    return NS_ERROR_INVALID_ARG;
-
-  // Stride is the padded width of each row, so it better be longer (I'm afraid
-  // people will not understand what stride means, so check it well)
-  if ((aInputFormat == INPUT_FORMAT_RGB && aStride < aWidth * 3) ||
-      ((aInputFormat == INPUT_FORMAT_RGBA ||
-        aInputFormat == INPUT_FORMAT_HOSTARGB) &&
-       aStride < aWidth * 4)) {
-    NS_WARNING("Invalid stride for InitFromData");
-    return NS_ERROR_INVALID_ARG;
+  // can't initialize more than once
+  if (HasBuffer()) {
+    return NS_ERROR_ALREADY_INITIALIZED;
   }
 
-  // can't initialize more than once
-  if (mImageBuffer != nullptr) {
-    return NS_ERROR_ALREADY_INITIALIZED;
+  nsresult rv =
+      PrepareRowPipeline(aFormat, aFlags, SurfaceFormat::R8G8B8, aSize);
+  if (NS_FAILED(rv)) {
+    return rv;
   }
 
   // options: we only have one option so this is easy
   int quality = 92;
-  if (aOutputOptions.Length() > 0) {
+  if (aOptions.Length() > 0) {
     // have options string
     const nsString qualityPrefix(NS_LITERAL_STRING("quality="));
-    if (aOutputOptions.Length() > qualityPrefix.Length() &&
-        StringBeginsWith(aOutputOptions, qualityPrefix)) {
+    if (aOptions.Length() > qualityPrefix.Length() &&
+        StringBeginsWith(aOptions, qualityPrefix)) {
       // have quality string
-      nsCString value = NS_ConvertUTF16toUTF8(
-          Substring(aOutputOptions, qualityPrefix.Length()));
+      nsCString value =
+          NS_ConvertUTF16toUTF8(Substring(aOptions, qualityPrefix.Length()));
       int newquality = -1;
       if (PR_sscanf(value.get(), "%d", &newquality) == 1) {
         if (newquality >= 0 && newquality <= 100) {
@@ -162,8 +135,8 @@ nsJPEGEncoder::InitFromData(const uint8_t* aData,
   }
 
   jpeg_create_compress(&cinfo);
-  cinfo.image_width = aWidth;
-  cinfo.image_height = aHeight;
+  cinfo.image_width = aSize.width;
+  cinfo.image_height = aSize.height;
   cinfo.input_components = 3;
   cinfo.in_color_space = JCS_RGB;
   cinfo.data_precision = 8;
@@ -188,70 +161,28 @@ nsJPEGEncoder::InitFromData(const uint8_t* aData,
 
   jpeg_start_compress(&cinfo, 1);
 
-  // feed it the rows
-  if (aInputFormat == INPUT_FORMAT_RGB) {
-    while (cinfo.next_scanline < cinfo.image_height) {
-      const uint8_t* row = &aData[cinfo.next_scanline * aStride];
-      jpeg_write_scanlines(&cinfo, const_cast<uint8_t**>(&row), 1);
-    }
-  } else if (aInputFormat == INPUT_FORMAT_RGBA) {
-    UniquePtr<uint8_t[]> rowptr = MakeUnique<uint8_t[]>(aWidth * 3);
-    uint8_t* row = rowptr.get();
-    while (cinfo.next_scanline < cinfo.image_height) {
-      ConvertRGBARow(&aData[cinfo.next_scanline * aStride], row, aWidth);
-      jpeg_write_scanlines(&cinfo, &row, 1);
-    }
-  } else if (aInputFormat == INPUT_FORMAT_HOSTARGB) {
-    UniquePtr<uint8_t[]> rowptr = MakeUnique<uint8_t[]>(aWidth * 3);
-    uint8_t* row = rowptr.get();
-    while (cinfo.next_scanline < cinfo.image_height) {
-      ConvertHostARGBRow(&aData[cinfo.next_scanline * aStride], row, aWidth);
-      jpeg_write_scanlines(&cinfo, &row, 1);
-    }
+  while (cinfo.next_scanline < cinfo.image_height) {
+    const uint8_t* row =
+        PrepareRow(aData, aStride, aSize.width, cinfo.next_scanline);
+    jpeg_write_scanlines(&cinfo, const_cast<uint8_t**>(&row), 1);
   }
 
   jpeg_finish_compress(&cinfo);
   jpeg_destroy_compress(&cinfo);
 
-  mFinished = true;
-  NotifyListener();
-
-  // if output callback can't get enough memory, it will free our buffer
-  if (!mImageBuffer) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
-  return NS_OK;
+  return ImageEncoder::EndImageEncode();
 }
 
-NS_IMETHODIMP
-nsJPEGEncoder::StartImageEncode(uint32_t aWidth, uint32_t aHeight,
-                                uint32_t aInputFormat,
-                                const nsAString& aOutputOptions) {
+nsresult nsJPEGEncoder::StartSurfaceDataEncode(const IntSize& aSize,
+                                               SurfaceFormat aFormat,
+                                               DataSurfaceFlags aFlags,
+                                               const nsAString& aOptions) {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-// Returns the number of bytes in the image buffer used.
-NS_IMETHODIMP
-nsJPEGEncoder::GetImageBufferUsed(uint32_t* aOutputSize) {
-  NS_ENSURE_ARG_POINTER(aOutputSize);
-  *aOutputSize = mImageBufferUsed;
-  return NS_OK;
-}
-
-// Returns a pointer to the start of the image buffer
-NS_IMETHODIMP
-nsJPEGEncoder::GetImageBuffer(char** aOutputBuffer) {
-  NS_ENSURE_ARG_POINTER(aOutputBuffer);
-  *aOutputBuffer = reinterpret_cast<char*>(mImageBuffer);
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsJPEGEncoder::AddImageFrame(const uint8_t* aData, uint32_t aLength,
-                             uint32_t aWidth, uint32_t aHeight,
-                             uint32_t aStride, uint32_t aFrameFormat,
-                             const nsAString& aFrameOptions) {
+nsresult nsJPEGEncoder::AddSurfaceDataFrame(
+    const uint8_t* aData, const IntSize& aSize, int32_t aStride,
+    SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
@@ -259,134 +190,11 @@ NS_IMETHODIMP
 nsJPEGEncoder::EndImageEncode() { return NS_ERROR_NOT_IMPLEMENTED; }
 
 NS_IMETHODIMP
-nsJPEGEncoder::Close() {
-  if (mImageBuffer != nullptr) {
-    free(mImageBuffer);
-    mImageBuffer = nullptr;
-    mImageBufferSize = 0;
-    mImageBufferUsed = 0;
-    mImageBufferReadPoint = 0;
-  }
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsJPEGEncoder::Available(uint64_t* _retval) {
-  if (!mImageBuffer) {
-    return NS_BASE_STREAM_CLOSED;
-  }
-
-  *_retval = mImageBufferUsed - mImageBufferReadPoint;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsJPEGEncoder::Read(char* aBuf, uint32_t aCount, uint32_t* _retval) {
-  return ReadSegments(NS_CopySegmentToBuffer, aBuf, aCount, _retval);
-}
-
-NS_IMETHODIMP
 nsJPEGEncoder::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
                             uint32_t aCount, uint32_t* _retval) {
   // Avoid another thread reallocing the buffer underneath us
   ReentrantMonitorAutoEnter autoEnter(mReentrantMonitor);
-
-  uint32_t maxCount = mImageBufferUsed - mImageBufferReadPoint;
-  if (maxCount == 0) {
-    *_retval = 0;
-    return mFinished ? NS_OK : NS_BASE_STREAM_WOULD_BLOCK;
-  }
-
-  if (aCount > maxCount) {
-    aCount = maxCount;
-  }
-  nsresult rv = aWriter(
-      this, aClosure,
-      reinterpret_cast<const char*>(mImageBuffer + mImageBufferReadPoint), 0,
-      aCount, _retval);
-  if (NS_SUCCEEDED(rv)) {
-    NS_ASSERTION(*_retval <= aCount, "bad write count");
-    mImageBufferReadPoint += *_retval;
-  }
-
-  // errors returned from the writer end here!
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsJPEGEncoder::IsNonBlocking(bool* _retval) {
-  *_retval = true;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsJPEGEncoder::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
-                         uint32_t aRequestedCount, nsIEventTarget* aTarget) {
-  if (aFlags != 0) {
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
-
-  if (mCallback || mCallbackTarget) {
-    return NS_ERROR_UNEXPECTED;
-  }
-
-  mCallbackTarget = aTarget;
-  // 0 means "any number of bytes except 0"
-  mNotifyThreshold = aRequestedCount;
-  if (!aRequestedCount) {
-    mNotifyThreshold = 1024;  // 1 KB seems good.  We don't want to
-                              // notify incessantly
-  }
-
-  // We set the callback absolutely last, because NotifyListener uses it to
-  // determine if someone needs to be notified.  If we don't set it last,
-  // NotifyListener might try to fire off a notification to a null target
-  // which will generally cause non-threadsafe objects to be used off the
-  // main thread
-  mCallback = aCallback;
-
-  // What we are being asked for may be present already
-  NotifyListener();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsJPEGEncoder::CloseWithStatus(nsresult aStatus) { return Close(); }
-
-// nsJPEGEncoder::ConvertHostARGBRow
-//
-//    Our colors are stored with premultiplied alphas, but we need
-//    an output with no alpha in machine-independent byte order.
-//
-//    See gfx/cairo/cairo/src/cairo-png.c
-void nsJPEGEncoder::ConvertHostARGBRow(const uint8_t* aSrc, uint8_t* aDest,
-                                       uint32_t aPixelWidth) {
-  for (uint32_t x = 0; x < aPixelWidth; x++) {
-    const uint32_t& pixelIn = ((const uint32_t*)(aSrc))[x];
-    uint8_t* pixelOut = &aDest[x * 3];
-
-    pixelOut[0] = (pixelIn & 0xff0000) >> 16;
-    pixelOut[1] = (pixelIn & 0x00ff00) >> 8;
-    pixelOut[2] = (pixelIn & 0x0000ff) >> 0;
-  }
-}
-
-/**
- * nsJPEGEncoder::ConvertRGBARow
- *
- * Input is RGBA, output is RGB, so we should alpha-premultiply.
- */
-void nsJPEGEncoder::ConvertRGBARow(const uint8_t* aSrc, uint8_t* aDest,
-                                   uint32_t aPixelWidth) {
-  for (uint32_t x = 0; x < aPixelWidth; x++) {
-    const uint8_t* pixelIn = &aSrc[x * 4];
-    uint8_t* pixelOut = &aDest[x * 3];
-
-    uint8_t alpha = pixelIn[3];
-    pixelOut[0] = gfxPreMultiply(pixelIn[0], alpha);
-    pixelOut[1] = gfxPreMultiply(pixelIn[1], alpha);
-    pixelOut[2] = gfxPreMultiply(pixelIn[2], alpha);
-  }
+  return ImageEncoder::ReadSegments(aWriter, aClosure, aCount, _retval);
 }
 
 void nsJPEGEncoder::NotifyListener() {
@@ -395,64 +203,36 @@ void nsJPEGEncoder::NotifyListener() {
   // listener twice about the same data (which generally leads to a truncated
   // image).
   ReentrantMonitorAutoEnter autoEnter(mReentrantMonitor);
-
-  if (mCallback &&
-      (mImageBufferUsed - mImageBufferReadPoint >= mNotifyThreshold ||
-       mFinished)) {
-    nsCOMPtr<nsIInputStreamCallback> callback;
-    if (mCallbackTarget) {
-      callback = NS_NewInputStreamReadyEvent("nsJPEGEncoder::NotifyListener",
-                                             mCallback, mCallbackTarget);
-    } else {
-      callback = mCallback;
-    }
-
-    NS_ASSERTION(callback, "Shouldn't fail to make the callback");
-    // Null the callback first because OnInputStreamReady could reenter
-    // AsyncWait
-    mCallback = nullptr;
-    mCallbackTarget = nullptr;
-    mNotifyThreshold = 0;
-
-    callback->OnInputStreamReady(this);
-  }
+  return ImageEncoder::NotifyListener();
 }
 
 /* static */
 void nsJPEGEncoderInternal::initDestination(jpeg_compress_struct* cinfo) {
   nsJPEGEncoder* that = static_cast<nsJPEGEncoder*>(cinfo->client_data);
-  NS_ASSERTION(!that->mImageBuffer, "Image buffer already initialized");
+  NS_ASSERTION(!that->HasBuffer(), "Image buffer already initialized");
 
-  that->mImageBufferSize = 8192;
-  that->mImageBuffer = (uint8_t*)malloc(that->mImageBufferSize);
-  that->mImageBufferUsed = 0;
-
-  cinfo->dest->next_output_byte = that->mImageBuffer;
-  cinfo->dest->free_in_buffer = that->mImageBufferSize;
+  that->AllocateBuffer(8192);
+  cinfo->dest->next_output_byte = that->BufferHead();
+  cinfo->dest->free_in_buffer = that->RemainingBytesToWrite();
 }
 
 /* static */
 boolean nsJPEGEncoderInternal::emptyOutputBuffer(jpeg_compress_struct* cinfo) {
   nsJPEGEncoder* that = static_cast<nsJPEGEncoder*>(cinfo->client_data);
-  NS_ASSERTION(that->mImageBuffer, "No buffer to empty!");
+  NS_ASSERTION(that->HasBuffer(), "No buffer to empty!");
 
   // When we're reallocing the buffer we need to take the lock to ensure
   // that nobody is trying to read from the buffer we are destroying
   ReentrantMonitorAutoEnter autoEnter(that->mReentrantMonitor);
 
-  that->mImageBufferUsed = that->mImageBufferSize;
+  nsresult rv = that->AdvanceBuffer(that->RemainingBytesToWrite());
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
 
   // expand buffer, just double size each time
-  that->mImageBufferSize *= 2;
-
-  uint8_t* newBuf =
-      (uint8_t*)realloc(that->mImageBuffer, that->mImageBufferSize);
-  if (!newBuf) {
+  rv = that->ReallocateBuffer(that->BufferSize() * 2);
+  if (NS_FAILED(rv)) {
     // can't resize, just zero (this will keep us from writing more)
-    free(that->mImageBuffer);
-    that->mImageBuffer = nullptr;
-    that->mImageBufferSize = 0;
-    that->mImageBufferUsed = 0;
+    that->ReleaseBuffer();
 
     // This seems to be the only way to do errors through the JPEG library.  We
     // pass an nsresult masquerading as an int, which works because the
@@ -460,21 +240,21 @@ boolean nsJPEGEncoderInternal::emptyOutputBuffer(jpeg_compress_struct* cinfo) {
     longjmp(((encoder_error_mgr*)(cinfo->err))->setjmp_buffer,
             static_cast<int>(NS_ERROR_OUT_OF_MEMORY));
   }
-  that->mImageBuffer = newBuf;
 
-  cinfo->dest->next_output_byte = &that->mImageBuffer[that->mImageBufferUsed];
-  cinfo->dest->free_in_buffer = that->mImageBufferSize - that->mImageBufferUsed;
+  cinfo->dest->next_output_byte = that->BufferHead();
+  cinfo->dest->free_in_buffer = that->RemainingBytesToWrite();
   return 1;
 }
 
 /* static */
 void nsJPEGEncoderInternal::termDestination(jpeg_compress_struct* cinfo) {
   nsJPEGEncoder* that = static_cast<nsJPEGEncoder*>(cinfo->client_data);
-  if (!that->mImageBuffer) {
+  if (!that->HasBuffer()) {
     return;
   }
-  that->mImageBufferUsed = cinfo->dest->next_output_byte - that->mImageBuffer;
-  NS_ASSERTION(that->mImageBufferUsed < that->mImageBufferSize,
+  uint32_t len = cinfo->dest->next_output_byte - that->BufferHead();
+  DebugOnly<nsresult> rv = that->AdvanceBuffer(len);
+  NS_ASSERTION(NS_SUCCEEDED(rv),
                "JPEG library busted, got a bad image buffer size");
   that->NotifyListener();
 }

@@ -929,7 +929,7 @@ var apng3 = {
       delay: 500,
 
       format: Ci.imgIEncoder.INPUT_FORMAT_RGBA,
-      stride: 12,
+      stride: 4,
 
       pixels: [0, 0, 0, 255],
     },
@@ -945,7 +945,7 @@ var apng3 = {
       delay: 500,
 
       format: Ci.imgIEncoder.INPUT_FORMAT_RGBA,
-      stride: 12,
+      stride: 4,
 
       pixels: [0, 0, 0, 255],
     },
@@ -961,7 +961,7 @@ var apng3 = {
       delay: 500,
 
       format: Ci.imgIEncoder.INPUT_FORMAT_RGBA,
-      stride: 12,
+      stride: 4,
 
       pixels: [0, 0, 0, 255],
     },
