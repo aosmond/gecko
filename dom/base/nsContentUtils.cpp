@@ -7564,7 +7564,8 @@ void nsContentUtils::TransferableToIPCTransferable(
         // Images to be placed on the clipboard are imgIContainers.
         RefPtr<mozilla::gfx::SourceSurface> surface = image->GetFrame(
             imgIContainer::FRAME_CURRENT,
-            imgIContainer::FLAG_SYNC_DECODE | imgIContainer::FLAG_ASYNC_NOTIFY);
+            imgIContainer::FLAG_SYNC_DECODE | imgIContainer::FLAG_ASYNC_NOTIFY |
+                imgIContainer::DECODE_FLAGS_CLIPBOARD);
         if (!surface) {
           continue;
         }

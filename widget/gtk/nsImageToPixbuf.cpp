@@ -79,9 +79,12 @@ GdkPixbuf* nsImageToPixbuf::SourceSurfaceToPixbuf(SourceSurface* aSurface,
 
       if (format == SurfaceFormat::B8G8R8A8) {
         const uint8_t a = (*srcPixel >> 24) & 0xFF;
-        const uint8_t r = unpremultiply((*srcPixel >> 16) & 0xFF, a);
+        /*const uint8_t r = unpremultiply((*srcPixel >> 16) & 0xFF, a);
         const uint8_t g = unpremultiply((*srcPixel >> 8) & 0xFF, a);
-        const uint8_t b = unpremultiply((*srcPixel >> 0) & 0xFF, a);
+        const uint8_t b = unpremultiply((*srcPixel >> 0) & 0xFF, a);*/
+        const uint8_t r = (*srcPixel >> 16) & 0xFF;
+        const uint8_t g = (*srcPixel >> 8) & 0xFF;
+        const uint8_t b = (*srcPixel >> 0) & 0xFF;
 
         *destPixel++ = r;
         *destPixel++ = g;
