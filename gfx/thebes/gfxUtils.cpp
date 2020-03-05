@@ -913,6 +913,117 @@ const gfx::DeviceColor& gfxUtils::GetColorForFrameNumber(
   return colors[aFrameNumber % sNumFrameColors];
 }
 
+static UserDataKey sSurfaceMetadataKey;
+
+static void SurfaceMetadataDestroy(void* aClosure) {
+  delete static_cast<SurfaceMetadata*>(aClosure);
+}
+
+SurfaceMetadata::SurfaceMetadata()
+    : mIsPremultiplied(true),
+      mIsDeviceColorSpace(gfxPlatform::GetCMSMode() != eCMSMode_Off) {}
+
+/* static */ SurfaceMetadata gfxUtils::ExtractSurfaceMetadata(
+    SourceSurface* aSurface) {
+  if (!aSurface) {
+    return SurfaceMetadata();
+  }
+
+  void* metadata = aSurface->GetUserData(&sSurfaceMetadataKey);
+  if (!metadata) {
+    return SurfaceMetadata();
+  }
+
+  return *static_cast<SurfaceMetadata*>(metadata);
+}
+
+/* static */ void gfxUtils::AnnotateSurfaceMetadata(
+    SourceSurface* aSurface, const SurfaceMetadata& aMetadata) {
+  if (!aSurface) {
+    return;
+  }
+
+  // No need to bother storing if it is just the system default.
+  SurfaceMetadata defaults;
+  if (aMetadata == defaults) {
+    return;
+  }
+
+  SurfaceMetadata* metadata = new SurfaceMetadata(aMetadata);
+  aSurface->AddUserData(&sSurfaceMetadataKey, metadata, SurfaceMetadataDestroy);
+}
+
+/* static */ void gfxUtils::DuplicateSurfaceMetadata(SourceSurface* aFrom,
+                                                     SourceSurface* aTo) {
+  if (!aFrom || !aTo) {
+    return;
+  }
+
+  void* fromMetadata = aFrom->GetUserData(&sSurfaceMetadataKey);
+  if (!fromMetadata) {
+    return;
+  }
+
+  SurfaceMetadata* toMetadata =
+      new SurfaceMetadata(*static_cast<SurfaceMetadata*>(fromMetadata));
+  aTo->AddUserData(&sSurfaceMetadataKey, toMetadata, SurfaceMetadataDestroy);
+}
+
+/* static */ bool gfxUtils::UnpremultiplyAndTosRGBDataSurface(
+    DataSourceSurface* aSrc, DataSourceSurface* aDst) {
+  if (!aSrc || !aDst || aSrc == aDst || aSrc->GetSize() != aDst->GetSize()) {
+    return false;
+  }
+
+  DataSourceSurface::ScopedMap smap(aSrc, DataSourceSurface::READ);
+  DataSourceSurface::ScopedMap dmap(aDst, DataSourceSurface::READ_WRITE);
+  if (!smap.IsMapped() || !dmap.IsMapped()) {
+    return false;
+  }
+
+  IntSize size = aSrc->GetSize();
+  SurfaceFormat sformat = aSrc->GetFormat();
+  SurfaceFormat dformat = aDst->GetFormat();
+  SurfaceMetadata metadata = ExtractSurfaceMetadata(aSrc);
+
+  // FIXME(aosmond): what if we swizzle from BGRA to BGRX -- unpremultiply first!
+  // Swizzling may alter the stride and byte order so do that first.
+  if (!SwizzleData(smap.GetData(), smap.GetStride(), sformat, dmap.GetData(),
+                   dmap.GetStride(), dformat, size)) {
+    return false;
+  }
+
+  // We need to do unpremultiplication before color management.
+  if (metadata.IsPremultiplied() && !IsOpaque(dformat)) {
+    if (!UnpremultiplyData(dmap.GetData(), dmap.GetStride(), dformat,
+                           dmap.GetData(), dmap.GetStride(), dformat, size)) {
+      return false;
+    }
+  }
+
+  // If it is in device space, put it back into sRGB.
+  if (metadata.IsDeviceColorSpace()) {
+    qcms_transform* transform =
+        gfxPlatform::GetCMSsRGBInverseTransform(dformat);
+    if (!transform) {
+      return false;
+    }
+
+    int32_t minStride = size.width * BytesPerPixel(dformat);
+    if (dmap.GetStride() == minStride) {
+      qcms_transform_data(transform, dmap.GetData(), dmap.GetData(),
+                          size.width * size.height);
+    } else {
+      for (int32_t row = 0; row < size.height; ++row) {
+        uint8_t* rowPtr = dmap.GetData() + row * dmap.GetStride();
+        qcms_transform_data(transform, rowPtr, rowPtr, size.width);
+      }
+    }
+  }
+
+  return true;
+}
+
 /* static */
 nsresult gfxUtils::EncodeSourceSurface(SourceSurface* aSurface,
                                        const ImageType aImageType,

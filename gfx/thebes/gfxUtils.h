@@ -29,6 +29,40 @@ namespace mozilla {
 namespace dom {
 class Element;
 }
+
+namespace gfx {
+
+class SurfaceMetadata {
+ public:
+  SurfaceMetadata();
+  SurfaceMetadata(const SurfaceMetadata& aOther) = default;
+  SurfaceMetadata& operator=(const SurfaceMetadata& aOther) = default;
+  ~SurfaceMetadata() = default;
+
+  bool operator==(const SurfaceMetadata& aOther) const {
+    return mIsPremultiplied == aOther.mIsPremultiplied &&
+           mIsDeviceColorSpace == aOther.mIsDeviceColorSpace;
+  }
+
+  bool operator!=(const SurfaceMetadata& aOther) const {
+    return !(*this == aOther);
+  }
+
+  SurfaceMetadata(bool aIsPremultiplied, bool aIsDeviceColorSpace)
+      : mIsPremultiplied(aIsPremultiplied),
+        mIsDeviceColorSpace(aIsDeviceColorSpace) {}
+
+  bool IsPremultiplied() const { return mIsPremultiplied; }
+
+  bool IsDeviceColorSpace() const { return mIsDeviceColorSpace; }
+
+ private:
+  bool mIsPremultiplied;
+  bool mIsDeviceColorSpace;
+};
+
+}  // namespace gfx
+
 namespace layers {
 class WebRenderBridgeChild;
 class GlyphArray;
@@ -228,6 +262,33 @@ class gfxUtils {
   static const uint32_t sNumFrameColors;
 
   enum BinaryOrData { eBinaryEncode, eDataURIEncode };
+
+  /**
+   * Extracts the given surface metadata if available for the surface. It will
+   * use best effort system defaults is not available, which may or may not be
+   * correct for this particular surface.
+   */
+  static mozilla::gfx::SurfaceMetadata ExtractSurfaceMetadata(
+      SourceSurface* aSurface);
+
+  /**
+   * Annotate a surface with the given metadata.
+   */
+  static void AnnotateSurfaceMetadata(
+      SourceSurface* aSurface, const mozilla::gfx::SurfaceMetadata& aMetadata);
+
+  /**
+   * Duplicate the metadata from the given surface to the other given surface.
+   */
+  static void DuplicateSurfaceMetadata(SourceSurface* aFrom,
+                                       SourceSurface* aTo);
+
+  /**
+   * Using the surface metadata and system defaults, attempt to create an
+   * unpremultiplied sRGB surface from the source.
+   */
+  static bool UnpremultiplyAndTosRGBDataSurface(DataSourceSurface* aSrc,
+                                                DataSourceSurface* aDst);
 
   /**
    * Encodes the given surface to PNG/JPEG/BMP/etc. using imgIEncoder.

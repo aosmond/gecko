@@ -2257,7 +2257,7 @@ qcms_profile* gfxPlatform::GetCMSsRGBProfile() {
 
 qcms_transform* gfxPlatform::GetCMSsRGBTransformInternal(SurfaceFormat aFormat,
                                                          bool aInvert) {
-  if (!gCMSsRGBTransformFailed) {
+  if (gCMSsRGBTransformFailed) {
     return nullptr;
   }
 
@@ -2305,7 +2305,7 @@ qcms_transform* gfxPlatform::GetCMSsRGBTransformInternal(SurfaceFormat aFormat,
         return nullptr;
     }
 
-    if (aInvert) {
+    if (!aInvert) {
       *transform = qcms_transform_create(inProfile, dataType, outProfile,
                                          dataType, QCMS_INTENT_PERCEPTUAL);
     } else {
