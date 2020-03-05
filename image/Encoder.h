@@ -46,6 +46,7 @@ class ImageEncoder : public imgIEncoder {
   nsresult VerifyParameters(uint32_t aLength, uint32_t aWidth, uint32_t aHeight,
                             uint32_t aStride, uint32_t aInputFormat);
   SurfaceFormat ToSurfaceFormat(uint32_t aInputFormat);
+  bool SupportsSurfaceFormat(SurfaceFormat aInputFormat);
 };
 
 }  // namespace image

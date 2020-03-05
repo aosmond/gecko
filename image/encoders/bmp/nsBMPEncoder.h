@@ -85,11 +85,28 @@ class nsBMPEncoder final : public imgIEncoder {
 
  public:
   NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_IMGIENCODER
   NS_DECL_NSIINPUTSTREAM
   NS_DECL_NSIASYNCINPUTSTREAM
 
   nsBMPEncoder();
+
+  // From ImageEncoder
+  nsresult InitFromData(const uint8_t* aData, const gfx::IntSize& aSize,
+                        int32_t aStride, gfx::SurfaceFormat aFormat,
+                        const nsAString& aOptions) override;
+
+  nsresult StartImageEncode(const gfx::IntSize& aSize,
+                            gfx::SurfaceFormat aFormat,
+                            const nsAString& outputOptions) override;
+
+  nsresult AddImageFrame(const uint8_t* aData, const gfx::IntSize& aSize,
+                         int32_t aStride, gfx::SurfaceFormat aFormat,
+                         const nsAString& aOptions) override;
+
+  // From imgIEncoder
+  NS_IMETHOD EndImageEncode(void) override;
+  NS_IMETHOD GetImageBufferUsed(uint32_t* _retval) override;
+  NS_IMETHOD GetImageBuffer(char** _retval) override;
 
  protected:
   ~nsBMPEncoder();
