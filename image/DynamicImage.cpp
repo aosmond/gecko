@@ -139,6 +139,16 @@ DynamicImage::GetFrame(uint32_t aWhichFrame, uint32_t aFlags) {
 NS_IMETHODIMP_(already_AddRefed<SourceSurface>)
 DynamicImage::GetFrameAtSize(const IntSize& aSize, uint32_t aWhichFrame,
                              uint32_t aFlags) {
+  // If we have an underlying surface and we want to draw at the same size, we
+  // can just return the same surface.
+  SourceSurface* surface = mDrawable->Surface();
+  if (surface && surface->IsDataSourceSurface()) {
+    RefPtr<DataSourceSurface> dataSurface = surface->GetDataSurface();
+    if (dataSurface->GetSize() == aSize) {
+      return dataSurface.forget();
+    }
+  }
+
   RefPtr<DrawTarget> dt =
       gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
           aSize, SurfaceFormat::OS_RGBA);

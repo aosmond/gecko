@@ -9,10 +9,16 @@
 
 #include "imgIContainer.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/Swizzle.h"  // for SwizzleData, UnpremultiplyData
 #include "mozilla/RefPtr.h"
 
 using mozilla::gfx::DataSourceSurface;
+using mozilla::gfx::DataSurfaceFlags;
+using mozilla::gfx::IntSize;
+using mozilla::gfx::IsOpaque;
 using mozilla::gfx::SurfaceFormat;
+using mozilla::gfx::SwizzleData;
+using mozilla::gfx::UnpremultiplyData;
 
 NS_IMPL_ISUPPORTS(nsImageToPixbuf, nsIImageToPixbuf)
 
@@ -56,53 +62,38 @@ GdkPixbuf* nsImageToPixbuf::SourceSurfaceToPixbuf(SourceSurface* aSurface,
 
   GdkPixbuf* pixbuf =
       gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8, aWidth, aHeight);
-  if (!pixbuf) return nullptr;
+  if (!pixbuf) {
+    return nullptr;
+  }
 
   uint32_t destStride = gdk_pixbuf_get_rowstride(pixbuf);
   guchar* destPixels = gdk_pixbuf_get_pixels(pixbuf);
 
   RefPtr<DataSourceSurface> dataSurface = aSurface->GetDataSurface();
-  DataSourceSurface::MappedSurface map;
-  if (!dataSurface->Map(DataSourceSurface::MapType::READ, &map)) return nullptr;
-
-  uint8_t* srcData = map.mData;
-  int32_t srcStride = map.mStride;
-
-  SurfaceFormat format = dataSurface->GetFormat();
-
-  for (int32_t row = 0; row < aHeight; ++row) {
-    for (int32_t col = 0; col < aWidth; ++col) {
-      guchar* destPixel = destPixels + row * destStride + 4 * col;
-
-      uint32_t* srcPixel =
-          reinterpret_cast<uint32_t*>((srcData + row * srcStride + 4 * col));
-
-      if (format == SurfaceFormat::B8G8R8A8) {
-        const uint8_t a = (*srcPixel >> 24) & 0xFF;
-        const uint8_t r = unpremultiply((*srcPixel >> 16) & 0xFF, a);
-        const uint8_t g = unpremultiply((*srcPixel >> 8) & 0xFF, a);
-        const uint8_t b = unpremultiply((*srcPixel >> 0) & 0xFF, a);
-
-        *destPixel++ = r;
-        *destPixel++ = g;
-        *destPixel++ = b;
-        *destPixel++ = a;
-      } else {
-        MOZ_ASSERT(format == SurfaceFormat::B8G8R8X8);
-
-        const uint8_t r = (*srcPixel >> 16) & 0xFF;
-        const uint8_t g = (*srcPixel >> 8) & 0xFF;
-        const uint8_t b = (*srcPixel >> 0) & 0xFF;
-
-        *destPixel++ = r;
-        *destPixel++ = g;
-        *destPixel++ = b;
-        *destPixel++ = 0xFF;  // A
-      }
-    }
+  DataSourceSurface::ScopedMap map(dataSurface, DataSourceSurface::READ);
+  if (!map.IsMapped()) {
+    g_object_unref(pixbuf);
+    return nullptr;
   }
 
-  dataSurface->Unmap();
+  SurfaceFormat format = dataSurface->GetFormat();
+  IntSize size(aWidth, aHeight);
+
+  if (!SwizzleData(map.GetData(), map.GetStride(), format, destPixels,
+                   destStride, SurfaceFormat::R8G8B8A8, size)) {
+    g_object_unref(pixbuf);
+    return nullptr;
+  }
+
+  if (!(dataSurface->Flags() & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA) &&
+      !IsOpaque(format)) {
+    if (!UnpremultiplyData(destPixels, destStride, SurfaceFormat::R8G8B8A8,
+                           destPixels, destStride, SurfaceFormat::R8G8B8A8,
+                           size)) {
+      g_object_unref(pixbuf);
+      return nullptr;
+    }
+  }
 
   return pixbuf;
 }
