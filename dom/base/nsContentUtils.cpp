@@ -7449,6 +7449,7 @@ nsresult nsContentUtils::DataTransferItemToImage(
 
   RefPtr<DataSourceSurface> image = CreateDataSourceSurfaceFromData(
       size, imageDetails.format(), data.get<uint8_t>(), imageDetails.stride());
+  image->SetFlags(imageDetails.flags());
 
   RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
   nsCOMPtr<imgIContainer> imageContainer =
@@ -7597,6 +7598,7 @@ void nsContentUtils::TransferableToIPCTransferable(
         imageDetails.height() = size.height;
         imageDetails.stride() = stride;
         imageDetails.format() = dataSurface->GetFormat();
+        imageDetails.flags() = dataSurface->Flags();
       } else {
         // Otherwise, handle this as a file.
         nsCOMPtr<BlobImpl> blobImpl;
