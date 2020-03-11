@@ -55,6 +55,7 @@ EXPORTS += [
 ]
 
 EXPORTS.mozilla.image += [
+    'Encoder.h',
     'encoders/bmp/nsBMPEncoder.h',
     'encoders/ico/nsICOEncoder.h',
     'encoders/jpeg/nsJPEGEncoder.h',
@@ -72,6 +73,7 @@ UNIFIED_SOURCES += [
     'Decoder.cpp',
     'DecoderFactory.cpp',
     'DynamicImage.cpp',
+    'Encoder.cpp',
     'FrameAnimator.cpp',
     'FrozenImage.cpp',
     'IDecodingTask.cpp',

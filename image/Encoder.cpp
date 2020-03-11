@@ -75,9 +75,9 @@ ImageEncoder::InitFromData(const uint8_t* aData,
   if (NS_FAILED(rv)) {
     return rv;
   }
-  return InitFromData(aData, IntSize(aWidth, aHeight), aStride,
-                      ToSurfaceFormat(aInputFormat),
-                      ToSurfaceFlags(aInputFormat), aOutputOptions);
+  return InitFromSurfaceData(aData, IntSize(aWidth, aHeight), aStride,
+                             ToSurfaceFormat(aInputFormat),
+                             ToSurfaceFlags(aInputFormat), aOutputOptions);
 }
 
 NS_IMETHODIMP ImageEncoder::StartImageEncode(uint32_t aWidth, uint32_t aHeight,
@@ -98,8 +98,8 @@ NS_IMETHODIMP ImageEncoder::StartImageEncode(uint32_t aWidth, uint32_t aHeight,
     return NS_ERROR_INVALID_ARG;
   }
 
-  return StartImageEncode(IntSize(aWidth, aHeight), format,
-                          ToSurfaceFlags(aInputFormat), aOptions);
+  return StartSurfaceDataEncode(IntSize(aWidth, aHeight), format,
+                                ToSurfaceFlags(aInputFormat), aOptions);
 }
 
 NS_IMETHODIMP
@@ -113,9 +113,9 @@ ImageEncoder::AddImageFrame(const uint8_t* aData,
   if (NS_FAILED(rv)) {
     return rv;
   }
-  return AddImageFrame(aData, IntSize(aWidth, aHeight), aStride,
-                       ToSurfaceFormat(aInputFormat),
-                       ToSurfaceFlags(aInputFormat), aFrameOptions);
+  return AddSurfaceDataFrame(aData, IntSize(aWidth, aHeight), aStride,
+                             ToSurfaceFormat(aInputFormat),
+                             ToSurfaceFlags(aInputFormat), aFrameOptions);
 }
 
 }  // namespace image

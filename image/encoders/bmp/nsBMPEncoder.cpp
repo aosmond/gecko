@@ -6,6 +6,7 @@
 #include "nsCRT.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/UniquePtrExtensions.h"
+#include "mozilla/gfx/Swizzle.h"
 #include "nsBMPEncoder.h"
 #include "nsString.h"
 #include "nsStreamUtils.h"
@@ -14,6 +15,7 @@
 #include "BMPHeaders.h"
 
 using namespace mozilla;
+using namespace mozilla::gfx;
 using namespace mozilla::image;
 using namespace mozilla::image::bmp;
 
@@ -47,40 +49,16 @@ nsBMPEncoder::~nsBMPEncoder() {
 //
 // One output option is supported: bpp=<bpp_value>
 // bpp specifies the bits per pixel to use where bpp_value can be 24 or 32
-NS_IMETHODIMP
-nsBMPEncoder::InitFromData(const uint8_t* aData,
-                           uint32_t aLength,  // (unused, req'd by JS)
-                           uint32_t aWidth, uint32_t aHeight, uint32_t aStride,
-                           uint32_t aInputFormat,
-                           const nsAString& aOutputOptions) {
-  // validate input format
-  if (aInputFormat != INPUT_FORMAT_RGB && aInputFormat != INPUT_FORMAT_RGBA &&
-      aInputFormat != INPUT_FORMAT_HOSTARGB) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
-  CheckedInt32 check = CheckedInt32(aWidth) * 4;
-  if (MOZ_UNLIKELY(!check.isValid())) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
-  // Stride is the padded width of each row, so it better be longer
-  if ((aInputFormat == INPUT_FORMAT_RGB && aStride < aWidth * 3) ||
-      ((aInputFormat == INPUT_FORMAT_RGBA ||
-        aInputFormat == INPUT_FORMAT_HOSTARGB) &&
-       aStride < aWidth * 4)) {
-    NS_WARNING("Invalid stride for InitFromData");
-    return NS_ERROR_INVALID_ARG;
-  }
-
+nsresult nsBMPEncoder::InitFromSurfaceData(
+    const uint8_t* aData, const IntSize& aSize, int32_t aStride,
+    SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
   nsresult rv;
-  rv = StartImageEncode(aWidth, aHeight, aInputFormat, aOutputOptions);
+  rv = StartSurfaceDataEncode(aSize, aFormat, aFlags, aOptions);
   if (NS_FAILED(rv)) {
     return rv;
   }
 
-  rv = AddImageFrame(aData, aLength, aWidth, aHeight, aStride, aInputFormat,
-                     aOutputOptions);
+  rv = AddSurfaceDataFrame(aData, aSize, aStride, aFormat, aFlags, aOptions);
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -104,35 +82,29 @@ static inline uint32_t PaddingBytes(uint16_t aBPP, uint32_t aWidth) {
 }
 
 // See ::InitFromData for other info.
-NS_IMETHODIMP
-nsBMPEncoder::StartImageEncode(uint32_t aWidth, uint32_t aHeight,
-                               uint32_t aInputFormat,
-                               const nsAString& aOutputOptions) {
+nsresult nsBMPEncoder::StartSurfaceDataEncode(const IntSize& aSize,
+                                              SurfaceFormat aFormat,
+                                              DataSurfaceFlags aFlags,
+                                              const nsAString& aOptions) {
   // can't initialize more than once
   if (mImageBufferStart || mImageBufferCurr) {
     return NS_ERROR_ALREADY_INITIALIZED;
   }
 
-  // validate input format
-  if (aInputFormat != INPUT_FORMAT_RGB && aInputFormat != INPUT_FORMAT_RGBA &&
-      aInputFormat != INPUT_FORMAT_HOSTARGB) {
-    return NS_ERROR_INVALID_ARG;
-  }
-
   // parse and check any provided output options
   Version version;
   uint16_t bpp;
-  nsresult rv = ParseOptions(aOutputOptions, version, bpp);
+  nsresult rv = ParseOptions(aOptions, aFormat, version, bpp);
   if (NS_FAILED(rv)) {
     return rv;
   }
   MOZ_ASSERT(bpp <= 32);
 
-  rv = InitFileHeader(version, bpp, aWidth, aHeight);
+  rv = InitFileHeader(version, bpp, aSize.width, aSize.height);
   if (NS_FAILED(rv)) {
     return rv;
   }
-  rv = InitInfoHeader(version, bpp, aWidth, aHeight);
+  rv = InitInfoHeader(version, bpp, aSize.width, aSize.height);
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -167,21 +139,12 @@ nsBMPEncoder::GetImageBuffer(char** aOutputBuffer) {
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsBMPEncoder::AddImageFrame(const uint8_t* aData,
-                            uint32_t aLength,  // (unused, req'd by JS)
-                            uint32_t aWidth, uint32_t aHeight, uint32_t aStride,
-                            uint32_t aInputFormat,
-                            const nsAString& aFrameOptions) {
+nsresult nsBMPEncoder::AddSurfaceDataFrame(
+    const uint8_t* aData, const IntSize& aSize, int32_t aStride,
+    SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
   // must be initialized
   if (!mImageBufferStart || !mImageBufferCurr) {
     return NS_ERROR_NOT_INITIALIZED;
-  }
-
-  // validate input format
-  if (aInputFormat != INPUT_FORMAT_RGB && aInputFormat != INPUT_FORMAT_RGBA &&
-      aInputFormat != INPUT_FORMAT_HOSTARGB) {
-    return NS_ERROR_INVALID_ARG;
   }
 
   if (mBMPInfoHeader.width < 0) {
@@ -194,50 +157,35 @@ nsBMPEncoder::AddImageFrame(const uint8_t* aData,
     return NS_ERROR_FAILURE;
   }
 
-  auto row = MakeUniqueFallible<uint8_t[]>(size.value());
-  if (!row) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
   CheckedUint32 check = CheckedUint32(mBMPInfoHeader.height) * aStride;
   if (MOZ_UNLIKELY(!check.isValid())) {
     return NS_ERROR_FAILURE;
   }
 
-  // write each row: if we add more input formats, we may want to
-  // generalize the conversions
-  if (aInputFormat == INPUT_FORMAT_HOSTARGB) {
-    // BMP requires RGBA with post-multiplied alpha, so we need to convert
-    for (int32_t y = mBMPInfoHeader.height - 1; y >= 0; y--) {
-      ConvertHostARGBRow(&aData[y * aStride], row, mBMPInfoHeader.width);
-      if (mBMPInfoHeader.bpp == 24) {
-        EncodeImageDataRow24(row.get());
-      } else {
-        EncodeImageDataRow32(row.get());
-      }
-    }
-  } else if (aInputFormat == INPUT_FORMAT_RGBA) {
-    // simple RGBA, no conversion needed
-    for (int32_t y = 0; y < mBMPInfoHeader.height; y++) {
-      if (mBMPInfoHeader.bpp == 24) {
-        EncodeImageDataRow24(row.get());
-      } else {
-        EncodeImageDataRow32(row.get());
-      }
-    }
-  } else if (aInputFormat == INPUT_FORMAT_RGB) {
-    // simple RGB, no conversion needed
-    for (int32_t y = 0; y < mBMPInfoHeader.height; y++) {
-      if (mBMPInfoHeader.bpp == 24) {
-        EncodeImageDataRow24(&aData[y * aStride]);
-      } else {
-        EncodeImageDataRow32(&aData[y * aStride]);
-      }
-    }
-  } else {
-    MOZ_ASSERT_UNREACHABLE("Bad format type");
-    return NS_ERROR_INVALID_ARG;
+  SurfaceFormat outFormat = mBMPInfoHeader.bpp == 24 ? SurfaceFormat::R8G8B8
+                                                     : SurfaceFormat::R8G8B8A8;
+
+  if (outFormat == SurfaceFormat::R8G8B8 && !IsOpaque(aFormat) &&
+      aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA) {
+    // FIXME(aosmond): we need to premultiply before we store, but we don't have
+    // enough room in the buffer
+    return NS_ERROR_FAILURE;
   }
+
+  if (!SwizzleData(aData, aStride, aFormat, mImageBufferCurr, size.value(),
+                   outFormat, aSize)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (!IsOpaque(aFormat) &&
+      !(aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA)) {
+    if (!UnpremultiplyData(mImageBufferCurr, size.value(), outFormat,
+                           mImageBufferCurr, size.value(), outFormat, aSize)) {
+      return NS_ERROR_FAILURE;
+    }
+  }
+
+  mImageBufferCurr += size.value() * mBMPInfoHeader.height;
 
   return NS_OK;
 }
@@ -263,9 +211,12 @@ nsBMPEncoder::EndImageEncode() {
 // Parses the encoder options and sets the bits per pixel to use
 // See InitFromData for a description of the parse options
 nsresult nsBMPEncoder::ParseOptions(const nsAString& aOptions,
-                                    Version& aVersionOut, uint16_t& aBppOut) {
+                                    SurfaceFormat aFormat, Version& aVersionOut,
+                                    uint16_t& aBppOut) {
   aVersionOut = VERSION_3;
-  aBppOut = 24;
+
+  // Default should be to preserve as much information as possible.
+  aBppOut = IsOpaque(aFormat) ? 24 : 32;
 
   // Parse the input string into a set of name/value pairs.
   // From a format like: name=value;bpp=<bpp_value>;name=value
@@ -407,38 +358,6 @@ nsBMPEncoder::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
 
 NS_IMETHODIMP
 nsBMPEncoder::CloseWithStatus(nsresult aStatus) { return Close(); }
-
-// nsBMPEncoder::ConvertHostARGBRow
-//
-//    Our colors are stored with premultiplied alphas, but we need
-//    an output with no alpha in machine-independent byte order.
-//
-void nsBMPEncoder::ConvertHostARGBRow(const uint8_t* aSrc,
-                                      const UniquePtr<uint8_t[]>& aDest,
-                                      uint32_t aPixelWidth) {
-  uint16_t bytes = BytesPerPixel(mBMPInfoHeader.bpp);
-
-  if (mBMPInfoHeader.bpp == 32) {
-    for (uint32_t x = 0; x < aPixelWidth; x++) {
-      const uint32_t& pixelIn = ((const uint32_t*)(aSrc))[x];
-      uint8_t* pixelOut = &aDest[x * bytes];
-
-      pixelOut[0] = (pixelIn & 0x00ff0000) >> 16;
-      pixelOut[1] = (pixelIn & 0x0000ff00) >> 8;
-      pixelOut[2] = (pixelIn & 0x000000ff) >> 0;
-      pixelOut[3] = (pixelIn & 0xff000000) >> 24;
-    }
-  } else {
-    for (uint32_t x = 0; x < aPixelWidth; x++) {
-      const uint32_t& pixelIn = ((const uint32_t*)(aSrc))[x];
-      uint8_t* pixelOut = &aDest[x * bytes];
-
-      pixelOut[0] = (pixelIn & 0xff0000) >> 16;
-      pixelOut[1] = (pixelIn & 0x00ff00) >> 8;
-      pixelOut[2] = (pixelIn & 0x0000ff) >> 0;
-    }
-  }
-}
 
 void nsBMPEncoder::NotifyListener() {
   if (mCallback && (GetCurrentImageBufferOffset() - mImageBufferReadPoint >=
@@ -663,52 +582,5 @@ void nsBMPEncoder::EncodeInfoHeader() {
     ENCODE(&mImageBufferCurr, littleEndianmBIH.profile_offset);
     ENCODE(&mImageBufferCurr, littleEndianmBIH.profile_size);
     ENCODE(&mImageBufferCurr, littleEndianmBIH.reserved);
-  }
-}
-
-// Sets a pixel in the image buffer that doesn't have alpha data
-static inline void SetPixel24(uint8_t*& imageBufferCurr, uint8_t aRed,
-                              uint8_t aGreen, uint8_t aBlue) {
-  *imageBufferCurr = aBlue;
-  *(imageBufferCurr + 1) = aGreen;
-  *(imageBufferCurr + 2) = aRed;
-}
-
-// Sets a pixel in the image buffer with alpha data
-static inline void SetPixel32(uint8_t*& imageBufferCurr, uint8_t aRed,
-                              uint8_t aGreen, uint8_t aBlue,
-                              uint8_t aAlpha = 0xFF) {
-  *imageBufferCurr = aBlue;
-  *(imageBufferCurr + 1) = aGreen;
-  *(imageBufferCurr + 2) = aRed;
-  *(imageBufferCurr + 3) = aAlpha;
-}
-
-// Encodes a row of image data which does not have alpha data
-void nsBMPEncoder::EncodeImageDataRow24(const uint8_t* aData) {
-  for (int32_t x = 0; x < mBMPInfoHeader.width; x++) {
-    uint32_t pos = x * BytesPerPixel(mBMPInfoHeader.bpp);
-    SetPixel24(mImageBufferCurr, aData[pos], aData[pos + 1], aData[pos + 2]);
-    mImageBufferCurr += BytesPerPixel(mBMPInfoHeader.bpp);
-  }
-
-  for (uint32_t x = 0;
-       x < PaddingBytes(mBMPInfoHeader.bpp, mBMPInfoHeader.width); x++) {
-    *mImageBufferCurr++ = 0;
-  }
-}
-
-// Encodes a row of image data which does have alpha data
-void nsBMPEncoder::EncodeImageDataRow32(const uint8_t* aData) {
-  for (int32_t x = 0; x < mBMPInfoHeader.width; x++) {
-    uint32_t pos = x * BytesPerPixel(mBMPInfoHeader.bpp);
-    SetPixel32(mImageBufferCurr, aData[pos], aData[pos + 1], aData[pos + 2],
-               aData[pos + 3]);
-    mImageBufferCurr += 4;
-  }
-
-  for (uint32_t x = 0;
-       x < PaddingBytes(mBMPInfoHeader.bpp, mBMPInfoHeader.width); x++) {
-    *mImageBufferCurr++ = 0;
   }
 }

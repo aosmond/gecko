@@ -10,7 +10,7 @@
 #include "mozilla/ReentrantMonitor.h"
 #include "mozilla/UniquePtr.h"
 
-#include "imgIEncoder.h"
+#include "mozilla/image/Encoder.h"
 
 #include "nsCOMPtr.h"
 
@@ -80,16 +80,40 @@ struct V5InfoHeader {
 // Provides BMP encoding functionality. Use InitFromData() to do the
 // encoding. See that function definition for encoding options.
 
-class nsBMPEncoder final : public imgIEncoder {
+class nsBMPEncoder final : public mozilla::image::ImageEncoder {
   typedef mozilla::ReentrantMonitor ReentrantMonitor;
 
  public:
   NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_IMGIENCODER
   NS_DECL_NSIINPUTSTREAM
   NS_DECL_NSIASYNCINPUTSTREAM
 
   nsBMPEncoder();
+
+  // From ImageEncoder
+  nsresult InitFromSurfaceData(const uint8_t* aData,
+                               const mozilla::gfx::IntSize& aSize,
+                               int32_t aStride,
+                               mozilla::gfx::SurfaceFormat aFormat,
+                               mozilla::gfx::DataSurfaceFlags aFlags,
+                               const nsAString& aOptions) override;
+
+  nsresult StartSurfaceDataEncode(const mozilla::gfx::IntSize& aSize,
+                                  mozilla::gfx::SurfaceFormat aFormat,
+                                  mozilla::gfx::DataSurfaceFlags aFlags,
+                                  const nsAString& outputOptions) override;
+
+  nsresult AddSurfaceDataFrame(const uint8_t* aData,
+                               const mozilla::gfx::IntSize& aSize,
+                               int32_t aStride,
+                               mozilla::gfx::SurfaceFormat aFormat,
+                               mozilla::gfx::DataSurfaceFlags aFlags,
+                               const nsAString& aOptions) override;
+
+  // From imgIEncoder
+  NS_IMETHOD EndImageEncode(void) override;
+  NS_IMETHOD GetImageBufferUsed(uint32_t* _retval) override;
+  NS_IMETHOD GetImageBuffer(char** _retval) override;
 
  protected:
   ~nsBMPEncoder();
@@ -97,12 +121,9 @@ class nsBMPEncoder final : public imgIEncoder {
   enum Version { VERSION_3 = 3, VERSION_5 = 5 };
 
   // See InitData in the cpp for valid parse options
-  nsresult ParseOptions(const nsAString& aOptions, Version& aVersionOut,
-                        uint16_t& aBppOut);
-  // Obtains data with no alpha in machine-independent byte order
-  void ConvertHostARGBRow(const uint8_t* aSrc,
-                          const mozilla::UniquePtr<uint8_t[]>& aDest,
-                          uint32_t aPixelWidth);
+  nsresult ParseOptions(const nsAString& aOptions,
+                        mozilla::gfx::SurfaceFormat aFormat,
+                        Version& aVersionOut, uint16_t& aBppOut);
   // Thread safe notify listener
   void NotifyListener();
 
@@ -117,10 +138,6 @@ class nsBMPEncoder final : public imgIEncoder {
   void EncodeFileHeader();
   // Encodes the bitmap info header member mBMPInfoHeader
   void EncodeInfoHeader();
-  // Encodes a row of image data which does not have alpha data
-  void EncodeImageDataRow24(const uint8_t* aData);
-  // Encodes a row of image data which does have alpha data
-  void EncodeImageDataRow32(const uint8_t* aData);
   // Obtains the current offset filled up to for the image buffer
   inline int32_t GetCurrentImageBufferOffset() {
     return static_cast<int32_t>(mImageBufferCurr - mImageBufferStart);
