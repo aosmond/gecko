@@ -14,7 +14,7 @@ namespace image {
 
 nsresult ImageEncoder::VerifyParameters(uint32_t aLength, uint32_t aWidth,
                                         uint32_t aHeight, uint32_t aStride,
-                                        uint32_t aInputFormat) {
+                                        uint32_t aInputFormat) const {
   if (aLength > INT32_MAX || aWidth > INT32_MAX || aHeight > INT32_MAX ||
       aStride > INT32_MAX) {
     return NS_ERROR_INVALID_ARG;
@@ -39,7 +39,7 @@ nsresult ImageEncoder::VerifyParameters(uint32_t aLength, uint32_t aWidth,
   return NS_OK;
 }
 
-SurfaceFormat ImageEncoder::ToSurfaceFormat(uint32_t aInputFormat) {
+SurfaceFormat ImageEncoder::ToSurfaceFormat(uint32_t aInputFormat) const {
   switch (aInputFormat) {
     case INPUT_FORMAT_RGB:
       return SurfaceFormat::R8G8B8;
@@ -49,6 +49,18 @@ SurfaceFormat ImageEncoder::ToSurfaceFormat(uint32_t aInputFormat) {
       return SurfaceFormat::A8R8G8B8_UINT32;
     default:
       return SurfaceFormat::UNKNOWN;
+  }
+}
+
+DataSurfaceFlags ImageEncoder::ToSurfaceFlags(uint32_t aInputFormat) const {
+  switch (aInputFormat) {
+    case INPUT_FORMAT_RGB:
+    case INPUT_FORMAT_RGBA:
+      // The encoders assume that RGBA implies unpremultiplied.
+      return DataSurfaceFlags::UNPREMULTIPLIED_ALPHA;
+    case INPUT_FORMAT_HOSTARGB:
+    default:
+      return DataSurfaceFlags::NONE;
   }
 }
 
@@ -64,7 +76,8 @@ ImageEncoder::InitFromData(const uint8_t* aData,
     return rv;
   }
   return InitFromData(aData, IntSize(aWidth, aHeight), aStride,
-                      ToSurfaceFormat(aInputFormat), aOutputOptions);
+                      ToSurfaceFormat(aInputFormat),
+                      ToSurfaceFlags(aInputFormat), aOutputOptions);
 }
 
 NS_IMETHODIMP ImageEncoder::StartImageEncode(uint32_t aWidth, uint32_t aHeight,
@@ -85,7 +98,8 @@ NS_IMETHODIMP ImageEncoder::StartImageEncode(uint32_t aWidth, uint32_t aHeight,
     return NS_ERROR_INVALID_ARG;
   }
 
-  return StartImageEncode(IntSize(aWidth, aHeight), format, aOptions);
+  return StartImageEncode(IntSize(aWidth, aHeight), format,
+                          ToSurfaceFlags(aInputFormat), aOptions);
 }
 
 NS_IMETHODIMP
@@ -100,7 +114,8 @@ ImageEncoder::AddImageFrame(const uint8_t* aData,
     return rv;
   }
   return AddImageFrame(aData, IntSize(aWidth, aHeight), aStride,
-                       ToSurfaceFormat(aInputFormat), aFrameOptions);
+                       ToSurfaceFormat(aInputFormat),
+                       ToSurfaceFlags(aInputFormat), aFrameOptions);
 }
 
 }  // namespace image

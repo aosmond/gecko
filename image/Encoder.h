@@ -8,6 +8,7 @@
 
 #include "imgIEncoder.h"
 #include "mozilla/gfx/Types.h"  // for SurfaceFormat
+#include "mozilla/gfx/2D.h"     // for DataSurfaceFlags
 #include "mozilla/gfx/Point.h"  // for IntSize
 
 namespace mozilla {
@@ -28,24 +29,11 @@ class ImageEncoder : public imgIEncoder {
                            uint32_t frameFormat,
                            const nsAString& frameOptions) final;
 
-  // Used by native code.
-  virtual nsresult InitFromData(const uint8_t* aData, const gfx::IntSize& aSize,
-                                int32_t aStride, gfx::SurfaceFormat aFormat,
-                                const nsAString& aOptions) = 0;
-
-  virtual nsresult StartImageEncode(const gfx::IntSize& aSize,
-                                    gfx::SurfaceFormat aFormat,
-                                    const nsAString& outputOptions) = 0;
-
-  virtual nsresult AddImageFrame(const uint8_t* aData,
-                                 const gfx::IntSize& aSize, int32_t aStride,
-                                 gfx::SurfaceFormat aFormat,
-                                 const nsAString& aOptions) = 0;
-
  private:
   nsresult VerifyParameters(uint32_t aLength, uint32_t aWidth, uint32_t aHeight,
-                            uint32_t aStride, uint32_t aInputFormat);
-  SurfaceFormat ToSurfaceFormat(uint32_t aInputFormat);
+                            uint32_t aStride, uint32_t aInputFormat) const;
+  gfx::SurfaceFormat ToSurfaceFormat(uint32_t aInputFormat) const;
+  gfx::DataSurfaceFlags ToSurfaceFlags(uint32_t aInputFormat) const;
 };
 
 }  // namespace image
