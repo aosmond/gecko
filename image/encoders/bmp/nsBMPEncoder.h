@@ -87,13 +87,6 @@ class nsBMPEncoder final : public mozilla::image::ImageEncoder {
   nsBMPEncoder();
 
   // From ImageEncoder
-  nsresult InitFromSurfaceData(const uint8_t* aData,
-                               const mozilla::gfx::IntSize& aSize,
-                               int32_t aStride,
-                               mozilla::gfx::SurfaceFormat aFormat,
-                               mozilla::gfx::DataSurfaceFlags aFlags,
-                               const nsAString& aOptions) override;
-
   nsresult StartSurfaceDataEncode(const mozilla::gfx::IntSize& aSize,
                                   mozilla::gfx::SurfaceFormat aFormat,
                                   mozilla::gfx::DataSurfaceFlags aFlags,
@@ -115,8 +108,6 @@ class nsBMPEncoder final : public mozilla::image::ImageEncoder {
   nsresult ParseOptions(const nsAString& aOptions,
                         mozilla::gfx::SurfaceFormat aFormat,
                         Version& aVersionOut, uint16_t& aBppOut);
-  // Thread safe notify listener
-  void NotifyListener();
 
   // Initializes the bitmap file header member mBMPFileHeader
   nsresult InitFileHeader(Version aVersion, uint16_t aBPP, uint32_t aWidth,

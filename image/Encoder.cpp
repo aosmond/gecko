@@ -17,7 +17,8 @@ NS_IMPL_ISUPPORTS(ImageEncoder, imgIEncoder, nsIInputStream,
                   nsIAsyncInputStream)
 
 ImageEncoder::ImageEncoder()
-    : mImageBufferSize(0),
+    : mImageBuffer(nullptr),
+      mImageBufferSize(0),
       mImageBufferWritePoint(0),
       mImageBufferReadPoint(0),
       mFinished(false),
@@ -25,7 +26,11 @@ ImageEncoder::ImageEncoder()
       mCallbackTarget(nullptr),
       mNotifyThreshold(0) {}
 
-ImageEncoder::~ImageEncoder() {}
+ImageEncoder::~ImageEncoder() {
+  if (mImageBuffer) {
+    free(mImageBuffer);
+  }
+}
 
 nsresult ImageEncoder::VerifyParameters(uint32_t aLength, uint32_t aWidth,
                                         uint32_t aHeight, uint32_t aStride,
@@ -77,6 +82,26 @@ DataSurfaceFlags ImageEncoder::ToSurfaceFlags(uint32_t aInputFormat) const {
     default:
       return DataSurfaceFlags::NONE;
   }
+}
+
+nsresult ImageEncoder::InitFromSurfaceData(
+    const uint8_t* aData, const IntSize& aSize, int32_t aStride,
+    SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
+  NS_ENSURE_ARG(aData);
+
+  nsresult rv;
+  rv = StartSurfaceDataEncode(aSize, aFormat, aFlags, aOptions);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  rv = AddSurfaceDataFrame(aData, aSize, aStride, aFormat, aFlags, aOptions);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  rv = EndImageEncode();
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -144,7 +169,7 @@ ImageEncoder::GetImageBufferUsed(uint32_t* aOutputSize) {
 NS_IMETHODIMP
 ImageEncoder::GetImageBuffer(char** aOutputBuffer) {
   NS_ENSURE_ARG_POINTER(aOutputBuffer);
-  *aOutputBuffer = reinterpret_cast<char*>(mImageBuffer.get());
+  *aOutputBuffer = reinterpret_cast<char*>(mImageBuffer);
   return NS_OK;
 }
 
@@ -172,11 +197,27 @@ nsresult ImageEncoder::AllocateBuffer(uint32_t aSize) {
     return NS_ERROR_FAILURE;
   }
 
-  mImageBuffer.reset(new (fallible) uint8_t[aSize]);
+  mImageBuffer = static_cast<uint8_t*>(malloc(aSize));
   if (!mImageBuffer) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
+  mImageBufferSize = aSize;
+  return NS_OK;
+}
+
+nsresult ImageEncoder::ReallocateBuffer(uint32_t aSize) {
+  if (mImageBufferWritePoint > aSize) {
+    MOZ_ASSERT_UNREACHABLE("Buffer reallocate to too small");
+    return NS_ERROR_FAILURE;
+  }
+
+  uint8_t* buf = static_cast<uint8_t*>(realloc(mImageBuffer, aSize));
+  if (!buf) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  mImageBuffer = buf;
   mImageBufferSize = aSize;
   return NS_OK;
 }
@@ -190,12 +231,17 @@ nsresult ImageEncoder::AdvanceBuffer(uint32_t aAdvance) {
   return NS_OK;
 }
 
-NS_IMETHODIMP
-ImageEncoder::Close() {
+void ImageEncoder::ReleaseBuffer() {
+  free(mImageBuffer);
   mImageBuffer = nullptr;
   mImageBufferSize = 0;
   mImageBufferWritePoint = 0;
   mImageBufferReadPoint = 0;
+}
+
+NS_IMETHODIMP
+ImageEncoder::Close() {
+  ReleaseBuffer();
   return NS_OK;
 }
 
@@ -231,7 +277,7 @@ ImageEncoder::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
   }
   nsresult rv = aWriter(
       this, aClosure,
-      reinterpret_cast<const char*>(mImageBuffer.get() + mImageBufferReadPoint),
+      reinterpret_cast<const char*>(mImageBuffer + mImageBufferReadPoint),
       0, aCount, _retval);
   if (NS_SUCCEEDED(rv)) {
     NS_ASSERTION(*_retval <= aCount, "bad write count");

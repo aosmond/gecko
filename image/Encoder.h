@@ -40,11 +40,20 @@ class ImageEncoder : public imgIEncoder {
   NS_IMETHOD GetImageBuffer(char** aOutputBuffer) final;
   NS_IMETHOD EndImageEncode(void) override;
 
+  nsresult InitFromSurfaceData(const uint8_t* aData, const gfx::IntSize& aSize,
+                               int32_t aStride, gfx::SurfaceFormat aFormat,
+                               gfx::DataSurfaceFlags aFlags,
+                               const nsAString& aOptions) final;
+
  protected:
   virtual ~ImageEncoder();
 
   nsresult AllocateBuffer(uint32_t aSize);
-  nsresult AdvanceBuffer(uint32_t aAdvance);
+  nsresult ReallocateBuffer(uint32_t aSize);
+  nsresult AdvanceBuffer(uint32_t aSize);
+  void ReleaseBuffer();
+
+  uint8_t* BufferHead() const { return mImageBuffer + mImageBufferWritePoint; }
 
   template <typename T>
   nsresult WriteBuffer(const T& aData) {
@@ -57,14 +66,28 @@ class ImageEncoder : public imgIEncoder {
     return NS_OK;
   }
 
-  uint8_t* BufferHead() const {
-    return mImageBuffer.get() + mImageBufferWritePoint;
+  nsresult WriteBuffer(const void* aData, size_t aDataSize) {
+    if (aDataSize > RemainingBytesToWrite()) {
+      MOZ_ASSERT_UNREACHABLE("Buffer overrun?");
+      return NS_ERROR_FAILURE;
+    }
+    memcpy(BufferHead(), aData, aDataSize);
+    mImageBufferWritePoint += aDataSize;
+    return NS_OK;
   }
+
+  bool HasBuffer() const { return !!mImageBuffer; }
+
+  uint32_t BufferSize() const { return mImageBufferSize; }
+
+  uint32_t BufferSizeWritten() const { return mImageBufferWritePoint; }
 
   uint32_t RemainingBytesToWrite() const {
     MOZ_ASSERT(mImageBufferSize >= mImageBufferWritePoint);
     return mImageBufferSize - mImageBufferWritePoint;
   }
+
+  virtual void NotifyListener();
 
  private:
   nsresult VerifyParameters(uint32_t aLength, uint32_t aWidth, uint32_t aHeight,
@@ -77,10 +100,8 @@ class ImageEncoder : public imgIEncoder {
     return mImageBufferWritePoint - mImageBufferReadPoint;
   }
 
-  void NotifyListener();
-
   // Keeps track of the start of the image buffer
-  UniquePtr<uint8_t[]> mImageBuffer;
+  uint8_t* mImageBuffer;
   // Keeps track of the image buffer size
   uint32_t mImageBufferSize;
   // Keeps track of the number of bytes in the image buffer which are written

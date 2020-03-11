@@ -26,28 +26,6 @@ nsBMPEncoder::nsBMPEncoder() : mBMPInfoHeader{} {
 
 nsBMPEncoder::~nsBMPEncoder() {}
 
-// nsBMPEncoder::InitFromData
-//
-// One output option is supported: bpp=<bpp_value>
-// bpp specifies the bits per pixel to use where bpp_value can be 24 or 32
-nsresult nsBMPEncoder::InitFromSurfaceData(
-    const uint8_t* aData, const IntSize& aSize, int32_t aStride,
-    SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
-  nsresult rv;
-  rv = StartSurfaceDataEncode(aSize, aFormat, aFlags, aOptions);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
-  rv = AddSurfaceDataFrame(aData, aSize, aStride, aFormat, aFlags, aOptions);
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
-  rv = EndImageEncode();
-  return rv;
-}
-
 // Just a helper method to make it explicit in calculations that we are dealing
 // with bytes and not bits
 static inline uint16_t BytesPerPixel(uint16_t aBPP) { return aBPP / 8; }
@@ -68,7 +46,7 @@ nsresult nsBMPEncoder::StartSurfaceDataEncode(const IntSize& aSize,
                                               DataSurfaceFlags aFlags,
                                               const nsAString& aOptions) {
   // can't initialize more than once
-  if (BufferHead()) {
+  if (HasBuffer()) {
     return NS_ERROR_ALREADY_INITIALIZED;
   }
 
@@ -105,7 +83,7 @@ nsresult nsBMPEncoder::AddSurfaceDataFrame(
     const uint8_t* aData, const IntSize& aSize, int32_t aStride,
     SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
   // must be initialized
-  if (!BufferHead()) {
+  if (!HasBuffer()) {
     return NS_ERROR_NOT_INITIALIZED;
   }
 
@@ -121,6 +99,11 @@ nsresult nsBMPEncoder::AddSurfaceDataFrame(
 
   CheckedUint32 check = CheckedUint32(mBMPInfoHeader.height) * aStride;
   if (MOZ_UNLIKELY(!check.isValid())) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (RemainingBytesToWrite() < size.value() * aSize.height) {
+    MOZ_ASSERT_UNREACHABLE("Buffer overrun?");
     return NS_ERROR_FAILURE;
   }
 

@@ -588,6 +588,12 @@ bool UnpremultiplyData(const uint8_t* aSrc, int32_t aSrcStride,
   return false;
 }
 
+SwizzleRowFn UnpremultiplyRow(SurfaceFormat aSrcFormat,
+                              SurfaceFormat aDstFormat) {
+  // FIXME(aosmond)
+  return nullptr;
+}
+
 /**
  * Swizzling
  */
@@ -1131,6 +1137,8 @@ SwizzleRowFn SwizzleRow(SurfaceFormat aSrcFormat, SurfaceFormat aDstFormat) {
     default:
       break;
   }
+
+  // FIXME(aosmond) add swizzlecopy
 
   MOZ_ASSERT_UNREACHABLE("Unsupported swizzle formats");
   return nullptr;
