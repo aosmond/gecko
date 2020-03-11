@@ -84,10 +84,6 @@ class nsBMPEncoder final : public mozilla::image::ImageEncoder {
   typedef mozilla::ReentrantMonitor ReentrantMonitor;
 
  public:
-  NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_NSIINPUTSTREAM
-  NS_DECL_NSIASYNCINPUTSTREAM
-
   nsBMPEncoder();
 
   // From ImageEncoder
@@ -109,11 +105,6 @@ class nsBMPEncoder final : public mozilla::image::ImageEncoder {
                                mozilla::gfx::SurfaceFormat aFormat,
                                mozilla::gfx::DataSurfaceFlags aFlags,
                                const nsAString& aOptions) override;
-
-  // From imgIEncoder
-  NS_IMETHOD EndImageEncode(void) override;
-  NS_IMETHOD GetImageBufferUsed(uint32_t* _retval) override;
-  NS_IMETHOD GetImageBuffer(char** _retval) override;
 
  protected:
   ~nsBMPEncoder();
@@ -138,30 +129,11 @@ class nsBMPEncoder final : public mozilla::image::ImageEncoder {
   void EncodeFileHeader();
   // Encodes the bitmap info header member mBMPInfoHeader
   void EncodeInfoHeader();
-  // Obtains the current offset filled up to for the image buffer
-  inline int32_t GetCurrentImageBufferOffset() {
-    return static_cast<int32_t>(mImageBufferCurr - mImageBufferStart);
-  }
 
   // These headers will always contain endian independent stuff
   // They store the BMP headers which will be encoded
   mozilla::image::bmp::FileHeader mBMPFileHeader;
   mozilla::image::bmp::V5InfoHeader mBMPInfoHeader;
-
-  // Keeps track of the start of the image buffer
-  uint8_t* mImageBufferStart;
-  // Keeps track of the current position in the image buffer
-  uint8_t* mImageBufferCurr;
-  // Keeps track of the image buffer size
-  uint32_t mImageBufferSize;
-  // Keeps track of the number of bytes in the image buffer which are read
-  uint32_t mImageBufferReadPoint;
-  // Stores true if the image is done being encoded
-  bool mFinished;
-
-  nsCOMPtr<nsIInputStreamCallback> mCallback;
-  nsCOMPtr<nsIEventTarget> mCallbackTarget;
-  uint32_t mNotifyThreshold;
 };
 
 #endif  // mozilla_image_encoders_bmp_nsBMPEncoder_h

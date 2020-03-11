@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "Encoder.h"
+#include "nsStreamUtils.h"
 #include "mozilla/CheckedInt.h"
 
 namespace mozilla {
@@ -11,6 +12,20 @@ namespace mozilla {
 using namespace gfx;
 
 namespace image {
+
+NS_IMPL_ISUPPORTS(ImageEncoder, imgIEncoder, nsIInputStream,
+                  nsIAsyncInputStream)
+
+ImageEncoder::ImageEncoder()
+    : mImageBufferSize(0),
+      mImageBufferWritePoint(0),
+      mImageBufferReadPoint(0),
+      mFinished(false),
+      mCallback(nullptr),
+      mCallbackTarget(nullptr),
+      mNotifyThreshold(0) {}
+
+ImageEncoder::~ImageEncoder() {}
 
 nsresult ImageEncoder::VerifyParameters(uint32_t aLength, uint32_t aWidth,
                                         uint32_t aHeight, uint32_t aStride,
@@ -116,6 +131,174 @@ ImageEncoder::AddImageFrame(const uint8_t* aData,
   return AddSurfaceDataFrame(aData, IntSize(aWidth, aHeight), aStride,
                              ToSurfaceFormat(aInputFormat),
                              ToSurfaceFlags(aInputFormat), aFrameOptions);
+}
+
+NS_IMETHODIMP
+ImageEncoder::GetImageBufferUsed(uint32_t* aOutputSize) {
+  NS_ENSURE_ARG_POINTER(aOutputSize);
+  *aOutputSize = mImageBufferSize;
+  return NS_OK;
+}
+
+// Returns a pointer to the start of the image buffer
+NS_IMETHODIMP
+ImageEncoder::GetImageBuffer(char** aOutputBuffer) {
+  NS_ENSURE_ARG_POINTER(aOutputBuffer);
+  *aOutputBuffer = reinterpret_cast<char*>(mImageBuffer.get());
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ImageEncoder::EndImageEncode() {
+  // must be initialized
+  if (!mImageBuffer || !mImageBufferWritePoint) {
+    return NS_ERROR_NOT_INITIALIZED;
+  }
+
+  mFinished = true;
+  NotifyListener();
+
+  // if output callback can't get enough memory, it will free our buffer
+  if (!mImageBuffer || !mImageBufferWritePoint) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  return NS_OK;
+}
+
+nsresult ImageEncoder::AllocateBuffer(uint32_t aSize) {
+  if (mImageBuffer) {
+    MOZ_ASSERT_UNREACHABLE("Buffer already allocated");
+    return NS_ERROR_FAILURE;
+  }
+
+  mImageBuffer.reset(new (fallible) uint8_t[aSize]);
+  if (!mImageBuffer) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  mImageBufferSize = aSize;
+  return NS_OK;
+}
+
+nsresult ImageEncoder::AdvanceBuffer(uint32_t aAdvance) {
+  if (mImageBufferWritePoint + aAdvance > mImageBufferSize) {
+    MOZ_ASSERT_UNREACHABLE("Buffer overrun?");
+    return NS_ERROR_FAILURE;
+  }
+  mImageBufferWritePoint += aAdvance;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ImageEncoder::Close() {
+  mImageBuffer = nullptr;
+  mImageBufferSize = 0;
+  mImageBufferWritePoint = 0;
+  mImageBufferReadPoint = 0;
+  return NS_OK;
+}
+
+// Obtains the available bytes to read
+NS_IMETHODIMP
+ImageEncoder::Available(uint64_t* _retval) {
+  if (!mImageBuffer) {
+    return NS_BASE_STREAM_CLOSED;
+  }
+
+  *_retval = RemainingBytesToRead();
+  return NS_OK;
+}
+
+// [noscript] Reads bytes which are available
+NS_IMETHODIMP
+ImageEncoder::Read(char* aBuf, uint32_t aCount, uint32_t* _retval) {
+  return ReadSegments(NS_CopySegmentToBuffer, aBuf, aCount, _retval);
+}
+
+// [noscript] Reads segments
+NS_IMETHODIMP
+ImageEncoder::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
+                           uint32_t aCount, uint32_t* _retval) {
+  uint32_t maxCount = RemainingBytesToRead();
+  if (maxCount == 0) {
+    *_retval = 0;
+    return mFinished ? NS_OK : NS_BASE_STREAM_WOULD_BLOCK;
+  }
+
+  if (aCount > maxCount) {
+    aCount = maxCount;
+  }
+  nsresult rv = aWriter(
+      this, aClosure,
+      reinterpret_cast<const char*>(mImageBuffer.get() + mImageBufferReadPoint),
+      0, aCount, _retval);
+  if (NS_SUCCEEDED(rv)) {
+    NS_ASSERTION(*_retval <= aCount, "bad write count");
+    mImageBufferReadPoint += *_retval;
+  }
+  // errors returned from the writer end here!
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ImageEncoder::IsNonBlocking(bool* _retval) {
+  *_retval = true;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ImageEncoder::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
+                        uint32_t aRequestedCount, nsIEventTarget* aTarget) {
+  if (aFlags != 0) {
+    return NS_ERROR_NOT_IMPLEMENTED;
+  }
+
+  if (mCallback || mCallbackTarget) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  mCallbackTarget = aTarget;
+  // 0 means "any number of bytes except 0"
+  mNotifyThreshold = aRequestedCount;
+  if (!aRequestedCount) {
+    mNotifyThreshold = 1024;  // We don't want to notify incessantly
+  }
+
+  // We set the callback absolutely last, because NotifyListener uses it to
+  // determine if someone needs to be notified.  If we don't set it last,
+  // NotifyListener might try to fire off a notification to a null target
+  // which will generally cause non-threadsafe objects to be used off the
+  // main thread
+  mCallback = aCallback;
+
+  // What we are being asked for may be present already
+  NotifyListener();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+ImageEncoder::CloseWithStatus(nsresult aStatus) { return Close(); }
+
+void ImageEncoder::NotifyListener() {
+  if (mCallback && (RemainingBytesToRead() >= mNotifyThreshold || mFinished)) {
+    nsCOMPtr<nsIInputStreamCallback> callback;
+    if (mCallbackTarget) {
+      callback = NS_NewInputStreamReadyEvent("nsBMPEncoder::NotifyListener",
+                                             mCallback, mCallbackTarget);
+    } else {
+      callback = mCallback;
+    }
+
+    NS_ASSERTION(callback, "Shouldn't fail to make the callback");
+    // Null the callback first because OnInputStreamReady could
+    // reenter AsyncWait
+    mCallback = nullptr;
+    mCallbackTarget = nullptr;
+    mNotifyThreshold = 0;
+
+    callback->OnInputStreamReady(this);
+  }
 }
 
 }  // namespace image

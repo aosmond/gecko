@@ -9,7 +9,6 @@
 #include "mozilla/gfx/Swizzle.h"
 #include "nsBMPEncoder.h"
 #include "nsString.h"
-#include "nsStreamUtils.h"
 #include "nsTArray.h"
 #include "mozilla/CheckedInt.h"
 #include "BMPHeaders.h"
@@ -19,31 +18,13 @@ using namespace mozilla::gfx;
 using namespace mozilla::image;
 using namespace mozilla::image::bmp;
 
-NS_IMPL_ISUPPORTS(nsBMPEncoder, imgIEncoder, nsIInputStream,
-                  nsIAsyncInputStream)
-
-nsBMPEncoder::nsBMPEncoder()
-    : mBMPInfoHeader{},
-      mImageBufferStart(nullptr),
-      mImageBufferCurr(0),
-      mImageBufferSize(0),
-      mImageBufferReadPoint(0),
-      mFinished(false),
-      mCallback(nullptr),
-      mCallbackTarget(nullptr),
-      mNotifyThreshold(0) {
+nsBMPEncoder::nsBMPEncoder() : mBMPInfoHeader{} {
   this->mBMPFileHeader.filesize = 0;
   this->mBMPFileHeader.reserved = 0;
   this->mBMPFileHeader.dataoffset = 0;
 }
 
-nsBMPEncoder::~nsBMPEncoder() {
-  if (mImageBufferStart) {
-    free(mImageBufferStart);
-    mImageBufferStart = nullptr;
-    mImageBufferCurr = nullptr;
-  }
-}
+nsBMPEncoder::~nsBMPEncoder() {}
 
 // nsBMPEncoder::InitFromData
 //
@@ -87,7 +68,7 @@ nsresult nsBMPEncoder::StartSurfaceDataEncode(const IntSize& aSize,
                                               DataSurfaceFlags aFlags,
                                               const nsAString& aOptions) {
   // can't initialize more than once
-  if (mImageBufferStart || mImageBufferCurr) {
+  if (BufferHead()) {
     return NS_ERROR_ALREADY_INITIALIZED;
   }
 
@@ -109,12 +90,10 @@ nsresult nsBMPEncoder::StartSurfaceDataEncode(const IntSize& aSize,
     return rv;
   }
 
-  mImageBufferSize = mBMPFileHeader.filesize;
-  mImageBufferStart = static_cast<uint8_t*>(malloc(mImageBufferSize));
-  if (!mImageBufferStart) {
-    return NS_ERROR_OUT_OF_MEMORY;
+  rv = AllocateBuffer(mBMPFileHeader.filesize);
+  if (NS_FAILED(rv)) {
+    return rv;
   }
-  mImageBufferCurr = mImageBufferStart;
 
   EncodeFileHeader();
   EncodeInfoHeader();
@@ -122,28 +101,11 @@ nsresult nsBMPEncoder::StartSurfaceDataEncode(const IntSize& aSize,
   return NS_OK;
 }
 
-// Returns the number of bytes in the image buffer used.
-// For a BMP file, this is all bytes in the buffer.
-NS_IMETHODIMP
-nsBMPEncoder::GetImageBufferUsed(uint32_t* aOutputSize) {
-  NS_ENSURE_ARG_POINTER(aOutputSize);
-  *aOutputSize = mImageBufferSize;
-  return NS_OK;
-}
-
-// Returns a pointer to the start of the image buffer
-NS_IMETHODIMP
-nsBMPEncoder::GetImageBuffer(char** aOutputBuffer) {
-  NS_ENSURE_ARG_POINTER(aOutputBuffer);
-  *aOutputBuffer = reinterpret_cast<char*>(mImageBufferStart);
-  return NS_OK;
-}
-
 nsresult nsBMPEncoder::AddSurfaceDataFrame(
     const uint8_t* aData, const IntSize& aSize, int32_t aStride,
     SurfaceFormat aFormat, DataSurfaceFlags aFlags, const nsAString& aOptions) {
   // must be initialized
-  if (!mImageBufferStart || !mImageBufferCurr) {
+  if (!BufferHead()) {
     return NS_ERROR_NOT_INITIALIZED;
   }
 
@@ -172,38 +134,20 @@ nsresult nsBMPEncoder::AddSurfaceDataFrame(
     return NS_ERROR_FAILURE;
   }
 
-  if (!SwizzleData(aData, aStride, aFormat, mImageBufferCurr, size.value(),
+  if (!SwizzleData(aData, aStride, aFormat, BufferHead(), size.value(),
                    outFormat, aSize)) {
     return NS_ERROR_FAILURE;
   }
 
   if (!IsOpaque(aFormat) &&
       !(aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA)) {
-    if (!UnpremultiplyData(mImageBufferCurr, size.value(), outFormat,
-                           mImageBufferCurr, size.value(), outFormat, aSize)) {
+    if (!UnpremultiplyData(BufferHead(), size.value(), outFormat, BufferHead(),
+                           size.value(), outFormat, aSize)) {
       return NS_ERROR_FAILURE;
     }
   }
 
-  mImageBufferCurr += size.value() * mBMPInfoHeader.height;
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsBMPEncoder::EndImageEncode() {
-  // must be initialized
-  if (!mImageBufferStart || !mImageBufferCurr) {
-    return NS_ERROR_NOT_INITIALIZED;
-  }
-
-  mFinished = true;
-  NotifyListener();
-
-  // if output callback can't get enough memory, it will free our buffer
-  if (!mImageBufferStart || !mImageBufferCurr) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
+  AdvanceBuffer(size.value() * mBMPInfoHeader.height);
 
   return NS_OK;
 }
@@ -265,123 +209,6 @@ nsresult nsBMPEncoder::ParseOptions(const nsAString& aOptions,
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsBMPEncoder::Close() {
-  if (mImageBufferStart) {
-    free(mImageBufferStart);
-    mImageBufferStart = nullptr;
-    mImageBufferSize = 0;
-    mImageBufferReadPoint = 0;
-    mImageBufferCurr = nullptr;
-  }
-
-  return NS_OK;
-}
-
-// Obtains the available bytes to read
-NS_IMETHODIMP
-nsBMPEncoder::Available(uint64_t* _retval) {
-  if (!mImageBufferStart || !mImageBufferCurr) {
-    return NS_BASE_STREAM_CLOSED;
-  }
-
-  *_retval = GetCurrentImageBufferOffset() - mImageBufferReadPoint;
-  return NS_OK;
-}
-
-// [noscript] Reads bytes which are available
-NS_IMETHODIMP
-nsBMPEncoder::Read(char* aBuf, uint32_t aCount, uint32_t* _retval) {
-  return ReadSegments(NS_CopySegmentToBuffer, aBuf, aCount, _retval);
-}
-
-// [noscript] Reads segments
-NS_IMETHODIMP
-nsBMPEncoder::ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
-                           uint32_t aCount, uint32_t* _retval) {
-  uint32_t maxCount = GetCurrentImageBufferOffset() - mImageBufferReadPoint;
-  if (maxCount == 0) {
-    *_retval = 0;
-    return mFinished ? NS_OK : NS_BASE_STREAM_WOULD_BLOCK;
-  }
-
-  if (aCount > maxCount) {
-    aCount = maxCount;
-  }
-  nsresult rv = aWriter(
-      this, aClosure,
-      reinterpret_cast<const char*>(mImageBufferStart + mImageBufferReadPoint),
-      0, aCount, _retval);
-  if (NS_SUCCEEDED(rv)) {
-    NS_ASSERTION(*_retval <= aCount, "bad write count");
-    mImageBufferReadPoint += *_retval;
-  }
-  // errors returned from the writer end here!
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsBMPEncoder::IsNonBlocking(bool* _retval) {
-  *_retval = true;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsBMPEncoder::AsyncWait(nsIInputStreamCallback* aCallback, uint32_t aFlags,
-                        uint32_t aRequestedCount, nsIEventTarget* aTarget) {
-  if (aFlags != 0) {
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
-
-  if (mCallback || mCallbackTarget) {
-    return NS_ERROR_UNEXPECTED;
-  }
-
-  mCallbackTarget = aTarget;
-  // 0 means "any number of bytes except 0"
-  mNotifyThreshold = aRequestedCount;
-  if (!aRequestedCount) {
-    mNotifyThreshold = 1024;  // We don't want to notify incessantly
-  }
-
-  // We set the callback absolutely last, because NotifyListener uses it to
-  // determine if someone needs to be notified.  If we don't set it last,
-  // NotifyListener might try to fire off a notification to a null target
-  // which will generally cause non-threadsafe objects to be used off the
-  // main thread
-  mCallback = aCallback;
-
-  // What we are being asked for may be present already
-  NotifyListener();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsBMPEncoder::CloseWithStatus(nsresult aStatus) { return Close(); }
-
-void nsBMPEncoder::NotifyListener() {
-  if (mCallback && (GetCurrentImageBufferOffset() - mImageBufferReadPoint >=
-                        mNotifyThreshold ||
-                    mFinished)) {
-    nsCOMPtr<nsIInputStreamCallback> callback;
-    if (mCallbackTarget) {
-      callback = NS_NewInputStreamReadyEvent("nsBMPEncoder::NotifyListener",
-                                             mCallback, mCallbackTarget);
-    } else {
-      callback = mCallback;
-    }
-
-    NS_ASSERTION(callback, "Shouldn't fail to make the callback");
-    // Null the callback first because OnInputStreamReady could
-    // reenter AsyncWait
-    mCallback = nullptr;
-    mCallbackTarget = nullptr;
-    mNotifyThreshold = 0;
-
-    callback->OnInputStreamReady(this);
-  }
-}
-
 // Initializes the BMP file header mBMPFileHeader to the passed in values
 nsresult nsBMPEncoder::InitFileHeader(Version aVersion, uint16_t aBPP,
                                       uint32_t aWidth, uint32_t aHeight) {
@@ -420,10 +247,6 @@ nsresult nsBMPEncoder::InitFileHeader(Version aVersion, uint16_t aBPP,
 
   return NS_OK;
 }
-
-#define ENCODE(pImageBufferCurr, value)            \
-  memcpy(*pImageBufferCurr, &value, sizeof value); \
-  *pImageBufferCurr += sizeof value;
 
 // Initializes the bitmap info header mBMPInfoHeader to the passed in values
 nsresult nsBMPEncoder::InitInfoHeader(Version aVersion, uint16_t aBPP,
@@ -506,10 +329,10 @@ void nsBMPEncoder::EncodeFileHeader() {
   NativeEndian::swapToLittleEndianInPlace(&littleEndianBFH.reserved, 1);
   NativeEndian::swapToLittleEndianInPlace(&littleEndianBFH.dataoffset, 1);
 
-  ENCODE(&mImageBufferCurr, littleEndianBFH.signature);
-  ENCODE(&mImageBufferCurr, littleEndianBFH.filesize);
-  ENCODE(&mImageBufferCurr, littleEndianBFH.reserved);
-  ENCODE(&mImageBufferCurr, littleEndianBFH.dataoffset);
+  WriteBuffer(littleEndianBFH.signature);
+  WriteBuffer(littleEndianBFH.filesize);
+  WriteBuffer(littleEndianBFH.reserved);
+  WriteBuffer(littleEndianBFH.dataoffset);
 }
 
 // Encodes the BMP info header mBMPInfoHeader
@@ -548,39 +371,39 @@ void nsBMPEncoder::EncodeInfoHeader() {
   NativeEndian::swapToLittleEndianInPlace(&littleEndianmBIH.profile_offset, 1);
   NativeEndian::swapToLittleEndianInPlace(&littleEndianmBIH.profile_size, 1);
 
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.bihsize);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.width);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.height);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.planes);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.bpp);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.compression);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.image_size);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.xppm);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.yppm);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.colors);
-  ENCODE(&mImageBufferCurr, littleEndianmBIH.important_colors);
+  WriteBuffer(littleEndianmBIH.bihsize);
+  WriteBuffer(littleEndianmBIH.width);
+  WriteBuffer(littleEndianmBIH.height);
+  WriteBuffer(littleEndianmBIH.planes);
+  WriteBuffer(littleEndianmBIH.bpp);
+  WriteBuffer(littleEndianmBIH.compression);
+  WriteBuffer(littleEndianmBIH.image_size);
+  WriteBuffer(littleEndianmBIH.xppm);
+  WriteBuffer(littleEndianmBIH.yppm);
+  WriteBuffer(littleEndianmBIH.colors);
+  WriteBuffer(littleEndianmBIH.important_colors);
 
   if (mBMPInfoHeader.bihsize > InfoHeaderLength::WIN_V3) {
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.red_mask);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.green_mask);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.blue_mask);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.alpha_mask);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.color_space);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.r.x);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.r.y);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.r.z);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.g.x);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.g.y);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.g.z);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.b.x);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.b.y);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.white_point.b.z);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.gamma_red);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.gamma_green);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.gamma_blue);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.intent);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.profile_offset);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.profile_size);
-    ENCODE(&mImageBufferCurr, littleEndianmBIH.reserved);
+    WriteBuffer(littleEndianmBIH.red_mask);
+    WriteBuffer(littleEndianmBIH.green_mask);
+    WriteBuffer(littleEndianmBIH.blue_mask);
+    WriteBuffer(littleEndianmBIH.alpha_mask);
+    WriteBuffer(littleEndianmBIH.color_space);
+    WriteBuffer(littleEndianmBIH.white_point.r.x);
+    WriteBuffer(littleEndianmBIH.white_point.r.y);
+    WriteBuffer(littleEndianmBIH.white_point.r.z);
+    WriteBuffer(littleEndianmBIH.white_point.g.x);
+    WriteBuffer(littleEndianmBIH.white_point.g.y);
+    WriteBuffer(littleEndianmBIH.white_point.g.z);
+    WriteBuffer(littleEndianmBIH.white_point.b.x);
+    WriteBuffer(littleEndianmBIH.white_point.b.y);
+    WriteBuffer(littleEndianmBIH.white_point.b.z);
+    WriteBuffer(littleEndianmBIH.gamma_red);
+    WriteBuffer(littleEndianmBIH.gamma_green);
+    WriteBuffer(littleEndianmBIH.gamma_blue);
+    WriteBuffer(littleEndianmBIH.intent);
+    WriteBuffer(littleEndianmBIH.profile_offset);
+    WriteBuffer(littleEndianmBIH.profile_size);
+    WriteBuffer(littleEndianmBIH.reserved);
   }
 }
