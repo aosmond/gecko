@@ -76,6 +76,16 @@ class ImageEncoder : public imgIEncoder {
     return NS_OK;
   }
 
+  nsresult WriteBufferByte(uint8_t aData, size_t aDataSize) {
+    if (aDataSize > RemainingBytesToWrite()) {
+      MOZ_ASSERT_UNREACHABLE("Buffer overrun?");
+      return NS_ERROR_FAILURE;
+    }
+    memset(BufferHead(), aData, aDataSize);
+    mImageBufferWritePoint += aDataSize;
+    return NS_OK;
+  }
+
   bool HasBuffer() const { return !!mImageBuffer; }
 
   uint32_t BufferSize() const { return mImageBufferSize; }
