@@ -80,7 +80,7 @@ struct BGRAColor {
     if (!mPremultiplied) {
       return BGRAColor(gfxPreMultiply(mBlue, mAlpha),
                        gfxPreMultiply(mGreen, mAlpha),
-                       gfxPreMultiply(mRed, mAlpha), mAlpha, true);
+                       gfxPreMultiply(mRed, mAlpha), mAlpha, true, msRGB);
     }
     return *this;
   }
@@ -169,6 +169,38 @@ struct ImageTestCase {
 // General Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
+// These macros work like gtest's ASSERT_* macros, except that they can be used
+// in functions that return values.
+#define ASSERT_TRUE_OR_RETURN(e, rv) \
+  EXPECT_TRUE(e);                    \
+  if (!(e)) {                        \
+    return rv;                       \
+  }
+
+#define ASSERT_EQ_OR_RETURN(a, b, rv) \
+  EXPECT_EQ(a, b);                    \
+  if ((a) != (b)) {                   \
+    return rv;                        \
+  }
+
+#define ASSERT_GE_OR_RETURN(a, b, rv) \
+  EXPECT_GE(a, b);                    \
+  if (!((a) >= (b))) {                \
+    return rv;                        \
+  }
+
+#define ASSERT_LE_OR_RETURN(a, b, rv) \
+  EXPECT_LE(a, b);                    \
+  if (!((a) <= (b))) {                \
+    return rv;                        \
+  }
+
+#define ASSERT_LT_OR_RETURN(a, b, rv) \
+  EXPECT_LT(a, b);                    \
+  if (!((a) < (b))) {                 \
+    return rv;                        \
+  }
+
 /**
  * A RAII class that ensure that ImageLib services are available. Any tests that
  * require ImageLib to be initialized (for example, any test that uses the
@@ -202,6 +234,15 @@ void SpinPendingEvents();
 
 /// Loads a file from the current directory. @return an nsIInputStream for it.
 already_AddRefed<nsIInputStream> LoadFile(const char* aRelativePath);
+
+/// Creates a surface with the given properties.
+already_AddRefed<gfx::DataSourceSurface> GenerateSurface(
+    const gfx::IntSize& aSize, gfx::SurfaceFormat aFormat, SurfaceFlags aFlags,
+    BGRAColor aPrimaryColor, BGRAColor aSecondaryColor);
+
+/// @returns true if every pixel of @aGot matches @aExp.
+bool MatchSurface(gfx::DataSourceSurface* aGot, gfx::DataSourceSurface* aExp,
+                  int32_t aFuzz = 0);
 
 /**
  * @returns true if every pixel of @aSurface is @aColor.

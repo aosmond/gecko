@@ -16,6 +16,7 @@
 #include "nsIProperties.h"
 #include "nsNetUtil.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/gfx/SourceSurfaceRawData.h"
 #include "nsStreamUtils.h"
 #include "nsString.h"
 
@@ -77,38 +78,6 @@ void ImageBenchmarkBase::TearDown() {}
 // General Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
-// These macros work like gtest's ASSERT_* macros, except that they can be used
-// in functions that return values.
-#define ASSERT_TRUE_OR_RETURN(e, rv) \
-  EXPECT_TRUE(e);                    \
-  if (!(e)) {                        \
-    return rv;                       \
-  }
-
-#define ASSERT_EQ_OR_RETURN(a, b, rv) \
-  EXPECT_EQ(a, b);                    \
-  if ((a) != (b)) {                   \
-    return rv;                        \
-  }
-
-#define ASSERT_GE_OR_RETURN(a, b, rv) \
-  EXPECT_GE(a, b);                    \
-  if (!((a) >= (b))) {                \
-    return rv;                        \
-  }
-
-#define ASSERT_LE_OR_RETURN(a, b, rv) \
-  EXPECT_LE(a, b);                    \
-  if (!((a) <= (b))) {                \
-    return rv;                        \
-  }
-
-#define ASSERT_LT_OR_RETURN(a, b, rv) \
-  EXPECT_LT(a, b);                    \
-  if (!((a) < (b))) {                 \
-    return rv;                        \
-  }
-
 void SpinPendingEvents() {
   nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
   EXPECT_TRUE(mainThread != nullptr);
@@ -153,6 +122,148 @@ already_AddRefed<nsIInputStream> LoadFile(const char* aRelativePath) {
   }
 
   return inputStream.forget();
+}
+
+already_AddRefed<DataSourceSurface> GenerateSurface(const IntSize& aSize,
+                                                    SurfaceFormat aFormat,
+                                                    SurfaceFlags aFlags,
+                                                    BGRAColor aPrimaryColor,
+                                                    BGRAColor aSecondaryColor) {
+  auto surface = MakeRefPtr<SourceSurfaceAlignedRawData>();
+  int32_t bpp = BytesPerPixel(aFormat);
+  int32_t stride = aSize.width * bpp;
+  if (!surface->Init(aSize, aFormat, true, 0, stride)) {
+    return nullptr;
+  }
+
+  DataSourceSurface::ScopedMap map(surface, DataSourceSurface::WRITE);
+  if (!map.IsMapped()) {
+    return nullptr;
+  }
+
+  uint8_t ri, gi, bi, ai;
+  switch (aFormat) {
+    case SurfaceFormat::B8G8R8A8:
+    case SurfaceFormat::B8G8R8X8:
+      bi = 0;
+      gi = 1;
+      ri = 2;
+      ai = 3;
+      break;
+    case SurfaceFormat::R8G8B8A8:
+    case SurfaceFormat::R8G8B8X8:
+      ri = 0;
+      gi = 1;
+      bi = 2;
+      ai = 3;
+      break;
+    case SurfaceFormat::A8R8G8B8:
+    case SurfaceFormat::X8R8G8B8:
+      ai = 0;
+      ri = 1;
+      gi = 2;
+      bi = 3;
+      break;
+    case SurfaceFormat::R8G8B8:
+      ri = 0;
+      gi = 1;
+      bi = 2;
+      ai = 0xFF;
+      break;
+    default:
+      return nullptr;
+  }
+
+  DataSurfaceFlags dataSurfaceFlags = DataSurfaceFlags::NONE;
+  BGRAColor primary, secondary;
+  if (aFlags & SurfaceFlags::TO_SRGB_COLORSPACE) {
+    primary = aPrimaryColor.sRGBColor();
+    secondary = aSecondaryColor.sRGBColor();
+    dataSurfaceFlags |= DataSurfaceFlags::SRGB_COLORSPACE;
+  } else {
+    primary = aPrimaryColor.DeviceColor();
+    secondary = aSecondaryColor.DeviceColor();
+  }
+
+  if (!(aFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA)) {
+    primary = primary.Premultiply();
+    secondary = secondary.Premultiply();
+  } else if (!IsOpaque(aFormat)) {
+    dataSurfaceFlags |= DataSurfaceFlags::UNPREMULTIPLIED_ALPHA;
+  }
+
+  uint8_t* p = map.GetData();
+
+  int32_t midRow = aSize.height / 2;
+  for (int32_t row = 0; row < midRow; ++row) {
+    for (int32_t col = 0; col < aSize.width; ++col) {
+      p[ri] = primary.mRed;
+      p[gi] = primary.mGreen;
+      p[bi] = primary.mBlue;
+      if (ai != 0xFF) {
+        p[ai] = primary.mAlpha;
+      }
+      p += bpp;
+    }
+  }
+  for (int32_t row = midRow; row < aSize.height; ++row) {
+    for (int32_t col = 0; col < aSize.width; ++col) {
+      p[ri] = secondary.mRed;
+      p[gi] = secondary.mGreen;
+      p[bi] = secondary.mBlue;
+      if (ai != 0xFF) {
+        p[ai] = secondary.mAlpha;
+      }
+      p += bpp;
+    }
+  }
+
+  surface->SetFlags(dataSurfaceFlags);
+  return surface.forget();
+}
+
+bool MatchSurface(DataSourceSurface* aGot, DataSourceSurface* aExp,
+                  int32_t aFuzz /* = 0 */) {
+  DataSourceSurface::ScopedMap gmap(aGot, DataSourceSurface::READ);
+  ASSERT_TRUE_OR_RETURN(gmap.IsMapped(), false);
+  DataSourceSurface::ScopedMap emap(aExp, DataSourceSurface::READ);
+  ASSERT_TRUE_OR_RETURN(emap.IsMapped(), false);
+
+  ASSERT_EQ_OR_RETURN(aGot->GetFormat(), aExp->GetFormat(), false);
+  ASSERT_EQ_OR_RETURN(aGot->GetSize(), aExp->GetSize(), false);
+  ASSERT_EQ_OR_RETURN(aGot->Flags(), aExp->Flags(), false);
+
+  int32_t bpp = BytesPerPixel(aGot->GetFormat());
+  IntSize size = aGot->GetSize();
+
+  bool channelMatch = true;
+  for (int32_t row = 0; row < size.height; ++row) {
+    const uint8_t* gdata = gmap.GetData() + row * gmap.GetStride();
+    const uint8_t* edata = emap.GetData() + row * emap.GetStride();
+    for (int32_t col = 0; col < size.width; ++col) {
+      for (int32_t channel = 0; channel < bpp; ++channel) {
+        if (std::abs(gdata[channel] - edata[channel]) > aFuzz) {
+          channelMatch = false;
+          break;
+        }
+      }
+
+      if (!channelMatch) {
+        EXPECT_EQ(gdata[0], edata[0]);
+        EXPECT_EQ(gdata[1], edata[1]);
+        EXPECT_EQ(gdata[2], edata[2]);
+        if (bpp == 4) {
+          EXPECT_EQ(gdata[3], edata[3]);
+        }
+        break;
+      }
+
+      gdata += bpp;
+      edata += bpp;
+    }
+  }
+
+  return channelMatch;
 }
 
 bool IsSolidColor(SourceSurface* aSurface, BGRAColor aColor,
