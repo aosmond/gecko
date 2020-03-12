@@ -24,7 +24,9 @@ ImageEncoder::ImageEncoder()
       mFinished(false),
       mCallback(nullptr),
       mCallbackTarget(nullptr),
-      mNotifyThreshold(0) {}
+      mNotifyThreshold(0),
+      mSwizzleFn(nullptr),
+      mPremultiplyFn(nullptr) {}
 
 ImageEncoder::~ImageEncoder() {
   if (mImageBuffer) {
@@ -82,6 +84,60 @@ DataSurfaceFlags ImageEncoder::ToSurfaceFlags(uint32_t aInputFormat) const {
     default:
       return DataSurfaceFlags::NONE;
   }
+}
+
+nsresult ImageEncoder::PrepareRowPipeline(SurfaceFormat aIn,
+                                          DataSurfaceFlags aInFlags,
+                                          SurfaceFormat aOut,
+                                          const IntSize& aSize) {
+  mSwizzleFn = SwizzleRow(aIn, aOut);
+  if (!mSwizzleFn) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (aInFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA) {
+    // Surface is unpremultiplied. If we are dropping the alpha, we actually
+    // need to perform premultiplication first. If we are keeping the alpha, we
+    // don't need to do anything.
+    if (IsOpaque(aOut)) {
+      mPremultiplyFn = PremultiplyRow(aIn, aIn);
+      if (!mPremultiplyFn) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+  } else {
+    // Surface is premultiplied. If we are dropping the alpha, we don't need to
+    // do anything. If we are keeping the alpha, we need to reverse the
+    // premultiplication first.
+    if (!IsOpaque(aOut)) {
+      mPremultiplyFn = UnpremultiplyRow(aIn, aIn);
+      if (!mPremultiplyFn) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+  }
+
+  mRowBuffer.reset(new (fallible) uint8_t[aSize.width * 4]);
+  if (!mRowBuffer) {
+    return NS_ERROR_FAILURE;
+  }
+}
+
+const uint8_t* ImageEncoder::PrepareRow(const uint8_t* aData, int32_t aStride,
+                                        int32_t aWidth, int32_t aRow) {
+  MOZ_ASSERT(mSwizzleFn);
+  MOZ_ASSERT(mRowBuffer);
+
+  const uint8_t* src = aData + aStride * aRow;
+
+  if (mPremultiplyFn) {
+    mPremultiplyFn(src, mRowBuffer.get(), aWidth);
+    mSwizzleFn(mRowBuffer.get(), mRowBuffer.get(), aWidth);
+  } else {
+    mSwizzleFn(src, mRowBuffer.get(), aWidth);
+  }
+
+  return mRowBuffer.get();
 }
 
 nsresult ImageEncoder::InitFromSurfaceData(

@@ -7,9 +7,10 @@
 #define mozilla_image_Encoder_h
 
 #include "imgIEncoder.h"
-#include "mozilla/gfx/Types.h"  // for SurfaceFormat
-#include "mozilla/gfx/2D.h"     // for DataSurfaceFlags
-#include "mozilla/gfx/Point.h"  // for IntSize
+#include "mozilla/gfx/Types.h"    // for SurfaceFormat
+#include "mozilla/gfx/2D.h"       // for DataSurfaceFlags
+#include "mozilla/gfx/Point.h"    // for IntSize
+#include "mozilla/gfx/Swizzle.h"  // for SwizzleRowFn
 
 namespace mozilla {
 namespace image {
@@ -47,6 +48,13 @@ class ImageEncoder : public imgIEncoder {
 
  protected:
   virtual ~ImageEncoder();
+
+  nsresult PrepareRowPipeline(gfx::SurfaceFormat aIn,
+                              gfx::DataSurfaceFlags aInFlags,
+                              gfx::SurfaceFormat aOut,
+                              const gfx::IntSize& aSize);
+  const uint8_t* PrepareRow(const uint8_t* aData, int32_t aStride,
+                            int32_t aWidth, int32_t aRow);
 
   nsresult AllocateBuffer(uint32_t aSize);
   nsresult ReallocateBuffer(uint32_t aSize);
@@ -124,6 +132,10 @@ class ImageEncoder : public imgIEncoder {
   nsCOMPtr<nsIInputStreamCallback> mCallback;
   nsCOMPtr<nsIEventTarget> mCallbackTarget;
   uint32_t mNotifyThreshold;
+
+  UniquePtr<uint8_t[]> mRowBuffer;
+  gfx::SwizzleRowFn mSwizzleFn;
+  gfx::SwizzleRowFn mPremultiplyFn;
 };
 
 }  // namespace image

@@ -8,7 +8,6 @@
 #include "nsString.h"
 #include "gfxColor.h"
 #include "mozilla/DebugOnly.h"
-#include "mozilla/gfx/Swizzle.h"
 
 extern "C" {
 #include "jpeglib.h"
@@ -86,6 +85,12 @@ nsresult nsJPEGEncoder::InitFromSurfaceData(
     return NS_ERROR_ALREADY_INITIALIZED;
   }
 
+  nsresult rv =
+      PrepareRowPipeline(aFormat, aFlags, SurfaceFormat::R8G8B8, aSize);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
   // options: we only have one option so this is easy
   int quality = 92;
   if (aOptions.Length() > 0) {
@@ -156,37 +161,10 @@ nsresult nsJPEGEncoder::InitFromSurfaceData(
 
   jpeg_start_compress(&cinfo, 1);
 
-  UniquePtr<uint8_t[]> rowptr(new (fallible) uint8_t[aSize.width * 4]);
-  if (!rowptr) {
-    return NS_ERROR_FAILURE;
-  }
-
-  SurfaceFormat outFormat = SurfaceFormat::R8G8B8;
-  SwizzleRowFn swizzleFn = SwizzleRow(aFormat, outFormat);
-  if (!swizzleFn) {
-    return NS_ERROR_FAILURE;
-  }
-
-  SwizzleRowFn premultiplyFn = nullptr;
-  if (!IsOpaque(aFormat) && aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA) {
-    premultiplyFn = PremultiplyRow(aFormat, aFormat);
-    if (!premultiplyFn) {
-      return NS_ERROR_FAILURE;
-    }
-  }
-
-  uint8_t* row = rowptr.get();
-  if (premultiplyFn) {
-    while (cinfo.next_scanline < cinfo.image_height) {
-      premultiplyFn(aData, row, aSize.width);
-      swizzleFn(row, row, aSize.width);
-      jpeg_write_scanlines(&cinfo, &row, 1);
-    }
-  } else {
-    while (cinfo.next_scanline < cinfo.image_height) {
-      swizzleFn(aData, row, aSize.width);
-      jpeg_write_scanlines(&cinfo, &row, 1);
-    }
+  while (cinfo.next_scanline < cinfo.image_height) {
+    const uint8_t* row =
+        PrepareRow(aData, aStride, aSize.width, cinfo.next_scanline);
+    jpeg_write_scanlines(&cinfo, const_cast<uint8_t**>(&row), 1);
   }
 
   jpeg_finish_compress(&cinfo);

@@ -9,7 +9,6 @@
 #include "nsString.h"
 #include "prprf.h"
 #include "mozilla/CheckedInt.h"
-#include "mozilla/gfx/Swizzle.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -168,27 +167,9 @@ nsresult nsPNGEncoder::AddSurfaceDataFrame(
     outFormat = SurfaceFormat::R8G8B8;
   }
 
-  SwizzleRowFn swizzleFn = SwizzleRow(aFormat, outFormat);
-  if (!swizzleFn) {
-    return NS_ERROR_FAILURE;
-  }
-
-  SwizzleRowFn premultiplyFn = nullptr;
-  if (outFormat == SurfaceFormat::R8G8B8 && !IsOpaque(aFormat) &&
-      aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA) {
-    premultiplyFn = PremultiplyRow(aFormat, aFormat);
-    if (!premultiplyFn) {
-      return NS_ERROR_FAILURE;
-    }
-  }
-
-  SwizzleRowFn unpremultiplyFn = nullptr;
-  if (!IsOpaque(aFormat) &&
-      !(aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA)) {
-    unpremultiplyFn = UnpremultiplyRow(outFormat, outFormat);
-    if (!unpremultiplyFn) {
-      return NS_ERROR_FAILURE;
-    }
+  rv = PrepareRowPipeline(aFormat, aFlags, outFormat, aSize);
+  if (NS_FAILED(rv)) {
+    return rv;
   }
 
 #ifdef PNG_APNG_SUPPORTED
@@ -204,28 +185,9 @@ nsresult nsPNGEncoder::AddSurfaceDataFrame(
   png_set_filter(mPNG, PNG_FILTER_TYPE_BASE, PNG_FILTER_VALUE_NONE);
 #endif
 
-  UniquePtr<uint8_t[]> row(new (fallible) uint8_t[aSize.width * 4]);
-  if (!row) {
-    return NS_ERROR_FAILURE;
-  }
-
-  if (premultiplyFn) {
-    for (int32_t y = 0; y < aSize.height; y++) {
-      premultiplyFn(&aData[y * aStride], row.get(), aSize.width);
-      swizzleFn(row.get(), row.get(), aSize.width);
-      png_write_row(mPNG, row.get());
-    }
-  } else if (unpremultiplyFn) {
-    for (int32_t y = 0; y < aSize.height; y++) {
-      swizzleFn(&aData[y * aStride], row.get(), aSize.width);
-      unpremultiplyFn(row.get(), row.get(), aSize.width);
-      png_write_row(mPNG, row.get());
-    }
-  } else {
-    for (int32_t y = 0; y < aSize.height; y++) {
-      swizzleFn(&aData[y * aStride], row.get(), aSize.width);
-      png_write_row(mPNG, row.get());
-    }
+  for (int32_t y = 0; y < aSize.height; y++) {
+    const uint8_t* row = PrepareRow(aData, aStride, aSize.width, y);
+    png_write_row(mPNG, row);
   }
 
 #ifdef PNG_APNG_SUPPORTED

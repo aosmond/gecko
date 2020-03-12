@@ -6,7 +6,6 @@
 #include "nsCRT.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/UniquePtrExtensions.h"
-#include "mozilla/gfx/Swizzle.h"
 #include "nsBMPEncoder.h"
 #include "nsString.h"
 #include "nsTArray.h"
@@ -87,6 +86,13 @@ nsresult nsBMPEncoder::AddSurfaceDataFrame(
     return NS_ERROR_NOT_INITIALIZED;
   }
 
+  SurfaceFormat outFormat = mBMPInfoHeader.bpp == 24 ? SurfaceFormat::R8G8B8
+                                                     : SurfaceFormat::R8G8B8A8;
+  nsresult rv = PrepareRowPipeline(aFormat, aFlags, outFormat, aSize);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
   if (mBMPInfoHeader.width < 0) {
     return NS_ERROR_ILLEGAL_VALUE;
   }
@@ -107,31 +113,13 @@ nsresult nsBMPEncoder::AddSurfaceDataFrame(
     return NS_ERROR_FAILURE;
   }
 
-  SurfaceFormat outFormat = mBMPInfoHeader.bpp == 24 ? SurfaceFormat::R8G8B8
-                                                     : SurfaceFormat::R8G8B8A8;
-
-  if (outFormat == SurfaceFormat::R8G8B8 && !IsOpaque(aFormat) &&
-      aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA) {
-    // FIXME(aosmond): we need to premultiply before we store, but we don't have
-    // enough room in the buffer
-    return NS_ERROR_FAILURE;
-  }
-
-  if (!SwizzleData(aData, aStride, aFormat, BufferHead(), size.value(),
-                   outFormat, aSize)) {
-    return NS_ERROR_FAILURE;
-  }
-
-  if (!IsOpaque(aFormat) &&
-      !(aFlags & DataSurfaceFlags::UNPREMULTIPLIED_ALPHA)) {
-    if (!UnpremultiplyData(BufferHead(), size.value(), outFormat, BufferHead(),
-                           size.value(), outFormat, aSize)) {
-      return NS_ERROR_FAILURE;
+  for (int32_t y = mBMPInfoHeader.height - 1; y >= 0; --y) {
+    const uint8_t* row = PrepareRow(aData, aStride, aSize.width, y);
+    rv = WriteBuffer(row, size.value());
+    if (NS_FAILED(rv)) {
+      return rv;
     }
   }
-
-  AdvanceBuffer(size.value() * mBMPInfoHeader.height);
-
   return NS_OK;
 }
 
