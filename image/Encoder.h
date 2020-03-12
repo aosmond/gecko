@@ -43,7 +43,7 @@ class ImageEncoder : public imgIEncoder {
   nsresult InitFromSurfaceData(const uint8_t* aData, const gfx::IntSize& aSize,
                                int32_t aStride, gfx::SurfaceFormat aFormat,
                                gfx::DataSurfaceFlags aFlags,
-                               const nsAString& aOptions) final;
+                               const nsAString& aOptions) override;
 
  protected:
   virtual ~ImageEncoder();
