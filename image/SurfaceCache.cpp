@@ -345,7 +345,12 @@ class ImageSurfaceCache {
     }
 
     // There's no perfect match, so find the best match we can.
+    int64_t idealArea = AreaOfIntSize(aIdealKey.Size());
+    int64_t bestArea = 0;
+
     RefPtr<CachedSurface> bestMatch;
+    AreaMatch bestAreaMatch = AreaMatch::Worse;
+
     for (auto iter = ConstIter(); !iter.Done(); iter.Next()) {
       NotNull<CachedSurface*> current = WrapNotNull(iter.UserData());
       const SurfaceKey& currentKey = current->GetSurfaceKey();
@@ -367,6 +372,8 @@ class ImageSurfaceCache {
       // checked, of course.)
       if (!bestMatch) {
         bestMatch = current;
+        bestArea = AreaOfIntSize(currentKey.Size());
+        bestAreaMatch = CompareBestAreaMargin(idealArea, bestArea);
         continue;
       }
 
@@ -382,10 +389,13 @@ class ImageSurfaceCache {
         continue;
       }
 
-      SurfaceKey bestMatchKey = bestMatch->GetSurfaceKey();
-      if (CompareArea(aIdealKey.Size(), bestMatchKey.Size(),
-                      currentKey.Size())) {
+      int64_t currentArea = AreaOfIntSize(currentKey.Size());
+      AreaMatch areaMatch =
+          CompareArea(idealArea, bestArea, bestAreaMatch, currentArea);
+      if (areaMatch != AreaMatch::Worse) {
         bestMatch = current;
+        bestArea = currentArea;
+        bestAreaMatch = areaMatch;
       }
     }
 
@@ -395,14 +405,24 @@ class ImageSurfaceCache {
         // No exact match, neither ideal nor factor of 2.
         MOZ_ASSERT(suggestedSize != bestMatch->GetSurfaceKey().Size(),
                    "No exact match despite the fact the sizes match!");
-        matchType = MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND;
+        if (bestAreaMatch == AreaMatch::WithinMargin) {
+          // Since the best match is within the margin of the ideal match, we
+          // should consider this equivalent and update the suggested size to
+          // minimize image container churn. If it ever gets evicted from the
+          // cache, then we will likely fall back to a factor of 2 size.
+          matchType = MatchType::SUBSTITUTE_BECAUSE_BEST;
+          suggestedSize = bestMatch->GetSurfaceKey().Size();
+        } else {
+          matchType = MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND;
+        }
       } else if (exactMatch != bestMatch) {
         // The exact match is still decoding, but we found a substitute.
         matchType = MatchType::SUBSTITUTE_BECAUSE_PENDING;
       } else if (aIdealKey.Size() != bestMatch->GetSurfaceKey().Size()) {
         // The best factor of 2 match is still decoding, but the best we've got.
         MOZ_ASSERT(suggestedSize != aIdealKey.Size());
-        MOZ_ASSERT(mFactor2Mode || mIsVectorImage);
+        MOZ_ASSERT(mFactor2Mode || mIsVectorImage ||
+                   bestAreaMatch == AreaMatch::WithinMargin);
         matchType = MatchType::SUBSTITUTE_BECAUSE_BEST;
       } else {
         // The exact match is still decoding, but it's the best we've got.
@@ -605,8 +625,15 @@ class ImageSurfaceCache {
     factorSize.width /= 2;
     factorSize.height /= 2;
 
+    int64_t idealArea = AreaOfIntSize(aSize);
+    int64_t bestArea = AreaOfIntSize(bestSize);
+    AreaMatch bestAreaMatch = CompareBestAreaMargin(idealArea, bestArea);
+
     while (!factorSize.IsEmpty()) {
-      if (!CompareArea(aSize, bestSize, factorSize)) {
+      int64_t factorArea = AreaOfIntSize(factorSize);
+      bestAreaMatch =
+          CompareArea(idealArea, bestArea, bestAreaMatch, factorArea);
+      if (bestAreaMatch == AreaMatch::Worse) {
         // This size is not better than the last. Since we proceed from largest
         // to smallest, we know that the next size will not be better if the
         // previous size was rejected. Break early.
@@ -615,6 +642,7 @@ class ImageSurfaceCache {
 
       // The current factor of 2 size is better than the last selected size.
       bestSize = factorSize;
+      bestArea = factorArea;
       factorSize.width /= 2;
       factorSize.height /= 2;
     }
@@ -622,30 +650,61 @@ class ImageSurfaceCache {
     return bestSize;
   }
 
-  bool CompareArea(const IntSize& aIdealSize, const IntSize& aBestSize,
-                   const IntSize& aSize) const {
+  enum class AreaMatch : uint8_t {
+    Worse,         /// The given area is worst than the current best match.
+    Better,        /// The given area is better than the current best match.
+    WithinMargin,  /// The given area is better than the current best match, and
+                   /// is within the margin.
+  };
+
+  bool CompareAreaMargin(int64_t aIdealArea, int64_t aArea) const {
+    // Compare areas. If the given area is within a fixed margin of the ideal
+    // area, we will consider it equivalent.
+    int64_t margin = aIdealArea >> 4;  // = 1/16 = 6.25%
+    int64_t marginArea = aArea - aIdealArea;
+    return -margin <= marginArea && margin >= marginArea;
+  }
+
+  AreaMatch CompareBestAreaMargin(int64_t aIdealArea, int64_t aArea) const {
+    if (CompareAreaMargin(aIdealArea, aArea)) {
+      return AreaMatch::WithinMargin;
+    }
+    return AreaMatch::Better;
+  }
+
+  AreaMatch CompareArea(int64_t aIdealArea, int64_t aBestArea,
+                        AreaMatch aBestAreaMatch, int64_t aArea) const {
     // Compare sizes. We use an area-based heuristic here instead of computing a
     // truly optimal answer, since it seems very unlikely to make a difference
     // for realistic sizes.
-    int64_t idealArea = AreaOfIntSize(aIdealSize);
-    int64_t currentArea = AreaOfIntSize(aSize);
-    int64_t bestMatchArea = AreaOfIntSize(aBestSize);
 
-    // If the best match is smaller than the ideal size, prefer bigger sizes.
-    if (bestMatchArea < idealArea) {
-      if (currentArea > bestMatchArea) {
-        return true;
+    // If the best match is within the margins, then we want to prefer sizes
+    // that bigger but also within the margin. A tiny upscale is preferable to a
+    // massive downscale for performance reasons, and preferring the within
+    // margin sizes also ensures that we minimize redecodes.
+    if (aBestAreaMatch == AreaMatch::WithinMargin) {
+      if (aArea > aBestArea && CompareAreaMargin(aIdealArea, aArea)) {
+        return AreaMatch::WithinMargin;
       }
-      return false;
+      return AreaMatch::Worse;
     }
 
-    // Other, prefer sizes closer to the ideal size, but still not smaller.
-    if (idealArea <= currentArea && currentArea < bestMatchArea) {
-      return true;
+    // Otherwise, if the best match is smaller than the ideal size, prefer
+    // bigger sizes.
+    if (aBestArea < aIdealArea) {
+      if (aArea > aBestArea) {
+        return CompareBestAreaMargin(aIdealArea, aArea);
+      }
+      return AreaMatch::Worse;
+    }
+
+    // Otherwise, prefer sizes closer to the ideal size, but still not smaller.
+    if (aIdealArea <= aArea && aArea < aBestArea) {
+      return CompareBestAreaMargin(aIdealArea, aArea);
     }
 
     // This surface isn't an improvement over the current best match.
-    return false;
+    return AreaMatch::Worse;
   }
 
   template <typename Function>
