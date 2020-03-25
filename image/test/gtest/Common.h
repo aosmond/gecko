@@ -181,6 +181,38 @@ struct ImageTestCase {
 // General Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
+// These macros work like gtest's ASSERT_* macros, except that they can be used
+// in functions that return values.
+#define ASSERT_TRUE_OR_RETURN(e, rv) \
+  EXPECT_TRUE(e);                    \
+  if (!(e)) {                        \
+    return rv;                       \
+  }
+
+#define ASSERT_EQ_OR_RETURN(a, b, rv) \
+  EXPECT_EQ(a, b);                    \
+  if ((a) != (b)) {                   \
+    return rv;                        \
+  }
+
+#define ASSERT_GE_OR_RETURN(a, b, rv) \
+  EXPECT_GE(a, b);                    \
+  if (!((a) >= (b))) {                \
+    return rv;                        \
+  }
+
+#define ASSERT_LE_OR_RETURN(a, b, rv) \
+  EXPECT_LE(a, b);                    \
+  if (!((a) <= (b))) {                \
+    return rv;                        \
+  }
+
+#define ASSERT_LT_OR_RETURN(a, b, rv) \
+  EXPECT_LT(a, b);                    \
+  if (!((a) < (b))) {                 \
+    return rv;                        \
+  }
+
 /**
  * A RAII class that ensure that ImageLib services are available. Any tests that
  * require ImageLib to be initialized (for example, any test that uses the
