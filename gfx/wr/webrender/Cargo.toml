@@ -19,6 +19,7 @@ display_list_stats = ["api/display_list_stats"]
 serialize_program = ["serde", "webrender_build/serialize_program"]
 no_static_freetype = []
 leak_checks = []
+no_snapping = []
 
 [build-dependencies]
 webrender_build = { version = "0.0.1", path = "../webrender_build" }

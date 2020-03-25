@@ -16,7 +16,9 @@ use crate::clip::{ClipDataStore, ClipNodeFlags, ClipChainId, ClipChainInstance, 
 use crate::debug_colors;
 use crate::debug_render::DebugItem;
 use crate::scene_building::{CreateShadow, IsVisible};
-use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Point2D, Vector2D};
+use euclid::{SideOffsets2D, Transform3D, Rect, Scale, Size2D, Vector2D};
+#[cfg(not(feature = "no_snapping"))]
+use euclid::Point2D;
 use euclid::approxeq::ApproxEq;
 use crate::frame_builder::{FrameBuildingContext, FrameBuildingState, PictureContext, PictureState};
 use crate::frame_builder::{FrameVisibilityContext, FrameVisibilityState};
@@ -52,8 +54,10 @@ use std::{cmp, fmt, hash, ops, u32, usize, mem};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::storage;
 use crate::texture_cache::TEXTURE_REGION_DIMENSIONS;
-use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset, RectHelpers, VectorHelpers};
 use crate::util::{clamp_to_scale_factor, pack_as_float, project_rect, raster_rect_to_device_pixels};
+use crate::util::{MatrixHelpers, MaxRect, Recycler, ScaleOffset};
+#[cfg(not(feature = "no_snapping"))]
+use crate::util::{RectHelpers, VectorHelpers};
 use crate::internal_types::{LayoutPrimitiveInfo, Filter};
 use smallvec::SmallVec;
 
@@ -194,6 +198,12 @@ impl SpaceSnapper {
         };
     }
 
+    #[cfg(feature = "no_snapping")]
+    pub fn snap_rect<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
+        *rect
+    }
+
+    #[cfg(not(feature = "no_snapping"))]
     pub fn snap_rect<F>(&self, rect: &Rect<f32, F>) -> Rect<f32, F> where F: fmt::Debug {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
@@ -205,6 +215,12 @@ impl SpaceSnapper {
         }
     }
 
+    #[cfg(feature = "no_snapping")]
+    pub fn snap_vector<F>(&self, vector: &Vector2D<f32, F>) -> Vector2D<f32, F> where F: fmt::Debug {
+        *vector
+    }
+
+    #[cfg(not(feature = "no_snapping"))]
     pub fn snap_vector<F>(&self, vector: &Vector2D<f32, F>) -> Vector2D<f32, F> where F: fmt::Debug {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
@@ -216,6 +232,12 @@ impl SpaceSnapper {
         }
     }
 
+    #[cfg(feature = "no_snapping")]
+    pub fn snap_size<F>(&self, size: &Size2D<f32, F>) -> Size2D<f32, F> where F: fmt::Debug {
+        *size
+    }
+
+    #[cfg(not(feature = "no_snapping"))]
     pub fn snap_size<F>(&self, size: &Size2D<f32, F>) -> Size2D<f32, F> where F: fmt::Debug {
         debug_assert!(self.current_target_spatial_node_index != SpatialNodeIndex::INVALID);
         match self.snapping_transform {
