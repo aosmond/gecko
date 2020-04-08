@@ -9,6 +9,19 @@
 extern "C" {
 #endif
 
+/* used as a lookup table for the input transformation.
+ * we refcount them so we only need to have one around per output
+ * profile, instead of duplicating them per transform */
+struct precache_input
+{
+	int ref_count;
+	/* We used a count of 256 to fit the entire color channel range in
+	 * the lookup table. */
+#define PRECACHE_INPUT_SIZE 256
+#define PRECACHE_INPUT_MAX (PRECACHE_INPUT_SIZE-1)
+	float data[PRECACHE_INPUT_SIZE];
+};
+
 /* used as a lookup table for the output transformation.
  * we refcount them so we only need to have one around per output
  * profile, instead of duplicating them per transform */
@@ -74,6 +87,9 @@ struct _qcms_transform {
 
 	size_t output_gamma_lut_gray_length;
 
+	struct precache_input *input_table_r;
+	struct precache_input *input_table_g;
+	struct precache_input *input_table_b;
 	struct precache_output *output_table_r;
 	struct precache_output *output_table_g;
 	struct precache_output *output_table_b;
@@ -232,6 +248,9 @@ struct _qcms_profile {
 	struct lutmABType *mBA;
 	struct matrix chromaticAdaption;
 
+	struct precache_input *input_table_r;
+	struct precache_input *input_table_g;
+	struct precache_input *input_table_b;
 	struct precache_output *output_table_r;
 	struct precache_output *output_table_g;
 	struct precache_output *output_table_b;
@@ -264,6 +283,7 @@ static inline float uInt16Number_to_float(uInt16Number a)
 }
 
 
+void precache_input_release(struct precache_input *p);
 void precache_release(struct precache_output *p);
 bool set_rgb_colorants(qcms_profile *profile, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries);
 bool get_rgb_colorants(struct matrix *colorants, qcms_CIE_xyY white_point, qcms_CIE_xyYTRIPLE primaries);
