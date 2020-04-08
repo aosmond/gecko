@@ -820,6 +820,27 @@ static void qcms_transform_data_rgb_out_linear(const qcms_transform *transform, 
  * This can lead to us prematurely deleting the precache if threads get unlucky
  * and write the wrong value to the ref count.
  */
+static struct precache_input *precache_input_reference(struct precache_input *p)
+{
+	qcms_atomic_increment(p->ref_count);
+	return p;
+}
+
+static struct precache_input *precache_input_create()
+{
+	struct precache_input *p = (struct precache_input*)malloc(sizeof(struct precache_input));
+	if (p)
+		p->ref_count = 1;
+	return p;
+}
+
+void precache_input_release(struct precache_input *p)
+{
+	if (qcms_atomic_decrement(p->ref_count) == 0) {
+		free(p);
+	}
+}
+
 static struct precache_output *precache_reference(struct precache_output *p)
 {
 	qcms_atomic_increment(p->ref_count);
@@ -892,6 +913,19 @@ void qcms_transform_release(qcms_transform *t)
 {
 	/* ensure we only free the gamma tables once even if there are
 	 * multiple references to the same data */
+
+	if (t->input_table_r) {
+		precache_input_release(t->input_table_r);
+		t->input_gamma_table_r = nullptr;
+	}
+	if (t->input_table_g) {
+		precache_input_release(t->input_table_g);
+		t->input_gamma_table_g = nullptr;
+	}
+	if (t->input_table_b) {
+		precache_input_release(t->input_table_b);
+		t->input_gamma_table_b = nullptr;
+	}
 
 	if (t->output_table_r)
 		precache_release(t->output_table_r);
@@ -1021,6 +1055,32 @@ struct matrix compute_whitepoint_adaption(float X, float Y, float Z) {
 		  (X*bradford_matrix.m[0][2]      + Y*bradford_matrix.m[1][2]      + Z*bradford_matrix.m[2][2]     );
 	struct matrix white_adaption = {{ {p,0,0}, {0,y,0}, {0,0,b}}, false};
 	return matrix_multiply( bradford_matrix_inv, matrix_multiply(white_adaption, bradford_matrix) );
+}
+
+void qcms_profile_precache_input_transform(qcms_profile *profile)
+{
+	/* we only support precaching on rgb profiles */
+	if (profile->color_space != RGB_SIGNATURE)
+		return;
+
+	/* don't precache if we do not have the TRC curves */
+	if (!profile->redTRC || !profile->greenTRC || !profile->blueTRC)
+		return;
+
+	profile->input_table_r = precache_input_create();
+	if (profile->input_table_r) {
+		compute_input_gamma_table(profile->redTRC, profile->input_table_r->data);
+	}
+
+	profile->input_table_g = precache_input_create();
+	if (profile->input_table_g) {
+		compute_input_gamma_table(profile->blueTRC, profile->input_table_g->data);
+	}
+
+	profile->input_table_b = precache_input_create();
+	if (profile->input_table_b) {
+		compute_input_gamma_table(profile->blueTRC, profile->input_table_b->data);
+	}
 }
 
 void qcms_profile_precache_output_transform(qcms_profile *profile)
@@ -1160,11 +1220,11 @@ qcms_transform* qcms_transform_create(
 		return NULL;
 	}
 
-	bool precache = false;
+	bool precache_output = false;
 	if (out->output_table_r &&
 			out->output_table_g &&
 			out->output_table_b) {
-		precache = true;
+		precache_output = true;
 	}
 
 	// This precache assumes RGB_SIGNATURE (fails on GRAY_SIGNATURE, for instance)
@@ -1186,7 +1246,7 @@ qcms_transform* qcms_transform_create(
 		return result;
 	}
 
-	if (precache) {
+	if (precache_output) {
 		transform->output_table_r = precache_reference(out->output_table_r);
 		transform->output_table_g = precache_reference(out->output_table_g);
 		transform->output_table_b = precache_reference(out->output_table_b);
@@ -1206,7 +1266,7 @@ qcms_transform* qcms_transform_create(
 
         if (in->color_space == RGB_SIGNATURE) {
 		struct matrix in_matrix, out_matrix, result;
-		if (precache) {
+		if (precache_output) {
 #ifdef X86
                     if (qcms_supports_avx) {
 			    if (in_type == QCMS_DATA_RGB_8) {
@@ -1281,10 +1341,25 @@ qcms_transform* qcms_transform_create(
 			}
 		}
 
-		//XXX: avoid duplicating tables if we can
-		transform->input_gamma_table_r = build_input_gamma_table(in->redTRC);
-		transform->input_gamma_table_g = build_input_gamma_table(in->greenTRC);
-		transform->input_gamma_table_b = build_input_gamma_table(in->blueTRC);
+		bool precache_input = false;
+		if (in->input_table_r &&
+				in->input_table_g &&
+				in->input_table_b) {
+			precache_input = true;
+		}
+
+		if (precache_input) {
+			transform->input_table_r = precache_input_reference(in->input_table_r);
+			transform->input_table_g = precache_input_reference(in->input_table_g);
+			transform->input_table_b = precache_input_reference(in->input_table_b);
+			transform->input_gamma_table_r = in->input_table_r->data;
+			transform->input_gamma_table_g = in->input_table_g->data;
+			transform->input_gamma_table_b = in->input_table_b->data;
+		} else {
+			transform->input_gamma_table_r = build_input_gamma_table(in->redTRC);
+			transform->input_gamma_table_g = build_input_gamma_table(in->greenTRC);
+			transform->input_gamma_table_b = build_input_gamma_table(in->blueTRC);
+		}
 		if (!transform->input_gamma_table_r || !transform->input_gamma_table_g || !transform->input_gamma_table_b) {
 			qcms_transform_release(transform);
 			return NO_MEM_TRANSFORM;
@@ -1330,7 +1405,7 @@ qcms_transform* qcms_transform_create(
 			return NO_MEM_TRANSFORM;
 		}
 
-		if (precache) {
+		if (precache_output) {
 			if (out_type == QCMS_DATA_RGB_8) {
 				transform->transform_fn = qcms_transform_data_gray_out_precache;
 			} else if (out_type == QCMS_DATA_RGBA_8) {
