@@ -86,6 +86,7 @@ static inline float u8Fixed8Number_to_float(uint16_t x)
   return x/256.;
 }
 
+bool compute_input_gamma_table(struct curveType *TRC, float* data);
 float *build_input_gamma_table(struct curveType *TRC);
 struct matrix build_colorant_matrix(qcms_profile *p);
 void build_output_lut(struct curveType *trc,

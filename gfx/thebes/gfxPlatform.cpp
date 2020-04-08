@@ -1103,6 +1103,7 @@ void gfxPlatform::Init() {
   Preferences::RegisterCallbackAndCall(RecordingPrefChanged,
                                        "gfx.2d.recording");
 
+  // Create the output display profile
   CreateCMSOutputProfile();
 
   // Create the sRGB to output display profile transforms. They can be accessed
@@ -2299,6 +2300,7 @@ qcms_profile* gfxPlatform::GetCMSsRGBProfile() {
   if (!gCMSsRGBProfile) {
     /* Create the profile using qcms. */
     gCMSsRGBProfile = qcms_profile_sRGB();
+    qcms_profile_precache_input_transform(gCMSsRGBProfile);
   }
   return gCMSsRGBProfile;
 }

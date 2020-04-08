@@ -1191,6 +1191,13 @@ static void lut_release(struct lutType *lut)
 
 void qcms_profile_release(qcms_profile *profile)
 {
+	if (profile->input_table_r)
+		precache_input_release(profile->input_table_r);
+	if (profile->input_table_g)
+		precache_input_release(profile->input_table_g);
+	if (profile->input_table_b)
+		precache_input_release(profile->input_table_b);
+
 	if (profile->output_table_r)
 		precache_release(profile->output_table_r);
 	if (profile->output_table_g)
