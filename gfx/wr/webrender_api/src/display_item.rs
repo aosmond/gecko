@@ -147,6 +147,7 @@ pub enum DisplayItem {
     StickyFrame(StickyFrameDisplayItem),
     Iframe(IframeDisplayItem),
     PushReferenceFrame(ReferenceFrameDisplayListItem),
+    PushComputedFrame(ComputedFrameDisplayListItem),
     PushStackingContext(PushStackingContextDisplayItem),
 
     // These marker items indicate an array of data follows, to be used for the
@@ -158,6 +159,7 @@ pub enum DisplayItem {
 
     // These marker items terminate a scope introduced by a previous item.
     PopReferenceFrame,
+    PopComputedFrame,
     PopStackingContext,
     PopAllShadows,
 
@@ -197,6 +199,7 @@ pub enum DebugDisplayItem {
     StickyFrame(StickyFrameDisplayItem),
     Iframe(IframeDisplayItem),
     PushReferenceFrame(ReferenceFrameDisplayListItem),
+    PushComputedFrame(ComputedFrameDisplayListItem),
     PushStackingContext(PushStackingContextDisplayItem),
 
     SetGradientStops(Vec<GradientStop>),
@@ -205,6 +208,7 @@ pub enum DebugDisplayItem {
     SetFilterPrimitives(Vec<FilterPrimitive>),
 
     PopReferenceFrame,
+    PopComputedFrame,
     PopStackingContext,
     PopAllShadows,
 }
@@ -724,6 +728,25 @@ pub struct ReferenceFrame {
     /// The transform matrix, either the perspective matrix or the transform
     /// matrix.
     pub transform: PropertyBinding<LayoutTransform>,
+    pub id: SpatialId,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, MallocSizeOf, PartialEq, Serialize, PeekPoke)]
+pub enum RotationKind {
+    None,
+    Rotate90,
+    Rotate180,
+    Rotate270,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize, PeekPoke)]
+pub struct ComputedFrameDisplayListItem {
+    pub origin: LayoutPoint,
+    pub parent_spatial_id: SpatialId,
+    //pub rotation: RotationKind,
+    pub vertical_flip: bool,
+    pub scale_from: Option<LayoutSize>,
     pub id: SpatialId,
 }
 
@@ -1519,10 +1542,12 @@ impl DisplayItem {
             DisplayItem::RepeatingImage(..) => "repeating_image",
             DisplayItem::Line(..) => "line",
             DisplayItem::PopAllShadows => "pop_all_shadows",
+            DisplayItem::PopComputedFrame => "pop_computed_frame",
             DisplayItem::PopReferenceFrame => "pop_reference_frame",
             DisplayItem::PopStackingContext => "pop_stacking_context",
             DisplayItem::PushShadow(..) => "push_shadow",
             DisplayItem::PushReferenceFrame(..) => "push_reference_frame",
+            DisplayItem::PushComputedFrame(..) => "push_computed_frame",
             DisplayItem::PushStackingContext(..) => "push_stacking_context",
             DisplayItem::SetFilterOps => "set_filter_ops",
             DisplayItem::SetFilterData => "set_filter_data",
