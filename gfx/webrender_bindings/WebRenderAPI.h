@@ -361,6 +361,7 @@ struct MOZ_STACK_CLASS StackingContextParams : public WrStackingContextParams {
             WrStackingContextClip::None(),
             nullptr,
             nullptr,
+            nullptr,
             wr::TransformStyle::Flat,
             wr::WrReferenceFrameKind::Transform,
             nullptr,

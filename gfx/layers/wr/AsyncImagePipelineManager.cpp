@@ -169,7 +169,7 @@ void AsyncImagePipelineManager::RemoveAsyncImagePipeline(
 void AsyncImagePipelineManager::UpdateAsyncImagePipeline(
     const wr::PipelineId& aPipelineId, const LayoutDeviceRect& aScBounds,
     const gfx::Matrix4x4& aScTransform, const gfx::MaybeIntSize& aScaleToSize,
-    const wr::ImageRendering& aFilter, const wr::MixBlendMode& aMixBlendMode) {
+    const wr::ImageRendering& aFilter, const wr::MixBlendMode& aMixBlendMode, const LayoutDeviceRect& aScaleFromSize) {
   if (mDestroyed) {
     return;
   }
@@ -180,7 +180,7 @@ void AsyncImagePipelineManager::UpdateAsyncImagePipeline(
   }
   pipeline->mInitialised = true;
   pipeline->Update(aScBounds, aScTransform, aScaleToSize, aFilter,
-                   aMixBlendMode);
+                   aMixBlendMode, aScaleFromSize);
 }
 
 Maybe<TextureHost::ResourceUpdateOp> AsyncImagePipelineManager::UpdateImageKeys(
@@ -362,8 +362,16 @@ void AsyncImagePipelineManager::ApplyAsyncImageForPipeline(
   float opacity = 1.0f;
   wr::StackingContextParams params;
   params.opacity = &opacity;
-  params.mTransformPtr = scTransform.IsIdentity() ? nullptr : &scTransform;
   params.mix_blend_mode = aPipeline->mMixBlendMode;
+
+  wr::WrComputedTransformData computedTransform;
+  if (!aPipeline->mScaleFromSize.IsEmpty()) {
+	  computedTransform.vertical_flip = false;
+	  computedTransform.scale_from = wr::ToLayoutSize(aPipeline->mScaleFromSize.Size());
+	  params.computed_transform = &computedTransform;
+  } else {
+          params.mTransformPtr = scTransform.IsIdentity() ? nullptr : &scTransform;
+  }
 
   Maybe<wr::WrSpatialId> referenceFrameId = builder.PushStackingContext(
       params, wr::ToLayoutRect(aPipeline->mScBounds),

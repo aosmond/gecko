@@ -11,6 +11,7 @@ use api::{LineOrientation, LineStyle, NinePatchBorderSource, PipelineId, MixBlen
 use api::{PropertyBinding, ReferenceFrame, ReferenceFrameKind, ScrollFrameDisplayItem, ScrollSensitivity};
 use api::{Shadow, SpaceAndClipInfo, SpatialId, StackingContext, StickyFrameDisplayItem, ImageMask};
 use api::{ClipMode, PrimitiveKeyKind, TransformStyle, YuvColorSpace, ColorRange, YuvData, TempFilterData};
+use api::{ComputedFrameDisplayListItem};
 use api::units::*;
 use crate::clip::{ClipChainId, ClipRegion, ClipItemKey, ClipStore, ClipItemKeyKind};
 use crate::clip::{ClipInternData, ClipNodeKind, ClipInstance};
@@ -286,6 +287,7 @@ pub struct SceneBuilder<'a> {
     /// The current recursion depth of iframes encountered. Used to restrict picture
     /// caching slices to only the top-level content frame.
     iframe_depth: usize,
+    iframe_size: Vec<LayoutSize>,
 
     /// The number of picture cache slices that were created for content.
     content_slice_count: usize,
@@ -340,6 +342,7 @@ impl<'a> SceneBuilder<'a> {
             external_scroll_mapper: ScrollOffsetMapper::new(),
             picture_caching_initialized: false,
             iframe_depth: 0,
+            iframe_size: Vec::new(),
             content_slice_count: 0,
             picture_cache_spatial_nodes: FastHashSet::default(),
             quality_settings: view.quality_settings,
@@ -619,7 +622,19 @@ impl<'a> SceneBuilder<'a> {
                     );
                     Some(subtraversal)
                 }
+                DisplayItem::PushComputedFrame(ref info) => {
+                    let parent_space = self.get_space(info.parent_spatial_id);
+                    let mut subtraversal = item.sub_iter();
+                    self.build_computed_frame(
+                        &mut subtraversal,
+                        pipeline_id,
+                        parent_space,
+                        &info,
+                    );
+                    Some(subtraversal)
+                }
                 DisplayItem::PopReferenceFrame |
+                DisplayItem::PopComputedFrame |
                 DisplayItem::PopStackingContext => return,
                 _ => None,
             };
@@ -734,6 +749,40 @@ impl<'a> SceneBuilder<'a> {
         self.rf_mapper.pop_scope();
     }
 
+    fn build_computed_frame(
+        &mut self,
+        traversal: &mut BuiltDisplayListIter<'a>,
+        pipeline_id: PipelineId,
+        parent_spatial_node: SpatialNodeIndex,
+        info: &ComputedFrameDisplayListItem,
+    ) {
+        let current_offset = self.current_offset(parent_spatial_node);
+
+        let transform = if let Some(scale_from) = info.scale_from {
+            let content_size = &self.iframe_size.last().unwrap();
+            LayoutTransform::create_scale(content_size.width / scale_from.width, content_size.height / scale_from.height, 1.0)
+        } else {
+            LayoutTransform::identity()
+        };
+        println!("computed transform {:?}", transform);
+
+        self.push_reference_frame(
+            info.id,
+            Some(parent_spatial_node),
+            pipeline_id,
+            TransformStyle::Flat,
+            PropertyBinding::Value(transform),
+            ReferenceFrameKind::Transform,
+            current_offset + info.origin.to_vector(),
+        );
+
+        self.rf_mapper.push_scope();
+        self.build_items(
+            traversal,
+            pipeline_id,
+        );
+        self.rf_mapper.pop_scope();
+    }
 
     fn build_stacking_context(
         &mut self,
@@ -850,11 +899,13 @@ impl<'a> SceneBuilder<'a> {
 
         self.rf_mapper.push_scope();
         self.iframe_depth += 1;
+        self.iframe_size.push(bounds.size);
 
         self.build_items(
             &mut pipeline.display_list.iter(),
             pipeline.pipeline_id,
         );
+        self.iframe_size.pop();
         self.iframe_depth -= 1;
         self.rf_mapper.pop_scope();
 
@@ -1323,6 +1374,8 @@ impl<'a> SceneBuilder<'a> {
             DisplayItem::PushStackingContext(..) |
             DisplayItem::PushReferenceFrame(..) |
             DisplayItem::PopReferenceFrame |
+            DisplayItem::PushComputedFrame(..) |
+            DisplayItem::PopComputedFrame |
             DisplayItem::PopStackingContext => {
                 unreachable!("Should have returned in parent method.")
             }

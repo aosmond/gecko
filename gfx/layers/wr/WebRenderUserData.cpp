@@ -267,7 +267,8 @@ void WebRenderImageData::CreateAsyncImageWebRenderCommands(
 
   WrBridge()->AddWebRenderParentCommand(
       OpUpdateAsyncImagePipeline(mPipelineId.value(), aSCBounds, aSCTransform,
-                                 aScaleToSize, aFilter, aMixBlendMode));
+                                 aScaleToSize, aFilter, aMixBlendMode,
+                                 LayoutDeviceRect()));
 }
 
 void WebRenderImageData::CreateImageClientIfNeeded() {

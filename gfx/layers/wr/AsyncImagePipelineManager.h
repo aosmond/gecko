@@ -98,7 +98,8 @@ class AsyncImagePipelineManager final {
                                 const gfx::Matrix4x4& aScTransform,
                                 const gfx::MaybeIntSize& aScaleToSize,
                                 const wr::ImageRendering& aFilter,
-                                const wr::MixBlendMode& aMixBlendMode);
+                                const wr::MixBlendMode& aMixBlendMode,
+                                const LayoutDeviceRect& aScaleFromSize);
   void ApplyAsyncImagesOfImageBridge(wr::TransactionBuilder& aSceneBuilderTxn,
                                      wr::TransactionBuilder& aFastTxn);
   void ApplyAsyncImageForPipeline(const wr::PipelineId& aPipelineId,
@@ -174,22 +175,25 @@ class AsyncImagePipelineManager final {
                 const gfx::Matrix4x4& aScTransform,
                 const gfx::MaybeIntSize& aScaleToSize,
                 const wr::ImageRendering& aFilter,
-                const wr::MixBlendMode& aMixBlendMode) {
+                const wr::MixBlendMode& aMixBlendMode,
+                const LayoutDeviceRect& aScaleFromSize) {
       mIsChanged |= !mScBounds.IsEqualEdges(aScBounds) ||
                     mScTransform != aScTransform ||
                     mScaleToSize != aScaleToSize || mFilter != aFilter ||
-                    mMixBlendMode != aMixBlendMode;
+                    mMixBlendMode != aMixBlendMode || !mScaleFromSize.IsEqualEdges(aScaleFromSize);
       mScBounds = aScBounds;
       mScTransform = aScTransform;
       mScaleToSize = aScaleToSize;
       mFilter = aFilter;
       mMixBlendMode = aMixBlendMode;
+      mScaleFromSize = aScaleFromSize;
     }
 
     bool mInitialised;
     bool mIsChanged;
     bool mUseExternalImage;
     LayoutDeviceRect mScBounds;
+    LayoutDeviceRect mScaleFromSize;
     gfx::Matrix4x4 mScTransform;
     gfx::MaybeIntSize mScaleToSize;
     wr::ImageRendering mFilter;
