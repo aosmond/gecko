@@ -487,11 +487,13 @@ impl BuiltDisplayList {
                 Real::ConicGradient(v) => Debug::ConicGradient(v),
                 Real::Iframe(v) => Debug::Iframe(v),
                 Real::PushReferenceFrame(v) => Debug::PushReferenceFrame(v),
+                Real::PushComputedFrame(v) => Debug::PushComputedFrame(v),
                 Real::PushStackingContext(v) => Debug::PushStackingContext(v),
                 Real::PushShadow(v) => Debug::PushShadow(v),
                 Real::BackdropFilter(v) => Debug::BackdropFilter(v),
 
                 Real::PopReferenceFrame => Debug::PopReferenceFrame,
+                Real::PopComputedFrame => Debug::PopComputedFrame,
                 Real::PopStackingContext => Debug::PopStackingContext,
                 Real::PopAllShadows => Debug::PopAllShadows,
                 Real::ReuseItems(_) |
@@ -866,6 +868,10 @@ impl<'de> Deserialize<'de> for BuiltDisplayList {
                     total_spatial_nodes += 1;
                     Real::PushReferenceFrame(v)
                 }
+                Debug::PushComputedFrame(v) => {
+                    total_spatial_nodes += 1;
+                    Real::PushComputedFrame(v)
+                }
                 Debug::SetFilterOps(filters) => {
                     DisplayListBuilder::push_iter_impl(&mut temp, filters);
                     Real::SetFilterOps
@@ -912,6 +918,7 @@ impl<'de> Deserialize<'de> for BuiltDisplayList {
 
                 Debug::PopStackingContext => Real::PopStackingContext,
                 Debug::PopReferenceFrame => Real::PopReferenceFrame,
+                Debug::PopComputedFrame => Real::PopComputedFrame,
                 Debug::PopAllShadows => Real::PopAllShadows,
             };
             poke_into_vec(&item, &mut data);
@@ -1543,6 +1550,33 @@ impl DisplayListBuilder {
 
     pub fn pop_reference_frame(&mut self) {
         self.push_item(&di::DisplayItem::PopReferenceFrame);
+    }
+
+    pub fn push_computed_frame(
+        &mut self,
+        origin: LayoutPoint,
+        parent_spatial_id: di::SpatialId,
+        rotation: di::RotationKind,
+        vertical_flip: bool,
+        scale_from: Option<LayoutSize>,
+    ) -> di::SpatialId {
+        let id = self.generate_spatial_index();
+
+        let item = di::DisplayItem::PushComputedFrame(di::ComputedFrameDisplayListItem {
+            parent_spatial_id,
+            origin,
+            //rotation,
+            vertical_flip,
+            scale_from,
+            id,
+        });
+
+        self.push_item(&item);
+        id
+    }
+
+    pub fn pop_computed_frame(&mut self) {
+        self.push_item(&di::DisplayItem::PopComputedFrame);
     }
 
     pub fn push_stacking_context(
