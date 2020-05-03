@@ -81,6 +81,7 @@ struct OpUpdateAsyncImagePipeline {
   MaybeIntSize scaleToSize;
   ImageRendering filter;
   MixBlendMode mixBlendMode;
+  LayoutDeviceRect scaleFromSize;
 };
 
 struct OpUpdatedAsyncImagePipeline {
