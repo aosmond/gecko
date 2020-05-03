@@ -370,6 +370,7 @@ pub struct SceneBuilder<'a> {
     /// The current recursion depth of iframes encountered. Used to restrict picture
     /// caching slices to only the top-level content frame.
     iframe_depth: usize,
+    iframe_size: Vec<LayoutSize>,
 
     /// The number of picture cache slices that were created for content.
     content_slice_count: usize,
@@ -425,6 +426,7 @@ impl<'a> SceneBuilder<'a> {
             external_scroll_mapper: ScrollOffsetMapper::new(),
             picture_caching_initialized: false,
             iframe_depth: 0,
+            iframe_size: Vec::new(),
             content_slice_count: 0,
             picture_cache_spatial_nodes: FastHashSet::default(),
             quality_settings: view.quality_settings,
@@ -883,12 +885,21 @@ impl<'a> SceneBuilder<'a> {
         apply_pipeline_clip: bool,
     ) {
         let current_offset = self.current_offset(parent_spatial_node);
+
+        let transform = if let Some(scale_from) = info.scale_from {
+            let content_size = &self.iframe_size.last().unwrap();
+            LayoutTransform::create_scale(content_size.width / scale_from.width, content_size.height / scale_from.height, 1.0)
+        } else {
+            LayoutTransform::identity()
+        };
+        println!("computed transform {:?}", transform);
+
         self.push_reference_frame(
             info.id,
             Some(parent_spatial_node),
             pipeline_id,
             TransformStyle::Flat,
-            PropertyBinding::Value(LayoutTransform::identity()),
+            PropertyBinding::Value(transform),
             ReferenceFrameKind::Transform,
             current_offset + info.origin.to_vector(),
         );
@@ -1039,12 +1050,14 @@ impl<'a> SceneBuilder<'a> {
 
         self.rf_mapper.push_scope();
         self.iframe_depth += 1;
+        self.iframe_size.push(bounds.size);
 
         self.build_items(
             &mut pipeline.display_list.iter(),
             pipeline.pipeline_id,
             true,
         );
+        self.iframe_size.pop();
         self.iframe_depth -= 1;
         self.rf_mapper.pop_scope();
 
