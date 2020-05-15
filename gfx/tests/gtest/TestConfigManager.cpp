@@ -244,6 +244,7 @@ class GfxConfigManager : public ::testing::Test, public gfxConfigManager {
     mWrPartialPresent = true;
     mWrForceAngle = true;
     mWrDCompWinEnabled = true;
+    mWrCompositorDCompRequired = true;
     mHwStretchingSupport = true;
     mIsWin10OrLater = true;
     mIsNightly = true;
@@ -454,6 +455,22 @@ TEST_F(GfxConfigManager, WebRenderDCompDisabled) {
   EXPECT_TRUE(mFeatures.mWrQualified.IsEnabled());
   EXPECT_TRUE(mFeatures.mWr.IsEnabled());
   EXPECT_FALSE(mFeatures.mWrCompositor.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrAngle.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrDComp.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrPartial.IsEnabled());
+  EXPECT_TRUE(mFeatures.mHwCompositing.IsEnabled());
+  EXPECT_TRUE(mFeatures.mGPUProcess.IsEnabled());
+  EXPECT_TRUE(mFeatures.mD3D11HwAngle.IsEnabled());
+}
+
+TEST_F(GfxConfigManager, WebRenderDCompNotRequired) {
+  mWrDCompWinEnabled = false;
+  mWrCompositorDCompRequired = false;
+  ConfigureWebRender();
+
+  EXPECT_TRUE(mFeatures.mWrQualified.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWr.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrCompositor.IsEnabled());
   EXPECT_TRUE(mFeatures.mWrAngle.IsEnabled());
   EXPECT_FALSE(mFeatures.mWrDComp.IsEnabled());
   EXPECT_TRUE(mFeatures.mWrPartial.IsEnabled());
