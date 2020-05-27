@@ -536,6 +536,7 @@ void GPUProcessManager::FallbackToSoftware(const char* aMessage) {
                        aMessage);
   gfxConfig::SetFailed(Feature::DIRECT2D, FeatureStatus::Blocked, aMessage);
 #endif
+  gfxVars::SetAnyActiveHwCompositing(false);
 }
 
 void GPUProcessManager::NotifyListenersOnCompositeDeviceReset() {

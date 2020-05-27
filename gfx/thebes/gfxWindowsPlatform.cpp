@@ -441,6 +441,12 @@ bool gfxWindowsPlatform::HandleDeviceReset() {
     InitializeDevices();
   }
   UpdateANGLEConfig();
+
+  if (XRE_IsParentProcess()) {
+    gfxVars::SetAnyActiveHwCompositing(
+        gfxVars::UseWebRender() ||
+        gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING));
+  }
   return true;
 }
 
@@ -1333,6 +1339,10 @@ void gfxWindowsPlatform::InitializeD3D11Config() {
                                         &message, failureId)) {
     d3d11.Disable(FeatureStatus::Blacklisted, message.get(), failureId);
   }
+
+  if (XRE_IsParentProcess() && d3d11.IsEnabled()) {
+    gfxVars::SetAnyActiveHwCompositing(true);
+  }
 }
 
 /* static */
@@ -1451,6 +1461,9 @@ void gfxWindowsPlatform::InitializeDevices() {
     gfxConfig::SetFailed(
         Feature::DIRECT2D, FeatureStatus::CrashedOnStartup,
         "Harware acceleration crashed during startup in a previous session");
+    if (XRE_IsParentProcess()) {
+      gfxVars::SetAnyActiveHwCompositing(false);
+    }
     return;
   }
 

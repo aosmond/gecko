@@ -2741,6 +2741,7 @@ void gfxPlatform::InitWebRenderConfig() {
   // this feature
   if (gfxConfig::IsEnabled(Feature::WEBRENDER)) {
     gfxVars::SetUseWebRender(true);
+    gfxVars::SetAnyActiveHwCompositing(true);
     reporter.SetSuccessful();
 
     Preferences::RegisterPrefixCallbackAndCall(WebRenderDebugPrefChangeCallback,
@@ -3288,6 +3289,7 @@ void gfxPlatform::NotifyGPUProcessDisabled() {
             FeatureStatus::Unavailable, "GPU Process is disabled",
             NS_LITERAL_CSTRING("FEATURE_FAILURE_GPU_PROCESS_DISABLED"));
     gfxVars::SetUseWebRender(false);
+    gfxVars::SetAnyActiveHwCompositing(false);
 
     RecomputeBackdropFilterEnabledState();
   }
@@ -3337,6 +3339,10 @@ void gfxPlatform::ImportGPUDeviceData(
 
   gfxConfig::ImportChange(Feature::OPENGL_COMPOSITING, aData.oglCompositing());
   gfxConfig::ImportChange(Feature::ADVANCED_LAYERS, aData.advancedLayers());
+
+  gfxVars::SetAnyActiveHwCompositing(
+      gfxVars::UseWebRender() || aData.oglCompositing() ||
+      aData.advancedLayers() || aData.d3d11Compositing());
 }
 
 bool gfxPlatform::SupportsApzTouchInput() const {
@@ -3400,6 +3406,10 @@ void gfxPlatform::InitOpenGLConfig() {
   if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &message,
                            failureId)) {
     openGLFeature.Disable(FeatureStatus::Blacklisted, message.get(), failureId);
+  }
+
+  if (XRE_IsParentProcess() && openGLFeature.IsEnabled()) {
+    gfxVars::SetAnyActiveHwCompositing(true);
   }
 }
 

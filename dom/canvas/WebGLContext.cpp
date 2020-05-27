@@ -57,6 +57,7 @@
 #include "mozilla/layers/TextureClientSharedSurface.h"
 #include "mozilla/layers/WebRenderUserData.h"
 #include "mozilla/layers/WebRenderCanvasRenderer.h"
+#include "mozilla/gfx/gfxVars.h"
 
 // Local
 #include "CanvasUtils.h"
@@ -277,35 +278,6 @@ void WebGLContext::OnMemoryPressure() {
 //
 // nsICanvasRenderingContextInternal
 //
-
-static bool HasAcceleratedLayers(const nsCOMPtr<nsIGfxInfo>& gfxInfo) {
-  int32_t status;
-
-  nsCString discardFailureId;
-  gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
-                                       nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS,
-                                       discardFailureId, &status);
-  if (status) return true;
-  gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
-                                       nsIGfxInfo::FEATURE_DIRECT3D_10_LAYERS,
-                                       discardFailureId, &status);
-  if (status) return true;
-  gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
-                                       nsIGfxInfo::FEATURE_DIRECT3D_10_1_LAYERS,
-                                       discardFailureId, &status);
-  if (status) return true;
-  gfxUtils::ThreadSafeGetFeatureStatus(gfxInfo,
-                                       nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS,
-                                       discardFailureId, &status);
-  if (status) return true;
-  gfxUtils::ThreadSafeGetFeatureStatus(
-      gfxInfo, nsIGfxInfo::FEATURE_OPENGL_LAYERS, discardFailureId, &status);
-  if (status) return true;
-
-  return false;
-}
-
-// --
 
 bool WebGLContext::CreateAndInitGL(
     bool forceEnabled, std::vector<FailureReason>* const out_failReasons) {
@@ -614,8 +586,7 @@ RefPtr<WebGLContext> WebGLContext::Create(HostWebGLContext& host,
     }
 
     if (desc.options.failIfMajorPerformanceCaveat) {
-      nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
-      if (!HasAcceleratedLayers(gfxInfo)) {
+      if (!gfx::gfxVars::AnyActiveHwCompositing()) {
         failureId = NS_LITERAL_CSTRING("FEATURE_FAILURE_WEBGL_PERF_CAVEAT");
         return Err(
             "failIfMajorPerformanceCaveat: Compositor is not"
