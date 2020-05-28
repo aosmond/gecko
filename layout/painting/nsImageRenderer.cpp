@@ -14,6 +14,7 @@
 #include "gfxDrawable.h"
 #include "ImageOps.h"
 #include "ImageRegion.h"
+#include "mozilla/gfx/Logging.h"
 #include "mozilla/layers/RenderRootStateManager.h"
 #include "mozilla/layers/StackingContextHelper.h"
 #include "mozilla/layers/WebRenderLayerManager.h"
@@ -458,7 +459,7 @@ ImgDrawResult nsImageRenderer::Draw(nsPresContext* aPresContext,
         gfxPlatform::GetPlatform()->CreateSimilarSoftwareDrawTarget(
             ctx->GetDrawTarget(), tmpDTRect.Size(), SurfaceFormat::B8G8R8A8);
     if (!tempDT || !tempDT->IsValid()) {
-      gfxDevCrash(LogReason::InvalidContext)
+      gfxCriticalErrorOnce()
           << "ImageRenderer::Draw problem " << gfx::hexa(tempDT);
       return ImgDrawResult::TEMPORARY_ERROR;
     }
