@@ -1020,20 +1020,22 @@ already_AddRefed<gfxDrawable> VectorImage::CreateSVGDrawable(
 Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
     const IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
     uint32_t aFlags) {
-  // If we're not allowed to use a cached surface, don't attempt a lookup.
-  if (aFlags & FLAG_BYPASS_SURFACE_CACHE) {
-    return MakeTuple(RefPtr<SourceSurface>(), aSize);
-  }
+  bool wantExactSize =
+      ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING));
 
-  // We don't do any caching if we have animation, so don't bother with a lookup
-  // in this case either.
-  if (mHaveAnimations) {
-    return MakeTuple(RefPtr<SourceSurface>(), aSize);
+  // If we're not allowed to use a cached surface, or we have an animation,
+  // don't attempt a lookup.
+  if (aFlags & FLAG_BYPASS_SURFACE_CACHE || mHaveAnimations) {
+    if (wantExactSize) {
+      return MakeTuple(RefPtr<SourceSurface>(), aSize);
+    }
+    return MakeTuple(RefPtr<SourceSurface>(),
+                     SurfaceCache::ClampVectorSize(aSize));
   }
 
   LookupResult result(MatchType::NOT_FOUND);
   SurfaceKey surfaceKey = VectorSurfaceKey(aSize, aSVGContext);
-  if ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
+  if (wantExactSize) {
     result = SurfaceCache::Lookup(ImageKey(this), surfaceKey,
                                   /* aMarkUsed = */ true);
   } else {
