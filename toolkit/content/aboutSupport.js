@@ -64,6 +64,10 @@ var snapshotFormatters = {
     $("application-box").textContent = data.name;
     $("useragent-box").textContent = data.userAgent;
     $("os-box").textContent = data.osVersion;
+    if (data.osLibrary) {
+      $("os-library-box").textContent = data.osLibrary;
+      $("os-library-container").hidden = false;
+    }
     $("binary-box").textContent = Services.dirsvc.get(
       "XREExeF",
       Ci.nsIFile

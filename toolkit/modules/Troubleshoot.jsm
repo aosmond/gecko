@@ -217,6 +217,10 @@ var dataProviders = {
       safeMode: Services.appinfo.inSafeMode,
     };
 
+    try {
+      data.osLibrary = Services.sysinfo.getProperty("secondaryLibrary");
+    } catch (e) {}
+
     if (AppConstants.MOZ_UPDATER) {
       data.updateChannel = ChromeUtils.import(
         "resource://gre/modules/UpdateUtils.jsm",

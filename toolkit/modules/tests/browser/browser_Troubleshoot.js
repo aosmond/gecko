@@ -162,6 +162,9 @@ const SNAPSHOT_SCHEMA = {
           required: true,
           type: "string",
         },
+        osLibrary: {
+          type: "string",
+        },
         vendor: {
           type: "string",
         },
