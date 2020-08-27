@@ -386,6 +386,8 @@ class ImageSurfaceCache {
       }
       if (!bestMatchIsDecoded && current->IsDecoded()) {
         bestMatch = current;
+        bestArea = AreaOfIntSize(currentKey.Size());
+        bestAreaMatch = CompareBestAreaMargin(idealArea, bestArea);
         continue;
       }
 
@@ -666,7 +668,9 @@ class ImageSurfaceCache {
     // area, we will consider it equivalent.
     int64_t margin = aIdealArea >> 4;  // = 1/16 = 6.25%
     int64_t marginArea = aArea - aIdealArea;
-    return -margin <= marginArea && margin >= marginArea;
+    bool within = -margin <= marginArea && margin >= marginArea;
+    printf_stderr("\t\tmargin %ld area delta %ld within %d\n", margin, marginArea, within);
+    return within;
   }
 
   AreaMatch CompareBestAreaMargin(int64_t aIdealArea, int64_t aArea) const {

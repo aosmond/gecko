@@ -1023,12 +1023,14 @@ Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
     uint32_t aFlags) {
   // If we're not allowed to use a cached surface, don't attempt a lookup.
   if (aFlags & FLAG_BYPASS_SURFACE_CACHE) {
+    printf_stderr("[AO][%p] VectorImage::LookupCachedSurface -- %dx%d bypass\n", this, aSize.width, aSize.height);
     return MakeTuple(RefPtr<SourceSurface>(), aSize);
   }
 
   // We don't do any caching if we have animation, so don't bother with a lookup
   // in this case either.
   if (mHaveAnimations) {
+    printf_stderr("[AO][%p] VectorImage::LookupCachedSurface -- %dx%d animated\n", this, aSize.width, aSize.height);
     return MakeTuple(RefPtr<SourceSurface>(), aSize);
   }
 
@@ -1047,6 +1049,7 @@ Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
   MOZ_ASSERT(result.Type() != MatchType::SUBSTITUTE_BECAUSE_PENDING);
   if (!result || result.Type() == MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND) {
     // No matching surface, or the OS freed the volatile buffer.
+    printf_stderr("[AO][%p] VectorImage::LookupCachedSurface -- %dx%d no %s match%s\n", this, aSize.width, aSize.height, ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) ? "exact" : "best", result.Type() == MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND ? ", substitute given" : "");
     return MakeTuple(RefPtr<SourceSurface>(), rasterSize);
   }
 
@@ -1054,6 +1057,7 @@ Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
   if (!sourceSurface) {
     // Something went wrong. (Probably a GPU driver crash or device reset.)
     // Attempt to recover.
+    printf_stderr("[AO][%p] VectorImage::LookupCachedSurface -- %dx%d error\n", this, aSize.width, aSize.height);
     RecoverFromLossOfSurfaces();
     return MakeTuple(RefPtr<SourceSurface>(), rasterSize);
   }
