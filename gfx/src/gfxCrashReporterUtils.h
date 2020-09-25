@@ -51,6 +51,17 @@ class ScopedGfxFeatureReporter {
   void WriteAppNote(char statusChar, int32_t statusNumber);
 };
 
+namespace gfx {
+
+enum class GraphicsState {
+  Uninitialized,
+  PlatformReady,
+  CompositorReady,
+  DeviceReset,
+};
+
+}  // end namespace gfx
+
 }  // end namespace mozilla
 
 #endif  // gfxCrashReporterUtils_h__

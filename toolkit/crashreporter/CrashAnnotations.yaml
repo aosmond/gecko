@@ -46,6 +46,7 @@ AdapterDeviceID:
   description: >
     Graphics adapter name.
   type: string
+  ping: true
 
 AdapterDriverVendor:
   description: >
@@ -56,16 +57,19 @@ AdapterDriverVersion:
   description: >
     Graphics adapter driver version.
   type: string
+  ping: true
 
 AdapterSubsysID:
   description: >
     Graphics adapter subsystem ID.
   type: string
+  ping: true
 
 AdapterVendorID:
   description: >
     Graphics adapter vendor name.
   type: string
+  ping: true
 
 additional_minidumps:
   description: >
@@ -382,6 +386,14 @@ GraphicsStartupTest:
   description: >
     Set to 1 by the graphics driver crash guard when it's activated.
   type: boolean
+
+GraphicsState:
+  description: >
+    Graphics state, such as initializing, handling device reset or ready. The
+    integer value of this annotation must match with one of the values in the
+    mozilla::gfx::GraphicsState enum.
+  type: integer
+  ping: true
 
 PHCKind:
   description: >
