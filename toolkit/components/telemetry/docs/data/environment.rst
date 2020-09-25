@@ -218,8 +218,15 @@ Structure:
               //   "available"   - User has this feature available.
               // The status can also include a ":" followed by a reason
               // e.g. "FEATURE_FAILURE_WEBRENDER_VIDEO_CRASH_INTEL_23.20.16.4973"
+              //
+              // The status variations (runtime, environment, user) refer to the different
+              // buckets in which we have categorized failures. For example, a feature may
+              // be disabled by environment, and forced on by a user.
               d3d11: { // This feature is Windows-only.
                 status: <string>,
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
                 warp: <bool>,           // Software rendering (WARP) mode was chosen.
                 textureSharing: <bool>  // Whether or not texture sharing works.
                 version: <number>,      // The D3D11 device feature level.
@@ -228,22 +235,70 @@ Structure:
               },
               d2d: { // This feature is Windows-only.
                 status: <string>,
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
                 version: <string>,      // Either "1.0" or "1.1".
               },
               gpuProcess: { // Out-of-process compositing ("GPU process") feature
                 status: <string>, // "Available" means currently in use
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
               },
               advancedLayers: { // Advanced Layers compositing. Only present if D3D11 enabled.
                 status: <string>,    // See the status codes above.
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
               },
               hwCompositing: { // hardware acceleration. i.e. whether we try using the GPU
                 status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
               },
-              wrCompositor: { // native OS compositor (CA, DComp, etc.)
+              webrender: { // WebRender compositing.
                 status: <string>
-              }
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
+              },
+              wrPartial: { // WebRender partial present.
+                status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
+              },
+              wrCompositor: { // native OS compositor with WebRender (CA, DComp, etc.)
+                status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
+              },
+              wrDcomp: { // WebRender DirectCompoosition support.
+                status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
+              },
+              wrAngle: { // WebRender ANGLE support.
+                status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
+              },
+              d3d11HwAngle: { // D3D11 ANGLE support.
+                status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
+              },
               openglCompositing: { // OpenGL compositing.
                 status: <string>
+                status_runtime: <string>,
+                status_environment: <string>,
+                status_user: <string>,
               }
             },
           },

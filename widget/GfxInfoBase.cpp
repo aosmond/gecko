@@ -1642,6 +1642,10 @@ void GfxInfoBase::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
       gfxConfig::GetFeature(gfx::Feature::WEBRENDER_COMPOSITOR);
   InitFeatureObject(aCx, aObj, "wrCompositor", wrCompositor, &obj);
 
+  gfx::FeatureState& wrPartial =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_PARTIAL);
+  InitFeatureObject(aCx, aObj, "wrPartial", wrPartial, &obj);
+
   gfx::FeatureState& openglCompositing =
       gfxConfig::GetFeature(gfx::Feature::OPENGL_COMPOSITING);
   InitFeatureObject(aCx, aObj, "openglCompositing", openglCompositing, &obj);
@@ -1669,6 +1673,42 @@ bool GfxInfoBase::InitFeatureObject(JSContext* aCx,
     return false;
   }
 
+  aFeatureState.ForEachStatusChange(
+      [&](const char* aType, FeatureStatus aStatus, const char* aMessage,
+          const nsACString& aFailureId) -> void {
+        // No need to record the default. The others will be runtime,
+        // environment and user.
+        if (strcmp(aType, "default") == 0) {
+          return;
+        }
+
+        nsCString status;
+        switch (aStatus) {
+          case FeatureStatus::Unused:
+            // We don't need to record unused.
+            return;
+          case FeatureStatus::Blocklisted:
+          case FeatureStatus::Disabled:
+          case FeatureStatus::Unavailable:
+          case FeatureStatus::UnavailableNoAngle:
+          case FeatureStatus::Blocked:
+            status.AppendPrintf("%s:%s", FeatureStatusToString(aStatus),
+                                aFeatureState.GetFailureId().get());
+            break;
+          default:
+            status.Append(FeatureStatusToString(aStatus));
+            break;
+        }
+
+        nsAutoCString type("status_"_ns);
+        type.Append(aType);
+
+        JS::Rooted<JSString*> str(aCx, JS_NewStringCopyZ(aCx, status.get()));
+        JS::Rooted<JS::Value> val(aCx, JS::StringValue(str));
+        JS_SetProperty(aCx, obj, type.get(), val);
+      });
+
+  // This records the aggregate result of the status variations.
   nsCString status;
   auto value = aFeatureState.GetValue();
   switch (value) {

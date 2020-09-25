@@ -2017,6 +2017,24 @@ void GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
     JS::Rooted<JS::Value> val(aCx, JS::StringValue(str));
     JS_SetProperty(aCx, obj, "version", val);
   }
+
+  gfx::FeatureState& d3d11HwAngle =
+      gfxConfig::GetFeature(gfx::Feature::D3D11_HW_ANGLE);
+  if (!InitFeatureObject(aCx, aObj, "d3d11HwAngle", d3d11HwAngle, &obj)) {
+    return;
+  }
+
+  gfx::FeatureState& wrDcompPresent =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_DCOMP_PRESENT);
+  if (!InitFeatureObject(aCx, aObj, "wrDcompPresent", wrDcompPresent, &obj)) {
+    return;
+  }
+
+  gfx::FeatureState& wrAngle =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_ANGLE);
+  if (!InitFeatureObject(aCx, aObj, "wrAngle", wrAngle, &obj)) {
+    return;
+  }
 }
 
 #ifdef DEBUG
