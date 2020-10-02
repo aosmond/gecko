@@ -29,11 +29,15 @@ void gfxConfigManager::Init() {
 
   WebRenderRollout::Init();
   mWrQualifiedOverride = WebRenderRollout::CalculateQualifiedOverride();
+  printf_stderr("[AO] mWrQualifiedOverride %d\n", mWrQualifiedOverride.isSome() ? *mWrQualifiedOverride : -1);
   mWrQualified = WebRenderRollout::CalculateQualified();
+  printf_stderr("[AO] mWrQualified %d\n", mWrQualified);
 
   EmplaceUserPref("gfx.webrender.compositor", mWrCompositorEnabled);
   mWrForceEnabled = gfxPlatform::WebRenderPrefEnabled();
+  printf_stderr("[AO] mWrForceEnabled %d\n", mWrForceEnabled);
   mWrForceDisabled = StaticPrefs::gfx_webrender_force_disabled_AtStartup();
+  printf_stderr("[AO] mWrForceDisabled %d\n", mWrForceDisabled);
   mWrCompositorForceEnabled =
       StaticPrefs::gfx_webrender_compositor_force_enabled_AtStartup();
   mGPUProcessAllowSoftware =
@@ -52,7 +56,9 @@ void gfxConfigManager::Init() {
 #endif
 
   mWrEnvForceEnabled = gfxPlatform::WebRenderEnvvarEnabled();
+  printf_stderr("[AO] mWrEnvForceEnabled %d\n", mWrForceEnabled);
   mWrEnvForceDisabled = gfxPlatform::WebRenderEnvvarDisabled();
+  printf_stderr("[AO] mWrEnvForceDisabled %d\n", mWrForceDisabled);
 
 #ifdef XP_WIN
   mHwStretchingSupport =

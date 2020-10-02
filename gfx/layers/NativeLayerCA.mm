@@ -772,8 +772,15 @@ void NativeLayerCA::NotifySurfaceReady() {
     ForAllRepresentations([&](Representation& r) { r.mMutatedDisplayRect = true; });
   }
   mInProgressDisplayRect = Nothing();
+  if (!mFrontSurface->mInvalidRegion.Intersect(mDisplayRect).IsEmpty()) {
+  printf_stderr("[AO] display rect (%d,%d) %dx%d\n", mDisplayRect.X(), mDisplayRect.Y(), mDisplayRect.Width(), mDisplayRect.Height());
+  for (auto i = mFrontSurface->mInvalidRegion.RectIter(); !i.Done(); i.Next()) {
+    const nsIntRect& r = i.Get();
+    printf_stderr("[AO] invalid region (%d,%d) %dx%d\n", r.X(), r.Y(), r.Width(), r.Height());
+  }
   MOZ_RELEASE_ASSERT(mFrontSurface->mInvalidRegion.Intersect(mDisplayRect).IsEmpty(),
                      "Parts of the display rect are invalid! This shouldn't happen.");
+  }
 }
 
 void NativeLayerCA::DiscardBackbuffers() {
