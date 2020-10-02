@@ -2760,6 +2760,23 @@ void gfxPlatform::InitWebRenderConfig() {
   manager.Init();
   manager.ConfigureWebRender();
 
+  {
+  FeatureState& feature = gfxConfig::GetFeature(Feature::WEBRENDER);
+  if (feature.IsEnabled()) {
+  printf_stderr("[AO] WebRender enabled\n");
+  } else {
+  printf_stderr("[AO] WebRender %s:%s\n", FeatureStatusToString(feature.GetValue()), feature.GetFailureId().get());
+  }
+  }
+  {
+  FeatureState& feature = gfxConfig::GetFeature(Feature::WEBRENDER_QUALIFIED);
+  if (feature.IsEnabled()) {
+  printf_stderr("[AO] WebRender Qualified enabled\n");
+  } else {
+  printf_stderr("[AO] WebRender Qualified %s:%s\n", FeatureStatusToString(feature.GetValue()), feature.GetFailureId().get());
+  }
+  }
+
 #ifdef XP_WIN
   if (gfxConfig::IsEnabled(Feature::WEBRENDER_ANGLE)) {
     gfxVars::SetUseWebRenderANGLE(gfxConfig::IsEnabled(Feature::WEBRENDER));
