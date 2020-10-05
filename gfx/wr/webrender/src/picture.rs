@@ -1045,7 +1045,7 @@ impl Tile {
         }
         // TODO(gw): We can avoid invalidating the whole tile in some cases here,
         //           but it should be a fairly rare invalidation case.
-        if self.current_descriptor.local_valid_rect != self.prev_descriptor.local_valid_rect {
+        if self.device_valid_rect != self.prev_device_valid_rect {
             self.invalidate(None, InvalidationReason::ValidRectChanged);
             state.composite_state.dirty_rects_are_valid = false;
         }
