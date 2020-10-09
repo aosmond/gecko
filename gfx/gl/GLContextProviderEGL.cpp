@@ -607,7 +607,7 @@ bool GLContextEGL::HasKhrPartialUpdate() const {
   return mEgl->IsExtensionSupported(EGLExtension::KHR_partial_update);
 }
 
-EGLint GLContextEGL::GetBufferAge() const {
+GLint GLContextEGL::GetBufferAge() {
   EGLSurface surface =
       mSurfaceOverride != EGL_NO_SURFACE ? mSurfaceOverride : mSurface;
 

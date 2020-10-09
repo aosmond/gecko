@@ -171,6 +171,9 @@ bool GLXLibrary::EnsureInitialized() {
   const SymLoadStruct symbols_swapcontrol[] = {SYMBOL(SwapIntervalEXT),
                                                END_OF_SYMBOLS};
 
+  const SymLoadStruct symbols_querydrawable[] = {SYMBOL(QueryDrawable),
+                                                 END_OF_SYMBOLS};
+
   const auto fnLoadSymbols = [&](const SymLoadStruct* symbols) {
     if (pfnLoader.LoadSymbols(symbols)) return true;
 
@@ -217,6 +220,11 @@ bool GLXLibrary::EnsureInitialized() {
         "swaps.");
   }
 
+  if (HasExtension(extensionsStr, "GLX_EXT_buffer_age") &&
+      fnLoadSymbols(symbols_querydrawable)) {
+    mHasBufferAge = true;
+  }
+
   mIsATI = serverVendor && DoesStringMatch(serverVendor, "ATI");
   mIsNVIDIA =
       serverVendor && DoesStringMatch(serverVendor, "NVIDIA Corporation");
@@ -245,6 +253,14 @@ bool GLXLibrary::SupportsVideoSync() {
   }
 
   return mHasVideoSync;
+}
+
+bool GLXLibrary::SupportsBufferAge() {
+  if (!EnsureInitialized()) {
+    return false;
+  }
+
+  return mHasBufferAge;
 }
 
 GLXPixmap GLXLibrary::CreatePixmap(gfxASurface* aSurface) {
@@ -617,6 +633,17 @@ bool GLContextGLX::SwapBuffers() {
   if (!mDoubleBuffered) return false;
   mGLX->fSwapBuffers(mDisplay, mDrawable);
   return true;
+}
+
+GLint GLContextGLX::GetBufferAge() {
+  if (!sGLXLibrary.SupportsBufferAge()) {
+    return 0;
+  }
+
+  GLuint result = 0;
+  mGLX->fQueryDrawable(mDisplay, mDrawable, LOCAL_GLX_BACK_BUFFER_AGE_EXT,
+                       &result);
+  return result;
 }
 
 void GLContextGLX::GetWSIInfo(nsCString* const out) const {

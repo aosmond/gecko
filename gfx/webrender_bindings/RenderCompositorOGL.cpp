@@ -57,11 +57,8 @@ bool RenderCompositorOGL::BeginFrame() {
 
   mGL->fBindFramebuffer(LOCAL_GL_FRAMEBUFFER, mGL->GetDefaultFramebuffer());
 
-  if (mIsEGL) {
-    // sets 0 if buffer_age is not supported
-    mBufferAge = gl::GLContextEGL::Cast(gl())->GetBufferAge();
-  }
-
+  // sets 0 if buffer_age is not supported
+  mBufferAge = gl()->GetBufferAge();
   return true;
 }
 
@@ -112,9 +109,7 @@ uint32_t RenderCompositorOGL::GetMaxPartialPresentRects() {
   return mIsEGL ? gfx::gfxVars::WebRenderMaxPartialPresentRects() : 0;
 }
 
-bool RenderCompositorOGL::RequestFullRender() {
-  return mIsEGL && (mBufferAge == 0);
-}
+bool RenderCompositorOGL::RequestFullRender() { return mBufferAge == 0; }
 
 bool RenderCompositorOGL::UsePartialPresent() {
   return mIsEGL && gfx::gfxVars::WebRenderMaxPartialPresentRects() > 0;
@@ -124,12 +119,7 @@ bool RenderCompositorOGL::ShouldDrawPreviousPartialPresentRegions() {
   return true;
 }
 
-size_t RenderCompositorOGL::GetBufferAge() const {
-  if (mIsEGL) {
-    return mBufferAge;
-  }
-  return 0;
-}
+size_t RenderCompositorOGL::GetBufferAge() const { return mBufferAge; }
 
 }  // namespace wr
 }  // namespace mozilla
