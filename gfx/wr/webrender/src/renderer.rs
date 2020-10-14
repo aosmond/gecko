@@ -5286,6 +5286,14 @@ impl Renderer {
             }
 
             self.force_redraw = false;
+        } else {
+            // Partial present is disabled, return a single dirty rect to the client
+            // that covers the entire framebuffer.
+            let fb_rect = DeviceIntRect::new(
+                DeviceIntPoint::zero(),
+                draw_target.dimensions(),
+            );
+            results.dirty_rects.push(fb_rect);
         }
 
         // Clear the framebuffer, if required
