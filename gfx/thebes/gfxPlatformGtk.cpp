@@ -687,12 +687,7 @@ already_AddRefed<gfx::VsyncSource> gfxPlatformGtk::CreateHardwareVsyncSource() {
   // NVIDIA drivers refuse to use EGL GL context when GLX was initialized first
   // and fail silently.
   if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
-    bool useGlxVsync = false;
-    // Nvidia doesn't support GLX at the same time as EGL.
-    if (!gfxVars::UseEGL()) {
-      useGlxVsync = gl::sGLXLibrary.SupportsVideoSync();
-    }
-    if (useGlxVsync) {
+    if (!gfxVars::UseEGL() && !gfxVars::UseWebRender() && gl::sGLXLibrary.SupportsVideoSync()) {
       RefPtr<VsyncSource> vsyncSource = new GtkVsyncSource();
       VsyncSource::Display& display = vsyncSource->GetGlobalDisplay();
       if (!static_cast<GtkVsyncSource::GLXDisplay&>(display).Setup()) {
