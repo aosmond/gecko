@@ -46,6 +46,14 @@ class MLGDevice;
 namespace gfx {
 class FeatureState;
 
+enum class HwStretchingSupport : uint8_t {
+  All,
+  Window,
+  FullScreen,
+  None,
+  Error
+};
+
 class DeviceManagerDx final {
  public:
   static void Init();
@@ -92,6 +100,7 @@ class DeviceManagerDx final {
   bool GetOutputFromMonitor(HMONITOR monitor, RefPtr<IDXGIOutput>* aOutOutput);
 
   // Check if the current adapter supports hardware stretching
+  void CheckHardwareStretchingSupport(nsTArray<HwStretchingSupport>& aRv);
   bool CheckHardwareStretchingSupport();
 
   bool CreateCompositorDevices();

@@ -210,41 +210,73 @@ bool DeviceManagerDx::GetOutputFromMonitor(HMONITOR monitor,
   return false;
 }
 
-bool DeviceManagerDx::CheckHardwareStretchingSupport() {
+void DeviceManagerDx::CheckHardwareStretchingSupport(
+    nsTArray<HwStretchingSupport>& aRv) {
   RefPtr<IDXGIAdapter> adapter = GetDXGIAdapter();
 
   if (!adapter) {
     NS_WARNING(
         "Failed to acquire a DXGI adapter for checking hardware stretching "
         "support.");
-    return false;
+    aRv.AppendElement(HwStretchingSupport::Error);
+    return;
   }
 
-  nsTArray<DXGI_OUTPUT_DESC1> outputs;
   for (UINT i = 0;; ++i) {
     RefPtr<IDXGIOutput> output = nullptr;
-    if (FAILED(adapter->EnumOutputs(i, getter_AddRefs(output)))) {
+    HRESULT result = adapter->EnumOutputs(i, getter_AddRefs(output));
+    if (result == DXGI_ERROR_NOT_FOUND) {
+      // No more outputs to check.
       break;
+    }
+
+    if (FAILED(result)) {
+      aRv.AppendElement(HwStretchingSupport::Error);
+      continue;
     }
 
     RefPtr<IDXGIOutput6> output6 = nullptr;
     if (FAILED(output->QueryInterface(__uuidof(IDXGIOutput6),
                                       getter_AddRefs(output6)))) {
-      break;
+      aRv.AppendElement(HwStretchingSupport::Error);
+      continue;
     }
 
     UINT flags = 0;
     if (FAILED(output6->CheckHardwareCompositionSupport(&flags))) {
-      break;
+      aRv.AppendElement(HwStretchingSupport::Error);
+      continue;
     }
 
-    // XXX Do we need add a check about which flags are supported?
-    if (flags) {
-      return true;
+    bool fullScreen = flags & DXGI_HARDWARE_COMPOSITION_SUPPORT_FLAG_FULLSCREEN;
+    bool window = flags & DXGI_HARDWARE_COMPOSITION_SUPPORT_FLAG_WINDOWED;
+    if (fullScreen && window) {
+      aRv.AppendElement(HwStretchingSupport::All);
+    } else if (fullScreen) {
+      aRv.AppendElement(HwStretchingSupport::FullScreen);
+    } else if (window) {
+      aRv.AppendElement(HwStretchingSupport::Window);
+    } else {
+      aRv.AppendElement(HwStretchingSupport::None);
+    }
+  }
+}
+
+bool DeviceManagerDx::CheckHardwareStretchingSupport() {
+  AutoTArray<HwStretchingSupport, 10> displays;
+  CheckHardwareStretchingSupport(displays);
+
+  if (displays.IsEmpty()) {
+    return false;
+  }
+
+  for (auto support : displays) {
+    if (support != HwStretchingSupport::All) {
+      return false;
     }
   }
 
-  return false;
+  return true;
 }
 
 #ifdef DEBUG
