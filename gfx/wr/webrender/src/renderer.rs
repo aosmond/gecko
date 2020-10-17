@@ -90,7 +90,10 @@ use crate::render_backend::{FrameId, RenderBackend};
 use crate::render_task_graph::RenderTaskGraph;
 use crate::render_task::{RenderTask, RenderTaskData, RenderTaskKind};
 use crate::resource_cache::ResourceCache;
-use crate::scene_builder_thread::{SceneBuilderThread, SceneBuilderThreadChannels, LowPrioritySceneBuilderThread};
+use crate::scene_builder_thread::{
+    SceneBuilderThread, SceneBuilderThreadChannels,
+    LowPrioritySceneBuilderThread, SceneBuilderBlobSender
+};
 use crate::screen_capture::AsyncScreenshotGrabber;
 use crate::shade::{Shaders, WrShaders};
 use smallvec::SmallVec;
@@ -2753,6 +2756,7 @@ impl Renderer {
             let lp_builder = LowPrioritySceneBuilderThread {
                 rx: low_priority_scene_rx,
                 tx: scene_tx.clone(),
+                blob_tx: SceneBuilderBlobSender::new(api_tx.clone()),
                 simulate_slow_ms: 0,
             };
 

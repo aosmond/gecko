@@ -8,7 +8,7 @@
 //! See the comment at the top of the `renderer` module for a description of
 //! how these two pieces interact.
 
-use api::{DebugFlags, BlobImageHandler};
+use api::{DebugFlags, BlobImageHandler, BlobMsg};
 use api::{DocumentId, DocumentLayer, ExternalScrollId, HitTestResult};
 use api::{IdNamespace, PipelineId, RenderNotifier, ScrollClamping};
 use api::{NotificationRequest, Checkpoint, QualitySettings};
@@ -1236,9 +1236,33 @@ impl RenderBackend {
             ApiMsg::SceneBuilderResult(msg) => {
                 return self.process_scene_builder_result(msg, profile_counters, frame_counter);
             }
+            ApiMsg::Blob(msg) => {
+                self.process_blob_msg(msg, profile_counters);
+            }
         }
 
         RenderBackendStatus::Continue
+    }
+
+    fn process_blob_msg(
+        &mut self,
+        msg: BlobMsg,
+        profile_counters: &mut BackendProfileCounters,
+    ) {
+        match msg {
+            BlobMsg::Rasterized(request, result) => {
+                // -- if we lagged, we need to post to a higher level to request a frame to
+                //    be scheduled to be generated
+                // TODO: need to avoid respawning same task; how do we do that today for rasterized
+                // blobs?
+                // TODO: what if we should have removed the blob image already?
+                // TODO: what if the blob was updated before we returned?
+                self.resource_cache.add_rasterized_blob_images(
+                    vec![(request, result)],
+                    &mut profile_counters.resources.texture_cache,
+                );
+            }
+        }
     }
 
     fn process_scene_builder_result(

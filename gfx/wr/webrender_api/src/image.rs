@@ -422,6 +422,30 @@ pub trait BlobImageHandler: Send {
     fn enable_multithreading(&mut self, enable: bool);
 }
 
+/// Message sent by the blob workers to the render backend thread.
+pub enum BlobMsg {
+    /// Deferred rasterized blob result.
+    Rasterized(BlobImageRequest, BlobImageResult),
+}
+
+/// Sender for blob messages to the render backend thread.
+pub trait BlobSender : Send {
+    /// Send message to the render backend thread.
+    fn send(
+        &self,
+        msg: BlobMsg
+    );
+
+    /// Clone directly into a box, avoiding dependency on the Sized trait.
+    fn box_clone(&self) -> Box<dyn BlobSender>;
+}
+
+impl Clone for Box<dyn BlobSender> {
+    fn clone(&self) -> Box<dyn BlobSender> {
+        self.box_clone()
+    }
+}
+
 /// A group of rasterization requests to execute synchronously on the scene builder thread.
 pub trait AsyncBlobImageRasterizer : Send {
     /// Rasterize the requests.
@@ -431,6 +455,7 @@ pub trait AsyncBlobImageRasterizer : Send {
     fn rasterize(
         &mut self,
         requests: &[BlobImageParams],
+        tx: &Box<dyn BlobSender>,
         low_priority: bool
     ) -> Vec<(BlobImageRequest, BlobImageResult)>;
 }

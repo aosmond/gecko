@@ -520,6 +520,7 @@ struct Job {
     dirty_rect: BlobDirtyRect,
     visible_rect: DeviceIntRect,
     tile_size: TileSize,
+    tx: Box<dyn BlobSender>,
 }
 
 /// Rasterizes gecko blob images.
@@ -559,6 +560,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
     fn rasterize(
         &mut self,
         requests: &[BlobImageParams],
+        tx: &Box<dyn BlobSender>,
         low_priority: bool,
     ) -> Vec<(BlobImageRequest, BlobImageResult)> {
         // All we do here is spin up our workers to callback into gecko to replay the drawing commands.
@@ -576,6 +578,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 visible_rect: command.visible_rect,
                 dirty_rect: params.dirty_rect,
                 tile_size: command.tile_size,
+                tx: tx.clone(),
             }
         };
 
@@ -598,7 +601,6 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 .collect();
             let lambda = move || deferrable_requests.into_par_iter().map(rasterize_deferrable_blob).collect();
             self.workers_low_priority.spawn(lambda);
-            // FIXME(aosmond): how to get the results
         };
 
         let sync_requests: Vec<Job> = if self.enable_multithreading {
@@ -634,7 +636,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             // Parallel version synchronously installs a job on the thread pool which will
             // try to do the work in parallel.
             // This thread is blocked until the thread pool is done doing the work.
-            let lambda = || sync_requests.into_par_iter().map(rasterize_blob).collect();
+            let lambda = || sync_requests.into_par_iter().map(rasterize_sync_blob).collect();
             if low_priority {
                 //TODO --bpe runtime flag to A/B test these two
                 self.workers_low_priority.install(lambda)
@@ -643,16 +645,12 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 self.workers.install(lambda)
             }
         } else {
-            sync_requests.into_iter().map(rasterize_blob).collect()
+            sync_requests.into_iter().map(rasterize_sync_blob).collect()
         }
     }
 }
 
-fn rasterize_deferrable_blob(job: Job) {
-    let (_, _) = rasterize_blob(job);
-}
-
-fn rasterize_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
+fn rasterize_blob(job: &Job) -> (BlobImageRequest, BlobImageResult) {
     let descriptor = job.descriptor;
     let buf_size =
         (descriptor.rect.size.width * descriptor.rect.size.height * descriptor.format.bytes_per_pixel()) as usize;
@@ -692,6 +690,15 @@ fn rasterize_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
     };
 
     (job.request, result)
+}
+
+fn rasterize_deferrable_blob(job: Job) {
+    let (request, result) = rasterize_blob(&job);
+    job.tx.send(BlobMsg::Rasterized(request, result));
+}
+
+fn rasterize_sync_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
+    rasterize_blob(&job)
 }
 
 impl BlobImageHandler for Moz2dBlobImageHandler {
