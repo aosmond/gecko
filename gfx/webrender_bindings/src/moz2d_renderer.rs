@@ -591,10 +591,11 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
         };
 
         if self.enable_multithreading {
-            // Split out the deferrable jobs and run these asynchronously on the thread
-            // pool which will try to do the work in parallel. We will attempt to pull
-            // the results out if they finish in time for this frame, otherwise they
-            // will be included in a future frame.
+            // Split out the deferrable jobs and run these asynchronously on the
+            // thread pool which will try to do the work in parallel. The workers
+            // will post the results directly to the render backend thread. Anything
+            // that gets posted before us will be included in this frame, otherwise
+            // they will request a new frame be generated.
             let deferrable_requests: Vec<Job> = requests
                 .into_iter()
                 .filter_map(|params| into_deferrable_job(params, true))
