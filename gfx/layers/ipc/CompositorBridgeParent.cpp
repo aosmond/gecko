@@ -704,6 +704,28 @@ void CompositorBridgeParent::ScheduleRenderOnCompositorThread() {
                         this, &CompositorBridgeParent::ScheduleComposition));
 }
 
+void CompositorBridgeParent::ScheduleForcedRenderOnCompositorThread() {
+  MOZ_ASSERT(CompositorThread());
+
+  class ScheduleForcedCompositionTask final : public Runnable {
+   public:
+    explicit ScheduleForcedCompositionTask(CompositorBridgeParent* aSelf)
+      : Runnable("layers::CompositorBridgeParent::ScheduleForcedComposition")
+      , mSelf(aSelf) {}
+
+    NS_IMETHOD Run() override {
+      mSelf->ScheduleForcedComposition();
+      return NS_OK;
+    }
+
+   private:
+    RefPtr<CompositorBridgeParent> mSelf;
+  };
+
+  RefPtr<Runnable> task = MakeRefPtr<ScheduleForcedCompositionTask>(this);
+  CompositorThread()->Dispatch(task.forget());
+}
+
 void CompositorBridgeParent::InvalidateOnCompositorThread() {
   MOZ_ASSERT(CompositorThread());
   CompositorThread()->Dispatch(
@@ -907,6 +929,19 @@ void CompositorBridgeParent::ScheduleComposition() {
 
   if (mWrBridge) {
     mWrBridge->ScheduleGenerateFrame();
+  } else {
+    mCompositorScheduler->ScheduleComposition();
+  }
+}
+
+void CompositorBridgeParent::ScheduleForcedComposition() {
+  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  if (mPaused) {
+    return;
+  }
+
+  if (mWrBridge) {
+    mWrBridge->ScheduleForcedGenerateFrame();
   } else {
     mCompositorScheduler->ScheduleComposition();
   }
