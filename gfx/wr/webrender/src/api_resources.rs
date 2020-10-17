@@ -273,6 +273,7 @@ impl ApiResources {
                         tile,
                     ).cast_unit(),
                     format: template.descriptor.format,
+                    deferrable: template.descriptor.is_deferrable(),
                 };
 
                 assert!(descriptor.rect.size.width > 0 && descriptor.rect.size.height > 0);

@@ -564,42 +564,77 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
         // All we do here is spin up our workers to callback into gecko to replay the drawing commands.
         let _marker = GeckoProfilerMarker::new(b"BlobRasterization\0");
 
-        let requests: Vec<Job> = requests
-            .into_iter()
-            .map(|params| {
-                let command = &self.blob_commands[&params.request.key];
-                let blob = Arc::clone(&command.data);
-                assert!(params.descriptor.rect.size.width > 0 && params.descriptor.rect.size.height > 0);
+        let into_job = |params: &BlobImageParams| -> Job {
+            let command = &self.blob_commands[&params.request.key];
+            let blob = Arc::clone(&command.data);
+            assert!(params.descriptor.rect.size.width > 0 && params.descriptor.rect.size.height > 0);
 
-                Job {
-                    request: params.request,
-                    descriptor: params.descriptor,
-                    commands: blob,
-                    visible_rect: command.visible_rect,
-                    dirty_rect: params.dirty_rect,
-                    tile_size: command.tile_size,
-                }
-            })
-            .collect();
+            Job {
+                request: params.request,
+                descriptor: params.descriptor,
+                commands: blob,
+                visible_rect: command.visible_rect,
+                dirty_rect: params.dirty_rect,
+                tile_size: command.tile_size,
+            }
+        };
+
+        let into_deferrable_job = |params: &BlobImageParams, deferrable: bool| -> Option<Job> {
+            if params.descriptor.deferrable == deferrable {
+                Some(into_job(params))
+            } else {
+               None
+            }
+        };
+
+        if self.enable_multithreading {
+            // Split out the deferrable jobs and run these asynchronously on the thread
+            // pool which will try to do the work in parallel. We will attempt to pull
+            // the results out if they finish in time for this frame, otherwise they
+            // will be included in a future frame.
+            let deferrable_requests: Vec<Job> = requests
+                .into_iter()
+                .filter_map(|params| into_deferrable_job(params, true))
+                .collect();
+            let lambda = move || deferrable_requests.into_par_iter().map(rasterize_deferrable_blob).collect();
+            self.workers_low_priority.spawn(lambda);
+            // FIXME(aosmond): how to get the results
+        };
+
+        let sync_requests: Vec<Job> = if self.enable_multithreading {
+            // We already split out the deferrable jobs above, so only include the
+            // blobs which must be run synchronously.
+            requests
+                .into_iter()
+                .filter_map(|params| into_deferrable_job(params, false))
+                .collect()
+        } else {
+            // We are unable to run any jobs in parallel, so just include all jobs
+            // in this, deferrable or not.
+            requests
+                .into_iter()
+                .map(|params| into_job(params))
+                .collect()
+        };
 
         // If we don't have a lot of blobs it is probably not worth the initial cost
         // of installing work on rayon's thread pool so we do it serially on this thread.
         let should_parallelize = if !self.enable_multithreading {
             false
         } else if low_priority {
-            requests.len() > 2
+            sync_requests.len() > 2
         } else {
             // For high priority requests we don't "risk" the potential priority inversion of
             // dispatching to a thread pool full of low priority jobs unless it is really
             // appealing.
-            requests.len() > 4
+            sync_requests.len() > 4
         };
 
         if should_parallelize {
             // Parallel version synchronously installs a job on the thread pool which will
             // try to do the work in parallel.
             // This thread is blocked until the thread pool is done doing the work.
-            let lambda = || requests.into_par_iter().map(rasterize_blob).collect();
+            let lambda = || sync_requests.into_par_iter().map(rasterize_blob).collect();
             if low_priority {
                 //TODO --bpe runtime flag to A/B test these two
                 self.workers_low_priority.install(lambda)
@@ -608,9 +643,13 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 self.workers.install(lambda)
             }
         } else {
-            requests.into_iter().map(rasterize_blob).collect()
+            sync_requests.into_iter().map(rasterize_blob).collect()
         }
     }
+}
+
+fn rasterize_deferrable_blob(job: Job) {
+    let (_, _) = rasterize_blob(job);
 }
 
 fn rasterize_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {

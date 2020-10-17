@@ -245,6 +245,10 @@ bitflags! {
         ///
         /// See https://github.com/servo/webrender/pull/2555/
         const ALLOW_MIPMAPS = 2;
+        /// Whether to allow deferring processing of this (blob) image is allowed or
+        /// not. This is used to rasterize blobs without blocking and be deferred to
+        /// a future frame if necessary.
+        const IS_DEFERRABLE = 4;
     }
 }
 
@@ -314,6 +318,11 @@ impl ImageDescriptor {
     /// Returns true if this descriptor allows mipmaps
     pub fn allow_mipmaps(&self) -> bool {
         self.flags.contains(ImageDescriptorFlags::ALLOW_MIPMAPS)
+    }
+
+    /// Returns true if this descriptor is deferrable.
+    pub fn is_deferrable(&self) -> bool {
+        self.flags.contains(ImageDescriptorFlags::IS_DEFERRABLE)
     }
 }
 
@@ -551,6 +560,8 @@ pub struct BlobImageDescriptor {
     pub rect: LayoutIntRect,
     /// Format for the data in the backing store.
     pub format: ImageFormat,
+    /// Whether the blob can be deferred to a future frame.
+    pub deferrable: bool,
 }
 
 /// Representation of a rasterized blob image. This is obtained by passing
