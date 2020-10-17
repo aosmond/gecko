@@ -164,8 +164,13 @@ enum State {
     QueryResources,
 }
 
+struct RasterizedBlobTile {
+    pub image: Option<RasterizedBlobImage>,
+    pub missed_request: bool,
+}
+
 /// Post scene building state.
-type RasterizedBlob = FastHashMap<TileOffset, RasterizedBlobImage>;
+type RasterizedBlob = FastHashMap<TileOffset, RasterizedBlobTile>;
 
 #[cfg_attr(feature = "capture", derive(Serialize))]
 #[cfg_attr(feature = "replay", derive(Deserialize))]
@@ -629,42 +634,71 @@ impl ResourceCache {
         }
     }
 
+    pub fn add_rasterized_blob_image(
+        &mut self,
+        request: BlobImageRequest,
+        result: BlobImageResult,
+        deferred: bool,
+        texture_cache_profile: &mut TextureCacheProfileCounters,
+    ) {
+        let data = match result {
+            Ok(data) => data,
+            Err(..) => {
+                warn!("Failed to rasterize a blob image");
+                return;
+            }
+        };
+
+        texture_cache_profile.rasterized_blob_pixels.inc(data.rasterized_rect.area() as usize);
+
+        match self.cached_images.try_get_mut(&request.key.as_image()) {
+            Some(&mut ImageResult::Multi(ref mut entries)) => {
+                let cached_key = CachedImageKey {
+                    rendering: ImageRendering::Auto, // TODO(nical)
+                    tile: Some(request.tile),
+                };
+                if let Some(entry) = entries.try_get_mut(&cached_key) {
+                    entry.dirty_rect = DirtyRect::All;
+                }
+            }
+            _ => {
+                // This could happen if a deferred blob was completed too late.
+                warn!("Discarding rasterized blob image result, no cached image");
+                return;
+            }
+        }
+
+        // First make sure we have an entry for this key (using a placeholder
+        // if need be).
+        let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
+            || { RasterizedBlob::default() }
+        );
+
+        match tiles.entry(request.tile) {
+            Occupied(entry) => {
+                let entry = entry.into_mut();
+                entry.image = Some(data);
+                if entry.missed_request {
+                    // TODO(aosmond): schedule composite?
+                    entry.missed_request = false;
+                }
+            },
+            Vacant(entry) => {
+                entry.insert(RasterizedBlobTile {
+                    image: Some(data),
+                    missed_request: false,
+                });
+            },
+        };
+    }
+
     pub fn add_rasterized_blob_images(
         &mut self,
         images: Vec<(BlobImageRequest, BlobImageResult)>,
         texture_cache_profile: &mut TextureCacheProfileCounters,
     ) {
         for (request, result) in images {
-            let data = match result {
-                Ok(data) => data,
-                Err(..) => {
-                    warn!("Failed to rasterize a blob image");
-                    continue;
-                }
-            };
-
-            texture_cache_profile.rasterized_blob_pixels.inc(data.rasterized_rect.area() as usize);
-
-            // First make sure we have an entry for this key (using a placeholder
-            // if need be).
-            let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
-                || { RasterizedBlob::default() }
-            );
-
-            tiles.insert(request.tile, data);
-
-            match self.cached_images.try_get_mut(&request.key.as_image()) {
-                Some(&mut ImageResult::Multi(ref mut entries)) => {
-                    let cached_key = CachedImageKey {
-                        rendering: ImageRendering::Auto, // TODO(nical)
-                        tile: Some(request.tile),
-                    };
-                    if let Some(entry) = entries.try_get_mut(&cached_key) {
-                        entry.dirty_rect = DirtyRect::All;
-                    }
-                }
-                _ => {}
-            }
+            self.add_rasterized_blob_image(request, result, false, texture_cache_profile);
         }
     }
 
@@ -916,18 +950,35 @@ impl ResourceCache {
             return
         }
 
-        if !self.pending_image_requests.insert(request) {
-            return
-        }
-
         if template.data.is_blob() {
             let request: BlobImageRequest = request.into();
-            let missing = match self.rasterized_blob_images.get(&request.key) {
-                Some(tiles) => !tiles.contains_key(&request.tile),
-                _ => true,
-            };
+            let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
+                || { RasterizedBlob::default() }
+            );
 
-            assert!(!missing);
+            // FIXME(aosmond): what if we had old data in the map? how do we know if it is stale?!
+            match tiles.entry(request.tile) {
+                Occupied(entry) => {
+                    let entry = entry.into_mut();
+                    if entry.image.is_none() {
+                        assert!(template.descriptor.is_deferrable());
+                        entry.missed_request = true;
+                        return
+                    }
+                },
+                Vacant(entry) => {
+                    assert!(template.descriptor.is_deferrable());
+                    entry.insert(RasterizedBlobTile {
+                        image: None,
+                        missed_request: true,
+                    });
+                    return
+                }
+            }
+        }
+
+        if !self.pending_image_requests.insert(request) {
+            return
         }
     }
 
@@ -1186,10 +1237,11 @@ impl ResourceCache {
                 }
                 CachedImageData::Blob => {
                     let blob_image = self.rasterized_blob_images.get_mut(&BlobImageKey(request.key)).unwrap();
-                    let img = &blob_image[&request.tile.unwrap()];
+                    let tile = &blob_image[&request.tile.unwrap()];
+                    let image = tile.image.as_ref().unwrap();
                     updates.push((
-                        CachedImageData::Raw(Arc::clone(&img.data)),
-                        Some(img.rasterized_rect)
+                        CachedImageData::Raw(Arc::clone(&image.data)),
+                        Some(image.rasterized_rect)
                     ));
                 }
             };
@@ -1471,8 +1523,8 @@ impl ResourceCache {
         //           these when that crash is fixed.
         /*
         for (_, image) in self.rasterized_blob_images.iter() {
-            let mut accumulate = |b: &RasterizedBlobImage| {
-                report.rasterized_blobs += unsafe { op(b.data.as_ptr() as *const c_void) };
+            let mut accumulate = |b: &RasterizedBlobTile| {
+                report.rasterized_blobs += unsafe { op(b.image.unwrap().data.as_ptr() as *const c_void) };
             };
             match image {
                 RasterizedBlob::Tiled(map) => map.values().for_each(&mut accumulate),
