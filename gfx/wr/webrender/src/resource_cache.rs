@@ -733,7 +733,7 @@ impl ResourceCache {
                 match tiles.entry(request.tile) {
                     Occupied(entry) => {
                         let entry = entry.into_mut();
-                        assert!(entry.requested_generation.0 >= generation.0);
+                        assert!(entry.requested_generation.0 <= generation.0);
                         entry.requested_generation = generation;
 
                         // If the size changed, we need to dump the old data.
