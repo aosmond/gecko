@@ -322,7 +322,8 @@ impl ImageDescriptor {
 
     /// Returns true if this descriptor is deferrable.
     pub fn is_deferrable(&self) -> bool {
-        self.flags.contains(ImageDescriptorFlags::IS_DEFERRABLE)
+        true
+        //self.flags.contains(ImageDescriptorFlags::IS_DEFERRABLE)
     }
 }
 
