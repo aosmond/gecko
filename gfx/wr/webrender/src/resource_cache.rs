@@ -172,11 +172,15 @@ struct RasterizedBlobTile {
 /// Post scene building state.
 type RasterizedBlob = FastHashMap<TileOffset, RasterizedBlobTile>;
 
+fn create_rasterized_blob_rect(descriptor: &BlobImageDescriptor) -> DeviceIntRect {
+    // FIXME(aosmond): proper coercion
+    DeviceIntRect::new(DeviceIntPoint::zero(), DeviceIntSize::new(descriptor.rect.size.width, descriptor.rect.size.height))
+}
+
 fn create_empty_rasterized_blob_image(descriptor: &BlobImageDescriptor) -> RasterizedBlobImage {
     let buf_size = (descriptor.rect.size.width * descriptor.rect.size.height * descriptor.format.bytes_per_pixel()) as usize;
     RasterizedBlobImage {
-        // FIXME(aosmond): proper coercion
-        rasterized_rect: DeviceIntRect::new(DeviceIntPoint::zero(), DeviceIntSize::new(descriptor.rect.size.width, descriptor.rect.size.height)),
+        rasterized_rect: create_rasterized_blob_rect(descriptor),
         data: Arc::new(vec![0; buf_size as usize]),
         generation: BlobImageGeneration::INVALID,
     }
@@ -650,18 +654,17 @@ impl ResourceCache {
         result: BlobImageResult,
         deferred: bool,
         texture_cache_profile: &mut TextureCacheProfileCounters,
-    ) {
+    ) -> bool {
         match result {
             Ok(_) => {},
             Err(BlobImageError::Deferred(_)) => {},
             Err(..) => {
                 warn!("Failed to rasterize a blob image");
-                return;
+                return false;
             }
         };
 
-        // FIXME(aosmond): How do we know if we removed the blobs and then the rasterized result
-        // finally made it in?!
+        // FIXME(aosmond): How do we detect the blob was removed, and the result was too late?
         match self.cached_images.try_get_mut(&request.key.as_image()) {
             Some(&mut ImageResult::Multi(ref mut entries)) => {
                 let cached_key = CachedImageKey {
@@ -698,9 +701,15 @@ impl ResourceCache {
                         // Since multiple generations of the same rasterized tile can complete out
                         // of order, we need to only update if this result is newer than what we
                         // have stored.
-                        let updated = entry.image.generation == BlobImageGeneration::INVALID || data.generation.0 > entry.image.generation.0;
-                        if updated {
+                        // TODO(aosmond): If we want to use the dirty rect mechanism for blob
+                        // images, we will need to do some sort of merging here and track state for
+                        // out of order results. For now, the dirty rect is always the entire tile
+                        // so we can just take the final result.
+                        let updated = if entry.image.generation == BlobImageGeneration::INVALID || data.generation.0 > entry.image.generation.0 {
                             entry.image = data;
+                            true
+                        } else {
+                            false
                         };
 
                         // If we updated our storage, then we may need to schedule a new frame to be
@@ -710,17 +719,16 @@ impl ResourceCache {
                         // multiple requests. In both cases, since we have updated data, we need a
                         // new frame to be generated since we don't know when the next rasterize
                         // result will come in.
-                        if deferred && updated && entry.requested_generation.0 >= entry.image.generation.0 {
-                            // TODO(aosmond): schedule composite
-                        }
+                        deferred && updated && entry.requested_generation.0 >= entry.image.generation.0
                     },
                     Vacant(entry) => {
                         entry.insert(RasterizedBlobTile {
                             requested_generation: data.generation,
                             image: data,
                         });
+                        false
                     },
-                };
+                }
             }
             Err(BlobImageError::Deferred((descriptor, generation))) => {
                 // This means we did not wait on the scene builder thread for the blob to finish
@@ -735,13 +743,6 @@ impl ResourceCache {
                         let entry = entry.into_mut();
                         assert!(entry.requested_generation.0 <= generation.0);
                         entry.requested_generation = generation;
-
-                        // If the size changed, we need to dump the old data.
-                        // FIXME(aosmond): this should compare total rect, not rasterized rect
-                        /*let rasterized_rect = descriptor.size.into();
-                        if entry.image.rasterized_rect != rasterized_rect {
-                            entry.image = create_empty_rasterized_blob_image(&descriptor);
-                        }*/
                     }
                     Vacant(entry) => {
                         entry.insert(RasterizedBlobTile {
@@ -750,9 +751,10 @@ impl ResourceCache {
                         });
                     }
                 }
+                false
             }
             Err(..) => unreachable!(),
-        };
+        }
     }
 
     pub fn add_rasterized_blob_images(
@@ -1023,7 +1025,9 @@ impl ResourceCache {
             // There should always be an entry for the blob image and tile in the hash maps but the
             // actual data may be present yet if it is a deferrable blob. We might have stale image
             // data but that should be fine to reuse until the new data becomes available.
-            // FIXME(aosmond): Do we need to do some special invalidation if the size changed?
+            // FIXME(aosmond): We need to suppress this and use the actual updates we have. We
+            // might not have received the deferred update yet, we may have one or more updates
+            // that came in since the last composite, or we may be on the generation we expected.
             match self.rasterized_blob_images.get(&request.key) {
                 Some(tiles) => {
                     match tiles.get(&request.tile) {

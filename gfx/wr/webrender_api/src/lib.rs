@@ -214,6 +214,11 @@ pub trait RenderNotifier: Send {
     /// Notify the thread containing the `Renderer` that the render backend has been
     /// shut down.
     fn shut_down(&self) {}
+    /// Request the compositor to schedule a frame to be rendered. If `force` is set, then current
+    /// frame will be invalidated.
+    fn schedule_render(&self, _force: bool) {
+        unimplemented!()
+    }
 }
 
 /// A stage of the rendering pipeline.

@@ -642,8 +642,15 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             .into_iter()
             .filter_map(|params| {
                 if params.descriptor.deferrable {
+                    // TODO(aosmond): Because we might resolve the tiles out of order, we always
+                    // set the dirty rect as the whole tile. This allows us to just always take the
+                    // most recent blob rasterize result as the preferred. A potential optimization
+                    // is to merge the results of the tiles in case it is a blob with an animation.
                     Some(DeferrableJob {
-                        job: self.into_job(params),
+                        job: Job {
+                            dirty_rect: DirtyRect::All,
+                            ..self.into_job(params)
+                        },
                         tx: tx.clone(),
                     })
                 } else {

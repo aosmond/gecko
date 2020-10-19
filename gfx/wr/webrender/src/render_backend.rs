@@ -1251,18 +1251,18 @@ impl RenderBackend {
     ) {
         match msg {
             BlobMsg::Rasterized(request, result) => {
-                // -- if we lagged, we need to post to a higher level to request a frame to
-                //    be scheduled to be generated
-                // TODO: need to avoid respawning same task; how do we do that today for rasterized
-                // blobs?
-                // TODO: what if we should have removed the blob image already?
-                // TODO: what if the blob was updated before we returned?
-                self.resource_cache.add_rasterized_blob_image(
+                let schedule_render = self.resource_cache.add_rasterized_blob_image(
                     request,
                     result,
                     true,
                     &mut profile_counters.resources.texture_cache,
                 );
+
+                if schedule_render {
+                    // FIXME(aosmond): Does this schedule a single frame, or one frame for every
+                    // blob?
+                    self.notifier.schedule_render(true);
+                }
             }
         }
     }
