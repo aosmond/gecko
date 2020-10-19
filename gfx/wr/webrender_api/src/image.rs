@@ -471,10 +471,11 @@ pub trait AsyncBlobImageRasterizer : Send {
 }
 
 /// Generation counter tracking changes in the blob image.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct BlobImageGeneration(pub u32);
 
 impl BlobImageGeneration {
+    /// Placeholder used to mark blob data as invalid.
     pub const INVALID: BlobImageGeneration = BlobImageGeneration(u32::MAX);
 }
 
@@ -628,7 +629,7 @@ pub enum BlobImageError {
     /// Other failure, embedding-specified.
     Other(String),
     /// Deferred, with the generation requested.
-    Deferred(BlobImageGeneration),
+    Deferred((BlobImageDescriptor, BlobImageGeneration)),
 }
 
 

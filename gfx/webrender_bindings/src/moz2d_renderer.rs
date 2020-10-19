@@ -667,7 +667,9 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             .into_iter()
             .filter_map(|params| {
                 if params.descriptor.deferrable {
-                    Some((params.request, BlobImageResult::Err(BlobImageError::Deferred(params.generation))))
+                    Some((params.request, BlobImageResult::Err(
+                        BlobImageError::Deferred((params.descriptor, params.generation))
+                    )))
                 } else {
                     None
                 }
