@@ -1257,8 +1257,10 @@ impl RenderBackend {
                 // blobs?
                 // TODO: what if we should have removed the blob image already?
                 // TODO: what if the blob was updated before we returned?
-                self.resource_cache.add_rasterized_blob_images(
-                    vec![(request, result)],
+                self.resource_cache.add_rasterized_blob_image(
+                    request,
+                    result,
+                    true,
                     &mut profile_counters.resources.texture_cache,
                 );
             }

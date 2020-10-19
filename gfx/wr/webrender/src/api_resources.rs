@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::api::{BlobImageKey, ImageDescriptor, DirtyRect, TileSize};
+use crate::api::{BlobImageKey, ImageDescriptor, DirtyRect, TileSize, BlobImageGeneration};
 use crate::api::{BlobImageHandler, AsyncBlobImageRasterizer, BlobImageData, BlobImageParams};
 use crate::api::{BlobImageRequest, BlobImageDescriptor, BlobImageResources};
 use crate::api::{FontKey, FontTemplate, FontInstanceData, FontInstanceKey};
@@ -17,6 +17,7 @@ use std::sync::Arc;
 /// We use this to generate the async blob rendering requests.
 struct BlobImageTemplate {
     descriptor: ImageDescriptor,
+    generation: BlobImageGeneration,
     tile_size: TileSize,
     dirty_rect: BlobDirtyRect,
     /// See ImageResource::visible_rect.
@@ -83,6 +84,7 @@ impl ApiResources {
                         img.key,
                         BlobImageTemplate {
                             descriptor: img.descriptor,
+                            generation: BlobImageGeneration(0),
                             tile_size: img.tile_size,
                             dirty_rect: DirtyRect::All,
                             valid_tiles_after_bounds_change: None,
@@ -225,6 +227,7 @@ impl ApiResources {
 
         image.valid_tiles_after_bounds_change = valid_tiles_after_bounds_change;
         image.visible_rect = *visible_rect;
+        image.generation = BlobImageGeneration(image.generation.0 + 1);
     }
 
     pub fn create_blob_scene_builder_requests(
@@ -282,6 +285,7 @@ impl ApiResources {
                         request: BlobImageRequest { key: *key, tile },
                         descriptor,
                         dirty_rect: DirtyRect::All,
+                        generation: template.generation,
                     }
                 );
             });

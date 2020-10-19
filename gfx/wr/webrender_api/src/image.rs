@@ -460,6 +460,13 @@ pub trait AsyncBlobImageRasterizer : Send {
     ) -> Vec<(BlobImageRequest, BlobImageResult)>;
 }
 
+/// Generation counter tracking changes in the blob image.
+#[derive(Copy, Clone, Debug)]
+pub struct BlobImageGeneration(pub u32);
+
+impl BlobImageGeneration {
+    pub const INVALID: BlobImageGeneration = BlobImageGeneration(u32::MAX);
+}
 
 /// Input parameters for the BlobImageRasterizer.
 #[derive(Copy, Clone, Debug)]
@@ -473,6 +480,8 @@ pub struct BlobImageParams {
     ///
     /// If set to None the entire image is rasterized.
     pub dirty_rect: BlobDirtyRect,
+    /// Age of the blob image.
+    pub generation: BlobImageGeneration,
 }
 
 /// The possible states of a Dirty rect.
@@ -597,6 +606,8 @@ pub struct RasterizedBlobImage {
     pub rasterized_rect: DeviceIntRect,
     /// Backing store. The format is stored out of band in `BlobImageDescriptor`.
     pub data: Arc<Vec<u8>>,
+    /// Age of the rasterized blob.
+    pub generation: BlobImageGeneration,
 }
 
 /// Error code for when blob rasterization failed.
@@ -606,6 +617,8 @@ pub enum BlobImageError {
     Oom,
     /// Other failure, embedding-specified.
     Other(String),
+    /// Deferred, with the generation requested.
+    Deferred(BlobImageGeneration),
 }
 
 

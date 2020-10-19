@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use api::{BlobImageResources, BlobImageRequest, RasterizedBlobImage};
+use api::{BlobImageResources, BlobImageRequest, RasterizedBlobImage, BlobImageGeneration, BlobImageError};
 use api::{DebugFlags, FontInstanceKey, FontKey, FontTemplate, GlyphIndex};
 use api::{ExternalImageData, ExternalImageType, ExternalImageId, BlobImageResult, FontInstanceData};
 use api::{DirtyRect, GlyphDimensions, IdNamespace, DEFAULT_TILE_SIZE};
@@ -166,7 +166,7 @@ enum State {
 
 struct RasterizedBlobTile {
     pub image: Option<RasterizedBlobImage>,
-    pub missed_request: bool,
+    pub requested_generation: BlobImageGeneration,
 }
 
 /// Post scene building state.
@@ -643,6 +643,33 @@ impl ResourceCache {
     ) {
         let data = match result {
             Ok(data) => data,
+            Err(BlobImageError::Deferred(generation)) => {
+                assert!(!deferred);
+
+                // This means we did not wait on the scene builder thread for the blob to finish
+                // rasterizing. Deferred blobs will signal directly to the render backend thread
+                // when they complete, so the result may already be stored here. We need to ensure
+                // we update the requested generation so that if the blob comes in after us, it
+                // knows to request a new frame to be composited to display it.
+                let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
+                    || { RasterizedBlob::default() }
+                );
+
+                match tiles.entry(request.tile) {
+                    Occupied(entry) => {
+                        let entry = entry.into_mut();
+                        assert!(entry.requested_generation.0 >= generation.0);
+                        entry.requested_generation = generation;
+                    }
+                    Vacant(entry) => {
+                        entry.insert(RasterizedBlobTile {
+                            image: None,
+                            requested_generation: generation,
+                        });
+                    }
+                }
+                return;
+            }
             Err(..) => {
                 warn!("Failed to rasterize a blob image");
                 return;
@@ -677,16 +704,41 @@ impl ResourceCache {
         match tiles.entry(request.tile) {
             Occupied(entry) => {
                 let entry = entry.into_mut();
-                entry.image = Some(data);
-                if entry.missed_request {
-                    // TODO(aosmond): schedule composite?
-                    entry.missed_request = false;
+
+                // If we aren't deferring, we should update the requested generation here.
+                if !deferred {
+                    assert!(entry.requested_generation.0 <= data.generation.0);
+                    entry.requested_generation = data.generation;
+                }
+
+                // Since multiple generations of the same rasterized tile can complete out of
+                // order, we need to only update if this result is newer than what we have stored.
+                let updated = if let Some(ref mut stored_data) = entry.image {
+                    if data.generation.0 > stored_data.generation.0 {
+                        *stored_data = data;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    entry.image = Some(data);
+                    true
+                };
+
+                // If we updated our storage, then we may need to schedule a new frame to be
+                // composited. If the requested generation matches the result, then we know we
+                // lagged behind a previous scene building request which was already processed. If
+                // the requested generation is newer, then we both lagged multiple requests. In
+                // both cases, since we have updated data, we need a new frame to be generated
+                // since we don't know when the next rasterize result will come in.
+                if deferred && updated && entry.requested_generation.0 >= entry.image.as_ref().unwrap().generation.0 {
+                    // TODO(aosmond): schedule composite
                 }
             },
             Vacant(entry) => {
                 entry.insert(RasterizedBlobTile {
+                    requested_generation: data.generation,
                     image: Some(data),
-                    missed_request: false,
                 });
             },
         };
@@ -952,38 +1004,24 @@ impl ResourceCache {
 
         if template.data.is_blob() {
             let request: BlobImageRequest = request.into();
-            let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
-                || { RasterizedBlob::default() }
-            );
 
-            // FIXME(aosmond): what if we had old data in the map? how do we know if it is stale?!
-            // -- generation counter, attach generation to each blob raster request/worker
-            //    - store the actual generation in the tile
-            //    - if the new generation is newer than the stored generation (race on updates)
-            //    and missing flag set then issue schedule composite
-            //    - if the new generation is the requested generation, clear missing flag
-            // -- give generation to render backend on scene transaction and deferred blob tile ids
-            //    - store the requested generation in the tile
-            //    - in request_image, set missing flag if generation mismatch (assert if requested
-            //    generation is older than stored generation -- shouldn't be possible based on
-            //    message ordering)
-            match tiles.entry(request.tile) {
-                Occupied(entry) => {
-                    let entry = entry.into_mut();
-                    if entry.image.is_none() {
-                        assert!(template.descriptor.is_deferrable());
-                        entry.missed_request = true;
-                        return
+            // There should always be an entry for the blob image and tile in the hash maps but the
+            // actual data may be present yet if it is a deferrable blob. We might have stale image
+            // data but that should be fine to reuse until the new data becomes available.
+            // FIXME(aosmond): Do we need to do some special invalidation if the size changed?
+            match self.rasterized_blob_images.get(&request.key) {
+                Some(tiles) => {
+                    match tiles.get(&request.tile) {
+                        Some(entry) => {
+                            if entry.image.is_none() {
+                                assert!(template.descriptor.is_deferrable());
+                                return
+                            }
+                        },
+                        None => panic!("BUG: missing blob image tile"),
                     }
                 },
-                Vacant(entry) => {
-                    assert!(template.descriptor.is_deferrable());
-                    entry.insert(RasterizedBlobTile {
-                        image: None,
-                        missed_request: true,
-                    });
-                    return
-                }
+                None => panic!("BUG: missing blob image"),
             }
         }
 
@@ -1723,7 +1761,8 @@ impl ResourceCache {
                     warn!("Tiled blob images aren't supported yet");
                     let result = RasterizedBlobImage {
                         rasterized_rect: desc.size.into(),
-                        data: Arc::new(vec![0; desc.compute_total_size() as usize])
+                        data: Arc::new(vec![0; desc.compute_total_size() as usize]),
+                        generation: BlobImageGeneration(0),
                     };
 
                     assert_eq!(result.rasterized_rect.size, desc.size);

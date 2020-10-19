@@ -521,6 +521,7 @@ struct Job {
     visible_rect: DeviceIntRect,
     tile_size: TileSize,
     tx: Box<dyn BlobSender>,
+    generation: BlobImageGeneration,
 }
 
 /// Rasterizes gecko blob images.
@@ -579,6 +580,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 dirty_rect: params.dirty_rect,
                 tile_size: command.tile_size,
                 tx: tx.clone(),
+                generation: params.generation,
             }
         };
 
@@ -586,10 +588,20 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             if params.descriptor.deferrable == deferrable {
                 Some(into_job(params))
             } else {
-               None
+                None
             }
         };
 
+        let into_deferrable_result = |params: &BlobImageParams| -> Option<(BlobImageRequest, BlobImageResult)> {
+            if params.descriptor.deferrable {
+                Some((params.request, BlobImageResult::Err(BlobImageError::Deferred(params.generation))))
+            } else {
+                None
+            }
+        };
+
+        // FIXME(aosmond): why can't I merge these?!?!
+        //let mut results: Vec<(BlobImageRequest, BlobImageResult)> = Vec::with_capacity(requests.len());
         if self.enable_multithreading {
             // Split out the deferrable jobs and run these asynchronously on the
             // thread pool which will try to do the work in parallel. The workers
@@ -602,6 +614,12 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 .collect();
             let lambda = move || deferrable_requests.into_par_iter().map(rasterize_deferrable_blob).collect();
             self.workers_low_priority.spawn(lambda);
+/*
+            let deferrable_results = requests
+                .into_iter()
+                .filter_map(|params| into_deferrable_result(params))
+                .collect();
+            results.extend(deferrable_results);*/
         };
 
         let sync_requests: Vec<Job> = if self.enable_multithreading {
@@ -633,6 +651,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             sync_requests.len() > 4
         };
 
+        //let sync_results = if should_parallelize {
         if should_parallelize {
             // Parallel version synchronously installs a job on the thread pool which will
             // try to do the work in parallel.
@@ -641,13 +660,17 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             if low_priority {
                 //TODO --bpe runtime flag to A/B test these two
                 self.workers_low_priority.install(lambda)
-            //self.workers.install(lambda)
             } else {
                 self.workers.install(lambda)
             }
         } else {
             sync_requests.into_iter().map(rasterize_sync_blob).collect()
         }
+//        };
+
+//        results.extend(sync_results);
+//        results
+//        sync_results
     }
 }
 
@@ -684,6 +707,7 @@ fn rasterize_blob(job: &Job) -> (BlobImageRequest, BlobImageResult) {
             Ok(RasterizedBlobImage {
                 rasterized_rect,
                 data: Arc::new(output),
+                generation: job.generation,
             })
         } else {
             panic!("Moz2D replay problem");
