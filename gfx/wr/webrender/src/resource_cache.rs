@@ -957,6 +957,16 @@ impl ResourceCache {
             );
 
             // FIXME(aosmond): what if we had old data in the map? how do we know if it is stale?!
+            // -- generation counter, attach generation to each blob raster request/worker
+            //    - store the actual generation in the tile
+            //    - if the new generation is newer than the stored generation (race on updates)
+            //    and missing flag set then issue schedule composite
+            //    - if the new generation is the requested generation, clear missing flag
+            // -- give generation to render backend on scene transaction and deferred blob tile ids
+            //    - store the requested generation in the tile
+            //    - in request_image, set missing flag if generation mismatch (assert if requested
+            //    generation is older than stored generation -- shouldn't be possible based on
+            //    message ordering)
             match tiles.entry(request.tile) {
                 Occupied(entry) => {
                     let entry = entry.into_mut();
