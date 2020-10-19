@@ -641,19 +641,91 @@ impl ResourceCache {
         deferred: bool,
         texture_cache_profile: &mut TextureCacheProfileCounters,
     ) {
-        let data = match result {
-            Ok(data) => data,
-            Err(BlobImageError::Deferred(generation)) => {
-                assert!(!deferred);
+        match result {
+            Ok(_) => {},
+            Err(BlobImageError::Deferred(_)) => {},
+            Err(..) => {
+                warn!("Failed to rasterize a blob image");
+                return;
+            }
+        };
 
+        // FIXME(aosmond): How do we know if we removed the blobs and then the rasterized result
+        // finally made it in?!
+        match self.cached_images.try_get_mut(&request.key.as_image()) {
+            Some(&mut ImageResult::Multi(ref mut entries)) => {
+                let cached_key = CachedImageKey {
+                    rendering: ImageRendering::Auto, // TODO(nical)
+                    tile: Some(request.tile),
+                };
+                if let Some(entry) = entries.try_get_mut(&cached_key) {
+                    entry.dirty_rect = DirtyRect::All;
+                }
+            }
+            _ => {}
+        }
+
+        // First make sure we have an entry for this key (using a placeholder
+        // if need be).
+        let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
+            || { RasterizedBlob::default() }
+        );
+
+        match result {
+            Ok(data) => {
+                texture_cache_profile.rasterized_blob_pixels.inc(data.rasterized_rect.area() as usize);
+
+                match tiles.entry(request.tile) {
+                    Occupied(entry) => {
+                        let entry = entry.into_mut();
+
+                        // If we aren't deferring, we should update the requested generation here.
+                        if !deferred {
+                            assert!(entry.requested_generation.0 <= data.generation.0);
+                            entry.requested_generation = data.generation;
+                        }
+
+                        // Since multiple generations of the same rasterized tile can complete out
+                        // of order, we need to only update if this result is newer than what we
+                        // have stored.
+                        let updated = if let Some(ref mut stored_data) = entry.image {
+                            if data.generation.0 > stored_data.generation.0 {
+                                *stored_data = data;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            entry.image = Some(data);
+                            true
+                        };
+
+                        // If we updated our storage, then we may need to schedule a new frame to be
+                        // composited. If the requested generation matches the result, then we know
+                        // we lagged behind a previous scene building request which was already
+                        // processed. If the requested generation is newer, then we both lagged
+                        // multiple requests. In both cases, since we have updated data, we need a
+                        // new frame to be generated since we don't know when the next rasterize
+                        // result will come in.
+                        if deferred && updated && entry.requested_generation.0 >= entry.image.as_ref().unwrap().generation.0 {
+                            // TODO(aosmond): schedule composite
+                        }
+                    },
+                    Vacant(entry) => {
+                        entry.insert(RasterizedBlobTile {
+                            requested_generation: data.generation,
+                            image: Some(data),
+                        });
+                    },
+                };
+            }
+            Err(BlobImageError::Deferred(generation)) => {
                 // This means we did not wait on the scene builder thread for the blob to finish
                 // rasterizing. Deferred blobs will signal directly to the render backend thread
                 // when they complete, so the result may already be stored here. We need to ensure
                 // we update the requested generation so that if the blob comes in after us, it
                 // knows to request a new frame to be composited to display it.
-                let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
-                    || { RasterizedBlob::default() }
-                );
+                assert!(!deferred);
 
                 match tiles.entry(request.tile) {
                     Occupied(entry) => {
@@ -668,79 +740,8 @@ impl ResourceCache {
                         });
                     }
                 }
-                return;
             }
-            Err(..) => {
-                warn!("Failed to rasterize a blob image");
-                return;
-            }
-        };
-
-        texture_cache_profile.rasterized_blob_pixels.inc(data.rasterized_rect.area() as usize);
-
-        match self.cached_images.try_get_mut(&request.key.as_image()) {
-            Some(&mut ImageResult::Multi(ref mut entries)) => {
-                let cached_key = CachedImageKey {
-                    rendering: ImageRendering::Auto, // TODO(nical)
-                    tile: Some(request.tile),
-                };
-                if let Some(entry) = entries.try_get_mut(&cached_key) {
-                    entry.dirty_rect = DirtyRect::All;
-                }
-            }
-            _ => {
-                // This could happen if a deferred blob was completed too late.
-                warn!("Discarding rasterized blob image result, no cached image");
-                return;
-            }
-        }
-
-        // First make sure we have an entry for this key (using a placeholder
-        // if need be).
-        let tiles = self.rasterized_blob_images.entry(request.key).or_insert_with(
-            || { RasterizedBlob::default() }
-        );
-
-        match tiles.entry(request.tile) {
-            Occupied(entry) => {
-                let entry = entry.into_mut();
-
-                // If we aren't deferring, we should update the requested generation here.
-                if !deferred {
-                    assert!(entry.requested_generation.0 <= data.generation.0);
-                    entry.requested_generation = data.generation;
-                }
-
-                // Since multiple generations of the same rasterized tile can complete out of
-                // order, we need to only update if this result is newer than what we have stored.
-                let updated = if let Some(ref mut stored_data) = entry.image {
-                    if data.generation.0 > stored_data.generation.0 {
-                        *stored_data = data;
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    entry.image = Some(data);
-                    true
-                };
-
-                // If we updated our storage, then we may need to schedule a new frame to be
-                // composited. If the requested generation matches the result, then we know we
-                // lagged behind a previous scene building request which was already processed. If
-                // the requested generation is newer, then we both lagged multiple requests. In
-                // both cases, since we have updated data, we need a new frame to be generated
-                // since we don't know when the next rasterize result will come in.
-                if deferred && updated && entry.requested_generation.0 >= entry.image.as_ref().unwrap().generation.0 {
-                    // TODO(aosmond): schedule composite
-                }
-            },
-            Vacant(entry) => {
-                entry.insert(RasterizedBlobTile {
-                    requested_generation: data.generation,
-                    image: Some(data),
-                });
-            },
+            Err(..) => unreachable!(),
         };
     }
 
