@@ -58,7 +58,15 @@ fn rasterize_blobs(txn: &mut TransactionMsg, tx: &Box<dyn BlobSender>, is_low_pr
     profile_scope!("rasterize_blobs");
 
     if let Some(ref mut rasterizer) = txn.blob_rasterizer {
-        let mut rasterized_blobs = rasterizer.rasterize(&txn.blob_requests, tx, is_low_priority);
+        let mut rasterized_blobs = rasterizer.rasterize_deferrable(&txn.blob_requests, tx);
+        // try using the existing allocation if our current list is empty
+        if txn.rasterized_blobs.is_empty() {
+            txn.rasterized_blobs = rasterized_blobs;
+        } else {
+            txn.rasterized_blobs.append(&mut rasterized_blobs);
+        }
+
+        rasterized_blobs = rasterizer.rasterize(&txn.blob_requests, is_low_priority);
         // try using the existing allocation if our current list is empty
         if txn.rasterized_blobs.is_empty() {
             txn.rasterized_blobs = rasterized_blobs;

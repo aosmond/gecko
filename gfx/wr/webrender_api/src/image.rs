@@ -455,8 +455,17 @@ pub trait AsyncBlobImageRasterizer : Send {
     fn rasterize(
         &mut self,
         requests: &[BlobImageParams],
-        tx: &Box<dyn BlobSender>,
         low_priority: bool
+    ) -> Vec<(BlobImageRequest, BlobImageResult)>;
+
+    /// Rasterize the deferrable requests.
+    ///
+    /// Gecko uses te priority hint to schedule work in a way that minimizes the risk
+    /// of high priority work being blocked by (or enqued behind) low priority work.
+    fn rasterize_deferrable(
+        &mut self,
+        requests: &[BlobImageParams],
+        tx: &Box<dyn BlobSender>
     ) -> Vec<(BlobImageRequest, BlobImageResult)>;
 }
 

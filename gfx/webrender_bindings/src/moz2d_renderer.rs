@@ -520,8 +520,12 @@ struct Job {
     dirty_rect: BlobDirtyRect,
     visible_rect: DeviceIntRect,
     tile_size: TileSize,
-    tx: Box<dyn BlobSender>,
     generation: BlobImageGeneration,
+}
+
+struct DeferrableJob {
+    job: Job,
+    tx: Box<dyn BlobSender>,
 }
 
 /// Rasterizes gecko blob images.
@@ -534,6 +538,24 @@ struct Moz2dBlobRasterizer {
     blob_commands: HashMap<BlobImageKey, BlobCommand>,
     ///
     enable_multithreading: bool,
+}
+
+impl Moz2dBlobRasterizer {
+    fn into_job(&self, params: &BlobImageParams) -> Job {
+        let command = &self.blob_commands[&params.request.key];
+        let blob = Arc::clone(&command.data);
+        assert!(params.descriptor.rect.size.width > 0 && params.descriptor.rect.size.height > 0);
+
+        Job {
+            request: params.request,
+            descriptor: params.descriptor,
+            commands: blob,
+            visible_rect: command.visible_rect,
+            dirty_rect: params.dirty_rect,
+            tile_size: command.tile_size,
+            generation: params.generation,
+        }
+    }
 }
 
 struct GeckoProfilerMarker {
@@ -561,102 +583,40 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
     fn rasterize(
         &mut self,
         requests: &[BlobImageParams],
-        tx: &Box<dyn BlobSender>,
         low_priority: bool,
     ) -> Vec<(BlobImageRequest, BlobImageResult)> {
         // All we do here is spin up our workers to callback into gecko to replay the drawing commands.
         let _marker = GeckoProfilerMarker::new(b"BlobRasterization\0");
 
-        let into_job = |params: &BlobImageParams| -> Job {
-            let command = &self.blob_commands[&params.request.key];
-            let blob = Arc::clone(&command.data);
-            assert!(params.descriptor.rect.size.width > 0 && params.descriptor.rect.size.height > 0);
-
-            Job {
-                request: params.request,
-                descriptor: params.descriptor,
-                commands: blob,
-                visible_rect: command.visible_rect,
-                dirty_rect: params.dirty_rect,
-                tile_size: command.tile_size,
-                tx: tx.clone(),
-                generation: params.generation,
-            }
-        };
-
-        let into_deferrable_job = |params: &BlobImageParams, deferrable: bool| -> Option<Job> {
-            if params.descriptor.deferrable == deferrable {
-                Some(into_job(params))
-            } else {
-                None
-            }
-        };
-
-        let into_deferrable_result = |params: &BlobImageParams| -> Option<(BlobImageRequest, BlobImageResult)> {
-            if params.descriptor.deferrable {
-                Some((params.request, BlobImageResult::Err(BlobImageError::Deferred(params.generation))))
-            } else {
-                None
-            }
-        };
-
-        // FIXME(aosmond): why can't I merge these?!?!
-        //let mut results: Vec<(BlobImageRequest, BlobImageResult)> = Vec::with_capacity(requests.len());
-        if self.enable_multithreading {
-            // Split out the deferrable jobs and run these asynchronously on the
-            // thread pool which will try to do the work in parallel. The workers
-            // will post the results directly to the render backend thread. Anything
-            // that gets posted before us will be included in this frame, otherwise
-            // they will request a new frame be generated.
-            let deferrable_requests: Vec<Job> = requests
-                .into_iter()
-                .filter_map(|params| into_deferrable_job(params, true))
-                .collect();
-            let lambda = move || deferrable_requests.into_par_iter().map(rasterize_deferrable_blob).collect();
-            self.workers_low_priority.spawn(lambda);
-/*
-            let deferrable_results = requests
-                .into_iter()
-                .filter_map(|params| into_deferrable_result(params))
-                .collect();
-            results.extend(deferrable_results);*/
-        };
-
-        let sync_requests: Vec<Job> = if self.enable_multithreading {
-            // We already split out the deferrable jobs above, so only include the
-            // blobs which must be run synchronously.
-            requests
-                .into_iter()
-                .filter_map(|params| into_deferrable_job(params, false))
-                .collect()
-        } else {
-            // We are unable to run any jobs in parallel, so just include all jobs
-            // in this, deferrable or not.
-            requests
-                .into_iter()
-                .map(|params| into_job(params))
-                .collect()
-        };
+        let requests: Vec<Job> = requests
+            .into_iter()
+            .filter_map(|params| {
+                if !params.descriptor.deferrable {
+                    Some(self.into_job(params))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         // If we don't have a lot of blobs it is probably not worth the initial cost
         // of installing work on rayon's thread pool so we do it serially on this thread.
         let should_parallelize = if !self.enable_multithreading {
             false
         } else if low_priority {
-            sync_requests.len() > 2
+            requests.len() > 2
         } else {
             // For high priority requests we don't "risk" the potential priority inversion of
             // dispatching to a thread pool full of low priority jobs unless it is really
             // appealing.
-            sync_requests.len() > 4
+            requests.len() > 4
         };
 
-        //let sync_results = if should_parallelize {
         if should_parallelize {
             // Parallel version synchronously installs a job on the thread pool which will
             // try to do the work in parallel.
             // This thread is blocked until the thread pool is done doing the work.
-            let lambda = || sync_requests.into_par_iter().map(rasterize_sync_blob).collect();
+            let lambda = || requests.into_par_iter().map(rasterize_sync_blob).collect();
             if low_priority {
                 //TODO --bpe runtime flag to A/B test these two
                 self.workers_low_priority.install(lambda)
@@ -664,13 +624,53 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 self.workers.install(lambda)
             }
         } else {
-            sync_requests.into_iter().map(rasterize_sync_blob).collect()
+            requests.into_iter().map(rasterize_sync_blob).collect()
         }
-//        };
+    }
 
-//        results.extend(sync_results);
-//        results
-//        sync_results
+    fn rasterize_deferrable(
+        &mut self,
+        requests: &[BlobImageParams],
+        tx: &Box<dyn BlobSender>
+    ) -> Vec<(BlobImageRequest, BlobImageResult)> {
+        // All we do here is spin up our workers to callback into gecko to replay the drawing commands.
+        let _marker = GeckoProfilerMarker::new(b"DeferrableBlobRasterization\0");
+
+        let jobs: Vec<DeferrableJob> = requests
+            .into_iter()
+            .filter_map(|params| {
+                if params.descriptor.deferrable {
+                    Some(DeferrableJob {
+                        job: self.into_job(params),
+                        tx: tx.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if self.enable_multithreading {
+            // Run the deferrable jobs asynchronously on the thread pool which will try to do the
+            // work in parallel. The workers will post the results directly to the render backend
+            // thread. Anything that gets posted before us will be included in this frame, otherwise
+            // they will request a new frame be generated.
+            let lambda = move || jobs.into_par_iter().map(rasterize_deferrable_blob).collect();
+            self.workers_low_priority.spawn(lambda);
+        } else {
+            jobs.into_iter().for_each(rasterize_deferrable_blob);
+        }
+
+        requests
+            .into_iter()
+            .filter_map(|params| {
+                if params.descriptor.deferrable {
+                    Some((params.request, BlobImageResult::Err(BlobImageError::Deferred(params.generation))))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -717,8 +717,8 @@ fn rasterize_blob(job: &Job) -> (BlobImageRequest, BlobImageResult) {
     (job.request, result)
 }
 
-fn rasterize_deferrable_blob(job: Job) {
-    let (request, result) = rasterize_blob(&job);
+fn rasterize_deferrable_blob(job: DeferrableJob) {
+    let (request, result) = rasterize_blob(&job.job);
     job.tx.send(BlobMsg::Rasterized(request, result));
 }
 
