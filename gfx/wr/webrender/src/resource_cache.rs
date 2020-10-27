@@ -694,6 +694,7 @@ impl ResourceCache {
 
                         // If we aren't deferring, we should update the requested generation here.
                         if !deferred {
+                            println!("[AO] [{:?}] add result, occupied, req gen {} -> {}", request, entry.requested_generation.0, data.generation.0);
                             assert!(entry.requested_generation.0 <= data.generation.0);
                             entry.requested_generation = data.generation;
                         }
@@ -706,6 +707,7 @@ impl ResourceCache {
                         // out of order results. For now, the dirty rect is always the entire tile
                         // so we can just take the final result.
                         let updated = if entry.image.generation == BlobImageGeneration::INVALID || data.generation.0 > entry.image.generation.0 {
+                            println!("[AO] [{:?}] add result, occupied, gen {} -> {}, {} -> {} bytes, dirty rect {:?} -> {:?}", request, entry.image.generation.0, data.generation.0, entry.image.data.len(), data.data.len(), entry.image.rasterized_rect, data.rasterized_rect);
                             entry.image = data;
                             true
                         } else {
@@ -722,6 +724,7 @@ impl ResourceCache {
                         deferred && updated && entry.requested_generation.0 >= entry.image.generation.0
                     },
                     Vacant(entry) => {
+                        println!("[AO] [{:?}] add result, vacant, gen {}, {} bytes, dirty rect {:?}", request, data.generation.0, data.data.len(), data.rasterized_rect);
                         entry.insert(RasterizedBlobTile {
                             requested_generation: data.generation,
                             image: data,
@@ -741,14 +744,19 @@ impl ResourceCache {
                 match tiles.entry(request.tile) {
                     Occupied(entry) => {
                         let entry = entry.into_mut();
+                        println!("[AO] [{:?}] add but deferred, occupied, req gen {} -> {}, {} bytes, dirty rect {:?}", request, entry.requested_generation.0, generation.0, entry.image.data.len(), entry.image.rasterized_rect);
                         assert!(entry.requested_generation.0 <= generation.0);
+                        if entry.image.generation == BlobImageGeneration::INVALID {
+                            //entry.image = create_empty_rasterized_blob_image(&descriptor);
+                        }
                         entry.requested_generation = generation;
                     }
                     Vacant(entry) => {
-                        entry.insert(RasterizedBlobTile {
+                        let entry = entry.insert(RasterizedBlobTile {
                             requested_generation: generation,
                             image: create_empty_rasterized_blob_image(&descriptor),
                         });
+                        println!("[AO] [{:?}] add but deferred, vacant, req gen {}, {} bytes, dirty rect {:?}", request, entry.requested_generation.0, entry.image.data.len(), entry.image.rasterized_rect);
                     }
                 }
                 false
@@ -1300,6 +1308,7 @@ impl ResourceCache {
                 CachedImageData::Blob => {
                     let blob_image = self.rasterized_blob_images.get_mut(&BlobImageKey(request.key)).unwrap();
                     let tile = &blob_image[&request.tile.unwrap()];
+                    println!("[AO] [{:?}] update {} bytes, dirty rect {:?}", request, tile.image.data.len(), tile.image.rasterized_rect);
                     updates.push((
                         CachedImageData::Raw(Arc::clone(&tile.image.data)),
                         Some(tile.image.rasterized_rect)
