@@ -827,7 +827,10 @@ pub enum InvalidationReason {
     // The compositor type changed
     CompositorKindChanged,
     // The valid region of the tile changed
-    ValidRectChanged,
+    ValidRectChanged {
+        old: PictureRect,
+        new: PictureRect,
+    },
     // The overall scale of the picture cache changed
     ScaleChanged,
 }
@@ -1023,8 +1026,10 @@ impl Tile {
         }
         // TODO(gw): We can avoid invalidating the whole tile in some cases here,
         //           but it should be a fairly rare invalidation case.
-        if self.current_descriptor.local_valid_rect != self.prev_descriptor.local_valid_rect {
-            self.invalidate(None, InvalidationReason::ValidRectChanged);
+        if self.current_descriptor.snapped_local_valid_rect != self.prev_descriptor.snapped_local_valid_rect {
+            self.invalidate(None, InvalidationReason::ValidRectChanged {
+                                    old: self.prev_descriptor.snapped_local_valid_rect,
+                                    new: self.current_descriptor.snapped_local_valid_rect });
             state.composite_state.dirty_rects_are_valid = false;
         }
     }
@@ -1290,6 +1295,11 @@ impl Tile {
             .round_out()
             .intersection(&device_rect)
             .unwrap_or_else(DeviceRect::zero);
+
+        let snapped_world_valid_rect = self.device_valid_rect / ctx.global_device_pixel_scale;
+        self.current_descriptor.snapped_local_valid_rect = ctx.pic_to_world_mapper
+            .unmap(&snapped_world_valid_rect)
+            .unwrap_or(self.current_descriptor.local_valid_rect);
 
         // Invalidate the tile based on the content changing.
         self.update_content_validity(ctx, state, frame_context);
@@ -1632,6 +1642,10 @@ pub struct TileDescriptor {
     /// Picture space rect that contains valid pixels region of this tile.
     local_valid_rect: PictureRect,
 
+    /// Picture space rect that contains valid pixels region of this tile,
+    /// snapped in device space.
+    snapped_local_valid_rect: PictureRect,
+
     /// List of the effects of color that we care about
     /// tracking for this tile.
     color_bindings: Vec<ColorBinding>,
@@ -1646,6 +1660,7 @@ impl TileDescriptor {
             images: Vec::new(),
             transforms: Vec::new(),
             local_valid_rect: PictureRect::zero(),
+            snapped_local_valid_rect: PictureRect::zero(),
             color_bindings: Vec::new(),
         }
     }
