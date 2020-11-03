@@ -870,8 +870,6 @@ pub struct Tile {
     /// TODO(gw): We have multiple dirty rects available due to the quadtree above. In future,
     ///           expose these as multiple dirty rects, which will help in some cases.
     pub device_dirty_rect: DeviceRect,
-    /// Device space rect that contains valid pixels region of this tile.
-    pub device_valid_rect: DeviceRect,
     /// Uniquely describes the content of this tile, in a way that can be
     /// (reasonably) efficiently hashed and compared.
     pub current_descriptor: TileDescriptor,
@@ -927,7 +925,6 @@ impl Tile {
             local_tile_rect: PictureRect::zero(),
             local_tile_box: PictureBox2D::zero(),
             world_tile_rect: WorldRect::zero(),
-            device_valid_rect: DeviceRect::zero(),
             local_dirty_rect: PictureRect::zero(),
             device_dirty_rect: DeviceRect::zero(),
             surface: None,
@@ -1022,7 +1019,7 @@ impl Tile {
         }
         // TODO(gw): We can avoid invalidating the whole tile in some cases here,
         //           but it should be a fairly rare invalidation case.
-        if self.current_descriptor.local_valid_rect != self.prev_descriptor.local_valid_rect {
+        if self.current_descriptor.device_valid_rect != self.prev_descriptor.device_valid_rect {
             self.invalidate(None, InvalidationReason::ValidRectChanged);
             state.composite_state.dirty_rects_are_valid = false;
         }
@@ -1284,7 +1281,7 @@ impl Tile {
         // always aligned to a device pixel. To handle this, round out to get all
         // required pixels, and intersect with the tile device rect.
         let device_rect = (self.world_tile_rect * ctx.global_device_pixel_scale).round();
-        self.device_valid_rect = (world_valid_rect * ctx.global_device_pixel_scale)
+        self.current_descriptor.device_valid_rect = (world_valid_rect * ctx.global_device_pixel_scale)
             .round_out()
             .intersection(&device_rect)
             .unwrap_or_else(DeviceRect::zero);
@@ -1630,6 +1627,9 @@ pub struct TileDescriptor {
     /// Picture space rect that contains valid pixels region of this tile.
     local_valid_rect: PictureRect,
 
+    /// Device space rect that contains valid pixels region of this tile.
+    pub device_valid_rect: DeviceRect,
+
     /// List of the effects of color that we care about
     /// tracking for this tile.
     color_bindings: Vec<ColorBinding>,
@@ -1644,6 +1644,7 @@ impl TileDescriptor {
             images: Vec::new(),
             transforms: Vec::new(),
             local_valid_rect: PictureRect::zero(),
+            device_valid_rect: DeviceRect::zero(),
             color_bindings: Vec::new(),
         }
     }
@@ -5177,7 +5178,9 @@ impl PicturePrimitive {
 
                             if tile.is_visible {
                                 // Get the world space rect that this tile will actually occupy on screem
-                                let device_draw_rect = device_clip_rect.intersection(&tile.device_valid_rect);
+                                let device_draw_rect = device_clip_rect.intersection(
+                                    &tile.current_descriptor.device_valid_rect,
+                                );
 
                                 // If that draw rect is occluded by some set of tiles in front of it,
                                 // then mark it as not visible and skip drawing. When it's not occluded
@@ -5409,7 +5412,8 @@ impl PicturePrimitive {
                                     .round()
                                     .to_i32();
 
-                                let valid_rect = tile.device_valid_rect
+                                let valid_rect = tile.current_descriptor
+                                    .device_valid_rect
                                     .translate(-device_rect.origin.to_vector())
                                     .round()
                                     .to_i32();
