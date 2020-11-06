@@ -3711,6 +3711,9 @@ impl Renderer {
                     self.device.gl().flush();  // early start on gpu cache updates
                 }
 
+                if doc_id.namespace_id.0 != 1 {
+                    println!("[AO] draw frame {:?}", doc_id);
+                }
                 self.draw_frame(
                     frame,
                     device_size,

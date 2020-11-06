@@ -2107,6 +2107,9 @@ void WebRenderBridgeParent::MaybeGenerateFrame(VsyncId aId,
     ResetPreviousSampleTime();
     return;
   }
+  if (mIdNamespace.mHandle != 1) {
+    printf_stderr("[AO] generate frame %u generate=%d forced=%d\n", mIdNamespace.mHandle, generateFrame, aForceGenerateFrame);
+  }
 
   if (RefPtr<OMTASampler> sampler = GetOMTASampler()) {
     if (sampler->HasAnimations()) {
@@ -2307,12 +2310,20 @@ void WebRenderBridgeParent::FlushRendering(bool aWaitForPresent) {
     return;
   }
 
+  if (mIdNamespace.mHandle != 1) {
+    printf_stderr("[AO] flush render %u, enter\n", mIdNamespace.mHandle);
+  }
+
   // This gets called during e.g. window resizes, so we need to flush the
   // scene (which has the display list at the new window size).
   FlushSceneBuilds();
   FlushFrameGeneration();
   if (aWaitForPresent) {
     FlushFramePresentation();
+  }
+
+  if (mIdNamespace.mHandle != 1) {
+    printf_stderr("[AO] flush render %u, exit\n", mIdNamespace.mHandle);
   }
 }
 

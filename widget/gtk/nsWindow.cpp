@@ -6472,6 +6472,9 @@ void draw_window_of_widget(GtkWidget* widget, GdkWindow* aWindow, cairo_t* cr) {
 
 /* static */
 gboolean expose_event_cb(GtkWidget* widget, cairo_t* cr) {
+  if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+    printf_stderr("[AO] popup expose enter\n");
+  }
   draw_window_of_widget(widget, gtk_widget_get_window(widget), cr);
 
   // A strong reference is already held during "draw" signal emission,
@@ -6485,17 +6488,30 @@ gboolean expose_event_cb(GtkWidget* widget, cairo_t* cr) {
       },
       widget);
 
+  if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+    printf_stderr("[AO] popup expose exit\n");
+  }
   return FALSE;
 }
 
 static gboolean configure_event_cb(GtkWidget* widget,
                                    GdkEventConfigure* event) {
+  if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+    printf_stderr("[AO] popup configure enter\n");
+  }
   RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
+    if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+      printf_stderr("[AO] popup configure early exit, no window\n");
+    }
     return FALSE;
   }
 
-  return window->OnConfigureEvent(widget, event);
+  auto rv = window->OnConfigureEvent(widget, event);
+  if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+    printf_stderr("[AO] popup configure exit\n");
+  }
+  return rv;
 }
 
 static void container_unrealize_cb(GtkWidget* widget) {
@@ -6508,12 +6524,21 @@ static void container_unrealize_cb(GtkWidget* widget) {
 }
 
 static void size_allocate_cb(GtkWidget* widget, GtkAllocation* allocation) {
+  if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+    printf_stderr("[AO] popup size allocate enter\n");
+  }
   RefPtr<nsWindow> window = get_window_for_gtk_widget(widget);
   if (!window) {
+    if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+      printf_stderr("[AO] popup size allocate early exit, no window\n");
+    }
     return;
   }
 
   window->OnSizeAllocate(allocation);
+  if (gtk_window_get_window_type(GTK_WINDOW(widget)) == GTK_WINDOW_POPUP) {
+    printf_stderr("[AO] popup size allocate exit\n");
+  }
 }
 
 static void toplevel_window_size_allocate_cb(GtkWidget* widget,

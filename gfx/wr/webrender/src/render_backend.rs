@@ -1418,6 +1418,9 @@ impl RenderBackend {
         frame_counter: &mut u32,
         has_built_scene: bool,
     ) -> bool {
+        if document_id.namespace_id.0 != 1 {
+          println!("[AO] build frame {:?} invalidate={} render={}", document_id, invalidate_rendered_frame, render_frame);
+        }
         let requested_frame = render_frame;
 
         let requires_frame_build = self.requires_frame_build();

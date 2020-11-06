@@ -554,6 +554,9 @@ impl SceneBuilderThread {
 
     /// Do the bulk of the work of the scene builder thread.
     fn process_transaction(&mut self, txn: &mut TransactionMsg) -> Box<BuiltTransaction> {
+        if txn.document_id.namespace_id.0 != 1 {
+          println!("[AO] build scene {:?} invalidate={}", txn.document_id, txn.invalidate_rendered_frame)
+        }
         profile_scope!("process_transaction");
 
         if let Some(ref hooks) = self.hooks {

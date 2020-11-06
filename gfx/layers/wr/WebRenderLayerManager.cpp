@@ -672,12 +672,22 @@ void WebRenderLayerManager::FlushRendering() {
 
   // Limit async FlushRendering to !resizing and Win DComp.
   // XXX relax the limitation
+  auto ns = WrBridge()->GetNamespace();
   if (WrBridge()->GetCompositorUseDComp() && !resizing) {
+    if (ns.mHandle != 1) {
+      printf_stderr("[AO] send async flush rendering %u\n", ns.mHandle);
+    }
     cBridge->SendFlushRenderingAsync();
   } else if (mWidget->SynchronouslyRepaintOnResize() ||
              StaticPrefs::layers_force_synchronous_resize()) {
+    if (ns.mHandle != 1) {
+      printf_stderr("[AO] send sync flush rendering %u\n", ns.mHandle);
+    }
     cBridge->SendFlushRendering();
   } else {
+    if (ns.mHandle != 1) {
+      printf_stderr("[AO] send async flush rendering %u (else)\n", ns.mHandle);
+    }
     cBridge->SendFlushRenderingAsync();
   }
 }
