@@ -657,6 +657,18 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
         nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_COMPARISON_IGNORED,
         V(0, 0, 0, 0), "FEATURE_FAILURE_WEBRENDER_BUG_1673939", "");
 
+    // Bug 1588904 / 1652783 - Disable WebRender for Wayland users with multiple
+    // GPUs.
+    if (mHasMultipleGPUs) {
+      APPEND_TO_DRIVER_BLOCKLIST_EXT(
+          OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
+          DesktopEnvironment::All, WindowProtocol::WaylandAll,
+          DriverVendor::All, DeviceFamily::NvidiaAll,
+          nsIGfxInfo::FEATURE_WEBRENDER, nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+          DRIVER_COMPARISON_IGNORED, V(0, 0, 0, 0),
+          "FEATURE_FAILURE_WEBRENDER_WAYLAND_MULTI_GPU", "");
+    }
+
     ////////////////////////////////////
     // FEATURE_WEBRENDER - ALLOWLIST
 
