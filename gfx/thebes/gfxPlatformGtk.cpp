@@ -94,7 +94,8 @@ gfxPlatformGtk::gfxPlatformGtk() {
     }
 #endif
 
-    if (IsWaylandDisplay() || (mIsX11Display && PR_GetEnv("MOZ_X11_EGL"))) {
+    if (IsWaylandDisplay() ||
+        (mIsX11Display && StaticPrefs::gfx_webrender_x11_egl_AtStartup())) {
       gfxVars::SetUseEGL(true);
     }
   }

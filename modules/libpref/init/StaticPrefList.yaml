@@ -4451,6 +4451,17 @@
   mirror: once
 #endif
 
+#ifdef MOZ_WIDGET_GTK
+- name: gfx.webrender.x11-egl
+  type: bool
+#ifdef NIGHTLY_BUILD
+  value: true
+#else
+  value: false
+#endif
+  mirror: once
+#endif
+
 # WebRender is not enabled when there is no GPU process on window when
 # WebRender uses ANGLE. It is for avoiding that WebGL and WebRender use ANGLE
 # at once. But there is a case that we want to enable WebRender for testing.
