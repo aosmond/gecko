@@ -662,7 +662,7 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
 
     // Intel Mesa baseline, chosen arbitrarily.
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
-        OperatingSystem::Linux, ScreenSizeStatus::SmallAndMedium,
+        OperatingSystem::Linux, ScreenSizeStatus::All,
         BatteryStatus::All, DesktopEnvironment::GNOME, WindowProtocol::X11,
         DriverVendor::MesaAll, DeviceFamily::IntelRolloutWebRender,
         nsIGfxInfo::FEATURE_WEBRENDER, nsIGfxInfo::FEATURE_ALLOW_ALWAYS,
@@ -680,8 +680,8 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
 #ifdef EARLY_BETA_OR_EARLIER
     // Intel Mesa baseline, chosen arbitrarily.
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
-        OperatingSystem::Linux, ScreenSizeStatus::SmallAndMedium,
-        BatteryStatus::All, DesktopEnvironment::GNOME, WindowProtocol::X11All,
+        OperatingSystem::Linux, ScreenSizeStatus::All,
+        BatteryStatus::All, DesktopEnvironment::GNOME, WindowProtocol::All,
         DriverVendor::MesaAll, DeviceFamily::IntelRolloutWebRender,
         nsIGfxInfo::FEATURE_WEBRENDER, nsIGfxInfo::FEATURE_ALLOW_ALWAYS,
         DRIVER_GREATER_THAN_OR_EQUAL, V(18, 0, 0, 0),
@@ -690,7 +690,7 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
     // ATI Mesa baseline, chosen arbitrarily.
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
         OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
-        DesktopEnvironment::GNOME, WindowProtocol::X11All,
+        DesktopEnvironment::GNOME, WindowProtocol::All,
         DriverVendor::MesaAll, DeviceFamily::AtiRolloutWebRender,
         nsIGfxInfo::FEATURE_WEBRENDER, nsIGfxInfo::FEATURE_ALLOW_ALWAYS,
         DRIVER_GREATER_THAN_OR_EQUAL, V(18, 0, 0, 0),
@@ -700,7 +700,7 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
 #ifdef NIGHTLY_BUILD
     // Intel Mesa baseline, chosen arbitrarily.
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
-        OperatingSystem::Linux, ScreenSizeStatus::SmallAndMedium,
+        OperatingSystem::Linux, ScreenSizeStatus::All,
         BatteryStatus::All, DesktopEnvironment::All, WindowProtocol::All,
         DriverVendor::MesaAll, DeviceFamily::IntelRolloutWebRender,
         nsIGfxInfo::FEATURE_WEBRENDER, nsIGfxInfo::FEATURE_ALLOW_QUALIFIED,
