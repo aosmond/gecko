@@ -736,6 +736,20 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
 #endif
 
     ////////////////////////////////////
+    // FEATURE_WEBRENDER_SOFTWARE - ALLOWLIST
+
+#ifdef NIGHTLY_BUILD
+    // Grant WebRender Software to Nvidia users with the proprietary driver.
+    APPEND_TO_DRIVER_BLOCKLIST_EXT(
+        OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
+        DesktopEnvironment::All, WindowProtocol::All, DriverVendor::NonMesaAll,
+        DeviceFamily::NvidiaAll, nsIGfxInfo::FEATURE_WEBRENDER_SOFTWARE,
+        nsIGfxInfo::FEATURE_ALLOW_QUALIFIED, DRIVER_COMPARISON_IGNORED,
+        V(0, 0, 0, 0), "FEATURE_FAILURE_WEBRENDER_SOFTWARE_NVIDIA_NON_MESA",
+        "");
+#endif
+
+    ////////////////////////////////////
 
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
         OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
