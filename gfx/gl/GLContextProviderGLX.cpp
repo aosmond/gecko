@@ -222,7 +222,10 @@ bool GLXLibrary::EnsureInitialized() {
 
   if (HasExtension(extensionsStr, "GLX_EXT_buffer_age") &&
       fnLoadSymbols(symbols_querydrawable)) {
+    printf_stderr("[AO] has GLX_EXT_buffer_age\n");
     mHasBufferAge = true;
+  } else {
+    printf_stderr("[AO] does not have GLX_EXT_buffer_age\n");
   }
 
   mIsATI = serverVendor && DoesStringMatch(serverVendor, "ATI");
