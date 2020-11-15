@@ -45,8 +45,17 @@ class DebianBootstrapper(LinuxBootstrapper, BaseBootstrapper):
     ]
 
     # These are common packages for building Firefox for Desktop
-    # (browser) for all Debian-derived distros (such as Ubuntu).
+    # (browser) for all Debian-derived distros (such as Ubuntu)
+    # for the host architecture.
     BROWSER_COMMON_PACKAGES = [
+        "xvfb",
+        "yasm",
+    ]
+
+    # These are common packages for building Firefox for Desktop
+    # (browser) for all Debian-derived distros (such as Ubuntu).
+    # for the target architecture.
+    BROWSER_ARCH_COMMON_PACKAGES = [
         "libasound2-dev",
         "libcurl4-openssl-dev",
         "libdbus-1-dev",
@@ -57,8 +66,6 @@ class DebianBootstrapper(LinuxBootstrapper, BaseBootstrapper):
         "libpulse-dev",
         "libx11-xcb-dev",
         "libxt-dev",
-        "xvfb",
-        "yasm",
     ]
 
     # These are common packages for building Firefox for Android
@@ -102,6 +109,12 @@ class DebianBootstrapper(LinuxBootstrapper, BaseBootstrapper):
     def install_browser_artifact_mode_packages(self, mozconfig_builder):
         self.ensure_browser_packages(artifact_mode=True)
 
+    def install_browser_cross_armv7_hf_packages(self, mozconfig_builder):
+        self.ensure_browser_packages()
+        self.apt_add_architecture(["armhf"])
+        #self.apt_update()
+        self.apt_install_arch("armhf", *self.BROWSER_ARCH_COMMON_PACKAGES)
+
     def install_mobile_android_packages(self, mozconfig_builder):
         self.ensure_mobile_android_packages(mozconfig_builder)
 
@@ -111,6 +124,7 @@ class DebianBootstrapper(LinuxBootstrapper, BaseBootstrapper):
     def ensure_browser_packages(self, artifact_mode=False):
         # TODO: Figure out what not to install for artifact mode
         self.apt_install(*self.BROWSER_COMMON_PACKAGES)
+        #self.apt_install(*self.BROWSER_ARCH_COMMON_PACKAGES)
         modern = self.is_nasm_modern()
         if not modern:
             self.apt_install("nasm")

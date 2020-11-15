@@ -453,6 +453,9 @@ class BaseBootstrapper(object):
 
         self.run_as_root(command)
 
+    def apt_install_arch(self, arch, *packages):
+        self.apt_install(*list(map(lambda p: '{}:{}'.format(p, arch), packages)))
+
     def apt_update(self):
         command = ["apt-get", "update"]
         if self.no_interactive:
@@ -810,6 +813,9 @@ class BaseBootstrapper(object):
             for target in android_targets:
                 if target not in targets:
                     subprocess.check_call([rustup, "target", "add", target])
+
+        if "browser_cross_armhf" in self.application:
+            subprocess.check_call([rustup, "target", "add", "armv7-unknown-linux-gnueabihf"])
 
     def upgrade_rust(self, rustup):
         """Upgrade Rust.
