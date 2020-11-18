@@ -2775,6 +2775,21 @@ void gfxPlatform::InitWebRenderConfig() {
                 gfxPlatform::WebRenderEnvvarDisabled(),
                 StaticPrefs::gfx_webrender_software_AtStartup());
 
+  // If we force enabled or disabled WebRender, make sure that is the case. This
+  // is to ensure we have the proper CI configuration.
+  if (gfxPlatform::WebRenderEnvvarEnabled()) {
+    MOZ_RELEASE_ASSERT(gfxVars::UseWebRender());
+  } else if (gfxPlatform::WebRenderEnvvarDisabled()) {
+    MOZ_RELEASE_ASSERT(!gfxVars::UseWebRender());
+  }
+
+  // If we are using WebRender, and we force enabled Software WebRender, make
+  // sure that is the case.
+  if (gfxVars::UseWebRender() &&
+      StaticPrefs::gfx_webrender_software_AtStartup()) {
+    MOZ_RELEASE_ASSERT(gfxVars::UseSoftwareWebRender());
+  }
+
 #ifdef XP_WIN
   if (gfxConfig::IsEnabled(Feature::WEBRENDER_DCOMP_PRESENT)) {
     gfxVars::SetUseWebRenderDCompWin(true);
@@ -3373,6 +3388,8 @@ void gfxPlatform::NotifyGPUProcessDisabled() {
     gfxConfig::GetFeature(Feature::WEBRENDER)
         .ForceDisable(FeatureStatus::Unavailable, "GPU Process is disabled",
                       "FEATURE_FAILURE_GPU_PROCESS_DISABLED"_ns);
+    MOZ_RELEASE_ASSERT(!WebRenderEnvvarEnabled(),
+                       "Forced WebRender but now disabled");
     gfxVars::SetUseWebRender(false);
   }
   gfxVars::SetRemoteCanvasEnabled(false);
