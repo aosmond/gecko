@@ -2769,6 +2769,15 @@ void gfxPlatform::InitWebRenderConfig() {
     UpdateForceSubpixelAAWherePossible();
   }
 
+  printf_stderr("[AO] wr=%d sw_wr=%d; ee=%d ed=%d ps=%d\n",
+                gfxVars::UseWebRender(), gfxVars::UseSoftwareWebRender(),
+                gfxPlatform::WebRenderEnvvarEnabled(),
+                gfxPlatform::WebRenderEnvvarDisabled(),
+                StaticPrefs::gfx_webrender_software_AtStartup());
+  if (!gfxVars::UseWebRender()) {
+    printf_stderr("[AO] wr_status=%s\n", gfxConfig::GetFailureId(Feature::WEBRENDER).get());
+  }
+
 #ifdef XP_WIN
   if (gfxConfig::IsEnabled(Feature::WEBRENDER_DCOMP_PRESENT)) {
     gfxVars::SetUseWebRenderDCompWin(true);
