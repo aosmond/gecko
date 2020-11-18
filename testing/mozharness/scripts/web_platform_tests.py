@@ -555,6 +555,11 @@ class WebPlatformTest(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidM
             env["MOZ_HEADLESS"] = "1"
             env["MOZ_HEADLESS_WIDTH"] = self.config["headless_width"]
             env["MOZ_HEADLESS_HEIGHT"] = self.config["headless_height"]
+        if self.config["enable_webrender"]:
+            env["MOZ_WEBRENDER"] = "1"
+            env["MOZ_ACCELERATED"] = "1"
+        else:
+            env["MOZ_WEBRENDER"] = "0"
 
         env["STYLO_THREADS"] = "4"
 
