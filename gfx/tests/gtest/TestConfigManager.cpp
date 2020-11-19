@@ -739,6 +739,60 @@ TEST_F(GfxConfigManager, WebRenderWhenXRenderEnabled) {
   EXPECT_FALSE(mFeatures.mWrSoftware.IsEnabled());
 }
 
+TEST_F(GfxConfigManager, WebRenderLayersAccelForceEnabled) {
+  mLayersAccelerationForceEnabled = true;
+  mMockGfxInfo->mStatusWr = nsIGfxInfo::FEATURE_DENIED;
+  ConfigureWebRender();
+
+  EXPECT_FALSE(mFeatures.mWrQualified.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWr.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrCompositor.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrAngle.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrDComp.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrPartial.IsEnabled());
+  EXPECT_TRUE(mFeatures.mHwCompositing.IsEnabled());
+  EXPECT_TRUE(mFeatures.mGPUProcess.IsEnabled());
+  EXPECT_TRUE(mFeatures.mD3D11HwAngle.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrSoftware.IsEnabled());
+}
+
+TEST_F(GfxConfigManager, WebRenderForceDisabledLayersAccelForceEnabled) {
+  // Force disabling WebRender would normally disable hardware compositing as
+  // well, but the layers.acceleration.force-enabled pref overrides that.
+  mLayersAccelerationForceEnabled = true;
+  mWrForceDisabled = true;
+  ConfigureWebRender();
+
+  EXPECT_TRUE(mFeatures.mWrQualified.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWr.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrCompositor.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrAngle.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrDComp.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrPartial.IsEnabled());
+  EXPECT_TRUE(mFeatures.mHwCompositing.IsEnabled());
+  EXPECT_TRUE(mFeatures.mGPUProcess.IsEnabled());
+  EXPECT_TRUE(mFeatures.mD3D11HwAngle.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrSoftware.IsEnabled());
+}
+
+TEST_F(GfxConfigManager, WebRenderLayersAccelForceEnabledNotNightly) {
+  mLayersAccelerationForceEnabled = true;
+  mIsNightly = false;
+  mMockGfxInfo->mStatusWr = nsIGfxInfo::FEATURE_DENIED;
+  ConfigureWebRender();
+
+  EXPECT_FALSE(mFeatures.mWrQualified.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWr.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrCompositor.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrAngle.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrDComp.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrPartial.IsEnabled());
+  EXPECT_TRUE(mFeatures.mHwCompositing.IsEnabled());
+  EXPECT_TRUE(mFeatures.mGPUProcess.IsEnabled());
+  EXPECT_TRUE(mFeatures.mD3D11HwAngle.IsEnabled());
+  EXPECT_FALSE(mFeatures.mWrSoftware.IsEnabled());
+}
+
 TEST_F(GfxConfigManager, WebRenderSofwareAndQualified) {
   // Enabling software in gfxInfo gives the same results
   // as the default configuration, since qualified hardware

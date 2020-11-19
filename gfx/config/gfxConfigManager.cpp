@@ -59,6 +59,8 @@ void gfxConfigManager::Init() {
 #ifdef MOZ_WIDGET_GTK
   mDisableHwCompositingNoWr = true;
   mXRenderEnabled = mozilla::Preferences::GetBool("gfx.xrender.enabled");
+  mLayersAccelerationForceEnabled = StaticPrefs::
+      layers_acceleration_force_enabled_AtStartup_DoNotUseDirectly();
 #endif
 
 #ifdef NIGHTLY_BUILD
@@ -262,6 +264,11 @@ void gfxConfigManager::ConfigureWebRender() {
     // gfx.webrender.all.qualified).
     mFeatureWr->UserDisable("User force-disabled WR",
                             "FEATURE_FAILURE_USER_FORCE_DISABLED"_ns);
+  } else if (mLayersAccelerationForceEnabled && mIsNightly) {
+    // If the user set layers.acceleration.force-enabled, and did not
+    // force disable WebRender above, then we should prefer WebRender.
+    // Note that we only sample the actual pref on Linux.
+    mFeatureWr->UserForceEnable("Force enabled by legacy pref");
   }
 
   if (!mFeatureWrQualified->IsEnabled()) {

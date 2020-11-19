@@ -37,6 +37,7 @@ class gfxConfigManager {
         mWrPartialPresent(false),
         mGPUProcessAllowSoftware(false),
         mXRenderEnabled(false),
+        mLayersAccelerationForceEnabled(false),
         mWrEnvForceEnabled(false),
         mWrEnvForceDisabled(false),
         mScaledResolution(false),
@@ -83,6 +84,7 @@ class gfxConfigManager {
   bool mWrPartialPresent;
   bool mGPUProcessAllowSoftware;
   bool mXRenderEnabled;
+  bool mLayersAccelerationForceEnabled;
 
   /**
    * Environment variables
