@@ -579,6 +579,7 @@ void GfxInfo::GetData() {
   }
 
   AddCrashReportAnnotations();
+  printf_stderr("[AO] mesa=%d accel=%d driver=%s vendor=%s device=%s\n", mIsMesa, mIsAccelerated, mDriverVendor.get(), mVendorId.get(), mDeviceId.get());
 }
 
 const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
