@@ -187,6 +187,9 @@ ccov-code-coverage-tests:
     - test-coverage
     - test-coverage-wpt
 
+marionette-gpu-tests:
+    - marionette-gpu
+
 mochitest-headless:
     - mochitest-plain-headless
 

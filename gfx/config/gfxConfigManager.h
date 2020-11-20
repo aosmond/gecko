@@ -9,8 +9,6 @@
 #include "gfxFeature.h"
 #include "gfxTypes.h"
 
-class nsIGfxInfo;
-
 namespace mozilla {
 namespace gfx {
 
@@ -30,6 +28,7 @@ class gfxConfigManager {
         mWrForceEnabled(false),
         mWrForceDisabled(false),
         mWrCompositorForceEnabled(false),
+        mWrQualified(false),
         mWrForceAngle(false),
         mWrForceAngleNoGPUProcess(false),
         mWrDCompWinEnabled(false),
@@ -52,7 +51,7 @@ class gfxConfigManager {
 
  protected:
   void EmplaceUserPref(const char* aPrefName, Maybe<bool>& aValue);
-  void ConfigureWebRenderQualified();
+  bool ConfigureWebRenderQualified();
   void ConfigureWebRenderSoftware();
 
   nsCOMPtr<nsIGfxInfo> mGfxInfo;
@@ -76,6 +75,8 @@ class gfxConfigManager {
   bool mWrForceEnabled;
   bool mWrForceDisabled;
   bool mWrCompositorForceEnabled;
+  bool mWrQualified;
+  Maybe<bool> mWrQualifiedOverride;
   bool mWrForceAngle;
   bool mWrForceAngleNoGPUProcess;
   bool mWrDCompWinEnabled;
