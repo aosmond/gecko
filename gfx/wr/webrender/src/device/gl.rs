@@ -1307,14 +1307,6 @@ impl From<DrawTarget> for ReadTarget {
 }
 
 impl Device {
-    fn dump_error(gl: &mut Rc<dyn gl::Gl>, state: &str) {
-        let mut err = gl.get_error();
-        while err != gl::NO_ERROR {
-            error!("Device::new {} error {}", state, err);
-            err = gl.get_error();
-        }
-    }
-
     pub fn new(
         mut gl: Rc<dyn gl::Gl>,
         resource_override_path: Option<PathBuf>,
@@ -1327,20 +1319,6 @@ impl Device {
         surface_origin_is_top_left: bool,
         panic_on_gl_error: bool,
     ) -> Device {
-        Self::dump_error(&mut gl, "enter");
-        let mut max_texture_size = [0];
-        let mut max_texture_layers = [0];
-        unsafe {
-            gl.get_integer_v(gl::MAX_TEXTURE_SIZE, &mut max_texture_size);
-            Self::dump_error(&mut gl, "max_texture_size");
-            gl.get_integer_v(gl::MAX_ARRAY_TEXTURE_LAYERS, &mut max_texture_layers);
-            Self::dump_error(&mut gl, "max_array_texture_layers");
-        }
-
-        let max_texture_size = max_texture_size[0];
-        let max_texture_layers = max_texture_layers[0] as u32;
-        let renderer_name = gl.get_string(gl::RENDERER);
-
         let mut extension_count = [0];
         unsafe {
             gl.get_integer_v(gl::NUM_EXTENSIONS, &mut extension_count);
@@ -1364,6 +1342,17 @@ impl Device {
                 panic!("Caught GL error {:x} at {}", code, name);
             });
         }
+
+        let mut max_texture_size = [1];
+        let mut max_texture_layers = [0];
+        unsafe {
+            gl.get_integer_v(gl::MAX_TEXTURE_SIZE, &mut max_texture_size);
+            gl.get_integer_v(gl::MAX_ARRAY_TEXTURE_LAYERS, &mut max_texture_layers);
+        }
+
+        let max_texture_size = max_texture_size[0];
+        let max_texture_layers = max_texture_layers[0] as u32;
+        let renderer_name = gl.get_string(gl::RENDERER);
 
         if supports_extension(&extensions, "GL_ANGLE_provoking_vertex") {
             gl.provoking_vertex_angle(gl::FIRST_VERTEX_CONVENTION);
