@@ -32,6 +32,7 @@
 #include "mozilla/Monitor.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/StaticPrefs_layers.h"
+#include "mozilla/StaticPrefs_gfx.h"
 #include "nsIGfxInfo.h"
 #include "nsMathUtils.h"
 #include "nsUnicharUtils.h"
@@ -88,24 +89,8 @@ gfxPlatformGtk::gfxPlatformGtk() {
   mIsX11Display = gfxPlatform::IsHeadless()
                       ? false
                       : GDK_IS_X11_DISPLAY(gdk_display_get_default());
-  if (XRE_IsParentProcess()) {
-#ifdef MOZ_X11
-    if (mIsX11Display && mozilla::Preferences::GetBool("gfx.xrender.enabled")) {
-      gfxVars::SetUseXRender(true);
-    }
-#endif
-
-    if (IsWaylandDisplay() || (mIsX11Display && PR_GetEnv("MOZ_X11_EGL"))) {
-      gfxVars::SetUseEGL(true);
-    }
-  }
 
   InitBackendPrefs(GetBackendPrefs());
-
-#ifdef MOZ_WAYLAND
-  mUseWebGLDmabufBackend =
-      gfxVars::UseEGL() && GetDMABufDevice()->IsDMABufWebGLEnabled();
-#endif
 
   gPlatformFTLibrary = Factory::NewFTLibrary();
   MOZ_RELEASE_ASSERT(gPlatformFTLibrary);
@@ -127,6 +112,55 @@ void gfxPlatformGtk::FlushContentDrawing() {
   if (gfxVars::UseXRender()) {
     XFlush(DefaultXDisplay());
   }
+}
+
+void gfxPlatformGtk::InitAcceleration() {
+  gfxPlatform::InitAcceleration();
+
+  if (!XRE_IsParentProcess()) {
+    return;
+  }
+
+  if (XRE_IsParentProcess()) {
+#ifdef MOZ_X11
+    if (mIsX11Display && mozilla::Preferences::GetBool("gfx.xrender.enabled")) {
+      gfxVars::SetUseXRender(true);
+    }
+#endif
+  }
+
+#ifdef MOZ_X11
+  if (mIsX11Display) {
+    FeatureState& x11EGL = gfxConfig::GetFeature(Feature::X11_EGL);
+    x11EGL.EnableByDefault();
+
+    if (PR_GetEnv("MOZ_X11_EGL")) {
+      x11EGL.UserForceEnable("Force enabled by envvar");
+    } else if (StaticPrefs::
+                   gfx_x11_egl_force_enabled_AtStartup_DoNotUseDirectly()) {
+      x11EGL.UserForceEnable("Force enabled by pref");
+    }
+
+    nsCString message;
+    nsCString failureId;
+    if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_X11_EGL, &message,
+                             failureId)) {
+      x11EGL.Disable(FeatureStatus::Blocklisted, message.get(), failureId);
+    }
+
+    gfxVars::SetUseEGL(x11EGL.IsEnabled());
+  } else
+#endif
+#ifdef MOZ_WAYLAND
+  {
+    gfxVars::SetUseEGL(IsWaylandDisplay());
+  }
+#endif
+
+#ifdef MOZ_WAYLAND
+  mUseWebGLDmabufBackend =
+      gfxVars::UseEGL() && GetDMABufDevice()->IsDMABufWebGLEnabled();
+#endif
 }
 
 void gfxPlatformGtk::InitPlatformGPUProcessPrefs() {

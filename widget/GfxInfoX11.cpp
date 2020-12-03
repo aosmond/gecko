@@ -22,6 +22,7 @@
 #include "mozilla/gfx/Logging.h"
 
 #include "GfxInfoX11.h"
+#include "gfxConfig.h"
 
 #include <gdk/gdkx.h>
 #ifdef MOZ_WAYLAND
@@ -55,6 +56,9 @@ nsresult GfxInfo::Init() {
   mIsXWayland = false;
   mHasMultipleGPUs = false;
   mGlxTestError = false;
+  mValidEGL = false;
+  mValidGLES = false;
+  mValidGLX = false;
   return GfxInfoBase::Init();
 }
 
@@ -153,6 +157,11 @@ void GfxInfo::GetData() {
                received_signal;
   bool errorLog = false;
 
+  // Library load status and has required symbols.
+  nsCString eglValid;
+  nsCString glesValid;
+  nsCString glxValid;
+
   nsCString glVendor;
   nsCString glRenderer;
   nsCString glVersion;
@@ -183,6 +192,12 @@ void GfxInfo::GetData() {
     } else if (logString) {
       gfxCriticalNote << "glxtest: " << line;
       logString = false;
+    } else if (!strcmp(line, "EGL_VALID")) {
+      stringToFill = &eglValid;
+    } else if (!strcmp(line, "GLES_VALID")) {
+      stringToFill = &glesValid;
+    } else if (!strcmp(line, "GLX_VALID")) {
+      stringToFill = &glxValid;
     } else if (!strcmp(line, "VENDOR")) {
       stringToFill = &glVendor;
     } else if (!strcmp(line, "RENDERER")) {
@@ -221,7 +236,14 @@ void GfxInfo::GetData() {
   size_t pciLen = std::min(pciVendors.Length(), pciDevices.Length());
   mHasMultipleGPUs = pciLen > 1;
 
-  if (!strcmp(textureFromPixmap.get(), "TRUE")) mHasTextureFromPixmap = true;
+  mValidEGL = strcmp(eglValid.get(), "TRUE") == 0;
+  mValidGLES = strcmp(glesValid.get(), "TRUE") == 0;
+  mValidGLX = strcmp(glxValid.get(), "TRUE") == 0;
+  if (!(mValidEGL && mValidGLES) && !mValidGLX) {
+    NS_WARNING("No valid GL library detected");
+  }
+
+  mHasTextureFromPixmap = strcmp(textureFromPixmap.get(), "TRUE") == 0;
 
   // only useful for Linux kernel version check for FGLRX driver.
   // assumes X client == X server, which is sad.
@@ -804,6 +826,30 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
         DeviceFamily::All, nsIGfxInfo::FEATURE_THREADSAFE_GL,
         nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_COMPARISON_IGNORED,
         V(0, 0, 0, 0), "FEATURE_FAILURE_THREADSAFE_GL", "");
+
+    ////////////////////////////////////
+    // FEATURE_X11_EGL
+    if (!mValidEGL) {
+      APPEND_TO_DRIVER_BLOCKLIST2(OperatingSystem::Linux, DeviceFamily::All,
+                                  nsIGfxInfo::FEATURE_X11_EGL,
+                                  nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+                                  DRIVER_COMPARISON_IGNORED, V(0, 0, 0, 0),
+                                  "FEATURE_FAILURE_MISSING_LIBEGL");
+    }
+
+    if (!mValidGLES) {
+      APPEND_TO_DRIVER_BLOCKLIST2(OperatingSystem::Linux, DeviceFamily::All,
+                                  nsIGfxInfo::FEATURE_X11_EGL,
+                                  nsIGfxInfo::FEATURE_BLOCKED_DEVICE,
+                                  DRIVER_COMPARISON_IGNORED, V(0, 0, 0, 0),
+                                  "FEATURE_FAILURE_MISSING_LIBGLES");
+    }
+
+    // TODO(aosmond): see bug 1677203.
+    APPEND_TO_DRIVER_BLOCKLIST2(
+        OperatingSystem::Linux, DeviceFamily::All, nsIGfxInfo::FEATURE_X11_EGL,
+        nsIGfxInfo::FEATURE_DENIED, DRIVER_COMPARISON_IGNORED, V(0, 0, 0, 0),
+        "FEATURE_FAILURE_NOT_ALLOWED");
   }
   return *sDriverInfo;
 }
@@ -880,6 +926,13 @@ nsresult GfxInfo::GetFeatureStatusImpl(
     return NS_OK;
   }
 
+  if (!(mValidEGL && mValidGLES) && !mValidGLX) {
+    // We didn't manage to load any GL libraries in glxtest.
+    *aStatus = nsIGfxInfo::FEATURE_BLOCKED_DEVICE;
+    aFailureId = "FEATURE_FAILURE_GL_LIBS_INVALID";
+    return NS_OK;
+  }
+
   if (mGLMajorVersion == 1) {
     // We're on OpenGL 1. In most cases that indicates really old hardware.
     // We better block them, rather than rely on them to fail gracefully,
@@ -900,6 +953,16 @@ nsresult GfxInfo::GetFeatureStatusImpl(
 
   return GfxInfoBase::GetFeatureStatusImpl(
       aFeature, aStatus, aSuggestedDriverVersion, aDriverInfo, aFailureId, &os);
+}
+
+void GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
+  // Add the platform neutral features
+  GfxInfoBase::DescribeFeatures(aCx, aObj);
+
+  JS::Rooted<JSObject*> obj(aCx);
+
+  gfx::FeatureState& x11Egl = gfx::gfxConfig::GetFeature(gfx::Feature::X11_EGL);
+  InitFeatureObject(aCx, aObj, "x11Egl", x11Egl, &obj);
 }
 
 NS_IMETHODIMP

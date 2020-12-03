@@ -78,6 +78,8 @@ class GfxInfo final : public GfxInfoBase {
   virtual bool DoesDriverVendorMatch(const nsAString& aBlocklistVendor,
                                      const nsAString& aDriverVendor) override;
 
+  void DescribeFeatures(JSContext* cx, JS::Handle<JSObject*> aOut) override;
+
  private:
   nsCString mVendorId;
   nsCString mDeviceId;
@@ -108,6 +110,9 @@ class GfxInfo final : public GfxInfoBase {
   bool mIsXWayland;
   bool mHasMultipleGPUs;
   bool mGlxTestError;
+  bool mValidEGL;
+  bool mValidGLES;
+  bool mValidGLX;
 
   void AddCrashReportAnnotations();
 };

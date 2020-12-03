@@ -94,6 +94,7 @@ class gfxPlatformGtk final : public gfxPlatform {
   }
 
  protected:
+  void InitAcceleration() override;
   void InitPlatformGPUProcessPrefs() override;
   bool CheckVariationFontSupport() override;
 

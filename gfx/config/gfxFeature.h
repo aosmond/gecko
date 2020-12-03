@@ -35,6 +35,7 @@ namespace gfx {
   _(OMTP, Feature, "Off Main Thread Painting")                       \
   _(ADVANCED_LAYERS, Feature, "Advanced Layers")                     \
   _(WEBGPU, Feature, "WebGPU")                                       \
+  _(X11_EGL, Feature, "X11 EGL")                                     \
   /* Add new entries above this comment */
 
 enum class Feature : uint32_t {

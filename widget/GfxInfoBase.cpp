@@ -231,6 +231,9 @@ static const char* GetPrefNameForFeature(int32_t aFeature) {
     case nsIGfxInfo::FEATURE_WEBRENDER_SOFTWARE:
       name = BLOCKLIST_PREF_BRANCH "webrender.software";
       break;
+    case nsIGfxInfo::FEATURE_X11_EGL:
+      name = BLOCKLIST_PREF_BRANCH "x11.egl";
+      break;
     default:
       MOZ_ASSERT_UNREACHABLE("Unexpected nsIGfxInfo feature?!");
       break;
@@ -429,6 +432,8 @@ static int32_t BlocklistFeatureToGfxFeature(const nsAString& aFeature) {
     return nsIGfxInfo::FEATURE_THREADSAFE_GL;
   else if (aFeature.EqualsLiteral("WEBRENDER_SOFTWARE"))
     return nsIGfxInfo::FEATURE_WEBRENDER_SOFTWARE;
+  else if (aFeature.EqualsLiteral("X11_EGL"))
+    return nsIGfxInfo::FEATURE_X11_EGL;
 
   // If we don't recognize the feature, it may be new, and something
   // this version doesn't understand.  So, nothing to do.  This is
@@ -1291,6 +1296,7 @@ void GfxInfoBase::EvaluateDownloadedBlocklist(
                         nsIGfxInfo::FEATURE_WEBRENDER,
                         nsIGfxInfo::FEATURE_WEBRENDER_COMPOSITOR,
                         nsIGfxInfo::FEATURE_WEBRENDER_SOFTWARE,
+                        nsIGfxInfo::FEATURE_X11_EGL,
                         nsIGfxInfo::FEATURE_DX_NV12,
                         nsIGfxInfo::FEATURE_DX_P010,
                         nsIGfxInfo::FEATURE_DX_P016,

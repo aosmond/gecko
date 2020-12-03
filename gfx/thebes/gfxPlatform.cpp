@@ -3487,16 +3487,31 @@ bool gfxPlatform::IsGfxInfoStatusOkay(int32_t aFeature, nsCString* aOutMessage,
                                       nsCString& aFailureId) {
   nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
   if (!gfxInfo) {
-    return true;
-  }
-
-  int32_t status;
-  if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(aFeature, aFailureId, &status)) &&
-      status != nsIGfxInfo::FEATURE_STATUS_OK) {
-    aOutMessage->AssignLiteral("#BLOCKLIST_");
-    aOutMessage->AppendASCII(aFailureId.get());
+    MOZ_ASSERT_UNREACHABLE("Missing gfxInfo service");
+    aOutMessage->AssignLiteral("gfxInfo is missing");
+    aFailureId.AssignLiteral("FEATURE_FAILURE_GFX_INFO_MISSING");
     return false;
   }
 
-  return true;
+  int32_t status;
+  if (NS_FAILED(gfxInfo->GetFeatureStatus(aFeature, aFailureId, &status))) {
+    aOutMessage->AssignLiteral("gfxInfo is broken");
+    return false;
+  }
+
+  switch (status) {
+    case nsIGfxInfo::FEATURE_STATUS_OK:
+    case nsIGfxInfo::FEATURE_ALLOW_ALWAYS:
+      return true;
+    case nsIGfxInfo::FEATURE_ALLOW_QUALIFIED:
+      MOZ_ASSERT_UNREACHABLE("Cannot check if qualified");
+      return false;
+    case nsIGfxInfo::FEATURE_DENIED:
+      aOutMessage->AssignLiteral("Not on allowlist");
+      return false;
+    default:
+      aOutMessage->AssignLiteral("#BLOCKLIST_");
+      aOutMessage->AppendASCII(aFailureId.get());
+      return false;
+  }
 }

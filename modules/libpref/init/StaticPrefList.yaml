@@ -4398,6 +4398,12 @@
   value: false
   mirror: always
 
+- name: gfx.x11-egl.force-enabled
+  type: bool
+  value: false
+  mirror: once
+  do_not_use_directly: true
+
 - name: gfx.testing.device-fail
   type: RelaxedAtomicBool
   value: false

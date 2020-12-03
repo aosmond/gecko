@@ -249,68 +249,220 @@ static void get_pci_status() {
 
 typedef void* EGLNativeDisplayType;
 typedef void* EGLDisplay;
+typedef void* EGLConfig;
+typedef void* EGLContext;
+typedef void* EGLSurface;
 typedef int EGLBoolean;
 typedef int EGLint;
 typedef void* (*PFNEGLGETPROCADDRESS)(const char*);
+typedef EGLDisplay (*PFNEGLGETDISPLAYPROC)(void* native_display);
+typedef EGLBoolean (*PFNEGLINITIALIZEPROC)(EGLDisplay dpy, EGLint* major,
+                                           EGLint* minor);
+typedef EGLBoolean (*PFNEGLTERMINATEPROC)(EGLDisplay dpy);
+typedef EGLBoolean (*PFNEGLCHOOSECONFIGPROC)(EGLDisplay dpy,
+                                             EGLint const* attrib_list,
+                                             EGLConfig* configs,
+                                             EGLint config_size,
+                                             EGLint* num_config);
+typedef EGLContext (*PFNEGLCREATECONTEXTPROC)(EGLDisplay dpy, EGLConfig config,
+                                              EGLContext share_context,
+                                              EGLint const* attrib_list);
+typedef EGLSurface (*PFNEGLCREATEPBUFFERSURFACEPROC)(EGLDisplay dpy,
+                                                     EGLConfig config,
+                                                     EGLint const* attrib_list);
+typedef EGLBoolean (*PFNEGLMAKECURRENTPROC)(EGLDisplay dpy, EGLSurface draw,
+                                            EGLSurface read,
+                                            EGLContext context);
+typedef const char* (*PFNEGLGETDISPLAYDRIVERNAMEPROC)(EGLDisplay dpy);
+typedef GLubyte* (*PFNGLGETSTRING)(GLenum);
 
-static void get_gles_status(EGLDisplay dpy,
-                            PFNEGLGETPROCADDRESS eglGetProcAddress) {
-  typedef void* EGLConfig;
-  typedef void* EGLContext;
-  typedef void* EGLSurface;
+typedef struct TestLibEGL {
+  void* lib;
+  int valid;
+  PFNEGLGETPROCADDRESS GetProcAddress;
+  PFNEGLGETDISPLAYPROC GetDisplay;
+  PFNEGLINITIALIZEPROC Initialize;
+  PFNEGLTERMINATEPROC Terminate;
+  PFNEGLCHOOSECONFIGPROC ChooseConfig;
+  PFNEGLCREATECONTEXTPROC CreateContext;
+  PFNEGLCREATEPBUFFERSURFACEPROC CreatePbufferSurface;
+  PFNEGLMAKECURRENTPROC MakeCurrent;
+  PFNEGLGETDISPLAYDRIVERNAMEPROC GetDisplayDriverName;
+  PFNGLGETSTRING GetString;
+} TestLibEGL;
 
-  typedef EGLBoolean (*PFNEGLCHOOSECONFIGPROC)(
-      EGLDisplay dpy, EGLint const* attrib_list, EGLConfig* configs,
-      EGLint config_size, EGLint* num_config);
-  PFNEGLCHOOSECONFIGPROC eglChooseConfig =
-      cast<PFNEGLCHOOSECONFIGPROC>(eglGetProcAddress("eglChooseConfig"));
+static void init_egl(TestLibEGL* egl) {
+  memset(egl, 0, sizeof(TestLibEGL));
 
-  typedef EGLContext (*PFNEGLCREATECONTEXTPROC)(
-      EGLDisplay dpy, EGLConfig config, EGLContext share_context,
-      EGLint const* attrib_list);
-  PFNEGLCREATECONTEXTPROC eglCreateContext =
-      cast<PFNEGLCREATECONTEXTPROC>(eglGetProcAddress("eglCreateContext"));
-
-  typedef EGLSurface (*PFNEGLCREATEPBUFFERSURFACEPROC)(
-      EGLDisplay dpy, EGLConfig config, EGLint const* attrib_list);
-  PFNEGLCREATEPBUFFERSURFACEPROC eglCreatePbufferSurface =
-      cast<PFNEGLCREATEPBUFFERSURFACEPROC>(
-          eglGetProcAddress("eglCreatePbufferSurface"));
-
-  typedef EGLBoolean (*PFNEGLMAKECURRENTPROC)(
-      EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext context);
-  PFNEGLMAKECURRENTPROC eglMakeCurrent =
-      cast<PFNEGLMAKECURRENTPROC>(eglGetProcAddress("eglMakeCurrent"));
-
-  if (!eglChooseConfig || !eglCreateContext || !eglCreatePbufferSurface ||
-      !eglMakeCurrent) {
-    record_error("libEGL missing methods for GLES test");
+  egl->lib = dlopen("libEGL.so.1", RTLD_LAZY);
+  if (!egl->lib) {
+    egl->lib = dlopen("libEGL.so", RTLD_LAZY);
+  }
+  if (!egl->lib) {
+    record_warning("libEGL missing");
     return;
   }
 
-  void* libgles = dlopen("libGLESv2.so.2", RTLD_LAZY);
-  if (!libgles) {
-    libgles = dlopen("libGLESv2.so", RTLD_LAZY);
-  }
-  if (!libgles) {
-    record_error("libGLESv2 missing");
+  egl->GetProcAddress =
+      cast<PFNEGLGETPROCADDRESS>(dlsym(egl->lib, "eglGetProcAddress"));
+  if (!egl->GetProcAddress) {
+    record_warning("no eglGetProcAddress");
     return;
   }
 
-  typedef GLubyte* (*PFNGLGETSTRING)(GLenum);
-  PFNGLGETSTRING glGetString =
-      cast<PFNGLGETSTRING>(eglGetProcAddress("glGetString"));
+  egl->GetDisplay =
+      cast<PFNEGLGETDISPLAYPROC>(egl->GetProcAddress("eglGetDisplay"));
+  egl->Initialize =
+      cast<PFNEGLINITIALIZEPROC>(egl->GetProcAddress("eglInitialize"));
+  egl->Terminate =
+      cast<PFNEGLTERMINATEPROC>(egl->GetProcAddress("eglTerminate"));
+  if (!egl->GetDisplay || !egl->Initialize || !egl->Terminate) {
+    record_warning("libEGL missing base methods");
+    return;
+  }
 
-  if (!glGetString) {
+  egl->ChooseConfig =
+      cast<PFNEGLCHOOSECONFIGPROC>(egl->GetProcAddress("eglChooseConfig"));
+  egl->CreateContext =
+      cast<PFNEGLCREATECONTEXTPROC>(egl->GetProcAddress("eglCreateContext"));
+  egl->CreatePbufferSurface = cast<PFNEGLCREATEPBUFFERSURFACEPROC>(
+      egl->GetProcAddress("eglCreatePbufferSurface"));
+  egl->MakeCurrent =
+      cast<PFNEGLMAKECURRENTPROC>(egl->GetProcAddress("eglMakeCurrent"));
+
+  if (!egl->ChooseConfig || !egl->CreateContext || !egl->CreatePbufferSurface ||
+      !egl->MakeCurrent) {
+    record_warning("libEGL missing methods for GLES test");
+    return;
+  }
+
+  // This is optional and accessed during gles initialization.
+  egl->GetString = cast<PFNGLGETSTRING>(egl->GetProcAddress("glGetString"));
+
+  // This is optional and used to get the driver name, if possible.
+  egl->GetDisplayDriverName = cast<PFNEGLGETDISPLAYDRIVERNAMEPROC>(
+      egl->GetProcAddress("eglGetDisplayDriverName"));
+
+  egl->valid = 1;
+}
+
+typedef struct TestLibGLES {
+  void* lib;
+  int valid;
+  PFNGLGETSTRING GetString;
+} TestLibGLES;
+
+static void init_gles(TestLibEGL* egl, TestLibGLES* gles) {
+  memset(gles, 0, sizeof(TestLibGLES));
+
+  gles->lib = dlopen("libGLESv2.so.2", RTLD_LAZY);
+  if (!gles->lib) {
+    gles->lib = dlopen("libGLESv2.so", RTLD_LAZY);
+  }
+  if (!gles->lib) {
+    record_warning("libGLESv2 missing");
+    return;
+  }
+
+  if (egl->valid && egl->GetString) {
+    gles->GetString = egl->GetString;
+  } else {
     // Implementations disagree about whether eglGetProcAddress or dlsym
     // should be used for getting functions from the actual API, see
     // https://github.com/anholt/libepoxy/commit/14f24485e33816139398d1bd170d617703473738
-    glGetString = cast<PFNGLGETSTRING>(dlsym(libgles, "glGetString"));
+    gles->GetString = cast<PFNGLGETSTRING>(dlsym(gles->lib, "glGetString"));
   }
 
-  if (!glGetString) {
-    dlclose(libgles);
+  if (!gles->GetString) {
     record_error("libGLESv2 glGetString missing");
+    return;
+  }
+
+  gles->valid = 1;
+}
+
+typedef void* (*PFNGLXGETPROCADDRESS)(const char*);
+typedef GLXFBConfig* (*PFNGLXQUERYEXTENSION)(Display*, int*, int*);
+typedef GLXFBConfig* (*PFNGLXQUERYVERSION)(Display*, int*, int*);
+typedef XVisualInfo* (*PFNGLXCHOOSEVISUAL)(Display*, int, int*);
+typedef GLXContext (*PFNGLXCREATECONTEXT)(Display*, XVisualInfo*, GLXContext,
+                                          Bool);
+typedef Bool (*PFNGLXMAKECURRENT)(Display*, GLXDrawable, GLXContext);
+typedef void (*PFNGLXDESTROYCONTEXT)(Display*, GLXContext);
+typedef Bool (*PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC)(int attribute,
+                                                          unsigned int* value);
+typedef const char* (*PFNGLXGETSCREENDRIVERPROC)(Display* dpy, int scrNum);
+
+typedef struct TestLibGLX {
+  void* lib;
+  int valid;
+  PFNGLXGETPROCADDRESS GetProcAddress;
+  PFNGLXQUERYEXTENSION QueryExtension;
+  PFNGLXQUERYVERSION QueryVersion;
+  PFNGLXCHOOSEVISUAL ChooseVisual;
+  PFNGLXCREATECONTEXT CreateContext;
+  PFNGLXMAKECURRENT MakeCurrent;
+  PFNGLXDESTROYCONTEXT DestroyContext;
+  PFNGLGETSTRING GetString;
+  PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC QueryCurrentRendererIntegerMESAProc;
+  PFNGLXGETSCREENDRIVERPROC GetScreenDriverProc;
+} TestLibGLX;
+
+static void init_glx(TestLibGLX* glx) {
+  memset(glx, 0, sizeof(TestLibGLX));
+
+  ///// Open libGL and load needed symbols /////
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+#  define LIBGL_FILENAME "libGL.so"
+#else
+#  define LIBGL_FILENAME "libGL.so.1"
+#endif
+  glx->lib = dlopen(LIBGL_FILENAME, RTLD_LAZY);
+  if (!glx->lib) {
+    record_warning(LIBGL_FILENAME " missing");
+    return;
+  }
+
+  glx->GetProcAddress =
+      cast<PFNGLXGETPROCADDRESS>(dlsym(glx->lib, "glXGetProcAddress"));
+  if (!glx->GetProcAddress) {
+    record_warning("no glXGetProcAddress");
+    return;
+  }
+
+  glx->QueryExtension =
+      cast<PFNGLXQUERYEXTENSION>(glx->GetProcAddress("glXQueryExtension"));
+  glx->QueryVersion =
+      cast<PFNGLXQUERYVERSION>(dlsym(glx->lib, "glXQueryVersion"));
+  glx->ChooseVisual =
+      cast<PFNGLXCHOOSEVISUAL>(glx->GetProcAddress("glXChooseVisual"));
+  glx->CreateContext =
+      cast<PFNGLXCREATECONTEXT>(glx->GetProcAddress("glXCreateContext"));
+  glx->MakeCurrent =
+      cast<PFNGLXMAKECURRENT>(glx->GetProcAddress("glXMakeCurrent"));
+  glx->DestroyContext =
+      cast<PFNGLXDESTROYCONTEXT>(glx->GetProcAddress("glXDestroyContext"));
+  glx->GetString = cast<PFNGLGETSTRING>(glx->GetProcAddress("glGetString"));
+
+  if (!glx->QueryExtension || !glx->QueryVersion || !glx->ChooseVisual ||
+      !glx->CreateContext || !glx->MakeCurrent || !glx->DestroyContext ||
+      !glx->GetString) {
+    record_warning(LIBGL_FILENAME " missing base methods");
+    return;
+  }
+
+  glx->QueryCurrentRendererIntegerMESAProc =
+      cast<PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC>(
+          glx->GetProcAddress("glXQueryCurrentRendererIntegerMESA"));
+  glx->GetScreenDriverProc = cast<PFNGLXGETSCREENDRIVERPROC>(
+      glx->GetProcAddress("glXGetScreenDriver"));
+
+  glx->valid = 1;
+}
+
+static void get_gles_status(TestLibEGL* egl, TestLibGLES* gles,
+                            EGLDisplay dpy) {
+  if (!egl || !egl->valid || !gles || !gles->valid) {
     return;
   }
 
@@ -318,15 +470,15 @@ static void get_gles_status(EGLDisplay dpy,
                            EGL_BLUE_SIZE, 8, EGL_NONE};
   EGLConfig config;
   EGLint num_config;
-  eglChooseConfig(dpy, config_attrs, &config, 1, &num_config);
+  egl->ChooseConfig(dpy, config_attrs, &config, 1, &num_config);
   EGLint ctx_attrs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
-  EGLContext ectx = eglCreateContext(dpy, config, EGL_NO_CONTEXT, ctx_attrs);
-  EGLSurface pbuf = eglCreatePbufferSurface(dpy, config, nullptr);
-  eglMakeCurrent(dpy, pbuf, pbuf, ectx);
+  EGLContext ectx = egl->CreateContext(dpy, config, EGL_NO_CONTEXT, ctx_attrs);
+  EGLSurface pbuf = egl->CreatePbufferSurface(dpy, config, nullptr);
+  egl->MakeCurrent(dpy, pbuf, pbuf, ectx);
 
-  const GLubyte* versionString = glGetString(GL_VERSION);
-  const GLubyte* vendorString = glGetString(GL_VENDOR);
-  const GLubyte* rendererString = glGetString(GL_RENDERER);
+  const GLubyte* versionString = gles->GetString(GL_VERSION);
+  const GLubyte* vendorString = gles->GetString(GL_VENDOR);
+  const GLubyte* rendererString = gles->GetString(GL_RENDERER);
 
   if (versionString && vendorString && rendererString) {
     record_value("VENDOR\n%s\nRENDERER\n%s\nVERSION\n%s\nTFP\nTRUE\n",
@@ -334,136 +486,43 @@ static void get_gles_status(EGLDisplay dpy,
   } else {
     record_error("libGLESv2 glGetString returned null");
   }
-
-  dlclose(libgles);
 }
 
-static void get_egl_status(EGLNativeDisplayType native_dpy, bool gles_test) {
-  void* libegl = dlopen("libEGL.so.1", RTLD_LAZY);
-  if (!libegl) {
-    libegl = dlopen("libEGL.so", RTLD_LAZY);
-  }
-  if (!libegl) {
-    record_warning("libEGL missing");
+static void get_egl_status(TestLibEGL* egl, TestLibGLES* gles,
+                           EGLNativeDisplayType native_dpy) {
+  if (!egl || !egl->valid) {
     return;
   }
 
-  PFNEGLGETPROCADDRESS eglGetProcAddress =
-      cast<PFNEGLGETPROCADDRESS>(dlsym(libegl, "eglGetProcAddress"));
-
-  if (!eglGetProcAddress) {
-    dlclose(libegl);
-    record_error("no eglGetProcAddress");
-    return;
-  }
-
-  typedef EGLDisplay (*PFNEGLGETDISPLAYPROC)(void* native_display);
-  PFNEGLGETDISPLAYPROC eglGetDisplay =
-      cast<PFNEGLGETDISPLAYPROC>(eglGetProcAddress("eglGetDisplay"));
-
-  typedef EGLBoolean (*PFNEGLINITIALIZEPROC)(EGLDisplay dpy, EGLint * major,
-                                             EGLint * minor);
-  PFNEGLINITIALIZEPROC eglInitialize =
-      cast<PFNEGLINITIALIZEPROC>(eglGetProcAddress("eglInitialize"));
-
-  typedef EGLBoolean (*PFNEGLTERMINATEPROC)(EGLDisplay dpy);
-  PFNEGLTERMINATEPROC eglTerminate =
-      cast<PFNEGLTERMINATEPROC>(eglGetProcAddress("eglTerminate"));
-
-  if (!eglGetDisplay || !eglInitialize || !eglTerminate) {
-    dlclose(libegl);
-    record_error("libEGL missing methods");
-    return;
-  }
-
-  EGLDisplay dpy = eglGetDisplay(native_dpy);
+  EGLDisplay dpy = egl->GetDisplay(native_dpy);
   if (!dpy) {
-    dlclose(libegl);
     record_warning("libEGL no display");
     return;
   }
 
   EGLint major, minor;
-  if (!eglInitialize(dpy, &major, &minor)) {
-    dlclose(libegl);
+  if (!egl->Initialize(dpy, &major, &minor)) {
     record_warning("libEGL initialize failed");
     return;
   }
 
-  if (gles_test) {
-    get_gles_status(dpy, eglGetProcAddress);
+  if (gles) {
+    get_gles_status(egl, gles, dpy);
   }
 
-  typedef const char* (*PFNEGLGETDISPLAYDRIVERNAMEPROC)(EGLDisplay dpy);
-  PFNEGLGETDISPLAYDRIVERNAMEPROC eglGetDisplayDriverName =
-      cast<PFNEGLGETDISPLAYDRIVERNAMEPROC>(
-          eglGetProcAddress("eglGetDisplayDriverName"));
-  if (eglGetDisplayDriverName) {
-    const char* driDriver = eglGetDisplayDriverName(dpy);
+  if (egl->GetDisplayDriverName) {
+    const char* driDriver = egl->GetDisplayDriverName(dpy);
     if (driDriver) {
       record_value("DRI_DRIVER\n%s\n", driDriver);
     }
   }
 
-  eglTerminate(dpy);
-  dlclose(libegl);
+  egl->Terminate(dpy);
 }
 
-static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
-  ///// Open libGL and load needed symbols /////
-#if defined(__OpenBSD__) || defined(__NetBSD__)
-#  define LIBGL_FILENAME "libGL.so"
-#else
-#  define LIBGL_FILENAME "libGL.so.1"
-#endif
-  void* libgl = dlopen(LIBGL_FILENAME, RTLD_LAZY);
-  if (!libgl) {
-    record_error(LIBGL_FILENAME " missing");
-    return;
-  }
-
-  typedef void* (*PFNGLXGETPROCADDRESS)(const char*);
-  PFNGLXGETPROCADDRESS glXGetProcAddress =
-      cast<PFNGLXGETPROCADDRESS>(dlsym(libgl, "glXGetProcAddress"));
-
-  if (!glXGetProcAddress) {
-    record_error("no glXGetProcAddress");
-    return;
-  }
-
-  typedef GLXFBConfig* (*PFNGLXQUERYEXTENSION)(Display*, int*, int*);
-  PFNGLXQUERYEXTENSION glXQueryExtension =
-      cast<PFNGLXQUERYEXTENSION>(glXGetProcAddress("glXQueryExtension"));
-
-  typedef GLXFBConfig* (*PFNGLXQUERYVERSION)(Display*, int*, int*);
-  PFNGLXQUERYVERSION glXQueryVersion =
-      cast<PFNGLXQUERYVERSION>(dlsym(libgl, "glXQueryVersion"));
-
-  typedef XVisualInfo* (*PFNGLXCHOOSEVISUAL)(Display*, int, int*);
-  PFNGLXCHOOSEVISUAL glXChooseVisual =
-      cast<PFNGLXCHOOSEVISUAL>(glXGetProcAddress("glXChooseVisual"));
-
-  typedef GLXContext (*PFNGLXCREATECONTEXT)(Display*, XVisualInfo*, GLXContext,
-                                            Bool);
-  PFNGLXCREATECONTEXT glXCreateContext =
-      cast<PFNGLXCREATECONTEXT>(glXGetProcAddress("glXCreateContext"));
-
-  typedef Bool (*PFNGLXMAKECURRENT)(Display*, GLXDrawable, GLXContext);
-  PFNGLXMAKECURRENT glXMakeCurrent =
-      cast<PFNGLXMAKECURRENT>(glXGetProcAddress("glXMakeCurrent"));
-
-  typedef void (*PFNGLXDESTROYCONTEXT)(Display*, GLXContext);
-  PFNGLXDESTROYCONTEXT glXDestroyContext =
-      cast<PFNGLXDESTROYCONTEXT>(glXGetProcAddress("glXDestroyContext"));
-
-  typedef GLubyte* (*PFNGLGETSTRING)(GLenum);
-  PFNGLGETSTRING glGetString =
-      cast<PFNGLGETSTRING>(glXGetProcAddress("glGetString"));
-
-  if (!glXQueryExtension || !glXQueryVersion || !glXChooseVisual ||
-      !glXCreateContext || !glXMakeCurrent || !glXDestroyContext ||
-      !glGetString) {
-    record_error(LIBGL_FILENAME " missing methods");
+static void get_glx_status(TestLibGLX* glx, int* gotGlxInfo,
+                           int* gotDriDriver) {
+  if (!glx || !glx->valid) {
     return;
   }
 
@@ -475,7 +534,7 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
   }
 
   ///// Check that the GLX extension is present /////
-  if (!glXQueryExtension(dpy, nullptr, nullptr)) {
+  if (!glx->QueryExtension(dpy, nullptr, nullptr)) {
     record_error("GLX extension missing");
     return;
   }
@@ -485,7 +544,7 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
   ///// Get a visual /////
   int attribs[] = {GLX_RGBA, GLX_RED_SIZE,  1, GLX_GREEN_SIZE,
                    1,        GLX_BLUE_SIZE, 1, None};
-  XVisualInfo* vInfo = glXChooseVisual(dpy, DefaultScreen(dpy), attribs);
+  XVisualInfo* vInfo = glx->ChooseVisual(dpy, DefaultScreen(dpy), attribs);
   if (!vInfo) {
     record_error("No visuals found");
     return;
@@ -504,16 +563,16 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
                          CWBorderPixel | CWColormap, &swa);
 
   ///// Get a GL context and make it current //////
-  GLXContext context = glXCreateContext(dpy, vInfo, nullptr, True);
-  glXMakeCurrent(dpy, window, context);
+  GLXContext context = glx->CreateContext(dpy, vInfo, nullptr, True);
+  glx->MakeCurrent(dpy, window, context);
 
   ///// Look for this symbol to determine texture_from_pixmap support /////
-  void* glXBindTexImageEXT = glXGetProcAddress("glXBindTexImageEXT");
+  void* glXBindTexImageEXT = glx->GetProcAddress("glXBindTexImageEXT");
 
   ///// Get GL vendor/renderer/versions strings /////
-  const GLubyte* versionString = glGetString(GL_VERSION);
-  const GLubyte* vendorString = glGetString(GL_VENDOR);
-  const GLubyte* rendererString = glGetString(GL_RENDERER);
+  const GLubyte* versionString = glx->GetString(GL_VERSION);
+  const GLubyte* vendorString = glx->GetString(GL_VENDOR);
+  const GLubyte* rendererString = glx->GetString(GL_RENDERER);
 
   if (versionString && vendorString && rendererString) {
     record_value("VENDOR\n%s\nRENDERER\n%s\nVERSION\n%s\nTFP\n%s\n",
@@ -525,22 +584,16 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
   }
 
   // If GLX_MESA_query_renderer is available, populate additional data.
-  typedef Bool (*PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC)(
-      int attribute, unsigned int* value);
-  PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC
-  glXQueryCurrentRendererIntegerMESAProc =
-      cast<PFNGLXQUERYCURRENTRENDERERINTEGERMESAPROC>(
-          glXGetProcAddress("glXQueryCurrentRendererIntegerMESA"));
-  if (glXQueryCurrentRendererIntegerMESAProc) {
+  if (glx->QueryCurrentRendererIntegerMESAProc) {
     unsigned int vendorId, deviceId, accelerated, videoMemoryMB;
-    glXQueryCurrentRendererIntegerMESAProc(GLX_RENDERER_VENDOR_ID_MESA,
-                                           &vendorId);
-    glXQueryCurrentRendererIntegerMESAProc(GLX_RENDERER_DEVICE_ID_MESA,
-                                           &deviceId);
-    glXQueryCurrentRendererIntegerMESAProc(GLX_RENDERER_ACCELERATED_MESA,
-                                           &accelerated);
-    glXQueryCurrentRendererIntegerMESAProc(GLX_RENDERER_VIDEO_MEMORY_MESA,
-                                           &videoMemoryMB);
+    glx->QueryCurrentRendererIntegerMESAProc(GLX_RENDERER_VENDOR_ID_MESA,
+                                             &vendorId);
+    glx->QueryCurrentRendererIntegerMESAProc(GLX_RENDERER_DEVICE_ID_MESA,
+                                             &deviceId);
+    glx->QueryCurrentRendererIntegerMESAProc(GLX_RENDERER_ACCELERATED_MESA,
+                                             &accelerated);
+    glx->QueryCurrentRendererIntegerMESAProc(GLX_RENDERER_VIDEO_MEMORY_MESA,
+                                             &videoMemoryMB);
 
     // Truncate IDs to 4 digits- that's all PCI IDs are.
     vendorId &= 0xFFFF;
@@ -555,11 +608,8 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
   }
 
   // From Mesa's GL/internal/dri_interface.h, to be used by DRI clients.
-  typedef const char* (*PFNGLXGETSCREENDRIVERPROC)(Display * dpy, int scrNum);
-  PFNGLXGETSCREENDRIVERPROC glXGetScreenDriverProc =
-      cast<PFNGLXGETSCREENDRIVERPROC>(glXGetProcAddress("glXGetScreenDriver"));
-  if (glXGetScreenDriverProc) {
-    const char* driDriver = glXGetScreenDriverProc(dpy, DefaultScreen(dpy));
+  if (glx->GetScreenDriverProc) {
+    const char* driDriver = glx->GetScreenDriverProc(dpy, DefaultScreen(dpy));
     if (driDriver) {
       *gotDriDriver = 1;
       record_value("DRI_DRIVER\n%s\n", driDriver);
@@ -588,9 +638,10 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
   ///// than expected, so it's important to consume as little memory as
   ///// possible. Also we want to check that we're able to do that too without
   ///// generating X errors.
-  glXMakeCurrent(dpy, None,
-                 nullptr);  // must release the GL context before destroying it
-  glXDestroyContext(dpy, context);
+  glx->MakeCurrent(
+      dpy, None,
+      nullptr);  // must release the GL context before destroying it
+  glx->DestroyContext(dpy, context);
   XDestroyWindow(dpy, window);
   XFreeColormap(dpy, swa.colormap);
 
@@ -604,8 +655,6 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
   // 973192
   XSync(dpy, False);
 #endif
-
-  dlclose(libgl);
 }
 
 static void close_logging() {
@@ -625,7 +674,7 @@ static void close_logging() {
 }
 
 #ifdef MOZ_WAYLAND
-static bool wayland_egltest() {
+static bool wayland_egltest(TestLibEGL* egl, TestLibGLES* gles) {
   // NOTE: returns false to fall back to X11 when the Wayland socket doesn't
   // exist but fails with record_error if something actually went wrong
   struct wl_display* dpy = wl_display_connect(nullptr);
@@ -633,22 +682,22 @@ static bool wayland_egltest() {
     return false;
   }
 
-  get_egl_status((EGLNativeDisplayType)dpy, true);
+  get_egl_status(egl, gles, (EGLNativeDisplayType)dpy);
   return true;
 }
 #endif
 
-static void glxtest() {
+static void glxtest(TestLibGLX* glx, TestLibEGL* egl, TestLibGLES* gles) {
   int gotGlxInfo = 0;
   int gotDriDriver = 0;
 
-  get_glx_status(&gotGlxInfo, &gotDriDriver);
+  get_glx_status(glx, &gotGlxInfo, &gotDriDriver);
   if (!gotGlxInfo) {
-    get_egl_status(nullptr, true);
+    get_egl_status(egl, gles, nullptr);
   } else if (!gotDriDriver) {
     // If we failed to get the driver name from X, try via
     // EGL_MESA_query_driver. We are probably using Wayland.
-    get_egl_status(nullptr, false);
+    get_egl_status(egl, nullptr, nullptr);
   }
 }
 
@@ -664,14 +713,28 @@ int childgltest() {
   // Get a list of all GPUs from the PCI bus.
   get_pci_status();
 
+  // Attempt to load each of the libraries to verify they are available and have
+  // all of the expected methods.
+  TestLibEGL egl;
+  init_egl(&egl);
+  record_value("EGL_VALID\n%s\n", egl.valid ? "TRUE" : "FALSE");
+
+  TestLibGLES gles;
+  init_gles(&egl, &gles);
+  record_value("GLES_VALID\n%s\n", gles.valid ? "TRUE" : "FALSE");
+
+  TestLibGLX glx;
+  init_glx(&glx);
+  record_value("GLX_VALID\n%s\n", glx.valid ? "TRUE" : "FALSE");
+
   // TODO: --display command line argument is not properly handled
   // NOTE: prefers X for now because eglQueryRendererIntegerMESA does not
   // exist yet
 #ifdef MOZ_WAYLAND
-  if (IsWaylandDisabled() || getenv("DISPLAY") || !wayland_egltest())
+  if (IsWaylandDisabled() || getenv("DISPLAY") || !wayland_egltest(&egl, &gles))
 #endif
   {
-    glxtest();
+    glxtest(&glx, &egl, &gles);
   }
 
   // Finally write buffered data to the pipe.

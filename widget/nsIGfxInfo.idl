@@ -168,6 +168,8 @@ interface nsIGfxInfo : nsISupports
   const long FEATURE_THREADSAFE_GL = 32;
   /* Support running WebRender using the software backend, starting in 84. */
   const long FEATURE_WEBRENDER_SOFTWARE = 33;
+  /* Whether EGL is preferred over GLX on X11. */
+  const long FEATURE_X11_EGL = 34;
   /* the maximum feature value. */
   const long FEATURE_MAX_VALUE = FEATURE_WEBRENDER_SOFTWARE;
 
