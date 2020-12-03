@@ -603,6 +603,13 @@ nsresult GfxInfo::GetFeatureStatusImpl(
       return NS_OK;
     }
 
+#ifdef NIGHTLY_BUILD
+    if (aFeature == FEATURE_WEBRENDER_SOFTWARE) {
+      *aStatus = nsIGfxInfo::FEATURE_ALLOW_ALWAYS;
+      return NS_OK;
+    }
+#endif
+
     if (aFeature == FEATURE_WEBRENDER_SCISSORED_CACHE_CLEARS) {
       // Emulator with SwiftShader is buggy when attempting to clear picture
       // cache textures with a scissor rect set.

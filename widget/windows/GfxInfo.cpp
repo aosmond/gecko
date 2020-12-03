@@ -1809,6 +1809,16 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
         V(0, 0, 0, 0), "FEATURE_ROLLOUT_INTEL");
 
     ////////////////////////////////////
+    // FEATURE_WEBRENDER_SOFTWARE - ALLOWLIST
+#ifdef NIGHTLY_BUILD
+    APPEND_TO_DRIVER_BLOCKLIST2(OperatingSystem::Windows, DeviceFamily::All,
+                                nsIGfxInfo::FEATURE_WEBRENDER_SOFTWARE,
+                                nsIGfxInfo::FEATURE_ALLOW_ALWAYS,
+                                DRIVER_COMPARISON_IGNORED, V(0, 0, 0, 0),
+                                "FEATURE_ROLLOUT_SW_WR_NIGHTLY");
+#endif
+
+    ////////////////////////////////////
     // FEATURE_WEBRENDER_COMPOSITOR
 
 #ifndef EARLY_BETA_OR_EARLIER
