@@ -2543,15 +2543,6 @@ bool CompositorBridgeParent::IsSameProcess() const {
   return OtherPid() == base::GetCurrentProcId();
 }
 
-void CompositorBridgeParent::NotifyWebRenderContextPurge() {
-  MOZ_ASSERT(CompositorThread()->IsOnCurrentThread());
-  if (!mWrBridge) {
-    return;
-  }
-  RefPtr<wr::WebRenderAPI> api = mWrBridge->GetWebRenderAPI();
-  api->ClearAllCaches();
-}
-
 void CompositorBridgeParent::NotifyWebRenderDisableNativeCompositor() {
   MOZ_ASSERT(CompositorThread()->IsOnCurrentThread());
   if (mWrBridge) {

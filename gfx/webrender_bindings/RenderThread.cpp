@@ -491,7 +491,7 @@ void RenderThread::UpdateAndRender(
     renderer->Update();
   }
   // Check graphics reset status even when rendering is skipped.
-  renderer->CheckGraphicsResetStatus();
+  renderer->CheckGraphicsResetStatus("PostUpdate");
 
   TimeStamp end = TimeStamp::Now();
   RefPtr<const WebRenderPipelineInfo> info = renderer->FlushPipelineInfo();
