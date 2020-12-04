@@ -187,7 +187,7 @@ RenderCompositor::~RenderCompositor() = default;
 bool RenderCompositor::MakeCurrent() { return gl()->MakeCurrent(); }
 
 bool RenderCompositor::IsContextLost() {
-  if (!gl()) {
+  if (!gl() || !gl()->IsSupported(gl::GLFeature::robustness)) {
     return false;
   }
   auto resetStatus = gl()->fGetGraphicsResetStatus();

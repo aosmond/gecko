@@ -320,10 +320,12 @@ already_AddRefed<GLContext> GLContextEGLFactory::CreateImpl(
   }
 
   CreateContextFlags flags = CreateContextFlags::NONE;
-  if (aWebRender && aUseGles) {
-    flags |= CreateContextFlags::PREFER_ES3;
-  }
-  if (!aWebRender) {
+  if (aWebRender) {
+    flags |= CreateContextFlags::PREFER_ROBUSTNESS;
+    if (aUseGles) {
+      flags |= CreateContextFlags::PREFER_ES3;
+    }
+  } else {
     flags |= CreateContextFlags::REQUIRE_COMPAT_PROFILE;
   }
 
@@ -711,6 +713,18 @@ RefPtr<GLContextEGL> GLContextEGL::CreateGLContext(
       rbab_attribs = robustness_attribs;
       rbab_attribs.push_back(LOCAL_EGL_CONTEXT_FLAGS_KHR);
       rbab_attribs.push_back(LOCAL_EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR);
+    }
+
+    if (egl->IsExtensionSupported(EGLExtension::NV_robustness_video_memory_purge)) {
+      if (!robustness_attribs.empty()) {
+        robustness_attribs.push_back(LOCAL_EGL_GENERATE_RESET_ON_VIDEO_MEMORY_PURGE_NV);
+        robustness_attribs.push_back(LOCAL_EGL_TRUE);
+      }
+
+      if (!rbab_attribs.empty()) {
+        rbab_attribs.push_back(LOCAL_EGL_GENERATE_RESET_ON_VIDEO_MEMORY_PURGE_NV);
+        rbab_attribs.push_back(LOCAL_EGL_TRUE);
+      }
     }
   }
 
