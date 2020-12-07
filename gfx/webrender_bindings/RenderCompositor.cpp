@@ -212,7 +212,11 @@ GLenum RenderCompositor::IsContextLost(bool aForce) {
       NS_WARNING("Device reset due to NV video memory purged");
       break;
     case LOCAL_GL_GUILTY_CONTEXT_RESET_ARB:
-      gfxCriticalError() << "Device reset due to WR context";
+      if (gl::GLContext::HasSimulatedDeviceReset()) {
+        gfxCriticalNote << "Device reset due to WR context";
+      } else {
+        gfxCriticalError() << "Device reset due to WR context";
+      }
       break;
     case LOCAL_GL_UNKNOWN_CONTEXT_RESET_ARB:
       gfxCriticalNote << "Device reset may be due to WR context";

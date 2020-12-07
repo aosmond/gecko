@@ -278,6 +278,7 @@ GLContext::GLContext(const GLContextDesc& desc, GLContext* sharedContext,
                      bool useTLSIsCurrent)
     : mDesc(desc),
       mUseTLSIsCurrent(ShouldUseTLSIsCurrent(useTLSIsCurrent)),
+      mSimulatedReset(gSimulatedReset),
       mDebugFlags(ChooseDebugFlags(mDesc.flags)),
       mSharedContext(sharedContext),
       mWorkAroundDriverBugs(
@@ -310,6 +311,28 @@ void GLContext::StaticDebugCallback(GLenum source, GLenum type, GLuint id,
                                     const GLvoid* userParam) {
   GLContext* gl = (GLContext*)userParam;
   gl->DebugCallback(source, type, id, severity, length, message);
+}
+
+Atomic<uint64_t> GLContext::gSimulatedReset;
+
+bool GLContext::CheckForSimulatedDeviceReset() const {
+  SimulatedReset reset(gSimulatedReset);
+  if (MOZ_UNLIKELY(reset.s.mGeneration > mSimulatedReset.s.mGeneration)) {
+    mSimulatedReset.v = reset.v;
+  }
+
+  return mSimulatedReset.s.mReason != LOCAL_GL_NO_ERROR;
+}
+
+/* static */ void GLContext::SimulateDeviceReset(GLenum aReason) {
+  SimulatedReset reset(gSimulatedReset);
+  reset.s.mReason = aReason;
+  ++reset.s.mGeneration;
+  gSimulatedReset = reset.v;
+}
+
+/* static */ bool GLContext::HasSimulatedDeviceReset() {
+  return gSimulatedReset != 0;
 }
 
 bool GLContext::Init() {
@@ -2426,6 +2449,17 @@ GLenum GLContext::GetError() const {
 
 GLenum GLContext::fGetGraphicsResetStatus() const {
   OnSyncCall();
+
+  GLenum resetReason = mSimulatedReset.s.mReason;
+  if (MOZ_UNLIKELY(resetReason != LOCAL_GL_NO_ERROR)) {
+    if (resetReason == LOCAL_GL_PURGED_CONTEXT_RESET_NV) {
+      // We reset the reason here because unlike other reasons, we don't
+      // actually lose the GL context. We just want the owner to purge all of
+      // its video memory and otherwise continue.
+      mSimulatedReset.s.mReason = GLenum(LOCAL_GL_NO_ERROR);
+    }
+    return resetReason;
+  }
 
   GLenum ret = 0;
   if (mSymbols.fGetGraphicsResetStatus) {

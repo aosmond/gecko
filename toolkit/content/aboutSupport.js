@@ -536,6 +536,7 @@ var snapshotFormatters = {
       }
     }
 
+    let gpuResetItems = [];
     if (
       (AppConstants.NIGHTLY_BUILD || AppConstants.MOZ_DEV_EDITION) &&
       AppConstants.platform != "macosx"
@@ -550,7 +551,36 @@ var snapshotFormatters = {
         gpuDeviceResetButton,
         "gpu-device-reset-button"
       );
-      addRow("diagnostics", "gpu-device-reset", [gpuDeviceResetButton]);
+
+      gpuResetItems.push(gpuDeviceResetButton);
+    }
+
+    if (AppConstants.NIGHTLY_BUILD || AppConstants.MOZ_DEV_EDITION) {
+      let gpuInnocentDeviceResetButton = $.new("button");
+      let gpuGuiltyDeviceResetButton = $.new("button");
+
+      gpuInnocentDeviceResetButton.addEventListener("click", function() {
+        windowUtils.triggerInnocentDeviceReset();
+      });
+      gpuGuiltyDeviceResetButton.addEventListener("click", function() {
+        windowUtils.triggerGuiltyDeviceReset();
+      });
+
+      document.l10n.setAttributes(
+        gpuInnocentDeviceResetButton,
+        "gpu-innocent-device-reset-button"
+      );
+      document.l10n.setAttributes(
+        gpuGuiltyDeviceResetButton,
+        "gpu-guilty-device-reset-button"
+      );
+
+      gpuResetItems.push(gpuInnocentDeviceResetButton);
+      gpuResetItems.push(gpuGuiltyDeviceResetButton);
+    }
+
+    if (gpuResetItems.length) {
+      addRow("diagnostics", "gpu-device-reset", gpuResetItems);
     }
 
     // graphics-failures-tbody tbody

@@ -1891,9 +1891,15 @@ interface nsIDOMWindowUtils : nsISupports {
   void leaveChaosMode();
 
   /**
-   * Alerts Gecko of a device reset
+   * Trigger the consequences of a  device reset.
    */
   void triggerDeviceReset();
+
+  /**
+   * Simulates a device reset at the GLContext level.
+   */
+  void triggerInnocentDeviceReset();
+  void triggerGuiltyDeviceReset();
 
   /**
    * Returns whether the document's style set's rule processor for the

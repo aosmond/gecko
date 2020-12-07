@@ -317,7 +317,15 @@ wmfvpxvideo-crash-guard = WMF VPX Video Decoder
 reset-on-next-restart = Reset on Next Restart
 gpu-process-kill-button = Terminate GPU Process
 gpu-device-reset = Device Reset
+# In this case, a basic device reset is pretending at a much higher level that
+# there was a device reset, and we should recreate the graphics layers. The
+# variants below trigger the device reset at the GL context level, which
+# exercises a lot more of our device reset handling code.
 gpu-device-reset-button = Trigger Device Reset
+# Innocent device resets are caused by something internal to the GPU / driver.
+gpu-innocent-device-reset-button = Simulate GL_INNOCENT_CONTEXT_RESET
+# Guilty device resets are caused somehow by our own GL calls.
+gpu-guilty-device-reset-button = Simulate GL_GUILTY_CONTEXT_RESET
 uses-tiling = Uses Tiling
 content-uses-tiling = Uses Tiling (Content)
 off-main-thread-paint-enabled = Off Main Thread Painting Enabled

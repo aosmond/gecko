@@ -95,6 +95,9 @@ parent:
   // the GPU process. This blocks until one is available (i.e., Init has completed).
   sync SimulateDeviceReset() returns (GPUDeviceData status);
 
+  // Request to simulate a device reset at the GLContext level.
+  async SimulateGLContextDeviceReset(uint32_t reason);
+
   // Have a message be broadcasted to the GPU process by the GPU process
   // observer service.
   async NotifyGpuObservers(nsCString aTopic);

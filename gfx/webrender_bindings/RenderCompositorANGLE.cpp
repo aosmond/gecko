@@ -829,6 +829,15 @@ RenderedFrameId RenderCompositorANGLE::UpdateFrameId() {
 }
 
 GLenum RenderCompositorANGLE::IsContextLost(bool aForce) {
+  // If we are simulating device resets, then check glGetGraphicsResetStatus
+  // first to try to get that result.
+  if (MOZ_UNLIKELY(gl::GLContext::HasSimulatedDeviceReset())) {
+    GLenum status = IsContextLost(aForce);
+    if (status != LOCAL_GL_NO_ERROR) {
+      return status;
+    }
+  }
+
   // glGetGraphicsResetStatus does not always work to detect timeout detection
   // and recovery (TDR). On Windows, ANGLE itself is just relying upon the same
   // API, so we should not need to check it separately.
