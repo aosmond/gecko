@@ -12,6 +12,7 @@
 #include "gfxCrashReporterUtils.h"
 #include "GfxInfoBase.h"
 #include "gfxPlatform.h"
+#include "GLContext.h"
 #include "GLContextProvider.h"
 #include "GPUProcessHost.h"
 #include "GPUProcessManager.h"
@@ -423,6 +424,12 @@ mozilla::ipc::IPCResult GPUParent::RecvSimulateDeviceReset(
     wr::RenderThread::Get()->SimulateDeviceReset();
   }
   RecvGetDeviceStatus(aOut);
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult GPUParent::RecvSimulateGLContextDeviceReset(
+    const uint32_t& aReason) {
+  gl::GLContext::SimulateDeviceReset(aReason);
   return IPC_OK();
 }
 

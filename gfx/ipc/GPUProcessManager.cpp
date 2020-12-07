@@ -50,6 +50,7 @@
 #include "VsyncSource.h"
 #include "nsExceptionHandler.h"
 #include "nsPrintfCString.h"
+#include "GLContext.h"
 
 #if defined(MOZ_WIDGET_ANDROID)
 #  include "mozilla/widget/AndroidUiThread.h"
@@ -445,6 +446,14 @@ void GPUProcessManager::SimulateDeviceReset() {
     OnRemoteProcessDeviceReset(mProcess);
   } else {
     OnInProcessDeviceReset(/* aTrackThreshold */ false);
+  }
+}
+
+void GPUProcessManager::SimulateGLContextDeviceReset(uint32_t aReason) {
+  if (mProcess) {
+    mGPUChild->SendSimulateGLContextDeviceReset(aReason);
+  } else {
+    gl::GLContext::SimulateDeviceReset(aReason);
   }
 }
 

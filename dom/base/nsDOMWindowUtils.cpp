@@ -125,6 +125,7 @@
 #include "mozilla/DisplayPortUtils.h"
 #include "mozilla/ResultExtensions.h"
 #include "mozilla/ViewportUtils.h"
+#include "GLDefs.h"
 
 #ifdef XP_WIN
 #  undef GetClassName
@@ -4089,6 +4090,33 @@ nsDOMWindowUtils::TriggerDeviceReset() {
   GPUProcessManager* pm = GPUProcessManager::Get();
   if (pm) {
     pm->SimulateDeviceReset();
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::TriggerInnocentDeviceReset() {
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    pm->SimulateGLContextDeviceReset(LOCAL_GL_INNOCENT_CONTEXT_RESET_ARB);
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::TriggerGuiltyDeviceReset() {
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    pm->SimulateGLContextDeviceReset(LOCAL_GL_GUILTY_CONTEXT_RESET_ARB);
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::TriggerNvidiaDeviceReset() {
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    pm->SimulateGLContextDeviceReset(LOCAL_GL_PURGED_CONTEXT_RESET_NV);
   }
   return NS_OK;
 }

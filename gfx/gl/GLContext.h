@@ -30,6 +30,7 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/ThreadLocal.h"
+#include "mozilla/Atomics.h"
 
 #include "MozFramebuffer.h"
 #include "nsTArray.h"
@@ -622,6 +623,33 @@ class GLContext : public GenericAtomicRefCounted, public SupportsWeakPtr {
                                              const GLchar* message,
                                              const GLvoid* userParam);
 
+  // Global reason and generation to simulate a device reset. Once the
+  // generation increases, GLContext instances should sample it.
+  union SimulatedReset {
+    uint64_t v;
+    struct {
+      GLenum mReason;
+      uint32_t mGeneration;
+    } s;
+
+    SimulatedReset() : v(0) { s.mReason = LOCAL_GL_NO_ERROR; }
+    explicit SimulatedReset(uint64_t aValue) { v = aValue; }
+  };
+
+  static_assert(sizeof(SimulatedReset) == sizeof(uint64_t));
+
+  static Atomic<uint64_t> gSimulatedReset;
+
+ protected:
+  // Local copy of the simulated reset reason and generation.
+  mutable SimulatedReset mSimulatedReset;
+
+  bool CheckForSimulatedDeviceReset() const;
+
+ public:
+  static void SimulateDeviceReset(GLenum aReason);
+  static bool HasSimulatedDeviceReset();
+
   // -----------------------------------------------------------------------------
   // MOZ_GL_DEBUG implementation
  private:
@@ -670,6 +698,10 @@ class GLContext : public GenericAtomicRefCounted, public SupportsWeakPtr {
       }
     }
     MOZ_GL_ASSERT(this, IsCurrentImpl());
+
+    if (MOZ_UNLIKELY(CheckForSimulatedDeviceReset())) {
+      return LOCAL_GL_CONTEXT_LOST;
+    }
 
     if (MOZ_UNLIKELY(mDebugFlags)) {
       BeforeGLCall_Debug(funcName);
