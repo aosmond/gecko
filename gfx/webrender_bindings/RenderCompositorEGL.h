@@ -11,15 +11,19 @@
 #include "mozilla/webrender/RenderCompositor.h"
 
 namespace mozilla {
+namespace gl {
+class GLContextEGL;
+}
 
 namespace wr {
 
-class RenderCompositorEGL : public RenderCompositor {
+class RenderCompositorEGL final : public RenderCompositor {
  public:
   static UniquePtr<RenderCompositor> Create(
       RefPtr<widget::CompositorWidget> aWidget, nsACString& aError);
 
-  explicit RenderCompositorEGL(RefPtr<widget::CompositorWidget> aWidget);
+  explicit RenderCompositorEGL(RefPtr<gl::GLContextEGL>&& aEGL,
+                               RefPtr<widget::CompositorWidget>&& aWidget);
   virtual ~RenderCompositorEGL();
 
   bool BeginFrame() override;
@@ -27,7 +31,7 @@ class RenderCompositorEGL : public RenderCompositor {
   void Pause() override;
   bool Resume() override;
 
-  gl::GLContext* gl() const override;
+  gl::GLContext* gl() const final;
 
   bool MakeCurrent() override;
 
@@ -53,6 +57,7 @@ class RenderCompositorEGL : public RenderCompositor {
 
   void DestroyEGLSurface();
 
+  RefPtr<gl::GLContextEGL> mEGL;
   EGLSurface mEGLSurface;
 #ifdef MOZ_WIDGET_ANDROID
   // On android we must track our own surface size.

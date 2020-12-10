@@ -23,6 +23,7 @@ struct IDXGISwapChain1;
 
 namespace mozilla {
 namespace gl {
+class GLContextEGL;
 class GLLibraryEGL;
 }  // namespace gl
 
@@ -30,12 +31,13 @@ namespace wr {
 
 class DCLayerTree;
 
-class RenderCompositorANGLE : public RenderCompositor {
+class RenderCompositorANGLE final : public RenderCompositor {
  public:
   static UniquePtr<RenderCompositor> Create(
       RefPtr<widget::CompositorWidget>&& aWidget, nsACString& aError);
 
-  explicit RenderCompositorANGLE(RefPtr<widget::CompositorWidget>&& aWidget);
+  explicit RenderCompositorANGLE(RefPtr<gl::GLContextEGL>&& aEGL,
+                                 RefPtr<widget::CompositorWidget>&& aWidget);
   virtual ~RenderCompositorANGLE();
   bool Initialize(nsACString& aError);
 
@@ -48,7 +50,7 @@ class RenderCompositorANGLE : public RenderCompositor {
   bool Resume() override;
   void Update() override;
 
-  gl::GLContext* gl() const override { return RenderThread::Get()->SharedGL(); }
+  gl::GLContext* gl() const final;
 
   bool MakeCurrent() override;
 
@@ -127,6 +129,7 @@ class RenderCompositorANGLE : public RenderCompositor {
   void ReleaseNativeCompositorResources();
   HWND GetCompositorHwnd();
 
+  RefPtr<gl::GLContextEGL> mEGL;
   EGLConfig mEGLConfig;
   EGLSurface mEGLSurface;
 

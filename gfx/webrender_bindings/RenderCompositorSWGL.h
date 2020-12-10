@@ -13,7 +13,7 @@ namespace mozilla {
 
 namespace wr {
 
-class RenderCompositorSWGL : public RenderCompositor {
+class RenderCompositorSWGL final : public RenderCompositor {
  public:
   static UniquePtr<RenderCompositor> Create(
       RefPtr<widget::CompositorWidget>&& aWidget, nsACString& aError);

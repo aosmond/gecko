@@ -15,7 +15,7 @@ namespace mozilla {
 
 namespace wr {
 
-class RenderCompositorD3D11SWGL : public RenderCompositor {
+class RenderCompositorD3D11SWGL final : public RenderCompositor {
  public:
   static UniquePtr<RenderCompositor> Create(
       RefPtr<widget::CompositorWidget>&& aWidget, nsACString& aError);

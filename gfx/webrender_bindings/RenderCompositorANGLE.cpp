@@ -54,8 +54,9 @@ UniquePtr<RenderCompositor> RenderCompositorANGLE::Create(
     return nullptr;
   }
 
+  RefPtr<gl::GLContextEGL> egl = gl::GLContextEGL::Cast(gl);
   UniquePtr<RenderCompositorANGLE> compositor =
-      MakeUnique<RenderCompositorANGLE>(std::move(aWidget));
+      MakeUnique<RenderCompositorANGLE>(std::move(egl), std::move(aWidget));
   if (!compositor->Initialize(aError)) {
     return nullptr;
   }
@@ -63,8 +64,9 @@ UniquePtr<RenderCompositor> RenderCompositorANGLE::Create(
 }
 
 RenderCompositorANGLE::RenderCompositorANGLE(
-    RefPtr<widget::CompositorWidget>&& aWidget)
+    RefPtr<gl::GLContextEGL>&& aEGL, RefPtr<widget::CompositorWidget>&& aWidget)
     : RenderCompositor(std::move(aWidget)),
+      mEGL(aEGL),
       mEGLConfig(nullptr),
       mEGLSurface(nullptr),
       mUseTripleBuffering(false),
@@ -79,18 +81,10 @@ RenderCompositorANGLE::~RenderCompositorANGLE() {
   MOZ_ASSERT(!mEGLSurface);
 }
 
+gl::GLContext* RenderCompositorANGLE::gl() const { return mEGL; }
+
 ID3D11Device* RenderCompositorANGLE::GetDeviceOfEGLDisplay(nsACString& aError) {
-  const auto& gl = RenderThread::Get()->SharedGL(aError);
-  if (!gl) {
-    if (aError.IsEmpty()) {
-      aError.Assign("RcANGLE(no shared GL in get device)"_ns);
-    } else {
-      aError.Append("(GetDevice)"_ns);
-    }
-    return nullptr;
-  }
-  const auto& gle = gl::GLContextEGL::Cast(gl);
-  const auto& egl = gle->mEgl;
+  const auto& egl = mEGL->mEgl;
   MOZ_ASSERT(egl);
   if (!egl || !egl->IsExtensionSupported(gl::EGLExtension::EXT_device_query)) {
     aError.Assign("RcANGLE(no EXT_device_query support)"_ns);
@@ -147,22 +141,12 @@ bool RenderCompositorANGLE::Initialize(nsACString& aError) {
     aError.Append("(Shutdown EGL)"_ns);
     return false;
   }
-  const auto gl = RenderThread::Get()->SharedGL(aError);
-  if (!gl) {
-    if (aError.IsEmpty()) {
-      aError.Assign("RcANGLE(no shared GL post maybe shutdown)"_ns);
-    } else {
-      aError.Append("(Initialize)"_ns);
-    }
-    return false;
-  }
 
   // Force enable alpha channel to make sure ANGLE use correct framebuffer
   // formart
-  const auto& gle = gl::GLContextEGL::Cast(gl);
-  const auto& egl = gle->mEgl;
+  const auto& egl = mEGL->mEgl;
   if (!gl::CreateConfig(*egl, &mEGLConfig, /* bpp */ 32,
-                        /* enableDepthBuffer */ true, gl->IsGLES())) {
+                        /* enableDepthBuffer */ true, mEGL->IsGLES())) {
     aError.Assign("RcANGLE(create EGLConfig failed)"_ns);
     return false;
   }
@@ -184,7 +168,7 @@ bool RenderCompositorANGLE::Initialize(nsACString& aError) {
   if (gfx::gfxVars::UseWebRenderDCompWin()) {
     HWND compositorHwnd = GetCompositorHwnd();
     if (compositorHwnd) {
-      mDCLayerTree = DCLayerTree::Create(gl, mEGLConfig, mDevice, mCtx,
+      mDCLayerTree = DCLayerTree::Create(mEGL, mEGLConfig, mDevice, mCtx,
                                          compositorHwnd, aError);
       if (!mDCLayerTree) {
         return false;
@@ -677,9 +661,7 @@ bool RenderCompositorANGLE::CreateEGLSurface() {
 
   const auto buffer = reinterpret_cast<EGLClientBuffer>(backBuf.get());
 
-  const auto gl = RenderThread::Get()->SharedGL();
-  const auto& gle = gl::GLContextEGL::Cast(gl);
-  const auto& egl = gle->mEgl;
+  const auto& egl = mEGL->mEgl;
   const EGLSurface surface = egl->fCreatePbufferFromClientBuffer(
       LOCAL_EGL_D3D_TEXTURE_ANGLE, buffer, mEGLConfig, pbuffer_attribs);
 
@@ -698,9 +680,8 @@ bool RenderCompositorANGLE::CreateEGLSurface() {
 void RenderCompositorANGLE::DestroyEGLSurface() {
   // Release EGLSurface of back buffer before calling ResizeBuffers().
   if (mEGLSurface) {
-    const auto& gle = gl::GLContextEGL::Cast(gl());
-    const auto& egl = gle->mEgl;
-    gle->SetEGLSurfaceOverride(EGL_NO_SURFACE);
+    const auto& egl = mEGL->mEgl;
+    mEGL->SetEGLSurfaceOverride(EGL_NO_SURFACE);
     egl->fDestroySurface(mEGLSurface);
     mEGLSurface = nullptr;
   }
@@ -718,8 +699,8 @@ void RenderCompositorANGLE::Update() {
 }
 
 bool RenderCompositorANGLE::MakeCurrent() {
-  gl::GLContextEGL::Cast(gl())->SetEGLSurfaceOverride(mEGLSurface);
-  return gl()->MakeCurrent();
+  mEGL->SetEGLSurfaceOverride(mEGLSurface);
+  return mEGL->MakeCurrent();
 }
 
 LayoutDeviceIntSize RenderCompositorANGLE::GetBufferSize() {

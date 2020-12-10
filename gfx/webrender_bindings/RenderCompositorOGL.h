@@ -13,7 +13,7 @@
 namespace mozilla {
 namespace wr {
 
-class RenderCompositorOGL : public RenderCompositor {
+class RenderCompositorOGL final : public RenderCompositor {
  public:
   static UniquePtr<RenderCompositor> Create(
       RefPtr<widget::CompositorWidget>&& aWidget, nsACString& aError);
@@ -27,7 +27,7 @@ class RenderCompositorOGL : public RenderCompositor {
   void Pause() override;
   bool Resume() override;
 
-  gl::GLContext* gl() const override { return mGL; }
+  gl::GLContext* gl() const final { return mGL; }
 
   LayoutDeviceIntSize GetBufferSize() override;
 

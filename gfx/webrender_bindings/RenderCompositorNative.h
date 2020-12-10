@@ -142,7 +142,7 @@ static inline bool operator==(const RenderCompositorNative::TileKey& a0,
 
 // RenderCompositorNativeOGL is a NativeLayer compositor that exposes an
 // OpenGL framebuffer for the respective NativeLayer bound to each tile.
-class RenderCompositorNativeOGL : public RenderCompositorNative {
+class RenderCompositorNativeOGL final : public RenderCompositorNative {
  public:
   static UniquePtr<RenderCompositor> Create(
       RefPtr<widget::CompositorWidget>&& aWidget, nsACString& aError);
