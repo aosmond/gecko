@@ -1081,7 +1081,8 @@ static already_AddRefed<gl::GLContext> CreateGLContextANGLE(
   }
 
   gl::CreateContextFlags flags = gl::CreateContextFlags::PREFER_ES3 |
-                                 gl::CreateContextFlags::PREFER_ROBUSTNESS;
+                                 gl::CreateContextFlags::PREFER_ROBUSTNESS |
+                                 gl::CreateContextFlags::ALLOW_CHAOSMODE_RESETS;
 
   if (egl->IsExtensionSupported(
           gl::EGLExtension::MOZ_create_context_provoking_vertex_dont_care)) {

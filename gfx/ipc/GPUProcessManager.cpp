@@ -10,6 +10,7 @@
 #include "gfxPlatform.h"
 #include "GPUProcessHost.h"
 #include "GPUProcessListener.h"
+#include "mozilla/ChaosMode.h"
 #include "mozilla/MemoryReportingProcess.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Sprintf.h"
@@ -547,6 +548,11 @@ void GPUProcessManager::NotifyWebRenderError(wr::WebRenderError aError) {
 }
 
 bool GPUProcessManager::OnDeviceReset(bool aTrackThreshold) {
+  // Don't ever disable the GPU process or WebRender if we are in chaos mode.
+  if (ChaosMode::isActive(ChaosFeature::GraphicsDeviceReset)) {
+    return false;
+  }
+
 #ifdef XP_WIN
   // Disable double buffering when device reset happens.
   if (!gfxVars::UseWebRender() && gfxVars::UseDoubleBufferingWithCompositor()) {

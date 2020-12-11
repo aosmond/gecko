@@ -35,6 +35,7 @@
 #include "SharedSurfaceGL.h"
 #include "GfxTexturesReporter.h"
 #include "gfx2DGlue.h"
+#include "mozilla/ChaosMode.h"
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_gl.h"
 #include "mozilla/IntegerPrintfMacros.h"
@@ -317,6 +318,17 @@ Atomic<uint64_t> GLContext::gSimulatedReset;
 
 bool GLContext::CheckForSimulatedDeviceReset() const {
   SimulatedReset reset(gSimulatedReset);
+
+  if (MOZ_UNLIKELY(ChaosMode::isActive(ChaosFeature::GraphicsDeviceReset))) {
+    if (mDesc.flags & CreateContextFlags::ALLOW_CHAOSMODE_RESETS &&
+        !mContextLost && ChaosMode::randomUint32LessThan(1000) < 1) {
+      reset.s.mReason = LOCAL_GL_INNOCENT_CONTEXT_RESET_ARB;
+      ++reset.s.mGeneration;
+      gSimulatedReset = reset.v;
+      printf_stderr("[AO] chaos mode reset %u\n", reset.s.mGeneration);
+    }
+  }
+
   if (MOZ_UNLIKELY(reset.s.mGeneration > mSimulatedReset.s.mGeneration)) {
     mSimulatedReset.v = reset.v;
   }

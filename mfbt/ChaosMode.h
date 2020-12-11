@@ -33,6 +33,8 @@ enum ChaosFeature {
   TaskDispatching = 0x40,
   // Delay task running to encourage sending threads to run.
   TaskRunning = 0x80,
+  // Randomly trigger recoverable graphics device resets.
+  GraphicsDeviceReset = 0x100,
   Any = 0xffffffff,
 };
 

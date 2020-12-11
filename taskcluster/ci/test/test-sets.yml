@@ -258,6 +258,9 @@ linux1804-qr-tests:
     - mochitest-webgl2-core
     - mochitest-webgl2-ext
     - reftest
+    - test-verify
+    - test-verify-gpu
+    - test-verify-wpt
     - xpcshell
 
 linux1804-ccov-tests:
@@ -286,6 +289,9 @@ windows-qr-tests:
     - mochitest-webgl1-core
     - mochitest-webgl2-core
     - reftest
+    - test-verify
+    - test-verify-gpu
+    - test-verify-wpt
 
 windows-reftest-gpu:
     - reftest-gpu
@@ -478,6 +484,7 @@ android-x86_64-qr-tests:
     - web-platform-tests-crashtest
     - web-platform-tests-reftest
     - reftest
+    - test-verify
 
 android-hw-aarch64-opt-unittests:
     - jittest

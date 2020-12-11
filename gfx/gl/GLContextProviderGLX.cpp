@@ -731,7 +731,8 @@ already_AddRefed<GLContext> CreateForWidget(Display* aXDisplay, Window aXWindow,
 
   CreateContextFlags flags;
   if (aWebRender) {
-    flags = CreateContextFlags::NONE;  // WR needs GL3.2+
+    // WR needs GL3.2+
+    flags = CreateContextFlags::ALLOW_CHAOSMODE_RESETS;
   } else {
     flags = CreateContextFlags::REQUIRE_COMPAT_PROFILE;
   }

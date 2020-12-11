@@ -230,7 +230,8 @@ Maybe<SymbolLoader> GLContextCGL::GetSymbolLoader() const {
 
 already_AddRefed<GLContext> GLContextProviderCGL::CreateForCompositorWidget(
     CompositorWidget* aCompositorWidget, bool aWebRender, bool aForceAccelerated) {
-  CreateContextFlags flags = CreateContextFlags::ALLOW_OFFLINE_RENDERER;
+  CreateContextFlags flags =
+      CreateContextFlags::ALLOW_OFFLINE_RENDERER | CreateContextFlags::ALLOW_CHAOSMODE_RESETS;
   if (aForceAccelerated) {
     flags |= CreateContextFlags::FORCE_ENABLE_HARDWARE;
   }

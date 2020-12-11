@@ -320,10 +320,12 @@ already_AddRefed<GLContext> GLContextEGLFactory::CreateImpl(
   }
 
   CreateContextFlags flags = CreateContextFlags::NONE;
-  if (aWebRender && aUseGles) {
-    flags |= CreateContextFlags::PREFER_ES3;
-  }
-  if (!aWebRender) {
+  if (aWebRender) {
+    flags |= CreateContextFlags::ALLOW_CHAOSMODE_RESETS;
+    if (aUseGles) {
+      flags |= CreateContextFlags::PREFER_ES3;
+    }
+  } else {
     flags |= CreateContextFlags::REQUIRE_COMPAT_PROFILE;
   }
 
