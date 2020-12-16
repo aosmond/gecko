@@ -2773,6 +2773,8 @@ void gfxPlatform::InitWebRenderConfig() {
     UpdateForceSubpixelAAWherePossible();
   }
 
+  MOZ_RELEASE_ASSERT(gfxPlatform::WebRenderEnvvarEnabled());
+
 #ifdef XP_WIN
   if (gfxConfig::IsEnabled(Feature::WEBRENDER_DCOMP_PRESENT)) {
     gfxVars::SetUseWebRenderDCompWin(true);
