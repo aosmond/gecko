@@ -741,6 +741,7 @@ nsresult GfxInfo::Init() {
     }
   }
 
+  printf_stderr("[AO] vendor=%04x device=%04x\n", adapterVendorID[0], adapterDeviceID[0]);
   mAdapterVendorID[0].AppendPrintf("0x%04x", adapterVendorID[0]);
   mAdapterDeviceID[0].AppendPrintf("0x%04x", adapterDeviceID[0]);
   mAdapterSubsysID[0].AppendPrintf("%08x", adapterSubsysID[0]);
