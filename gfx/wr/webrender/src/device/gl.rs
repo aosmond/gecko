@@ -799,6 +799,14 @@ impl ProgramSourceInfo {
     fn full_name(&self) -> String {
         Self::make_full_name(self.base_filename, &self.features)
     }
+
+    fn ext_name(&self) -> String {
+        let full_name = self.full_name();
+        match self.source_type {
+            ProgramSourceType::Optimized(gl_version) => format!("{}_{:?}", full_name, gl_version),
+            ProgramSourceType::Unoptimized => full_name,
+        }
+    }
 }
 
 #[cfg_attr(feature = "serialize_program", derive(Deserialize, Serialize))]
@@ -2043,7 +2051,7 @@ impl Device {
         let _guard = CrashAnnotatorGuard::new(
             &self.crash_annotator,
             CrashAnnotation::CompileShader,
-            &program.source_info.full_name()
+            &program.source_info.ext_name()
         );
 
         assert!(!program.is_initialized());

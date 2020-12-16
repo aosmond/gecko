@@ -551,7 +551,11 @@ impl Gl for Context {
                 }
             }
         }
-        panic!("unknown shader");
+        let mut len = 0;
+        for s in strings {
+            len += s.len();
+        }
+        panic!("unknown shader; lines {} chars {}", strings.len(), len);
     }
 
     fn tex_buffer(&self, target: GLenum, internal_format: GLenum, buffer: GLuint) {
