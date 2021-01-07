@@ -658,13 +658,18 @@ void DeviceManagerDx::CreateCompositorDevice(FeatureState& d3d11) {
     mCompositorDeviceSupportsVideo = true;
   }
 
-  // Only test this when not using WARP since it can fail and cause
-  // GetDeviceRemovedReason to return weird values.
-  bool textureSharingWorks = D3D11Checks::DoesTextureSharingWork(device);
-
   DXGI_ADAPTER_DESC desc;
   PodZero(&desc);
   adapter->GetDesc(&desc);
+
+  const bool warp = desc.VendorId == 0x1414;
+
+  // Only test this when not using WARP since it can fail and cause
+  // GetDeviceRemovedReason to return weird values.
+  bool textureSharingWorks = false;
+  if (!warp || IsWin8OrLater()) {
+    textureSharingWorks = D3D11Checks::DoesTextureSharingWork(device);
+  }
 
   if (!textureSharingWorks) {
     gfxConfig::SetFailed(Feature::D3D11_HW_ANGLE, FeatureStatus::Broken,
@@ -689,7 +694,7 @@ void DeviceManagerDx::CreateCompositorDevice(FeatureState& d3d11) {
 
     int32_t sequenceNumber = GetNextDeviceCounter();
     mDeviceStatus = Some(D3D11DeviceStatus(
-        false, textureSharingWorks, featureLevel, DxgiAdapterDesc::From(desc),
+        warp, textureSharingWorks, featureLevel, DxgiAdapterDesc::From(desc),
         sequenceNumber, formatOptions));
   }
   mCompositorDevice->SetExceptionMode(0);
