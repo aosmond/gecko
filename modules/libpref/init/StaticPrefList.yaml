@@ -4801,7 +4801,7 @@
 # Whether to use the D3D11 RenderCompositor when using WebRender software backend
 - name: gfx.webrender.software.d3d11
   type: bool
-  value: true
+  value: false
   mirror: once
 
 - name: gfx.webrender.software.d3d11.upload-mode
