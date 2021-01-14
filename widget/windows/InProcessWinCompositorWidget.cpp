@@ -118,6 +118,7 @@ InProcessWinCompositorWidget::StartRemoteDrawing() {
   HDC dc = GetWindowSurface();
   if (!surf) {
     if (!dc) {
+      printf_stderr("[AO] InProcessWinCompositorWidget::StartRemoteDrawing -- no surface or DC, transparency=%u memoryDC=%p hwnd=%p\n", (uint32_t)mTransparencyMode, mMemoryDC, mWnd);
       return nullptr;
     }
     uint32_t flags = (mTransparencyMode == eTransparencyOpaque)
@@ -131,6 +132,10 @@ InProcessWinCompositorWidget::StartRemoteDrawing() {
     if (dc) {
       FreeWindowSurface(dc);
     }
+    IntSize clientSize = GetClientSize().ToUnknownSize();
+    printf_stderr("[AO] InProcessWinCompositorWidget::StartRemoteDrawing -- bad size %dx%d, client size %dx%d, transparency=%u memoryDC=%p hwnd=%p\n",
+        size.width, size.height, clientSize.width, clientSize.height,
+        (uint32_t)mTransparencyMode, mMemoryDC, mWnd);
     return nullptr;
   }
 
@@ -140,6 +145,7 @@ InProcessWinCompositorWidget::StartRemoteDrawing() {
   if (dt) {
     mCompositeDC = dc;
   } else {
+    printf_stderr("[AO] InProcessWinCompositorWidget::StartRemoteDrawing -- no dt size %dx%d\n", size.width, size.height);
     FreeWindowSurface(dc);
   }
 

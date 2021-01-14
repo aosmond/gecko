@@ -610,6 +610,7 @@ already_AddRefed<gfx::DrawTarget> Client::BorrowDrawTarget() {
                   WAIT_OBJECT_0);
 
   if (mSharedDataPtr->dataType != SharedDataType::BorrowResponse) {
+    printf_stderr("[AO] Client::BorrowDrawTarget -- data type %u\n", (uint32_t)mSharedDataPtr->dataType);
     return nullptr;
   }
 
@@ -617,6 +618,7 @@ already_AddRefed<gfx::DrawTarget> Client::BorrowDrawTarget() {
 
   if ((responseData.result != ResponseResult::BorrowSameBuffer) &&
       (responseData.result != ResponseResult::BorrowSuccess)) {
+    printf_stderr("[AO] Client::BorrowDrawTarget -- response result %u\n", (uint32_t)responseData.result);
     return nullptr;
   }
 
@@ -627,6 +629,7 @@ already_AddRefed<gfx::DrawTarget> Client::BorrowDrawTarget() {
     if (!newBackbuffer->InitializeRemote(responseData.width,
                                          responseData.height,
                                          responseData.fileMapping)) {
+      printf_stderr("[AO] Client::BorrowDrawTarget -- initialize remote failed\n");
       return nullptr;
     }
 
@@ -635,7 +638,11 @@ already_AddRefed<gfx::DrawTarget> Client::BorrowDrawTarget() {
 
   MOZ_ASSERT(mBackbuffer);
 
-  return mBackbuffer->CreateDrawTarget();
+  RefPtr<gfx::DrawTarget> dt = mBackbuffer->CreateDrawTarget();
+  if (!dt) {
+    printf_stderr("[AO] Client::BorrowDrawTarget -- dt create failed\n");
+  }
+  return dt.forget();
 }
 
 bool Client::PresentDrawTarget(gfx::IntRegion aDirtyRegion) {

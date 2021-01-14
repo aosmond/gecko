@@ -59,6 +59,7 @@ bool RenderCompositorSWGL::AllocateMappedBuffer() {
   layers::BufferMode bufferMode = layers::BufferMode::BUFFERED;
   mDT = mWidget->StartRemoteDrawingInRegion(mRegion, &bufferMode);
   if (!mDT) {
+    printf_stderr("[AO] RenderCompositorSWGL::AllocateMappedBuffer -- no draw target\n");
     return false;
   }
   // Attempt to lock the underlying buffer directly from the draw target.
@@ -101,6 +102,7 @@ bool RenderCompositorSWGL::AllocateMappedBuffer() {
     }
     gfx::DataSourceSurface::MappedSurface map = {nullptr, 0};
     if (!mSurface || !mSurface->Map(gfx::DataSourceSurface::READ_WRITE, &map)) {
+      printf_stderr("[AO] RenderCompositorSWGL::AllocateMappedBuffer -- no surface %p or map failed\n", mSurface.get());
       // We failed mapping the data surface, so need to cancel the frame.
       mWidget->EndRemoteDrawingInRegion(mDT, mRegion);
       ClearMappedBuffer();

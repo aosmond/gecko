@@ -175,6 +175,7 @@ void gfxASurface::Init(cairo_surface_t* surface, bool existingSurface) {
   mSurface = surface;
   mSurfaceValid = !cairo_surface_status(surface);
   if (!mSurfaceValid) {
+    printf_stderr("[AO] gfxASurface::Init -- status %u surface %p\n", (uint32_t)cairo_surface_status(surface), surface);
     gfxWarning() << "ASurface Init failed with Cairo status "
                  << cairo_surface_status(surface) << " on " << hexa(surface);
   }
