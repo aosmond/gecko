@@ -269,6 +269,7 @@ function plPageFlags() {
 
 var ContentListener = {
   receiveMessage(message) {
+    dumpLine("[AO] ContentListener:receiveMessage -- " + message.name);
     switch (message.name) {
       case "PageLoader:LoadEvent":
         return plLoadHandlerMessage(message);
@@ -639,9 +640,11 @@ function plRecordTime(time) {
 function plLoadHandlerCapturing(evt) {
   // make sure we pick up the right load event
   if (evt.type != "load" || evt.originalTarget.defaultView.frameElement) {
+    dumpLine("[AO] plLoadHandlerCapturing -- exit type=" + evt.type + " frameElement=" + evt.originalTarget.defaultView.frameElement);
     return;
   }
 
+  dumpLine("[AO] plLoadHandlerCapturing");
   // set the tpRecordTime function (called from test pages we load) to store a global time.
   content.contentWindow.wrappedJSObject.tpRecordTime = function(
     time,
@@ -679,6 +682,7 @@ function sendScroll() {
 }
 
 function plWaitForPaintingCapturing() {
+  dumpLine("[AO] plWaitForPaintingCapturing");
   if (gPaintListener) {
     return;
   }
@@ -697,12 +701,14 @@ function plWaitForPaintingCapturing() {
 }
 
 function plPaintedCapturing() {
+  dumpLine("[AO] plPaintedCapturing");
   gPaintWindow.removeEventListener("MozAfterPaint", plPaintedCapturing, true);
   gPaintListener = false;
   _loadHandlerCapturing();
 }
 
 function _loadHandlerCapturing() {
+  dumpLine("[AO] _loadHandlerCapturing");
   failTimeout.clear();
 
   if (!(plPageFlags() & TEST_DOES_OWN_TIMING)) {
@@ -735,9 +741,11 @@ function _loadHandlerCapturing() {
 function plLoadHandler(evt) {
   // make sure we pick up the right load event
   if (evt.type != "load" || evt.originalTarget.defaultView.frameElement) {
+    dumpLine("[AO] plLoadHandler -- exit type=" + evt.type + " frameElement=" + evt.originalTarget.defaultView.frameElement);
     return;
   }
 
+  dumpLine("[AO] plLoadHandler");
   content.removeEventListener("load", plLoadHandler, true);
   setTimeout(waitForPainted, 0);
 }
@@ -747,10 +755,12 @@ function waitForPainted() {
   var utils = gPaintWindow.windowUtils;
 
   if (!utils.isMozAfterPaintPending || !useMozAfterPaint) {
+    dumpLine("[AO] waitForPainted -- _loadHandler");
     _loadHandler();
     return;
   }
 
+  dumpLine("[AO] waitForPainted");
   if (!gPaintListener) {
     gPaintWindow.addEventListener("MozAfterPaint", plPainted, true);
   }
@@ -758,12 +768,14 @@ function waitForPainted() {
 }
 
 function plPainted() {
+  dumpLine("[AO] plPainted");
   gPaintWindow.removeEventListener("MozAfterPaint", plPainted, true);
   gPaintListener = false;
   _loadHandler();
 }
 
 function _loadHandler(paint_time = 0) {
+  dumpLine("[AO] _loadHandler");
   failTimeout.clear();
   var end_time = 0;
 
