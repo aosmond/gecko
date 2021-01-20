@@ -216,6 +216,8 @@ class WebRenderLayerManager final : public LayerManager {
 
   bool mNeedsComposite;
   bool mIsFirstPaint;
+  bool mInTransaction;
+  bool mInEmptyTransaction;
   FocusTarget mFocusTarget;
 
   // When we're doing a transaction in order to draw to a non-default

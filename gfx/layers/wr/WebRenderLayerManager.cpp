@@ -40,6 +40,8 @@ WebRenderLayerManager::WebRenderLayerManager(nsIWidget* aWidget)
       mLatestTransactionId{0},
       mNeedsComposite(false),
       mIsFirstPaint(false),
+      mInTransaction(false),
+      mInEmptyTransaction(false),
       mTarget(nullptr),
       mPaintSequenceNumber(0),
       mWebRenderCommandBuilder(this),
@@ -238,6 +240,7 @@ bool WebRenderLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags) {
     return false;
   }
 
+  mInEmptyTransaction = true;
   mDisplayItemCache.SkipWaitingForPartialDisplayList();
 
   // Since we don't do repeat transactions right now, just set the time
@@ -254,6 +257,7 @@ bool WebRenderLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags) {
       // Revoke TransactionId to trigger next paint.
       mTransactionIdAllocator->RevokeTransactionId(mLatestTransactionId);
       mLatestTransactionId = mLatestTransactionId.Prev();
+      mInEmptyTransaction = false;
       return true;
     }
   }
@@ -307,6 +311,7 @@ bool WebRenderLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags) {
   mTransactionStart = TimeStamp();
 
   MakeSnapshotIfRequired(size);
+  mInEmptyTransaction = false;
   return true;
 }
 
@@ -322,6 +327,8 @@ void WebRenderLayerManager::EndTransactionWithoutLayer(
     nsDisplayList* aDisplayList, nsDisplayListBuilder* aDisplayListBuilder,
     WrFiltersHolder&& aFilters, WebRenderBackgroundData* aBackground) {
   AUTO_PROFILER_TRACING_MARKER("Paint", "RenderLayers", GRAPHICS);
+
+  mInTransaction = true;
 
   // Since we don't do repeat transactions right now, just set the time
   mAnimationReadyTime = TimeStamp::Now();
@@ -480,6 +487,7 @@ void WebRenderLayerManager::EndTransactionWithoutLayer(
 
   MakeSnapshotIfRequired(size);
   mNeedsComposite = false;
+  mInTransaction = false;
 }
 
 void WebRenderLayerManager::SetFocusTarget(const FocusTarget& aFocusTarget) {
@@ -558,6 +566,8 @@ void WebRenderLayerManager::MakeSnapshotIfRequired(LayoutDeviceIntSize aSize) {
 }
 
 void WebRenderLayerManager::DiscardImages() {
+  MOZ_RELEASE_ASSERT(!mInTransaction);
+  MOZ_RELEASE_ASSERT(!mInEmptyTransaction);
   wr::IpcResourceUpdateQueue resources(WrBridge());
   mStateManager.DiscardImagesInTransaction(resources);
   WrBridge()->UpdateResources(resources);
