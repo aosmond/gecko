@@ -352,6 +352,20 @@ struct DIGroup {
     mFonts.clear();
   }
 
+  bool ValidateImageKey(WebRenderLayerManager* aWrManager) {
+    if (!mKey) {
+      return false;
+    }
+
+    if (aWrManager->WrBridge()->GetNamespace() != mKey.ref()._0.mNamespace) {
+      printf_stderr("[AO] DIGroup key invalid, must drop\n");
+      MOZ_RELEASE_ASSERT(false);
+      mKey = Nothing();
+    }
+
+    return mKey.isSome();
+  }
+
   static IntRect ToDeviceSpace(nsRect aBounds, Matrix& aMatrix,
                                int32_t aAppUnitsPerDevPixel) {
     // RoundedOut can convert empty rectangles to non-empty ones
@@ -613,7 +627,7 @@ struct DIGroup {
     if (mInvalidRect.IsEmpty() && mVisibleRect.IsEqualEdges(mLastVisibleRect)) {
       GP("Not repainting group because it's empty\n");
       GP("End EndGroup\n");
-      if (mKey) {
+      if (ValidateImageKey(aWrManager)) {
         // Although the contents haven't changed, the visible area *may* have,
         // so request it be updated unconditionally (wr should be able to easily
         // detect if this is a no-op on its side, if that matters)
@@ -690,7 +704,7 @@ struct DIGroup {
     }
     Range<uint8_t> bytes((uint8_t*)recorder->mOutputStream.mData,
                          recorder->mOutputStream.mLength);
-    if (!mKey) {
+    if (!ValidateImageKey(aWrManager)) {
       // we don't want to send a new image that doesn't have any
       // items in it
       if (!hasItems || mVisibleRect.IsEmpty()) {
@@ -2343,7 +2357,10 @@ WebRenderCommandBuilder::GenerateFallbackData(
         // it means we don't need to push image for the item.
         if (!fallbackData->GetBlobImageKey().isSome()) {
           return nullptr;
-        }
+        } else if (fallbackData->GetBlobImageKey().ref()._0.mNamespace != mManager->WrBridge()->GetNamespace()) {
+          printf_stderr("[AO] GenerateFallbackData invalid key\n");
+          MOZ_RELEASE_ASSERT(false);
+	}
       }
     } else {
       WebRenderImageData* imageData = fallbackData->PaintIntoImage();
@@ -2489,6 +2506,11 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
   LayoutDeviceRect imageRect = LayerRect(itemRect) / layerScale;
 
   nsPoint maskOffset = aMaskItem->ToReferenceFrame() - bounds.TopLeft();
+
+  if (maskData->mBlobKey && maskData->mBlobKey.ref()._0.mNamespace != mManager->WrBridge()->GetNamespace()) {
+    printf_stderr("[AO] BuildWrMaskImage key invalid\n");
+    MOZ_RELEASE_ASSERT(false);
+  }
 
   nsRect dirtyRect;
   // If this mask item is being painted for the first time, some members of

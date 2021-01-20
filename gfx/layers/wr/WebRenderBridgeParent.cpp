@@ -1793,7 +1793,9 @@ wr::Epoch WebRenderBridgeParent::UpdateWebRender(
   // allocation. Without client side's layout refactoring, we could not finish
   // all old layers/webrender keys removals before new layer/webrender keys
   // allocation. In future, we could address the problem.
+  printf_stderr("[AO][%u] WebRenderBridgeParent::UpdateWebRender -- send\n", (uint32_t)OtherPid());
   Unused << SendWrUpdated(mIdNamespace, aTextureFactoryIdentifier);
+  printf_stderr("[AO][%u] WebRenderBridgeParent::UpdateWebRender -- sent\n", (uint32_t)OtherPid());
   CompositorBridgeParentBase* cBridge = mCompositorBridge;
   // XXX Stop to clear resources if webreder supports resources sharing between
   // different webrender instances.

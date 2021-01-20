@@ -496,6 +496,7 @@ bool WebRenderBridgeChild::InForwarderThread() { return NS_IsMainThread(); }
 mozilla::ipc::IPCResult WebRenderBridgeChild::RecvWrUpdated(
     const wr::IdNamespace& aNewIdNamespace,
     const TextureFactoryIdentifier& textureFactoryIdentifier) {
+  printf_stderr("[AO][%u] WebRenderBridgeChild::RecvWrUpdated -- manager %p\n", (uint32_t)base::GetCurrentProcId(), mManager);
   if (mManager) {
     mManager->WrUpdated();
   }
