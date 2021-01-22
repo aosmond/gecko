@@ -4467,7 +4467,7 @@
 # Prefer EGL over GLX if available.
 - name: gfx.prefer-x11-egl
   type: bool
-  value: false
+  value: true
   mirror: once
 
 - name: gfx.testing.device-fail

@@ -128,6 +128,8 @@ gfxPlatformGtk::gfxPlatformGtk() {
       gfxInfo->GetDrmRenderDevice(drmRenderDevice);
       gfxVars::SetDrmRenderDevice(drmRenderDevice);
     }
+
+    printf_stderr("gfxVars::UseEGL %d\n", gfxVars::UseEGL());
   }
 
   InitBackendPrefs(GetBackendPrefs());

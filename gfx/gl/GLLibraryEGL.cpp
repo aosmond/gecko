@@ -387,10 +387,12 @@ bool GLLibraryEGL::Init(nsACString* const out_failureId) {
 
   if (!mEGLLibrary) {
     mEGLLibrary = PR_LoadLibrary("libEGL.so");
+    printf_stderr("[AO] libEGL.so %p\n", mEGLLibrary);
   }
 #  if defined(XP_UNIX)
   if (!mEGLLibrary) {
     mEGLLibrary = PR_LoadLibrary("libEGL.so.1");
+    printf_stderr("[AO] libEGL.so.1 %p\n", mEGLLibrary);
   }
 #  endif
 
@@ -402,11 +404,13 @@ bool GLLibraryEGL::Init(nsACString* const out_failureId) {
 
   if (!mGLLibrary) {
     mGLLibrary = PR_LoadLibrary(GLES2_LIB);
+    printf_stderr("[AO] " GLES2_LIB " %p\n", mGLLibrary);
   }
 
 #  ifdef GLES2_LIB2
   if (!mGLLibrary) {
     mGLLibrary = PR_LoadLibrary(GLES2_LIB2);
+    printf_stderr("[AO] " GLES2_LIB2 " %p\n", mGLLibrary);
   }
 #  endif
 
