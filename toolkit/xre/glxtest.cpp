@@ -404,7 +404,7 @@ static char* get_render_name(const char* name) {
 }
 #endif
 
-static void get_gles_status(EGLDisplay dpy,
+static bool get_gles_status(EGLDisplay dpy,
                             PFNEGLGETPROCADDRESS eglGetProcAddress) {
   typedef EGLBoolean (*PFNEGLCHOOSECONFIGPROC)(
       EGLDisplay dpy, EGLint const* attrib_list, EGLConfig* configs,
@@ -444,7 +444,7 @@ static void get_gles_status(EGLDisplay dpy,
   if (!eglChooseConfig || !eglCreateContext || !eglCreatePbufferSurface ||
       !eglMakeCurrent) {
     record_error("libEGL missing methods for GLES test");
-    return;
+    return false;
   }
 
   typedef GLubyte* (*PFNGLGETSTRING)(GLenum);
@@ -461,7 +461,7 @@ static void get_gles_status(EGLDisplay dpy,
       libgl = dlopen(LIBGLES_FILENAME, RTLD_LAZY);
       if (!libgl) {
         record_error("Unable to load " LIBGL_FILENAME " or " LIBGLES_FILENAME);
-        return;
+        return false;
       }
     }
 
@@ -469,7 +469,7 @@ static void get_gles_status(EGLDisplay dpy,
     if (!glGetString) {
       dlclose(libgl);
       record_error("libGL or libGLESv2 glGetString missing");
-      return;
+      return false;
     }
   }
 
@@ -519,13 +519,14 @@ static void get_gles_status(EGLDisplay dpy,
   if (libgl) {
     dlclose(libgl);
   }
+  return true;
 }
 
-static void get_egl_status(EGLNativeDisplayType native_dpy, bool gles_test) {
+static bool get_egl_status(EGLNativeDisplayType native_dpy, bool gles_test) {
   void* libegl = dlopen(LIBEGL_FILENAME, RTLD_LAZY);
   if (!libegl) {
     record_warning("libEGL missing");
-    return;
+    return false;
   }
 
   PFNEGLGETPROCADDRESS eglGetProcAddress =
@@ -534,7 +535,7 @@ static void get_egl_status(EGLNativeDisplayType native_dpy, bool gles_test) {
   if (!eglGetProcAddress) {
     dlclose(libegl);
     record_error("no eglGetProcAddress");
-    return;
+    return false;
   }
 
   typedef EGLDisplay (*PFNEGLGETDISPLAYPROC)(void* native_display);
@@ -553,25 +554,25 @@ static void get_egl_status(EGLNativeDisplayType native_dpy, bool gles_test) {
   if (!eglGetDisplay || !eglInitialize || !eglTerminate) {
     dlclose(libegl);
     record_error("libEGL missing methods");
-    return;
+    return false;
   }
 
   EGLDisplay dpy = eglGetDisplay(native_dpy);
   if (!dpy) {
     dlclose(libegl);
     record_warning("libEGL no display");
-    return;
+    return false;
   }
 
   EGLint major, minor;
   if (!eglInitialize(dpy, &major, &minor)) {
     dlclose(libegl);
     record_warning("libEGL initialize failed");
-    return;
+    return false;
   }
 
-  if (gles_test) {
-    get_gles_status(dpy, eglGetProcAddress);
+  if (gles_test && !get_gles_status(dpy, eglGetProcAddress)) {
+    return false;
   }
 
   typedef const char* (*PFNEGLGETDISPLAYDRIVERNAMEPROC)(EGLDisplay dpy);
@@ -587,6 +588,7 @@ static void get_egl_status(EGLNativeDisplayType native_dpy, bool gles_test) {
 
   eglTerminate(dpy);
   dlclose(libegl);
+  return true;
 }
 
 #ifdef MOZ_X11
@@ -787,7 +789,9 @@ static void get_glx_status(int* gotGlxInfo, int* gotDriDriver) {
 }
 
 static bool x11_egltest() {
-  get_egl_status(nullptr, true);
+  if (!get_egl_status(nullptr, true)) {
+    return false;
+  }
 
   Display* dpy = XOpenDisplay(nullptr);
   if (!dpy) {
@@ -798,6 +802,7 @@ static bool x11_egltest() {
   get_x11_screen_info(dpy);
 
   XCloseDisplay(dpy);
+  record_value("TEST_TYPE\nEGL\n");
   return true;
 }
 
@@ -813,6 +818,8 @@ static void glxtest() {
     // EGL_MESA_query_driver. We are probably using Wayland.
     get_egl_status(nullptr, false);
   }
+
+  record_value("TEST_TYPE\nGLX\n");
 }
 #endif
 
@@ -1145,6 +1152,7 @@ static bool wayland_egltest() {
   get_wayland_screen_info(dpy);
 
   wl_display_disconnect(dpy);
+  record_value("TEST_TYPE\nEGL\n");
   return true;
 }
 #endif
@@ -1169,7 +1177,7 @@ int childgltest() {
 #endif
 #ifdef MOZ_X11
   // TODO: --display command line argument is not properly handled
-  if (!result && IsX11EGLEnabled()) {
+  if (!result) {
     result = x11_egltest();
   }
   if (!result) {
