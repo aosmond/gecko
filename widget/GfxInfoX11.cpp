@@ -427,8 +427,7 @@ void GfxInfo::GetData() {
         if (mDeviceId.IsEmpty()) {
           mDeviceId = pciDevices[i];
         } else if (!mDeviceId.Equals(pciVendors[i])) {
-          gfxCriticalNote << "Different GPUs from same vendor detected via "
-                             "PCI, cannot deduce device";
+          gfxCriticalNote << "Different GPUs from same vendor detected via PCI";
           mDeviceId.Truncate();
           break;
         }
@@ -436,125 +435,184 @@ void GfxInfo::GetData() {
     }
   }
 
-  // The DRI_PRIME envvar allows a user to select which graphics card they would
-  // prefer to use. Generally it will default to the integrated GPU. If set to
-  // "1", it will prefer the discrete GPU. If set to "pci-domain_bus_dev_func",
-  // it will prefer the specified GPU. This can be used to inform our strategy
-  // for guessing the vendor/device ID from the PCI list.
-  bool matchIntegrated = false;
-  bool matchDiscrete = false;
-  bool matchPrime = false;
-  bool dumpCandidates = false;
-  const char* driPrime = PR_GetEnv("DRI_PRIME");
-  if (driPrime) {
-    if (strncmp(driPrime, "pci-", 4) == 0) {
-      // User requested a specific GPU, we can match against the PCI primes.
-      matchPrime = true;
-    } else if (strcmp(driPrime, "1") == 0) {
-      // User requested the discrete GPU.
-      matchDiscrete = true;
+  // The DRI_PRIME envvar allows a user to select which graphics card they
+  // would prefer to use. Generally it will default to the integrated GPU. If
+  // set to "1", it will prefer the discrete GPU. If set to
+  // "pci-domain_bus_dev_func", it will prefer the specified GPU. This can be
+  // used to inform our strategy for guessing the vendor/device ID from the
+  // PCI list if we have no other option.
+  if (mVendorId.IsEmpty() || mDeviceId.IsEmpty()) {
+    bool matchIntegrated = false;
+    bool matchDiscrete = false;
+    bool matchPrime = false;
+    bool dumpCandidates = false;
+    const char* driPrime = PR_GetEnv("DRI_PRIME");
+    if (driPrime) {
+      if (strncmp(driPrime, "pci-", 4) == 0) {
+        // User requested a specific GPU, we can match against the PCI primes.
+        matchPrime = true;
+      } else if (strcmp(driPrime, "1") == 0) {
+        // User requested the discrete GPU.
+        matchDiscrete = true;
+      } else {
+        // Defaults to the integrated GPU.
+        matchIntegrated = true;
+      }
     } else {
       // Defaults to the integrated GPU.
       matchIntegrated = true;
     }
-  } else {
-    // Defaults to the integrated GPU.
-    matchIntegrated = true;
-  }
 
-  size_t pciSelected = pciLen;
-  if (pciLen == 1) {
-    // There is only one device detected via PCI, no need to search.
-    pciSelected = 0;
-  } else if (matchPrime) {
-    for (size_t i = 0; i < pciLen; ++i) {
-      if (pciPrimes[i].EqualsASCII(driPrime)) {
+    bool intelCPU = false;
+    bool amdCPU = false;
+    if (matchIntegrated || matchDiscrete) {
+      // TODO(aosmond): determine CPU type
+    }
+
+    size_t pciSelected = pciLen;
+    if (pciLen == 1) {
+      // There is only one device detected via PCI, no need to search.
+      pciSelected = 0;
+    } else if (matchPrime) {
+      for (size_t i = 0; i < pciLen; ++i) {
+        if (pciPrimes[i].EqualsASCII(driPrime)) {
+          if (pciSelected == pciLen) {
+            pciSelected = i;
+          } else {
+            gfxCriticalNote << "Multiple matching PCI prime candidates";
+            pciSelected = pciLen;
+            break;
+          }
+        }
+      }
+    } else if (matchIntegrated) {
+      // Try to match a GPU that is an integrated GPU. We'll ignore any that
+      // don't match the CPU vendor.
+      nsAutoCString preferredVendor;
+      if (intelCPU) {
+        preferredVendor.AssignLiteral("0x8086");
+      } else if (amdCPU) {
+        preferredVendor.AssignLiteral("0x1002");
+      }
+
+      for (size_t i = 0; i < pciLen; ++i) {
+        if (!pciVendors[i].Equals(preferredVendor)) {
+          continue;
+        }
+
         if (pciSelected == pciLen) {
           pciSelected = i;
-        } else {
-          gfxCriticalNote << "Multiple matching PCI prime candidates";
+        } else if (!pciDevices[i].Equals(pciDevices[pciSelected])) {
           pciSelected = pciLen;
           break;
         }
       }
-    }
-  } else if (matchIntegrated || matchDiscrete) {
-    size_t pciIntel = pciLen;
-    size_t pciAMD = pciLen;
-    size_t pciOther = pciLen;
 
-    bool hasIntel = false;
-    bool hasAMD = false;
-    bool hasOther = false;
+      // There are either no integrated GPUs, or multiple candidates.
+    } else if (matchDiscrete) {
+      // Try to match a GPU that isn't an integrated GPU. We'll ignore any that
+      // match the CPU vendor.
+      nsAutoCString avoidedVendor;
+      if (intelCPU) {
+        avoidedVendor.AssignLiteral("0x8086");
+      } else if (amdCPU) {
+        avoidedVendor.AssignLiteral("0x1002");
+      }
 
-    for (size_t i = 0; i < pciLen; ++i) {
-      if (pciVendors[i].EqualsLiteral("0x8086")) {
-        if (!hasIntel) {
-          pciIntel = i;
-          hasIntel = true;
-        } else if (!pciDevices[i].Equals(pciDevices[pciIntel])) {
-          pciIntel = pciLen;
+      for (size_t i = 0; i < pciLen; ++i) {
+        if (pciVendors[i].Equals(avoidedVendor)) {
+          continue;
+        }
+
+        if (pciSelected == pciLen) {
+          pciSelected = i;
+        } else if (!pciVendors[i].Equals(pciVendors[pciSelected]) ||
+                   !pciDevices[i].Equals(pciDevices[pciSelected])) {
+          pciSelected = pciLen;
           break;
         }
-      } else if (pciVendors[i].EqualsLiteral("0x1002")) {
-        if (!hasAMD) {
-          pciAMD = i;
-          hasAMD = true;
-        } else if (!pciDevices[i].Equals(pciDevices[pciAMD])) {
-          pciAMD = pciLen;
+      }
+
+      // There are either no discrete GPUs, or multiple candidates.
+    } else if (matchIntegrated || matchDiscrete) {
+      size_t pciIntel = pciLen;
+      size_t pciAMD = pciLen;
+      size_t pciOther = pciLen;
+
+      bool hasIntel = false;
+      bool hasAMD = false;
+      bool hasOther = false;
+
+      for (size_t i = 0; i < pciLen; ++i) {
+        if (pciVendors[i].EqualsLiteral("0x8086")) {
+          if (!hasIntel) {
+            pciIntel = i;
+            hasIntel = true;
+          } else if (!pciDevices[i].Equals(pciDevices[pciIntel])) {
+            pciIntel = pciLen;
+            break;
+          }
+        } else if (pciVendors[i].EqualsLiteral("0x1002")) {
+          if (!hasAMD) {
+            pciAMD = i;
+            hasAMD = true;
+          } else if (!pciDevices[i].Equals(pciDevices[pciAMD])) {
+            pciAMD = pciLen;
+          }
+        } else {
+          if (!hasOther) {
+            pciOther = i;
+            hasOther = true;
+          } else if (!pciVendors[i].Equals(pciVendors[pciOther]) ||
+                     !pciDevices[i].Equals(pciDevices[pciOther])) {
+            pciOther = pciLen;
+          }
+        }
+      }
+
+      if (matchIntegrated) {
+        if (hasIntel) {
+          pciSelected = pciIntel;
+        } else if (hasAMD) {
+          pciSelected = pciAMD;
+        } else if (hasOther) {
+          pciSelected = pciOther;
         }
       } else {
-        if (!hasOther) {
-          pciOther = i;
-          hasOther = true;
-        } else if (!pciVendors[i].Equals(pciVendors[pciOther]) ||
-                   !pciDevices[i].Equals(pciDevices[pciOther])) {
-          pciOther = pciLen;
+        if (hasOther) {
+          pciSelected = pciOther;
+        } else if (hasAMD) {
+          pciSelected = pciAMD;
+        } else if (hasIntel) {
+          pciSelected = pciIntel;
         }
       }
     }
 
-    if (matchIntegrated) {
-      if (hasIntel) {
-        pciSelected = pciIntel;
-      } else if (hasAMD) {
-        pciSelected = pciAMD;
-      } else if (hasOther) {
-        pciSelected = pciOther;
-      }
-    } else {
-      if (hasOther) {
-        pciSelected = pciOther;
-      } else if (hasAMD) {
-        pciSelected = pciAMD;
-      } else if (hasIntel) {
-        pciSelected = pciIntel;
-      }
-    }
-  }
-
-  // If we were able to guess the GPU from the PCI device list, then either use
-  // that as our vendor/device info, or compare against what was already chosen.
-  if (pciSelected != pciLen) {
-    if (mVendorId.IsEmpty()) {
-      // We should only hit this code path for Mesa < 19, where we couldn't get
-      // the DRI driver and guess the vendor ID.
-      mVendorId = pciVendors[pciSelected];
-      mDeviceId = pciDevices[pciSelected];
-      // If we guessed and there are 2+ options, log them.
-      dumpCandidates = pciLen > 1;
-    } else if (mVendorId.Equals(pciVendors[pciSelected])) {
-      if (mDeviceId.IsEmpty()) {
+    // If we were able to guess the GPU from the PCI device list, then either
+    // use that as our vendor/device info, or compare against what was already
+    // chosen.
+    if (pciSelected != pciLen) {
+      if (mVendorId.IsEmpty()) {
+        // We should only hit this code path for Mesa < 19, where we couldn't
+        // get the DRI driver and guess the vendor ID.
+        mVendorId = pciVendors[pciSelected];
         mDeviceId = pciDevices[pciSelected];
         // If we guessed and there are 2+ options, log them.
         dumpCandidates = pciLen > 1;
-      } else if (!mDeviceId.Equals(pciDevices[pciSelected])) {
-        gfxCriticalNote << "Selected PCI device mismatch";
+      } else if (mVendorId.Equals(pciVendors[pciSelected])) {
+        if (mDeviceId.IsEmpty()) {
+          mDeviceId = pciDevices[pciSelected];
+          // If we guessed and there are 2+ options, log them.
+          dumpCandidates = pciLen > 1;
+        } else if (!mDeviceId.Equals(pciDevices[pciSelected])) {
+          gfxCriticalNote << "Selected PCI device mismatch";
+          dumpCandidates = true;
+        }
+      } else {
+        gfxCriticalNote << "Selected PCI vendor mismatch";
         dumpCandidates = true;
       }
-    } else {
-      gfxCriticalNote << "Selected PCI vendor mismatch";
-      dumpCandidates = true;
     }
   }
 
