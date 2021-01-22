@@ -172,6 +172,7 @@ void GfxInfo::GetData() {
 
   AutoTArray<nsCString, 2> pciVendors;
   AutoTArray<nsCString, 2> pciDevices;
+  AutoTArray<nsCString, 2> pciPrimes;
 
   nsCString* stringToFill = nullptr;
   bool logString = false;
@@ -210,6 +211,8 @@ void GfxInfo::GetData() {
       stringToFill = pciVendors.AppendElement();
     } else if (!strcmp(line, "PCI_DEVICE_ID")) {
       stringToFill = pciDevices.AppendElement();
+    } else if (!strcmp(line, "PCI_PRIME_ID")) {
+      stringToFill = pciPrimes.AppendElement();
     } else if (!strcmp(line, "DRM_RENDERDEVICE")) {
       stringToFill = &drmRenderDevice;
     } else if (!strcmp(line, "TEST_TYPE")) {
@@ -224,8 +227,11 @@ void GfxInfo::GetData() {
 
   MOZ_ASSERT(pciDevices.Length() == pciVendors.Length(),
              "Missing PCI vendors/devices");
+  MOZ_ASSERT(pciDevices.Length() == pciPrimes.Length(),
+             "Missing PCI devices/primes");
 
   size_t pciLen = std::min(pciVendors.Length(), pciDevices.Length());
+  pciLen = std::min(pciLen, pciPrimes.Length());
   mHasMultipleGPUs = pciLen > 1;
 
   if (!strcmp(textureFromPixmap.get(), "TRUE")) mHasTextureFromPixmap = true;
@@ -356,6 +362,7 @@ void GfxInfo::GetData() {
   }
 
   // If we have the DRI driver, we can derive the vendor ID from that if needed.
+  // We only get the DRI driver for Mesa 19+.
   if (mVendorId.IsEmpty() && !driDriver.IsEmpty()) {
     const char* nvidiaDrivers[] = {"nouveau", "tegra", nullptr};
     for (size_t i = 0; nvidiaDrivers[i]; ++i) {
@@ -398,15 +405,16 @@ void GfxInfo::GetData() {
     }
   }
 
-  // If we still don't have a vendor ID, we can try the PCI vendor list.
+  // If we still don't have a vendor ID, we can try the PCI vendor list. If
+  // there is only one vendor, it is most likely correct.
   if (mVendorId.IsEmpty()) {
-    if (pciVendors.Length() == 1) {
-      mVendorId = pciVendors[0];
-    } else if (pciVendors.IsEmpty()) {
-      gfxCriticalNote << "No GPUs detected via PCI";
-    } else {
-      gfxCriticalNote
-          << "More than 1 GPU detected via PCI, cannot deduce vendor";
+    for (size_t i = 0; i < pciVendors.Length(); ++i) {
+      if (mVendorId.IsEmpty()) {
+        mVendorId = pciVendors[i];
+      } else if (!mVendorId.Equals(pciVendors[i])) {
+        // Multiple vendors, so we cannot guess at least the vendor.
+        mVendorId.Truncate();
+      }
     }
   }
 
@@ -417,8 +425,8 @@ void GfxInfo::GetData() {
       if (mVendorId.Equals(pciVendors[i])) {
         if (mDeviceId.IsEmpty()) {
           mDeviceId = pciDevices[i];
-        } else {
-          gfxCriticalNote << "More than 1 GPU from same vendor detected via "
+        } else if (!mDeviceId.Equals(pciVendors[i])) {
+          gfxCriticalNote << "Different GPUs from same vendor detected via "
                              "PCI, cannot deduce device";
           mDeviceId.Truncate();
           break;
@@ -427,11 +435,135 @@ void GfxInfo::GetData() {
     }
   }
 
+  // The DRI_PRIME envvar allows a user to select which graphics card they would
+  // prefer to use. Generally it will default to the integrated GPU. If set to
+  // "1", it will prefer the discrete GPU. If set to "pci-domain_bus_dev_func",
+  // it will prefer the specified GPU. This can be used to inform our strategy
+  // for guessing the vendor/device ID from the PCI list.
+  bool matchIntegrated = false;
+  bool matchDiscrete = false;
+  bool matchPrime = false;
+  bool dumpCandidates = false;
+  const char* driPrime = PR_GetEnv("DRI_PRIME");
+  if (driPrime) {
+    if (strncmp(driPrime, "pci-", 4) == 0) {
+      // User requested a specific GPU, we can match against the PCI primes.
+      matchPrime = true;
+    } else if (strcmp(driPrime, "1") == 0) {
+      // User requested the discrete GPU.
+      matchDiscrete = true;
+    } else {
+      // Defaults to the integrated GPU.
+      matchIntegrated = true;
+    }
+  } else {
+    // Defaults to the integrated GPU.
+    matchIntegrated = true;
+  }
+
+  size_t pciSelected = pciLen;
+  if (pciLen == 1) {
+    // There is only one device detected via PCI, no need to search.
+    pciSelected = 0;
+  } else if (matchPrime) {
+    for (size_t i = 0; i < pciLen; ++i) {
+      if (pciPrimes[i].EqualsASCII(driPrime)) {
+        if (pciSelected == pciLen) {
+          pciSelected = i;
+        } else {
+          gfxCriticalNote << "Multiple matching PCI prime candidates";
+          pciSelected = pciLen;
+          break;
+        }
+      }
+    }
+  } else if (matchIntegrated) {
+    size_t pciIntel = pciLen;
+    size_t pciAMD = pciLen;
+    size_t pciOther = pciLen;
+    for (size_t i = 0; i < pciLen; ++i) {
+      if (pciVendors[i].EqualsLiteral("0x8086")) {
+        if (pciIntel == pciLen) {
+          pciIntel = i;
+        } else if (!pciDevices[i].Equals(pciDevices[pciIntel])) {
+          pciIntel = pciAMD = pciOther = pciLen;
+          break;
+        }
+      } else if (pciVendors[i].EqualsLiteral("0x1002")) {
+        if (pciAMD == pciLen) {
+          pciAMD = i;
+        } else if (!pciDevices[i].Equals(pciDevices[pciAMD])) {
+          pciAMD = pciOther = pciLen;
+          break;
+        }
+      } else {
+        if (pciOther == pciLen) {
+          pciOther = i;
+        } else if (!pciVendors[i].Equals(pciVendors[pciOther]) ||
+                   !pciDevices[i].Equals(pciDevices[pciOther])) {
+          pciOther = pciLen;
+          break;
+        }
+      }
+    }
+
+    if (pciIntel != pciLen) {
+      pciSelected = pciIntel;
+    } else if (pciAMD != pciLen) {
+      pciSelected = pciAMD;
+    } else {
+      pciSelected = pciOther;
+    }
+  } else if (matchDiscrete) {
+    for (size_t i = 0; i < pciLen; ++i) {
+      // Non-intel GPUs are generally discrete.
+      // TODO(aosmond): What about integrated AMD GPUs?
+      if (pciVendors[i].EqualsLiteral("0x8086")) {
+        continue;
+      }
+
+      if (pciSelected == pciLen) {
+        pciSelected = i;
+      } else if (!pciVendors[i].Equals(pciVendors[pciSelected]) ||
+                 !pciDevices[i].Equals(pciDevices[pciSelected])) {
+        // We found another, different discrete GPU.
+        pciSelected = pciLen;
+        break;
+      }
+    }
+  }
+
+  // If we were able to guess the GPU from the PCI device list, then either use
+  // that as our vendor/device info, or compare against what was already chosen.
+  if (pciSelected != pciLen) {
+    if (mVendorId.IsEmpty()) {
+      // We should only hit this code path for Mesa < 19, where we couldn't get
+      // the DRI driver and guess the vendor ID.
+      mVendorId = pciVendors[pciSelected];
+      mDeviceId = pciDevices[pciSelected];
+      // If we guessed and there are 2+ options, log them.
+      dumpCandidates = pciLen > 1;
+    } else if (mVendorId.Equals(pciVendors[pciSelected])) {
+      if (mDeviceId.IsEmpty()) {
+        mDeviceId = pciDevices[pciSelected];
+        // If we guessed and there are 2+ options, log them.
+        dumpCandidates = pciLen > 1;
+      } else if (!mDeviceId.Equals(pciDevices[pciSelected])) {
+        gfxCriticalNote << "Selected PCI device mismatch";
+        dumpCandidates = true;
+      }
+    } else {
+      gfxCriticalNote << "Selected PCI vendor mismatch";
+      dumpCandidates = true;
+    }
+  }
+
   // Assuming we know the vendor, we should check for a secondary card.
   if (!mVendorId.IsEmpty()) {
     if (pciLen > 2) {
       gfxCriticalNote
           << "More than 2 GPUs detected via PCI, secondary GPU is arbitrary";
+      dumpCandidates = true;
     }
     for (size_t i = 0; i < pciLen; ++i) {
       if (!mVendorId.Equals(pciVendors[i]) ||
@@ -444,10 +576,10 @@ void GfxInfo::GetData() {
   }
 
   // If we couldn't choose, log them.
-  if (mVendorId.IsEmpty()) {
+  if (mVendorId.IsEmpty() || mDeviceId.IsEmpty() || dumpCandidates) {
     for (size_t i = 0; i < pciLen; ++i) {
       gfxCriticalNote << "PCI candidate " << pciVendors[i].get() << "/"
-                      << pciDevices[i].get();
+                      << pciDevices[i].get() << " -- " << pciPrimes[i].get();
     }
   }
 

@@ -312,8 +312,11 @@ static void get_pci_status() {
     pci_fill_info(dev, PCI_FILL_IDENT | PCI_FILL_CLASS);
     if (dev->device_class >> 8 == PCI_BASE_CLASS_DISPLAY && dev->vendor_id &&
         dev->device_id) {
-      record_value("PCI_VENDOR_ID\n0x%04x\nPCI_DEVICE_ID\n0x%04x\n",
-                   dev->vendor_id, dev->device_id);
+      record_value(
+          "PCI_VENDOR_ID\n0x%04x\nPCI_DEVICE_ID\n0x%04x\n"
+          "PCI_PRIME_ID\npci-%04x_%02x_%02x_%u",
+          dev->vendor_id, dev->device_id, dev->domain_16, dev->bus, dev->dev,
+          dev->func);
     }
   }
 
