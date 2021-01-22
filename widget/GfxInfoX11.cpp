@@ -173,6 +173,7 @@ void GfxInfo::GetData() {
   AutoTArray<nsCString, 2> pciVendors;
   AutoTArray<nsCString, 2> pciDevices;
   AutoTArray<nsCString, 2> pciPrimes;
+  AutoTArray<PCIEntry, 2> pciEntries;
 
   nsCString* stringToFill = nullptr;
   bool logString = false;
@@ -477,58 +478,57 @@ void GfxInfo::GetData() {
         }
       }
     }
-  } else if (matchIntegrated) {
+  } else if (matchIntegrated || matchDiscrete) {
     size_t pciIntel = pciLen;
     size_t pciAMD = pciLen;
     size_t pciOther = pciLen;
+
+    bool hasIntel = false;
+    bool hasAMD = false;
+    bool hasOther = false;
+
     for (size_t i = 0; i < pciLen; ++i) {
       if (pciVendors[i].EqualsLiteral("0x8086")) {
-        if (pciIntel == pciLen) {
+        if (!hasIntel) {
           pciIntel = i;
+          hasIntel = true;
         } else if (!pciDevices[i].Equals(pciDevices[pciIntel])) {
-          pciIntel = pciAMD = pciOther = pciLen;
+          pciIntel = pciLen;
           break;
         }
       } else if (pciVendors[i].EqualsLiteral("0x1002")) {
-        if (pciAMD == pciLen) {
+        if (!hasAMD) {
           pciAMD = i;
+          hasAMD = true;
         } else if (!pciDevices[i].Equals(pciDevices[pciAMD])) {
-          pciAMD = pciOther = pciLen;
-          break;
+          pciAMD = pciLen;
         }
       } else {
-        if (pciOther == pciLen) {
+        if (!hasOther) {
           pciOther = i;
+          hasOther = true;
         } else if (!pciVendors[i].Equals(pciVendors[pciOther]) ||
                    !pciDevices[i].Equals(pciDevices[pciOther])) {
           pciOther = pciLen;
-          break;
         }
       }
     }
 
-    if (pciIntel != pciLen) {
-      pciSelected = pciIntel;
-    } else if (pciAMD != pciLen) {
-      pciSelected = pciAMD;
-    } else {
-      pciSelected = pciOther;
-    }
-  } else if (matchDiscrete) {
-    for (size_t i = 0; i < pciLen; ++i) {
-      // Non-intel GPUs are generally discrete.
-      // TODO(aosmond): What about integrated AMD GPUs?
-      if (pciVendors[i].EqualsLiteral("0x8086")) {
-        continue;
+    if (matchIntegrated) {
+      if (hasIntel) {
+        pciSelected = pciIntel;
+      } else if (hasAMD) {
+        pciSelected = pciAMD;
+      } else if (hasOther) {
+        pciSelected = pciOther;
       }
-
-      if (pciSelected == pciLen) {
-        pciSelected = i;
-      } else if (!pciVendors[i].Equals(pciVendors[pciSelected]) ||
-                 !pciDevices[i].Equals(pciDevices[pciSelected])) {
-        // We found another, different discrete GPU.
-        pciSelected = pciLen;
-        break;
+    } else {
+      if (hasOther) {
+        pciSelected = pciOther;
+      } else if (hasAMD) {
+        pciSelected = pciAMD;
+      } else if (hasIntel) {
+        pciSelected = pciIntel;
       }
     }
   }
