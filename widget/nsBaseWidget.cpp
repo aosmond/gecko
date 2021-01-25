@@ -1216,7 +1216,8 @@ already_AddRefed<LayerManager> nsBaseWidget::CreateCompositorSession(
     // even when gfxVars::UseWebRender() is true. WebRender could coexist only
     // with BasicCompositor.
     bool enableWR =
-        gfx::gfxVars::UseWebRender() && WidgetTypeSupportsAcceleration();
+        gfx::gfxVars::UseSoftwareWebRender() ||
+        (gfx::gfxVars::UseWebRender() && WidgetTypeSupportsAcceleration());
     bool enableAPZ = UseAPZ();
     CompositorOptions options(enableAPZ, enableWR);
 
