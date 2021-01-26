@@ -685,6 +685,26 @@ EglDisplay::EglDisplay(const PrivateUseOnly&, GLLibraryEGL& lib,
     MarkExtensionUnsupported(EGLExtension::KHR_image_pixmap);
   }
 
+  const auto vendor =
+      (const char*)mLib->fQueryString(mDisplay, LOCAL_EGL_VENDOR);
+  const auto glVendor =
+      (const char*)mLib->fQueryString(mDisplay, LOCAL_GL_VENDOR);
+  const auto renderer =
+      (const char*)mLib->fQueryString(mDisplay, LOCAL_GL_RENDERER);
+  const auto version =
+      (const char*)mLib->fQueryString(mDisplay, LOCAL_GL_VERSION);
+  const char* driver = nullptr;
+  if (IsExtensionSupported(EGLExtension::MESA_query_driver)) {
+    driver = mLib->fGetDisplayDriverName(mDisplay);
+  }
+  printf_stderr(
+      "[AO] vendor=   %s\n"
+      "[AO] glvendor= %s\n"
+      "[AO] renderer= %s\n"
+      "[AO] version=  %s\n"
+      "[AO] driver=   %s\n",
+      vendor, glVendor, renderer, version, driver);
+
   if (IsExtensionSupported(EGLExtension::KHR_surfaceless_context)) {
     const auto vendor =
         (const char*)mLib->fQueryString(mDisplay, LOCAL_EGL_VENDOR);
