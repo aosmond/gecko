@@ -101,6 +101,7 @@ enum class EGLExtension {
   EXT_buffer_age,
   KHR_partial_update,
   NV_robustness_video_memory_purge,
+  MESA_query_driver,
   Max
 };
 
@@ -449,6 +450,11 @@ class GLLibraryEGL final {
     WRAP(fSetDamageRegion(dpy, surface, rects, n_rects));
   }
 
+  // EGL_MESA_query_driver
+  const char* fGetDisplayDriverName(EGLDisplay dpy) {
+    WRAP(fGetDisplayDriverName(dpy));
+  }
+
 #undef WRAP
 #undef PROFILE_CALL
 #undef BEFORE_CALL
@@ -580,6 +586,8 @@ class GLLibraryEGL final {
                                              EGLint n_rects);
     EGLClientBuffer(GLAPIENTRY* fGetNativeClientBufferANDROID)(
         const struct AHardwareBuffer* buffer);
+    // EGL_MESA_query_driver
+    const char*(GLAPIENTRY* fGetDisplayDriverName)(EGLDisplay dpy);
   } mSymbols = {};
 };
 
@@ -837,6 +845,12 @@ class EglDisplay final {
                               EGLint n_rects) {
     MOZ_ASSERT(IsExtensionSupported(EGLExtension::KHR_partial_update));
     return mLib->fSetDamageRegion(mDisplay, surface, rects, n_rects);
+  }
+
+  // EGL_MESA_query_driver
+  const char* fGetDisplayDriverName() {
+    MOZ_ASSERT(IsExtensionSupported(EGLExtension::MESA_query_driver));
+    return mLib->fGetDisplayDriverName(mDisplay);
   }
 };
 

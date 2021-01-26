@@ -80,7 +80,8 @@ static const char* sEGLExtensionNames[] = {
     "EGL_KHR_swap_buffers_with_damage",
     "EGL_EXT_buffer_age",
     "EGL_KHR_partial_update",
-    "EGL_NV_robustness_video_memory_purge"};
+    "EGL_NV_robustness_video_memory_purge",
+    "EGL_MESA_query_driver"};
 
 PRLibrary* LoadApitraceLibrary() {
   const char* path = nullptr;
@@ -606,6 +607,13 @@ bool GLLibraryEGL::Init(nsACString* const out_failureId) {
         END_OF_SYMBOLS};
     (void)fnLoadSymbols(symbols);
   }
+  {
+    const SymLoadStruct symbols[] = {
+        {(PRFuncPtr*)&mSymbols.fGetDisplayDriverName,
+         {{"eglGetDisplayDriverName"}}},
+        END_OF_SYMBOLS};
+    (void)fnLoadSymbols(symbols);
+  }
 
   return true;
 }
@@ -680,7 +688,6 @@ EglDisplay::EglDisplay(const PrivateUseOnly&, GLLibraryEGL& lib,
   if (IsExtensionSupported(EGLExtension::KHR_surfaceless_context)) {
     const auto vendor =
         (const char*)mLib->fQueryString(mDisplay, LOCAL_EGL_VENDOR);
-
     // Bug 1464610: Mali T720 (Amazon Fire 8 HD) claims to support this
     // extension, but if you actually eglMakeCurrent() with EGL_NO_SURFACE, it
     // fails to render anything when a real surface is provided later on. We
