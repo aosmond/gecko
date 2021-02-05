@@ -491,6 +491,17 @@ bool WebRenderBridgeParent::UpdateResources(
     const nsTArray<RefCountedShmem>& aSmallShmems,
     const nsTArray<ipc::Shmem>& aLargeShmems,
     wr::TransactionBuilder& aUpdates) {
+  bool success = UpdateResourcesInternal(aResourceUpdates, aSmallShmems,
+                                         aLargeShmems, aUpdates);
+  MOZ_RELEASE_ASSERT(success, "Unable to bind resource updates");
+  return success;
+}
+
+bool WebRenderBridgeParent::UpdateResourcesInternal(
+    const nsTArray<OpUpdateResource>& aResourceUpdates,
+    const nsTArray<RefCountedShmem>& aSmallShmems,
+    const nsTArray<ipc::Shmem>& aLargeShmems,
+    wr::TransactionBuilder& aUpdates) {
   wr::ShmSegmentsReader reader(aSmallShmems, aLargeShmems);
   UniquePtr<ScheduleSharedSurfaceRelease> scheduleRelease;
 
