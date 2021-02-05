@@ -529,6 +529,7 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       }
       case OpUpdateResource::TOpAddBlobImage: {
         const auto& op = cmd.get_OpAddBlobImage();
+        printf_stderr("[AO][WebRenderBridgeParent] -- add blob %08lx\n", wr::AsUint64(op.key()._0));
         MOZ_DIAGNOSTIC_ASSERT(MatchesNamespace(op.key()),
                               "stale blob key for add!");
         wr::Vec<uint8_t> bytes;
@@ -542,6 +543,7 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       }
       case OpUpdateResource::TOpUpdateBlobImage: {
         const auto& op = cmd.get_OpUpdateBlobImage();
+        printf_stderr("[AO][WebRenderBridgeParent] -- update blob %08lx\n", wr::AsUint64(op.key()._0));
         MOZ_DIAGNOSTIC_ASSERT(MatchesNamespace(op.key()),
                               "stale blob key for update!");
         wr::Vec<uint8_t> bytes;
@@ -556,6 +558,7 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       }
       case OpUpdateResource::TOpSetBlobImageVisibleArea: {
         const auto& op = cmd.get_OpSetBlobImageVisibleArea();
+        printf_stderr("[AO][WebRenderBridgeParent] -- visible blob %08lx\n", wr::AsUint64(op.key()._0));
         MOZ_DIAGNOSTIC_ASSERT(MatchesNamespace(op.key()),
                               "stale blob key for visible area!");
         aUpdates.SetBlobImageVisibleArea(op.key(),
@@ -640,6 +643,7 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       }
       case OpUpdateResource::TOpDeleteBlobImage: {
         const auto& op = cmd.get_OpDeleteBlobImage();
+        printf_stderr("[AO][WebRenderBridgeParent] -- delete blob %08lx\n", wr::AsUint64(op.key()._0));
         aUpdates.DeleteBlobImage(op.key());
         break;
       }

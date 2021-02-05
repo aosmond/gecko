@@ -58,12 +58,18 @@ already_AddRefed<DataSourceSurface> SharedSurfacesParent::Get(
     const wr::ExternalImageId& aId) {
   StaticMutexAutoLock lock(sMutex);
   if (!sInstance) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] get -- no instance\n", wr::AsUint64(aId));
     gfxCriticalNote << "SSP:Get " << wr::AsUint64(aId) << " shtd";
     return nullptr;
   }
 
   RefPtr<SourceSurfaceSharedDataWrapper> surface;
   sInstance->mSurfaces.Get(wr::AsUint64(aId), getter_AddRefs(surface));
+  if (surface) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] get %p\n", wr::AsUint64(aId), surface.get());
+  } else {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] get -- missing\n", wr::AsUint64(aId));
+  }
   return surface.forget();
 }
 
@@ -72,6 +78,7 @@ already_AddRefed<DataSourceSurface> SharedSurfacesParent::Acquire(
     const wr::ExternalImageId& aId) {
   StaticMutexAutoLock lock(sMutex);
   if (!sInstance) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] acquire -- no instance\n", wr::AsUint64(aId));
     gfxCriticalNote << "SSP:Acq " << wr::AsUint64(aId) << " shtd";
     return nullptr;
   }
@@ -82,6 +89,9 @@ already_AddRefed<DataSourceSurface> SharedSurfacesParent::Acquire(
   if (surface) {
     DebugOnly<bool> rv = surface->AddConsumer();
     MOZ_ASSERT(!rv);
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] acquire %p\n", wr::AsUint64(aId), surface.get());
+  } else {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] acquire -- missing\n", wr::AsUint64(aId));
   }
   return surface.forget();
 }
@@ -91,6 +101,7 @@ bool SharedSurfacesParent::Release(const wr::ExternalImageId& aId,
                                    bool aForCreator) {
   StaticMutexAutoLock lock(sMutex);
   if (!sInstance) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] release -- no instance\n", wr::AsUint64(aId));
     return false;
   }
 
@@ -98,12 +109,16 @@ bool SharedSurfacesParent::Release(const wr::ExternalImageId& aId,
   RefPtr<SourceSurfaceSharedDataWrapper> surface;
   sInstance->mSurfaces.Get(wr::AsUint64(aId), getter_AddRefs(surface));
   if (!surface) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] release -- no surface\n", wr::AsUint64(aId));
     return false;
   }
 
   if (surface->RemoveConsumer(aForCreator)) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] release %p -- remove\n", wr::AsUint64(aId), surface.get());
     wr::RenderThread::Get()->UnregisterExternalImage(id);
     sInstance->mSurfaces.Remove(id);
+  } else {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] release %p -- keep\n", wr::AsUint64(aId), surface.get());
   }
 
   return true;
@@ -116,6 +131,7 @@ void SharedSurfacesParent::AddSameProcess(const wr::ExternalImageId& aId,
   MOZ_ASSERT(NS_IsMainThread());
   StaticMutexAutoLock lock(sMutex);
   if (!sInstance) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] addsp -- no instance\n", wr::AsUint64(aId));
     gfxCriticalNote << "SSP:Ads " << wr::AsUint64(aId) << " shtd";
     return;
   }
@@ -140,6 +156,7 @@ void SharedSurfacesParent::AddSameProcess(const wr::ExternalImageId& aId,
   }
   wr::RenderThread::Get()->RegisterExternalImage(id, texture.forget());
 
+  printf_stderr("[AO][SharedSurfacesParent][%08lx] addsp %p\n", wr::AsUint64(aId), surface.get());
   surface->AddConsumer();
   sInstance->mSurfaces.Put(id, std::move(surface));
 }
@@ -148,6 +165,7 @@ void SharedSurfacesParent::AddSameProcess(const wr::ExternalImageId& aId,
 void SharedSurfacesParent::RemoveSameProcess(const wr::ExternalImageId& aId) {
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
+  printf_stderr("[AO][SharedSurfacesParent][%08lx] removesp\n", wr::AsUint64(aId));
   Release(aId, /* aForCreator */ true);
 }
 
@@ -164,6 +182,7 @@ void SharedSurfacesParent::DestroyProcess(base::ProcessId aPid) {
     SourceSurfaceSharedDataWrapper* surface = i.Data();
     if (surface->GetCreatorPid() == aPid && surface->HasCreatorRef() &&
         surface->RemoveConsumer(/* aForCreator */ true)) {
+      printf_stderr("[AO][SharedSurfacesParent][%08lx] destroy %p\n", i.Key(), surface);
       wr::RenderThread::Get()->UnregisterExternalImage(i.Key());
       i.Remove();
     }
@@ -178,6 +197,7 @@ void SharedSurfacesParent::Add(const wr::ExternalImageId& aId,
   MOZ_ASSERT(aPid != base::GetCurrentProcId());
   StaticMutexAutoLock lock(sMutex);
   if (!sInstance) {
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] add -- no instance\n", wr::AsUint64(aId));
     gfxCriticalNote << "SSP:Add " << wr::AsUint64(aId) << " shtd";
     return;
   }
@@ -188,6 +208,7 @@ void SharedSurfacesParent::Add(const wr::ExternalImageId& aId,
   if (NS_WARN_IF(!surface->Init(aDesc.size(), aDesc.stride(), aDesc.format(),
                                 aDesc.handle(), aPid))) {
     gfxCriticalNote << "SSP:Add " << wr::AsUint64(aId) << " init";
+    printf_stderr("[AO][SharedSurfacesParent][%08lx] add %p -- init failed\n", wr::AsUint64(aId), surface.get());
     return;
   }
 
@@ -202,12 +223,14 @@ void SharedSurfacesParent::Add(const wr::ExternalImageId& aId,
   }
   wr::RenderThread::Get()->RegisterExternalImage(id, texture.forget());
 
+  printf_stderr("[AO][SharedSurfacesParent][%08lx] add %p\n", wr::AsUint64(aId), surface.get());
   surface->AddConsumer();
   sInstance->mSurfaces.Put(id, std::move(surface));
 }
 
 /* static */
 void SharedSurfacesParent::Remove(const wr::ExternalImageId& aId) {
+  printf_stderr("[AO][SharedSurfacesParent][%08lx] remove\n", wr::AsUint64(aId));
   DebugOnly<bool> rv = Release(aId, /* aForCreator */ true);
   MOZ_ASSERT(rv);
 }
