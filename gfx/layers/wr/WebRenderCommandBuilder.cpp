@@ -183,6 +183,7 @@ static void TakeExternalSurfaces(
     WebRenderDrawEventRecorder* aRecorder,
     std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
     RenderRootStateManager* aManager, wr::IpcResourceUpdateQueue& aResources) {
+  printf_stderr("[AO][TakeExternalSurfaces] -- persisting %zu surfaces\n", aExternalSurfaces.size());
   aRecorder->TakeExternalSurfaces(aExternalSurfaces);
 
   for (auto& surface : aExternalSurfaces) {
@@ -195,6 +196,7 @@ static void TakeExternalSurfaces(
         SharedSurfacesChild::Share(surface, aManager, aResources, key);
     MOZ_ASSERT(rv.value != NS_ERROR_NOT_IMPLEMENTED);
   }
+  printf_stderr("[AO][TakeExternalSurfaces] -- persisted surfaces\n");
 }
 
 struct DIGroup;
@@ -707,8 +709,10 @@ struct DIGroup {
               key, descriptor, bytes,
               ViewAs<ImagePixel>(mVisibleRect,
                                  PixelCastJustification::LayerIsImage))) {
+        printf_stderr("[AO][WebRenderCommandBuilder][%08lx] group %p blob image -- failed\n", wr::AsUint64(key._0), this);
         return;
       }
+      printf_stderr("[AO][WebRenderCommandBuilder][%08lx] group %p blob image created\n", wr::AsUint64(key._0), this);
       mKey = Some(key);
     } else {
       MOZ_DIAGNOSTIC_ASSERT(
@@ -731,8 +735,10 @@ struct DIGroup {
               ViewAs<ImagePixel>(mVisibleRect,
                                  PixelCastJustification::LayerIsImage),
               dirtyRect)) {
+        printf_stderr("[AO][WebRenderCommandBuilder][%08lx] group %p blob image reused -- failed\n", wr::AsUint64(mKey.ref()._0), this);
         return;
       }
+      printf_stderr("[AO][WebRenderCommandBuilder][%08lx] group %p blob image reused\n", wr::AsUint64(mKey.ref()._0), this);
     }
     mFonts = std::move(fonts);
     aResources.SetBlobImageVisibleArea(
@@ -866,6 +872,11 @@ struct DIGroup {
   }
 
   ~DIGroup() {
+    if (mKey) {
+      printf_stderr("[AO][WebRenderCommandBuilder][%08lx] group %p blob image deleted\n", wr::AsUint64(mKey.ref()._0), this);
+    } else {
+      printf_stderr("[AO][WebRenderCommandBuilder] group %p blob image deleted\n", this);
+    }
     GP("Group destruct\n");
     for (auto iter = mDisplayItems.Iter(); !iter.Done(); iter.Next()) {
       BlobItemData* data = iter.Get()->GetKey();
@@ -2349,8 +2360,10 @@ WebRenderCommandBuilder::GenerateFallbackData(
                 key, descriptor, bytes,
                 ViewAs<ImagePixel>(visibleRect,
                                    PixelCastJustification::LayerIsImage))) {
+          printf_stderr("[AO][WebRenderCommandBuilder][%08lx] fallback %p blob -- failed\n", wr::AsUint64(key._0), fallbackData.get());
           return nullptr;
         }
+        printf_stderr("[AO][WebRenderCommandBuilder][%08lx] fallback %p blob created\n", wr::AsUint64(key._0), fallbackData.get());
         TakeExternalSurfaces(recorder, fallbackData->mExternalSurfaces,
                              mManager->GetRenderRootStateManager(), aResources);
         fallbackData->SetBlobImageKey(key);
@@ -2419,6 +2432,7 @@ WebRenderCommandBuilder::GenerateFallbackData(
   }
 
   if (useBlobImage) {
+    printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using fallback %p blob\n", wr::AsUint64(fallbackData->GetBlobImageKey().ref()._0), fallbackData.get());
     MOZ_DIAGNOSTIC_ASSERT(mManager->WrBridge()->MatchesNamespace(
                               fallbackData->GetBlobImageKey().ref()),
                           "Stale blob key for fallback!");
@@ -2427,6 +2441,8 @@ WebRenderCommandBuilder::GenerateFallbackData(
         fallbackData->GetBlobImageKey().value(),
         ViewAs<ImagePixel>(visibleRect, PixelCastJustification::LayerIsImage));
   }
+
+  printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using fallback %p blob image\n", wr::AsUint64(fallbackData->GetImageKey().ref()), fallbackData.get());
 
   // Update current bounds to fallback data
   fallbackData->mBounds = paintBounds;
@@ -2598,8 +2614,10 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
                                    wr::OpacityType::HasAlphaChannel);
     if (!aResources.AddBlobImage(key, descriptor, bytes,
                                  ImageIntRect(0, 0, size.width, size.height))) {
+      printf_stderr("[AO][WebRenderCommandBuilder][%08lx] mask %p blob image -- failed\n", wr::AsUint64(key._0), maskData.get());
       return Nothing();
     }
+    printf_stderr("[AO][WebRenderCommandBuilder][%08lx] mask %p blob image created\n", wr::AsUint64(key._0), maskData.get());
     maskData->ClearImageKey();
     maskData->mBlobKey = Some(key);
     maskData->mFonts = fonts;
@@ -2614,6 +2632,7 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
     }
   }
 
+  printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using mask %p blob image\n", wr::AsUint64(maskData->mBlobKey.ref()._0), maskData.get());
   MOZ_DIAGNOSTIC_ASSERT(
       mManager->WrBridge()->MatchesNamespace(maskData->mBlobKey.ref()),
       "Stale blob key for mask!");

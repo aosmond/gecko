@@ -540,10 +540,15 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       case OpUpdateResource::TOpAddBlobImage: {
         const auto& op = cmd.get_OpAddBlobImage();
         if (!MatchesNamespace(op.key())) {
+          printf_stderr(
+              "[AO][WebRenderBridgeParent] -- add blob %08lx, stale!\n",
+              wr::AsUint64(op.key()._0));
           MOZ_ASSERT_UNREACHABLE("Stale blob image key (add)!");
           break;
         }
 
+        printf_stderr("[AO][WebRenderBridgeParent] -- add blob %08lx\n",
+                      wr::AsUint64(op.key()._0));
         wr::Vec<uint8_t> bytes;
         if (!reader.Read(op.bytes(), bytes)) {
           gfxCriticalNote << "TOpAddBlobImage failed";
@@ -556,10 +561,15 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       case OpUpdateResource::TOpUpdateBlobImage: {
         const auto& op = cmd.get_OpUpdateBlobImage();
         if (!MatchesNamespace(op.key())) {
+          printf_stderr(
+              "[AO][WebRenderBridgeParent] -- update blob %08lx, stale!\n",
+              wr::AsUint64(op.key()._0));
           MOZ_ASSERT_UNREACHABLE("Stale blob image key (update)!");
           break;
         }
 
+        printf_stderr("[AO][WebRenderBridgeParent] -- update blob %08lx\n",
+                      wr::AsUint64(op.key()._0));
         wr::Vec<uint8_t> bytes;
         if (!reader.Read(op.bytes(), bytes)) {
           gfxCriticalNote << "TOpUpdateBlobImage failed";
@@ -573,9 +583,15 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       case OpUpdateResource::TOpSetBlobImageVisibleArea: {
         const auto& op = cmd.get_OpSetBlobImageVisibleArea();
         if (!MatchesNamespace(op.key())) {
+          printf_stderr(
+              "[AO][WebRenderBridgeParent] -- visible blob %08lx, stale!\n",
+              wr::AsUint64(op.key()._0));
           MOZ_ASSERT_UNREACHABLE("Stale blob image key (visible)!");
           break;
         }
+
+        printf_stderr("[AO][WebRenderBridgeParent] -- visible blob %08lx\n",
+                      wr::AsUint64(op.key()._0));
         aUpdates.SetBlobImageVisibleArea(op.key(),
                                          wr::ToDeviceIntRect(op.area()));
         break;
@@ -677,10 +693,15 @@ bool WebRenderBridgeParent::UpdateResourcesInternal(
       case OpUpdateResource::TOpDeleteBlobImage: {
         const auto& op = cmd.get_OpDeleteBlobImage();
         if (!MatchesNamespace(op.key())) {
+          printf_stderr(
+              "[AO][WebRenderBridgeParent] -- delete blob %08lx, stale!\n",
+              wr::AsUint64(op.key()._0));
           MOZ_ASSERT_UNREACHABLE("Stale blob image key (delete)!");
           break;
         }
 
+        printf_stderr("[AO][WebRenderBridgeParent] -- delete blob %08lx\n",
+                      wr::AsUint64(op.key()._0));
         aUpdates.DeleteBlobImage(op.key());
         break;
       }
@@ -763,6 +784,7 @@ bool WebRenderBridgeParent::AddSharedExternalImage(
 
   RefPtr<DataSourceSurface> dSurf = SharedSurfacesParent::Acquire(aExtId);
   if (!dSurf) {
+    printf_stderr("[AO][WebRenderBridgeParent][%08lx] -- acquire failed, key %08lx\n", wr::AsUint64(aExtId), wr::AsUint64(aKey));
     gfxCriticalNote
         << "DataSourceSurface of SharedSurfaces does not exist for extId:"
         << wr::AsUint64(aExtId);

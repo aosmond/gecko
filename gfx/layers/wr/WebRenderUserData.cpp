@@ -123,6 +123,9 @@ bool WebRenderImageData::UsingSharedSurface(
   wr::ImageKey key;
   nsresult rv = SharedSurfacesChild::Share(
       mContainer, mManager, mManager->AsyncResourceUpdates(), key, aProducerId);
+  if (rv != NS_ERROR_NOT_IMPLEMENTED) {
+    printf_stderr("[AO][WebRenderImageData] using shared surface, key %08lx, cached key %08lx\n", wr::AsUint64(key), wr::AsUint64(mKey.ref()));
+  }
   return NS_SUCCEEDED(rv) && mKey.ref() == key;
 }
 
@@ -162,6 +165,7 @@ Maybe<wr::ImageKey> WebRenderImageData::UpdateImageKey(
       // shared across multiple elements.
       ClearImageKey();
       mKey = Some(key);
+      printf_stderr("[AO][WebRenderImageData] updated key %08lx\n", wr::AsUint64(key));
       return mKey;
     }
 

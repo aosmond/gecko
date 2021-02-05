@@ -18,6 +18,7 @@ DrawEventRecorderPrivate::DrawEventRecorderPrivate() : mExternalFonts(false) {}
 
 void DrawEventRecorderPrivate::StoreExternalSurfaceRecording(
     SourceSurface* aSurface, uint64_t aKey) {
+  printf_stderr("[AO][DrawEventRecorderPrivate][%08lx] store %p\n", aKey, aSurface);
   RecordEvent(RecordedExternalSurfaceCreation(aSurface, aKey));
   mExternalSurfaces.push_back(aSurface);
 }
