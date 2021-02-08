@@ -119,6 +119,7 @@ wr::ImageKey SharedSurfacesChild::SharedUserData::UpdateKey(
       bool ownsKey = wrBridge->GetNamespace() == entry.mImageKey.mNamespace;
       if (!ownsKey) {
         entry.mImageKey = wrBridge->GetNextImageKey();
+        printf_stderr("[AO][SharedSurfacesChild][%08lx] remap to key %08lx\n", wr::AsUint64(mId), wr::AsUint64(entry.mImageKey));
         entry.TakeDirtyRect();
         aResources.AddSharedExternalImage(mId, entry.mImageKey);
       } else {
@@ -142,6 +143,7 @@ wr::ImageKey SharedSurfacesChild::SharedUserData::UpdateKey(
 
   if (!found) {
     key = aManager->WrBridge()->GetNextImageKey();
+    printf_stderr("[AO][SharedSurfacesChild][%08lx] map to key %08lx\n", wr::AsUint64(mId), wr::AsUint64(key));
     ImageKeyData data(aManager, key);
     mKeys.AppendElement(std::move(data));
     aResources.AddSharedExternalImage(mId, key);
@@ -208,7 +210,8 @@ nsresult SharedSurfacesChild::ShareInternal(SourceSurfaceSharedData* aSurface,
   // to map the data into our memory space twice.
   auto pid = manager->OtherPid();
   if (pid == base::GetCurrentProcId()) {
-    printf_stderr("[AO][SharedSurfacesChild][%08lx] share same process %p\n", wr::AsUint64(data->Id()), aSurface);
+    // printf_stderr("[AO][SharedSurfacesChild][%08lx] share same process %p\n",
+    // wr::AsUint64(data->Id()), aSurface);
     SharedSurfacesParent::AddSameProcess(data->Id(), aSurface);
     data->MarkShared();
     *aUserData = data;
@@ -305,7 +308,6 @@ nsresult SharedSurfacesChild::Share(SourceSurfaceSharedData* aSurface,
   if (NS_SUCCEEDED(rv)) {
     MOZ_ASSERT(data);
     aKey = data->UpdateKey(aManager, aResources, dirtyRect);
-    printf_stderr("[AO][SharedSurfacesChild][%08lx] share %p, map to key %08lx\n", wr::AsUint64(data->Id()), aSurface, wr::AsUint64(aKey));
   } else {
     printf_stderr("[AO][SharedSurfacesChild] share %p, failed %04x\n", aSurface, rv);
   }
@@ -430,7 +432,8 @@ void SharedSurfacesChild::Unshare(const wr::ExternalImageId& aId,
     // last shared with the GPU process, which crashed several times, and its
     // job was moved into the parent process.
     if (manager->OwnsExternalImageId(aId)) {
-      printf_stderr("[AO][SharedSurfacesChild][%08lx] unshare same process\n", wr::AsUint64(aId));
+      // printf_stderr("[AO][SharedSurfacesChild][%08lx] unshare same
+      // process\n", wr::AsUint64(aId));
       SharedSurfacesParent::RemoveSameProcess(aId);
     }
   } else if (manager->OwnsExternalImageId(aId)) {
@@ -438,7 +441,8 @@ void SharedSurfacesChild::Unshare(const wr::ExternalImageId& aId,
     // possible we had a surface that was previously shared, the GPU process
     // crashed / was restarted, and then we freed the surface. In that case
     // we know the mapping has already been freed.
-    printf_stderr("[AO][SharedSurfacesChild][%08lx] unshare\n", wr::AsUint64(aId));
+    // printf_stderr("[AO][SharedSurfacesChild][%08lx] unshare\n",
+    // wr::AsUint64(aId));
     manager->SendRemoveSharedSurface(aId);
   }
 }

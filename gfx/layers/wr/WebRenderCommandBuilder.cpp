@@ -183,9 +183,12 @@ static void TakeExternalSurfaces(
     WebRenderDrawEventRecorder* aRecorder,
     std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
     RenderRootStateManager* aManager, wr::IpcResourceUpdateQueue& aResources) {
-  printf_stderr("[AO][TakeExternalSurfaces] -- persisting %zu surfaces\n", aExternalSurfaces.size());
   aRecorder->TakeExternalSurfaces(aExternalSurfaces);
+  if (aExternalSurfaces.empty()) {
+    return;
+  }
 
+  printf_stderr("[AO][TakeExternalSurfaces] -- persisting %zu surfaces\n", aExternalSurfaces.size());
   for (auto& surface : aExternalSurfaces) {
     // While we don't use the image key with the surface, because the blob image
     // renderer doesn't have easy access to the resource set, we still want to
@@ -2425,6 +2428,11 @@ WebRenderCommandBuilder::GenerateFallbackData(
           !imageData->UpdateImageKey(imageContainer, aResources, true)) {
         return nullptr;
       }
+
+      printf_stderr(
+          "[AO][WebRenderCommandBuilder][%08lx] updated fallback %p blob "
+          "image\n",
+          wr::AsUint64(fallbackData->GetImageKey().ref()), fallbackData.get());
     }
 
     fallbackData->mScale = scale;
@@ -2432,7 +2440,9 @@ WebRenderCommandBuilder::GenerateFallbackData(
   }
 
   if (useBlobImage) {
-    printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using fallback %p blob\n", wr::AsUint64(fallbackData->GetBlobImageKey().ref()._0), fallbackData.get());
+    // printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using fallback %p
+    // blob\n", wr::AsUint64(fallbackData->GetBlobImageKey().ref()._0),
+    // fallbackData.get());
     MOZ_DIAGNOSTIC_ASSERT(mManager->WrBridge()->MatchesNamespace(
                               fallbackData->GetBlobImageKey().ref()),
                           "Stale blob key for fallback!");
@@ -2440,9 +2450,11 @@ WebRenderCommandBuilder::GenerateFallbackData(
     aResources.SetBlobImageVisibleArea(
         fallbackData->GetBlobImageKey().value(),
         ViewAs<ImagePixel>(visibleRect, PixelCastJustification::LayerIsImage));
+  } else {
+    // printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using fallback %p
+    // blob image\n", wr::AsUint64(fallbackData->GetImageKey().ref()),
+    // fallbackData.get());
   }
-
-  printf_stderr("[AO][WebRenderCommandBuilder][%08lx] using fallback %p blob image\n", wr::AsUint64(fallbackData->GetImageKey().ref()), fallbackData.get());
 
   // Update current bounds to fallback data
   fallbackData->mBounds = paintBounds;
