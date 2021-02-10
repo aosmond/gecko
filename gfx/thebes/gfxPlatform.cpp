@@ -2718,9 +2718,15 @@ void gfxPlatform::InitWebRenderConfig() {
   manager.Init();
   manager.ConfigureWebRender();
 
+#if 0
   bool hasHardware = gfxConfig::IsEnabled(Feature::WEBRENDER);
   bool hasSoftware = gfxConfig::IsEnabled(Feature::WEBRENDER_SOFTWARE);
   bool hasWebRender = hasHardware || hasSoftware;
+#else
+  const bool hasHardware = false;
+  const bool hasSoftware = true;
+  const bool hasWebRender = true;
+#endif
 
 #ifdef XP_WIN
   if (gfxConfig::IsEnabled(Feature::WEBRENDER_ANGLE)) {

@@ -382,6 +382,7 @@ mochitest-plain-headless:
     chunks:
         by-test-platform:
             linux.*/debug: 16
+            macosx.*64.*: 16
             default: 5
     e10s: true
     max-run-time: 5400
