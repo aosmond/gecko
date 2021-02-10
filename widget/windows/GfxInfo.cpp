@@ -1848,6 +1848,7 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
     ////////////////////////////////////
     // FEATURE_WEBRENDER_SOFTWARE
 
+#if 0
     // TODO(aosmond): Bug 1678044 - wdspec tests ignore enable/disable-webrender
     // Once the test infrastructure is fixed, we can remove this blocklist rule
     APPEND_TO_DRIVER_BLOCKLIST2(
@@ -1855,6 +1856,7 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
         nsIGfxInfo::FEATURE_WEBRENDER_SOFTWARE,
         nsIGfxInfo::FEATURE_BLOCKED_DEVICE, DRIVER_COMPARISON_IGNORED,
         V(0, 0, 0, 0), "FEATURE_FAILURE_BUG_1678044");
+#endif
 
     ////////////////////////////////////
     // FEATURE_WEBRENDER_SOFTWARE - ALLOWLIST
