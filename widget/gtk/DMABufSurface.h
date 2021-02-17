@@ -76,6 +76,7 @@ class DMABufSurface {
   SurfaceType GetSurfaceType() { return mSurfaceType; };
   virtual uint32_t GetTextureCount() = 0;
 
+  void* MapReadOnly(uint32_t* aStride, int aPlane = 0);
   bool IsMapped(int aPlane = 0) { return (mMappedRegion[aPlane] != nullptr); };
   void Unmap(int aPlane = 0);
 
@@ -95,6 +96,8 @@ class DMABufSurface {
   // and it's used to track surface lifetime in various parts of rendering
   // engine.
   uint32_t GetUID() const { return mUID; };
+
+  int GetBufferPlaneCount() const { return mBufferPlaneCount; }
 
   // Creates a global reference counter objects attached to the surface.
   // It's created as unreferenced, i.e. IsGlobalRefSet() returns false
