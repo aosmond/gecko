@@ -526,6 +526,11 @@ void DMABufSurfaceRGBA::ReleaseSurface() {
   ReleaseDMABuf();
 }
 
+void* DMABufSurface::MapReadOnly(uint32_t* aStride, int aPlane /* = 0 */) {
+  return MapInternal(0, 0, GetWidth(aPlane), GetHeight(aPlane), aStride,
+                     GBM_BO_TRANSFER_READ, aPlane);
+}
+
 void* DMABufSurface::MapInternal(uint32_t aX, uint32_t aY, uint32_t aWidth,
                                  uint32_t aHeight, uint32_t* aStride,
                                  int aGbmFlags, int aPlane) {

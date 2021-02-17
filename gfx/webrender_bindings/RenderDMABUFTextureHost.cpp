@@ -71,4 +71,54 @@ void RenderDMABUFTextureHost::ClearCachedResources() {
   mGL = nullptr;
 }
 
+size_t RenderDMABUFTextureHost::GetPlaneCount() const {
+  return mSurface->GetBufferPlaneCount();
+}
+
+gfx::SurfaceFormat RenderDMABUFTextureHost::GetFormat() const {
+  switch (mSurface->GetSurfaceType()) {
+    case DMABufSurface::SURFACE_NV12:
+      return gfx::SurfaceFormat::NV12;
+    case DMABufSurface::SURFACE_YUV420:
+      return gfx::SurfaceFormat::YUV;
+    case DMABufSurface::SURFACE_RGBA:
+    default:
+      if (mSurface->GetAsDMABufSurfaceRGBA()->HasAlpha()) {
+        return gfx::SurfaceFormat::B8G8R8A8;
+      }
+      return gfx::SurfaceFormat::B8G8R8X8;
+  }
+}
+
+gfx::ColorDepth RenderDMABUFTextureHost::GetColorDepth() const {
+  return gfx::ColorDepth::COLOR_8;
+}
+
+gfx::YUVColorSpace RenderDMABUFTextureHost::GetYUVColorSpace() const {
+  return mSurface->GetYUVColorSpace();
+}
+
+bool RenderDMABUFTextureHost::MapPlane(RenderCompositor* aCompositor,
+                                       uint8_t aChannelIndex,
+                                       PlaneInfo& aPlaneInfo) {
+  uint32_t stride = 0;
+  void* data = mSurface->MapReadOnly(&stride, aChannelIndex);
+  if (!data) {
+    return false;
+  }
+
+  aPlaneInfo.mData = data;
+  aPlaneInfo.mSize = gfx::IntSize(mSurface->GetWidth(aChannelIndex),
+                                  mSurface->GetHeight(aChannelIndex));
+  aPlaneInfo.mStride = stride;
+  return true;
+}
+
+void RenderDMABUFTextureHost::UnmapPlanes() {
+  int planeCount = mSurface->GetBufferPlaneCount();
+  for (int i = 0; i < planeCount; ++i) {
+    mSurface->Unmap(i);
+  }
+}
+
 }  // namespace mozilla::wr

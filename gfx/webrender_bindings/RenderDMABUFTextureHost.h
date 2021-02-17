@@ -8,7 +8,7 @@
 #define MOZILLA_GFX_RENDERDMABUFTEXTUREHOST_H
 
 #include "mozilla/layers/TextureHostOGL.h"
-#include "RenderTextureHost.h"
+#include "RenderTextureHostSWGL.h"
 #include "mozilla/widget/DMABufSurface.h"
 
 namespace mozilla {
@@ -19,7 +19,7 @@ class SurfaceDescriptorDMABuf;
 
 namespace wr {
 
-class RenderDMABUFTextureHost final : public RenderTextureHost {
+class RenderDMABUFTextureHost final : public RenderTextureHostSWGL {
  public:
   explicit RenderDMABUFTextureHost(DMABufSurface* aSurface);
 
@@ -32,6 +32,20 @@ class RenderDMABUFTextureHost final : public RenderTextureHost {
     return mSurface->GetWidth() * mSurface->GetHeight() *
            BytesPerPixel(mSurface->GetFormat());
   }
+
+  // RenderTextureHostSWGL
+  size_t GetPlaneCount() const override;
+
+  gfx::SurfaceFormat GetFormat() const override;
+
+  gfx::ColorDepth GetColorDepth() const override;
+
+  gfx::YUVColorSpace GetYUVColorSpace() const override;
+
+  bool MapPlane(RenderCompositor* aCompositor, uint8_t aChannelIndex,
+                PlaneInfo& aPlaneInfo) override;
+
+  void UnmapPlanes() override;
 
  private:
   virtual ~RenderDMABUFTextureHost();
