@@ -291,6 +291,11 @@ TEST_VARIANTS = {
         "suffix": "wr",
         "merge": {
             "webrender": True,
+            "mozharness": {
+                "extra-options": [
+                    "--setpref=gfx.webrender.all=true",
+                ],
+            },
         },
     },
     "webrender-sw": {
@@ -300,6 +305,7 @@ TEST_VARIANTS = {
             "webrender": True,
             "mozharness": {
                 "extra-options": [
+                    "--setpref=gfx.webrender.all=true",
                     "--setpref=gfx.webrender.software=true",
                 ],
             },
@@ -1682,6 +1688,7 @@ def enable_webrender(config, tasks):
         if task.get("webrender"):
             extra_options = task["mozharness"].setdefault("extra-options", [])
             extra_options.append("--enable-webrender")
+            extra_options.append("--setpref=gfx.webrender.all=true")
             # We only want to 'setpref' on tests that have a profile
             if not task["attributes"]["unittest_category"] in [
                 "cppunittest",

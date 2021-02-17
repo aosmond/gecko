@@ -272,6 +272,8 @@ function FindProxyForURL(url, host) {
     # differentiate webrender from non-webrender results
     if browser_config["preferences"].get("gfx.webrender.software", False):
         talos_results.add_extra_option("webrender-sw")
+    elif browser_config["preferences"].get("gfx.webrender.all", False):
+        talos_results.add_extra_option("webrender")
     elif browser_config.get("enable_webrender", False):
         talos_results.add_extra_option("webrender")
 
