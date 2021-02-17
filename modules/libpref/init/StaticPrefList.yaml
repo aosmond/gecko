@@ -4726,7 +4726,11 @@
 # Whether or not to fallback from WebRender to Software WebRender.
 - name: gfx.webrender.fallback.software
   type: bool
+#ifdef ANDROID
+  value: false
+#else
   value: @IS_NIGHTLY_BUILD@
+#endif
   mirror: once
 
 #ifdef XP_WIN
