@@ -120,7 +120,7 @@ mochitest-browser-chrome:
     variants:
         by-test-platform:
             linux.*64(-shippable)?/opt: ['fission', 'a11y-checks']
-            linux.*64(-shippable)?-qr/debug: ['webrender-sw', 'fission']
+            linux.*64-qr/debug: ['webrender-sw', 'fission']
             default: ['fission']
     fission-run-on-projects:
         by-test-platform:
@@ -239,7 +239,7 @@ mochitest-devtools-chrome:
     variants:
         by-test-platform:
             linux.*64(-shippable)?/opt: ['fission', 'a11y-checks']
-            linux.*64(-shippable)?-qr/debug: ['webrender-sw', 'fission']
+            linux.*64-qr/debug: ['webrender-sw', 'fission']
             default: ['fission']
     fission-run-on-projects:
         by-test-platform:
