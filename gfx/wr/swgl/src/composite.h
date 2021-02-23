@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <stdio.h>
+
 template <typename P>
 static inline void scale_row(P* dst, int dstWidth, const P* src, int srcWidth,
                              int span, int frac) {
@@ -446,6 +448,7 @@ void Composite(LockedTexture* lockedDst, LockedTexture* lockedSrc, GLint srcX,
     if (!srcReq.same_size(dstReq) && srctex.width >= 2) {
       linear_composite(srctex, srcReq, dsttex, dstReq, flip, clipRect);
     } else {
+      fprintf(stderr, "[AO] u_s %u %u\n", (uint32_t)srctex.id, (uint32_t)dsttex.id);
       unscaled_composite(srctex, srcReq, dsttex, dstReq, flip, clipRect);
     }
   }

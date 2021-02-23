@@ -37,11 +37,13 @@ RenderDXGITextureHost::RenderDXGITextureHost(WindowsHandle aHandle,
               mFormat != gfx::SurfaceFormat::P016) ||
              (mSize.width % 2 == 0 && mSize.height % 2 == 0));
   MOZ_ASSERT(aHandle);
+  printf_stderr("[AO][%p] RenderDXGITextureHost\n", this);
 }
 
 RenderDXGITextureHost::~RenderDXGITextureHost() {
   MOZ_COUNT_DTOR_INHERITED(RenderDXGITextureHost, RenderTextureHost);
   DeleteTextureHandle();
+  printf_stderr("[AO][%p] ~RenderDXGITextureHost\n", this);
 }
 
 ID3D11Texture2D* RenderDXGITextureHost::GetD3D11Texture2DWithGL() {

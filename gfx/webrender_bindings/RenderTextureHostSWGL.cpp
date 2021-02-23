@@ -68,6 +68,9 @@ bool RenderTextureHostSWGL::UpdatePlanes(RenderCompositor* aCompositor,
         MOZ_RELEASE_ASSERT(false, "Unhandled external image format");
         break;
     }
+    printf_stderr("[AO][%p] context %p map plane %u data (%p,%p)\n", this, mContext, plane.mTexture,
+                  plane.mData,
+                  ((uint8_t*)plane.mData) + plane.mStride * plane.mSize.height);
     wr_swgl_set_texture_buffer(mContext, plane.mTexture, internalFormat,
                                plane.mSize.width, plane.mSize.height,
                                plane.mStride, plane.mData, 0, 0);

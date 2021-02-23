@@ -547,6 +547,7 @@ struct Texture {
   int depth = 0;
   char* buf = nullptr;
   size_t buf_size = 0;
+  size_t id = 0;
   uint32_t buf_stride = 0;
   uint8_t buf_bpp = 0;
   GLenum min_filter = GL_NEAREST;
@@ -2095,7 +2096,9 @@ void TexParameteri(GLenum target, GLenum pname, GLint param) {
 void GenTextures(int n, GLuint* result) {
   for (int i = 0; i < n; i++) {
     Texture t;
-    result[i] = ctx->textures.insert(t);
+    auto id = ctx->textures.insert(t);
+    ctx->textures[id].id = id;
+    result[i] = id;
   }
 }
 
@@ -5133,6 +5136,7 @@ void MakeCurrent(Context* c) {
     return;
   }
   ctx = c;
+  fprintf(stderr, "[AO] context %p\n", c);
   setup_program(ctx ? ctx->current_program : 0);
 }
 

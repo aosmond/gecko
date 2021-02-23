@@ -18,10 +18,12 @@ RenderSharedSurfaceTextureHost::RenderSharedSurfaceTextureHost(
     : mSurface(aSurface), mMap(), mLocked(false) {
   MOZ_COUNT_CTOR_INHERITED(RenderSharedSurfaceTextureHost, RenderTextureHost);
   MOZ_ASSERT(aSurface);
+  printf_stderr("[AO][%p] RenderSharedSurfaceTextureHost\n", this);
 }
 
 RenderSharedSurfaceTextureHost::~RenderSharedSurfaceTextureHost() {
   MOZ_COUNT_DTOR_INHERITED(RenderSharedSurfaceTextureHost, RenderTextureHost);
+  printf_stderr("[AO][%p] ~RenderSharedSurfaceTextureHost\n", this);
 }
 
 wr::WrExternalImage RenderSharedSurfaceTextureHost::Lock(
