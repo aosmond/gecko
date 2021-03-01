@@ -438,8 +438,12 @@ struct Texture {
     // of smaller formats without risking unaligned access.
     set_bpp();
     set_stride();
-    assert(new_stride >= size_t(bpp() * width) &&
-           new_stride % min(bpp(), sizeof(uint32_t)) == 0);
+
+    if (new_stride < buf_stride) {
+      fprintf(stderr,"[AO] width=%d height=%d size=%u bpp=%d stride=%u format=%08x\n", width, height, (uint32_t)buf_size, buf_bpp, (uint32_t)buf_stride, (uint32_t)internal_format);
+      assert(new_stride >= size_t(bpp() * width));
+      assert(new_stride % min(bpp(), sizeof(uint32_t)) == 0);
+    }
 
     buf = (char*)new_buf;
     buf_size = 0;
