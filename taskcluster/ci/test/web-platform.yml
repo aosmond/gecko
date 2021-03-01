@@ -316,7 +316,7 @@ test-verify-wpt:
     suite:
         category: test-verify
         name: test-verify-wpt
-    variants: []
+    variants: ['webrender-sw']
     treeherder-symbol: TVw
     max-run-time: 10800
     run-on-projects:
