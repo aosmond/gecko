@@ -436,11 +436,12 @@ struct Texture {
     // is aligned to the smaller of either the BPP or word-size. We need to at
     // least be able to sample data from within a row and sample whole pixels
     // of smaller formats without risking unaligned access.
+    auto old_stride = buf_stride;
     set_bpp();
     set_stride();
 
     if (new_stride < buf_stride) {
-      fprintf(stderr,"[AO] width=%d height=%d size=%u bpp=%d stride=%u format=%08x\n", width, height, (uint32_t)buf_size, buf_bpp, (uint32_t)buf_stride, (uint32_t)internal_format);
+      fprintf(stderr,"[AO] width=%d height=%d size=%u bpp=%d stride=%u format=%08x old_stride=%u new_stride=%u\n", width, height, (uint32_t)buf_size, buf_bpp, (uint32_t)buf_stride, (uint32_t)internal_format, (uint32_t)old_stride, (uint32_t)new_stride);
       assert(new_stride >= size_t(bpp() * width));
       assert(new_stride % min(bpp(), sizeof(uint32_t)) == 0);
     }
@@ -1641,6 +1642,13 @@ static void set_tex_storage(Texture& t, GLenum external_format, GLsizei width,
   bool changed = false;
   if (t.width != width || t.height != height ||
       t.internal_format != internal_format) {
+    {
+      auto ao_bpp = bytes_for_internal_format(internal_format);
+      auto ao_stride = aligned_stride(ao_bpp * width);
+      if (ao_stride > stride) {
+        fprintf(stderr, "[AO] set_tex_storage: size changed w=%d h=%d d=%d f=%08x -> w=%d h=%d d=%d f=%08x\n", t.width, t.height, t.depth, t.internal_format, width, height, 0, internal_format);
+      }
+    }
     changed = true;
     t.internal_format = internal_format;
     t.width = width;
@@ -2237,6 +2245,12 @@ void InitDefaultFramebuffer(int x, int y, int width, int height, int stride,
   // If the dimensions or buffer properties changed, we need to reallocate
   // the underlying storage for the color buffer texture.
   Texture& colortex = ctx->textures[fb.color_attachment];
+  {
+    auto ao_stride = aligned_stride(4 * width);
+    if (ao_stride > stride) {
+      fprintf(stderr, "[AO] InitDefaultFramebuffer: offset (%d, %d) -> (%d, %d)\n", colortex.offset.x, colortex.offset.y, x, y);
+    }
+  }
   set_tex_storage(colortex, GL_RGBA8, width, height, buf, stride);
   colortex.offset = IntPoint(x, y);
   if (!fb.depth_attachment) {
