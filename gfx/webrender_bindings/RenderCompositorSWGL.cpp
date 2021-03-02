@@ -85,6 +85,10 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   if (data) {
     mMappedData = data;
     mMappedStride = stride;
+    // If we previously allocated a surface, and we have now successfully locked
+    // the DT, we don't want to keep it around, otherwise we will commit the
+    // wrong buffer in CommitMappedBuffer.
+    mSurface = nullptr;
     // Disambiguate whether the widget's draw target has its origin at zero or
     // if it is offset to the dirty region origin. The DT might either enclose
     // only the region itself, the region including the origin, or the entire
