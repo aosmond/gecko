@@ -83,6 +83,7 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   LayoutDeviceIntRect bounds = mDirtyRegion.GetBounds();
   // If locking succeeded above, just use that.
   if (data) {
+    mSurface = nullptr;
     mMappedData = data;
     mMappedStride = stride;
     // Disambiguate whether the widget's draw target has its origin at zero or
