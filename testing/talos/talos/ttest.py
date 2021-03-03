@@ -105,6 +105,7 @@ class TTest(object):
 
         if browser_config["enable_webrender"]:
             setup.env["MOZ_WEBRENDER"] = "1"
+            setup.env["GDK_SYNCHRONIZE"] = "1"
             setup.env["MOZ_ACCELERATED"] = "1"
         else:
             setup.env["MOZ_WEBRENDER"] = "0"
