@@ -194,6 +194,7 @@ bool nsDMABufDevice::Configure(nsACString& aFailureId) {
 
   MOZ_ASSERT(!mInitialized);
   mInitialized = true;
+  static_cast<LogModule*>(gDmabufLog)->SetLevel(LogLevel::Verbose);
 
   bool isDMABufUsed = (
 #ifdef NIGHTLY_BUILD
