@@ -89,6 +89,8 @@ static bool IsX11EGLEnvvarEnabled() {
   const char* eglPref = PR_GetEnv("MOZ_X11_EGL");
   return (eglPref && *eglPref);
 }
+
+static bool GetDisplayXvfb(nsCString& aFailureId, bool* aRv);
 #endif
 
 gfxPlatformGtk::gfxPlatformGtk() {
@@ -201,6 +203,21 @@ void gfxPlatformGtk::InitDmabufConfig() {
     feature.Disable(FeatureStatus::Blocklisted, "Blocklisted by gfxInfo",
                     failureId);
   }
+
+#  ifdef MOZ_X11
+  if (mIsX11Display) {
+    bool xvfb = false;
+    if (GetDisplayXvfb(failureId, &xvfb)) {
+      if (xvfb) {
+        feature.ForceDisable(FeatureStatus::Unavailable, "Using XVFB",
+                             "FEATURE_FAILURE_XVFB"_ns);
+      }
+    } else {
+      feature.ForceDisable(FeatureStatus::Unavailable, "XVFB check failed",
+                           failureId);
+    }
+  }
+#  endif
 
   if (!gfxVars::UseEGL()) {
     feature.ForceDisable(FeatureStatus::Unavailable, "Requires EGL",
@@ -438,6 +455,46 @@ uint32_t gfxPlatformGtk::MaxGenericSubstitions() {
 bool gfxPlatformGtk::AccelerateLayersByDefault() { return true; }
 
 #if defined(MOZ_X11)
+static bool GetDisplayXvfb(nsCString& aFailureId, bool* aRv) {
+  GdkDisplay* display = gdk_display_get_default();
+  Display* dpy = GDK_DISPLAY_XDISPLAY(display);
+  if (!dpy) {
+    aFailureId = "FEATURE_FAILURE_NO_XDISPLAY";
+    return false;
+  }
+
+  Atom property = XInternAtom(dpy, "XVFB_SCREEN", true);
+  Atom reqType = XInternAtom(dpy, "STRING", true);
+  if (!property || !reqType) {
+    *aRv = false;
+    return true;
+  }
+
+  Window root = gdk_x11_get_default_root_xwindow();
+  Atom actualType;
+  int format = 0;
+  unsigned long itemCount = 0;
+  unsigned long bytesRemaining = 0;
+  unsigned char* value = nullptr;
+  int result = XGetWindowProperty(dpy, root, property, 0, INT_MAX, X11False,
+                                  reqType, &actualType, &format, &itemCount,
+                                  &bytesRemaining, &value);
+  if (result != Success || bytesRemaining != 0 || itemCount > 1) {
+    if (value) {
+      XFree(value);
+    }
+    aFailureId = "FEATURE_FAILURE_XGETWINDOWPROPERTY";
+    return false;
+  }
+
+  if (value) {
+    *aRv = strcmp("TRUE", reinterpret_cast<char*>(value)) == 0;
+    XFree(value);
+  } else {
+    *aRv = false;
+  }
+  return true;
+}
 
 static nsTArray<uint8_t> GetDisplayICCProfile(Display* dpy, Window& root) {
   const char kIccProfileAtomName[] = "_ICC_PROFILE";
