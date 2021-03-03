@@ -811,6 +811,17 @@ const nsTArray<GfxDriverInfo>& GfxInfo::GetGfxDriverInfo() {
         V(0, 0, 0, 0), "FEATURE_FAILURE_X11_EGL_DISABLED", "");
 
     ////////////////////////////////////
+    // FEATURE_DMABUF
+
+    // X11 Mesa baseline, see bug 1695997.
+    APPEND_TO_DRIVER_BLOCKLIST_EXT(
+        OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
+        DesktopEnvironment::All, WindowProtocol::X11, DriverVendor::MesaAll,
+        DeviceFamily::All, nsIGfxInfo::FEATURE_DMABUF,
+        nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION, DRIVER_LESS_THAN,
+        V(20, 2, 0, 0), "FEATURE_FAILURE_OLD_MESA_X11", "");
+
+    ////////////////////////////////////
 
     APPEND_TO_DRIVER_BLOCKLIST_EXT(
         OperatingSystem::Linux, ScreenSizeStatus::All, BatteryStatus::All,
