@@ -83,6 +83,9 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   LayoutDeviceIntRect bounds = mDirtyRegion.GetBounds();
   // If locking succeeded above, just use that.
   if (data) {
+    if (stride < bounds.width * 4) {
+      printf_stderr("[AO] AllocateMappedBuffer -- from LockBits; size %dx%d, bounds (%d,%d) %dx%d\n", size.width, size.height, bounds.x, bounds.y, bounds.width, bounds.height);
+    }
     mSurface = nullptr;
     mMappedData = data;
     mMappedStride = stride;
@@ -112,6 +115,9 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
     }
     mMappedData = map.mData;
     mMappedStride = map.mStride;
+    if (map.mStride < bounds.width * 4) {
+      printf_stderr("[AO] AllocateMappedBuffer -- from surface\n");
+    }
   }
   MOZ_ASSERT(mMappedData != nullptr && mMappedStride > 0);
   wr_swgl_init_default_framebuffer(mContext, bounds.x, bounds.y, bounds.width,

@@ -1646,7 +1646,7 @@ static void set_tex_storage(Texture& t, GLenum external_format, GLsizei width,
       auto ao_bpp = bytes_for_internal_format(internal_format);
       auto ao_stride = aligned_stride(ao_bpp * width);
       if (ao_stride > stride) {
-        fprintf(stderr, "[AO] set_tex_storage: size changed w=%d h=%d d=%d f=%08x -> w=%d h=%d d=%d f=%08x\n", t.width, t.height, t.depth, t.internal_format, width, height, 0, internal_format);
+        fprintf(stderr, "[AO] set_tex_storage: size changed w=%d h=%d f=%08x -> w=%d h=%d f=%08x\n", t.width, t.height, t.internal_format, width, height, internal_format);
       }
     }
     changed = true;
