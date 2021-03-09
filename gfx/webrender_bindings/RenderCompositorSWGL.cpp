@@ -49,14 +49,45 @@ bool RenderCompositorSWGL::MakeCurrent() {
 bool RenderCompositorSWGL::BeginFrame() {
   // Set up a temporary region representing the entire window surface in case a
   // dirty region is not supplied.
+  auto widgetSize = mWidget->GetClientSize();
+  if ((!mLastBeginFrameSize.IsEmpty() && widgetSize != mLastBeginFrameSize) ||
+      (!mLastStartCompositingSize.IsEmpty() &&
+       widgetSize != mLastStartCompositingSize) ||
+      (!mLastAllocateMappedBufferSize.IsEmpty() &&
+       widgetSize != mLastAllocateMappedBufferSize)) {
+    printf_stderr(
+        "[AO] BeginFrame -- widget %dx%d; beginFrame %dx%d; "
+        "startCompositing %dx%d, allocateMappedBuffer %dx%d\n",
+        widgetSize.width, widgetSize.height, mLastBeginFrameSize.width,
+        mLastBeginFrameSize.height, mLastStartCompositingSize.width,
+        mLastStartCompositingSize.height, mLastAllocateMappedBufferSize.width,
+        mLastAllocateMappedBufferSize.height);
+  }
+  mLastBeginFrameSize = widgetSize;
   ClearMappedBuffer();
-  mDirtyRegion = LayoutDeviceIntRect(LayoutDeviceIntPoint(), GetBufferSize());
+  mDirtyRegion = LayoutDeviceIntRect(LayoutDeviceIntPoint(), widgetSize);
   wr_swgl_make_current(mContext);
   return true;
 }
 
 bool RenderCompositorSWGL::AllocateMappedBuffer(
     const wr::DeviceIntRect* aOpaqueRects, size_t aNumOpaqueRects) {
+  auto widgetSize = mWidget->GetClientSize();
+  if ((!mLastBeginFrameSize.IsEmpty() && widgetSize != mLastBeginFrameSize) ||
+      (!mLastStartCompositingSize.IsEmpty() &&
+       widgetSize != mLastStartCompositingSize) ||
+      (!mLastAllocateMappedBufferSize.IsEmpty() &&
+       widgetSize != mLastAllocateMappedBufferSize)) {
+    printf_stderr(
+        "[AO] AllocateMappedBuffer -- widget %dx%d; beginFrame %dx%d; "
+        "startCompositing %dx%d, allocateMappedBuffer %dx%d\n",
+        widgetSize.width, widgetSize.height, mLastBeginFrameSize.width,
+        mLastBeginFrameSize.height, mLastStartCompositingSize.width,
+        mLastStartCompositingSize.height, mLastAllocateMappedBufferSize.width,
+        mLastAllocateMappedBufferSize.height);
+  }
+  mLastAllocateMappedBufferSize = widgetSize;
+
   // Request a new draw target to use from the widget...
   MOZ_ASSERT(!mDT);
   layers::BufferMode bufferMode = layers::BufferMode::BUFFERED;
@@ -83,9 +114,9 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   LayoutDeviceIntRect bounds = mDirtyRegion.GetBounds();
   // If locking succeeded above, just use that.
   if (data) {
-    if (stride < bounds.width * 4) {
-      auto widgetSize = mWidget->GetClientSize();
-      printf_stderr("[AO] AllocateMappedBuffer -- from LockBits; size %dx%d, bounds (%d,%d) %dx%d, widget size %dx%d\n", size.width, size.height, bounds.x, bounds.y, bounds.width, bounds.height, widgetSize.width, widgetSize.height);
+    auto widgetSize = mWidget->GetClientSize();
+    if (stride < bounds.width * 4 || widgetSize != mLastAllocateMappedBufferSize) {
+      printf_stderr("[AO] AllocateMappedBuffer -- from LockBits; size %dx%d, bounds (%d,%d) %dx%d, widget size %dx%d (was %dx%d)\n", size.width, size.height, bounds.x, bounds.y, bounds.width, bounds.height, widgetSize.width, widgetSize.height, mLastAllocateMappedBufferSize.width, mLastAllocateMappedBufferSize.height);
     }
     mSurface = nullptr;
     mMappedData = data;
@@ -148,11 +179,26 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
 void RenderCompositorSWGL::StartCompositing(
     const wr::DeviceIntRect* aDirtyRects, size_t aNumDirtyRects,
     const wr::DeviceIntRect* aOpaqueRects, size_t aNumOpaqueRects) {
+  auto widgetSize = mWidget->GetClientSize();
+  if ((!mLastBeginFrameSize.IsEmpty() && widgetSize != mLastBeginFrameSize) ||
+      (!mLastStartCompositingSize.IsEmpty() &&
+       widgetSize != mLastStartCompositingSize) ||
+      (!mLastAllocateMappedBufferSize.IsEmpty() &&
+       widgetSize != mLastAllocateMappedBufferSize)) {
+    printf_stderr(
+        "[AO] StartCompositing -- widget %dx%d; beginFrame %dx%d; "
+        "startCompositing %dx%d, allocateMappedBuffer %dx%d\n",
+        widgetSize.width, widgetSize.height, mLastBeginFrameSize.width,
+        mLastBeginFrameSize.height, mLastStartCompositingSize.width,
+        mLastStartCompositingSize.height, mLastAllocateMappedBufferSize.width,
+        mLastAllocateMappedBufferSize.height);
+  }
+  mLastStartCompositingSize = widgetSize;
   if (mDT) {
     // Cancel any existing buffers that might accidentally be left from updates
     CommitMappedBuffer(false);
     // Reset the region to the widget bounds
-    mDirtyRegion = LayoutDeviceIntRect(LayoutDeviceIntPoint(), GetBufferSize());
+    mDirtyRegion = LayoutDeviceIntRect(LayoutDeviceIntPoint(), widgetSize);
   }
   if (aNumDirtyRects) {
     // Install the dirty rects into the bounds of the existing region
