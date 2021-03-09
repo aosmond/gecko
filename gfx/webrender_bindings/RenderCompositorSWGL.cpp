@@ -84,7 +84,8 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   // If locking succeeded above, just use that.
   if (data) {
     if (stride < bounds.width * 4) {
-      printf_stderr("[AO] AllocateMappedBuffer -- from LockBits; size %dx%d, bounds (%d,%d) %dx%d\n", size.width, size.height, bounds.x, bounds.y, bounds.width, bounds.height);
+      auto widgetSize = mWidget->GetClientSize();
+      printf_stderr("[AO] AllocateMappedBuffer -- from LockBits; size %dx%d, bounds (%d,%d) %dx%d, widget size %dx%d\n", size.width, size.height, bounds.x, bounds.y, bounds.width, bounds.height, widgetSize.width, widgetSize.height);
     }
     mSurface = nullptr;
     mMappedData = data;
@@ -98,8 +99,8 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
       // Update the bounds to include zero if the origin is at zero.
       bounds.ExpandToEnclose(LayoutDeviceIntPoint(0, 0));
     }
-    bounds.UnionRect(bounds,
-                     LayoutDeviceIntRect(0, 0, size.width, size.height));
+    //bounds.UnionRect(bounds,
+    //                 LayoutDeviceIntRect(0, 0, size.width, size.height));
   } else {
     // If we couldn't lock the DT above, then allocate a data surface and map
     // that for usage with SWGL.
