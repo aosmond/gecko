@@ -65,6 +65,7 @@ bool RenderCompositorSWGL::BeginFrame() {
   }
   mLastBeginFrameSize = widgetSize;
   if (mDT && !mSurface && mMappedData) {
+    printf_stderr("[AO] BeginFrame -- already has mapped data %p stride %d\n", mMappedData, mMappedStride);
     // We may have called AllocateMappedBuffer without a corresponding
     // CancelFrame or EndFrame if the draw was internal to WebRender and not
     // triggered by RendererOGL::UpdateAndRender.
