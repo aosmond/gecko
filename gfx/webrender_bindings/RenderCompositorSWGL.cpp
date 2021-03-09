@@ -98,6 +98,8 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
       // Update the bounds to include zero if the origin is at zero.
       bounds.ExpandToEnclose(LayoutDeviceIntPoint(0, 0));
     }
+    bounds.UnionRect(bounds,
+                     LayoutDeviceIntRect(0, 0, size.width, size.height));
   } else {
     // If we couldn't lock the DT above, then allocate a data surface and map
     // that for usage with SWGL.
