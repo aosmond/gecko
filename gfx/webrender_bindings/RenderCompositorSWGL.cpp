@@ -64,13 +64,13 @@ bool RenderCompositorSWGL::BeginFrame() {
         mLastAllocateMappedBufferSize.height);
   }
   mLastBeginFrameSize = widgetSize;
-  if (mDT && !mSurface && mMappedData) {
-    printf_stderr("[AO] BeginFrame -- already has mapped data %p stride %d\n", mMappedData, mMappedStride);
+  //if (mDT && !mSurface && mMappedData) {
+  //  printf_stderr("[AO] BeginFrame -- already has mapped data %p stride %d\n", mMappedData, mMappedStride);
     // We may have called AllocateMappedBuffer without a corresponding
     // CancelFrame or EndFrame if the draw was internal to WebRender and not
     // triggered by RendererOGL::UpdateAndRender.
-    mDT->ReleaseBits(mMappedData);
-  }
+    //mDT->ReleaseBits(mMappedData);
+  //}
   ClearMappedBuffer();
   mDirtyRegion = LayoutDeviceIntRect(LayoutDeviceIntPoint(), widgetSize);
   wr_swgl_make_current(mContext);
@@ -100,6 +100,8 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   layers::BufferMode bufferMode = layers::BufferMode::BUFFERED;
   mDT = mWidget->StartRemoteDrawingInRegion(mDirtyRegion, &bufferMode);
   if (!mDT) {
+    gfxCriticalNote
+        << "RenderCompositorSWGL failed mapping default framebuffer, no DT";
     return false;
   }
   // Attempt to lock the underlying buffer directly from the draw target.
@@ -152,6 +154,8 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
       // We failed mapping the data surface, so need to cancel the frame.
       mWidget->EndRemoteDrawingInRegion(mDT, mDirtyRegion);
       ClearMappedBuffer();
+      gfxCriticalNote
+          << "RenderCompositorSWGL failed mapping default framebuffer, no surf";
       return false;
     }
     mMappedData = map.mData;
@@ -222,9 +226,7 @@ void RenderCompositorSWGL::StartCompositing(
   // Now that the dirty rects have been supplied and the composition region
   // is known, allocate and install a framebuffer encompassing the composition
   // region.
-  if (!AllocateMappedBuffer(aOpaqueRects, aNumOpaqueRects)) {
-    gfxCriticalNote
-        << "RenderCompositorSWGL failed mapping default framebuffer";
+  if (mDirtyRegion.IsEmpty() || !AllocateMappedBuffer(aOpaqueRects, aNumOpaqueRects)) {
     // If allocation of the mapped default framebuffer failed, then just install
     // a small temporary framebuffer so compositing can still proceed.
     wr_swgl_init_default_framebuffer(mContext, 0, 0, 2, 2, 0, nullptr);
@@ -233,6 +235,7 @@ void RenderCompositorSWGL::StartCompositing(
 
 void RenderCompositorSWGL::CommitMappedBuffer(bool aDirty) {
   if (!mDT) {
+    mDirtyRegion.SetEmpty();
     return;
   }
   // Clear out the old framebuffer in case something tries to access it after
@@ -266,6 +269,7 @@ void RenderCompositorSWGL::CommitMappedBuffer(bool aDirty) {
   }
   // Done with the DT. Hand it back to the widget and clear out any trace of it.
   mWidget->EndRemoteDrawingInRegion(mDT, mDirtyRegion);
+  mDirtyRegion.SetEmpty();
   ClearMappedBuffer();
 }
 
