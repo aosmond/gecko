@@ -64,6 +64,12 @@ bool RenderCompositorSWGL::BeginFrame() {
         mLastAllocateMappedBufferSize.height);
   }
   mLastBeginFrameSize = widgetSize;
+  if (mDT && !mSurface && mMappedData) {
+    // We may have called AllocateMappedBuffer without a corresponding
+    // CancelFrame or EndFrame if the draw was internal to WebRender and not
+    // triggered by RendererOGL::UpdateAndRender.
+    mDT->ReleaseBits(mMappedData);
+  }
   ClearMappedBuffer();
   mDirtyRegion = LayoutDeviceIntRect(LayoutDeviceIntPoint(), widgetSize);
   wr_swgl_make_current(mContext);
