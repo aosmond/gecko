@@ -3303,6 +3303,8 @@ void gfxPlatform::NotifyCompositorCreated(LayersBackend aBackend) {
 bool gfxPlatform::FallbackFromAcceleration(FeatureStatus aStatus,
                                            const char* aMessage,
                                            const nsACString& aFailureId) {
+  MOZ_RELEASE_ASSERT(!WebRenderEnvvarEnabled());
+
   // We always want to ensure (Hardware) WebRender is disabled.
   if (gfxConfig::IsEnabled(Feature::WEBRENDER)) {
     gfxConfig::GetFeature(Feature::WEBRENDER)
