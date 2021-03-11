@@ -128,6 +128,7 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
   wr_swgl_init_default_framebuffer(mContext, bounds.x, bounds.y, bounds.width,
                                    bounds.height, mMappedStride, mMappedData);
 
+#if 0
   LayoutDeviceIntRegion opaque;
   for (size_t i = 0; i < aNumOpaqueRects; i++) {
     const auto& rect = aOpaqueRects[i];
@@ -143,6 +144,10 @@ bool RenderCompositorSWGL::AllocateMappedBuffer(
     wr_swgl_clear_color_rect(mContext, 0, rect.x, rect.y, rect.width,
                              rect.height, 0, 0, 0, 0);
   }
+#else
+  wr_swgl_clear_color_rect(mContext, 0, bounds.x, bounds.y, bounds.width,
+                           bounds.height, 0, 0, 0, 0);
+#endif
 
   return true;
 }
