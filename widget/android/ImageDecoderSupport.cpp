@@ -86,6 +86,8 @@ class ImageCallbackHelper : public imgIContainerCallback,
           imgIContainer::FLAG_SYNC_DECODE | imgIContainer::FLAG_ASYNC_NOTIFY);
     }
 
+    NS_ENSURE_TRUE(surface, NS_ERROR_FAILURE);
+
     RefPtr<DataSourceSurface> dataSurface = surface->GetDataSurface();
 
     NS_ENSURE_TRUE(dataSurface, NS_ERROR_FAILURE);
