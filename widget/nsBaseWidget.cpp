@@ -1223,6 +1223,7 @@ already_AddRefed<LayerManager> nsBaseWidget::CreateCompositorSession(
     bool supportsAcceleration = WidgetTypeSupportsAcceleration();
     bool enableWR;
     bool enableSWWR;
+#if 0
     if (supportsAcceleration) {
       enableWR = gfx::gfxVars::UseWebRender();
       enableSWWR = gfx::gfxVars::UseSoftwareWebRender();
@@ -1231,6 +1232,10 @@ already_AddRefed<LayerManager> nsBaseWidget::CreateCompositorSession(
     } else {
       enableWR = enableSWWR = false;
     }
+#else
+    enableWR = gfx::gfxVars::UseWebRender();
+    enableSWWR = gfx::gfxVars::UseSoftwareWebRender();
+#endif
     bool enableAPZ = UseAPZ();
     CompositorOptions options(enableAPZ, enableWR, enableSWWR);
 
