@@ -5155,7 +5155,7 @@
 # Firefox.
 - name: image.mem.shared.unmap.force-enabled
   type: bool
-  value: false
+  value: true
   mirror: once
 
 # Minimum timeout to unmap shared surfaces since they have been last used,
