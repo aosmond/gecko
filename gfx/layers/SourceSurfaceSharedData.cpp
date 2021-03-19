@@ -14,6 +14,10 @@
 
 #include "base/process_util.h"
 
+#ifdef XP_WIN
+#include <windows.h>
+#endif
+
 #ifdef DEBUG
 /**
  * If defined, this makes SourceSurfaceSharedData::Finalize memory protect the
@@ -46,6 +50,17 @@ void SourceSurfaceSharedDataWrapper::Init(
   }
 
   while (!mBuf->Map(len)) {
+#ifdef XP_WIN
+    printf_stderr("[AO] failed to map %p, len %u, size %dx%d, stride %d, format %u, error %08x\n", aHandle, len, aSize.width, aSize.height, aStride, (uint32_t)aFormat, ::GetLastError());
+
+    MEMORYSTATUSEX stat;
+    stat.dwLength = sizeof(stat);
+    if (GlobalMemoryStatusEx(&stat)) {
+      printf_stderr("[AO] load %u, phys total %lx avail %lx, page total %lx avail %lx, virt total %lx avail %lx ext %lx\n", stat.dwMemoryLoad, stat.ullTotalPhys, stat.ullAvailPhys, stat.ullTotalPageFile, stat.ullAvailPageFile, stat.ullTotalVirtual, stat.ullAvailVirtual, stat.ullAvailExtendedVirtual);
+    } else {
+      printf_stderr("[AO] mem status failed %08x\n", ::GetLastError());
+    }
+#endif
     nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>> expired;
     bool aged =
         SharedSurfacesParent::AgeOneGenerationLocked(expired, aAutoLock);
