@@ -63,6 +63,9 @@ class SourceSurfaceSharedDataWrapper final : public DataSourceSurface {
 
   bool OnHeap() const override { return false; }
 
+  bool Map(MapType, MappedSurface* aMappedSurface) final;
+  void Unmap() final;
+
   bool AddConsumer() { return ++mConsumers == 1; }
 
   bool RemoveConsumer(bool aForCreator) {
@@ -93,6 +96,7 @@ class SourceSurfaceSharedDataWrapper final : public DataSourceSurface {
     return mozilla::ipc::SharedMemory::PageAlignedSize(GetDataLength());
   }
 
+  mutable Maybe<Mutex> mHandleMutex;
   int32_t mStride;
   uint32_t mConsumers;
   IntSize mSize;

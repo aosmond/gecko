@@ -35,17 +35,15 @@ bool SourceSurfaceSharedDataWrapper::Init(
   mStride = aStride;
   mFormat = aFormat;
   mCreatorPid = aCreatorPid;
+  mHandleMutex.emplace("SourceSurfaceSharedDataWrapper");
 
-  size_t len = GetAlignedDataLength();
   mBuf = MakeAndAddRef<SharedMemoryBasic>();
   if (NS_WARN_IF(
-          !mBuf->SetHandle(aHandle, ipc::SharedMemory::RightsReadOnly)) ||
-      NS_WARN_IF(!mBuf->Map(len))) {
+          !mBuf->SetHandle(aHandle, ipc::SharedMemory::RightsReadOnly))) {
     mBuf = nullptr;
     return false;
   }
 
-  mBuf->CloseHandle();
   return true;
 }
 
@@ -57,6 +55,41 @@ void SourceSurfaceSharedDataWrapper::Init(SourceSurfaceSharedData* aSurface) {
   mFormat = aSurface->mFormat;
   mCreatorPid = base::GetCurrentProcId();
   mBuf = aSurface->mBuf;
+}
+
+bool SourceSurfaceSharedDataWrapper::Map(MapType, MappedSurface* aMappedSurface) {
+  if (mHandleMutex) {
+    MutexAutoLock lock(*mHandleMutex);
+    if (mMapCount == 0) {
+      size_t len = GetAlignedDataLength();
+      bool mapped = mBuf->Map(len);
+      MOZ_RELEASE_ASSERT(mapped);
+    }
+    aMappedSurface->mData = GetData();
+    aMappedSurface->mStride = Stride();
+    mMapCount++;
+  } else {
+    aMappedSurface->mData = GetData();
+    aMappedSurface->mStride = Stride();
+    mMapCount++;
+  }
+
+  MOZ_RELEASE_ASSERT(aMappedSurface->mData);
+  return true;
+}
+
+void SourceSurfaceSharedDataWrapper::Unmap() {
+  if (mHandleMutex) {
+    MutexAutoLock lock(*mHandleMutex);
+    mMapCount--;
+    MOZ_ASSERT(mMapCount >= 0);
+    if (mMapCount == 0) {
+      mBuf->Unmap();
+    }
+  } else {
+    mMapCount--;
+    MOZ_ASSERT(mMapCount >= 0);
+  }
 }
 
 bool SourceSurfaceSharedData::Init(const IntSize& aSize, int32_t aStride,
