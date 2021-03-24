@@ -666,6 +666,8 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase,
     return nullptr;
   }
 
+  static void CaptureWidgets();
+
  private:
   void Initialize();
 

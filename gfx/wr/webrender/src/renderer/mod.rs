@@ -2076,16 +2076,21 @@ impl Renderer {
                 (CompositorKind::Draw { .. }, CompositorKind::Native { .. }) => {
                     true
                 }
+                (CompositorKind::Draw { max_partial_present_rects: 0, draw_previous_partial_present_regions: false },
+                 CompositorKind::Draw { max_partial_present_rects: 0, draw_previous_partial_present_regions: true }) => {
+                    // We should only hit this in wrench during replay of a capture.
+                    false
+                }
                 (current_compositor_kind, active_doc_compositor_kind) => {
                     dbg!(current_compositor_kind, active_doc_compositor_kind);
                     unreachable!();
                 }
             };
 
-            self.compositor_config
-                .compositor()
-                .unwrap()
-                .enable_native_compositor(enable);
+            if let Some(compositor) = self.compositor_config.compositor() {
+                compositor.enable_native_compositor(enable);
+            }
+
             self.current_compositor_kind = compositor_kind;
         }
 

@@ -4645,6 +4645,13 @@
   value: false
   mirror: once
 
+# When performing a capture, attempt to create captures for each of the top
+# level widget CompositorBridgeParent objects.
+- name: gfx.webrender.capture-all-widgets
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 - name: gfx.webrender.dl.dump-parent
   type: RelaxedAtomicBool
   value: false

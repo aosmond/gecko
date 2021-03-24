@@ -2710,5 +2710,22 @@ Maybe<CollectedFramesParams> CompositorBridgeParent::WrapCollectedFrames(
   return Some(std::move(ipcFrames));
 }
 
+/* static */ void CompositorBridgeParent::CaptureWidgets() {
+  // Here we attempt to capture from all of the top level widgets in the tree.
+  // This is useful when one would like to capture popup windows in particular
+  // as they are separate from the displayed window.
+  MonitorAutoLock lock(*sIndirectLayerTreesLock);
+  sIndirectLayerTreesLock->AssertCurrentThreadOwns();
+  for (auto& it : sIndirectLayerTrees) {
+    LayerTreeState* state = &it.second;
+    if (state->mWrBridge && !state->mContentCompositorBridgeParent) {
+      RefPtr<wr::WebRenderAPI> api = state->mWrBridge->GetWebRenderAPI();
+      if (api) {
+        api->Capture();
+      }
+    }
+  }
+}
+
 }  // namespace layers
 }  // namespace mozilla

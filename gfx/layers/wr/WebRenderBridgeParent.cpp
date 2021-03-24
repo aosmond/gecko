@@ -1914,7 +1914,9 @@ void WebRenderBridgeParent::ScheduleForcedGenerateFrame() {
 }
 
 mozilla::ipc::IPCResult WebRenderBridgeParent::RecvCapture() {
-  if (!mDestroyed) {
+  if (StaticPrefs::gfx_webrender_capture_all_widgets()) {
+    CompositorBridgeParent::CaptureWidgets();
+  } else if (!mDestroyed) {
     mApi->Capture();
   }
   return IPC_OK();
