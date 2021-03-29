@@ -39,12 +39,7 @@ class SourceSurfaceSharedDataWrapper final : public DataSourceSurface {
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SourceSurfaceSharedDataWrapper,
                                           override)
 
-  SourceSurfaceSharedDataWrapper()
-      : mStride(0),
-        mConsumers(0),
-        mFormat(SurfaceFormat::UNKNOWN),
-        mCreatorPid(0),
-        mCreatorRef(true) {}
+  SourceSurfaceSharedDataWrapper();
 
   void Init(const IntSize& aSize, int32_t aStride, SurfaceFormat aFormat,
             const SharedMemoryBasic::Handle& aHandle,
@@ -94,6 +89,8 @@ class SourceSurfaceSharedDataWrapper final : public DataSourceSurface {
   nsExpirationState* GetExpirationState() { return &mExpirationState; }
 
  private:
+  ~SourceSurfaceSharedDataWrapper() override;
+
   size_t GetDataLength() const {
     return static_cast<size_t>(mStride) * mSize.height;
   }

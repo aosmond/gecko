@@ -283,11 +283,14 @@ bool SharedSurfacesParent::AgeOneGenerationLocked(
     nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>>& aExpired,
     const StaticMutexAutoLock& aAutoLock) {
   if (sInstance->mTracker.IsEmptyLocked(aAutoLock)) {
+    printf_stderr("[AO] age one generation, empty; %u in table\n", sInstance->mSurfaces.Count());
     return false;
   }
 
+  uint32_t len = (uint32_t)sInstance->mTracker.Length(aAutoLock);
   sInstance->mTracker.AgeOneGenerationLocked(aAutoLock);
   sInstance->mTracker.TakeExpired(aExpired, aAutoLock);
+  printf_stderr("[AO] expiring %u/%u table %u\n", (uint32_t)aExpired.Length(), len, sInstance->mSurfaces.Count());
   return true;
 }
 

@@ -15,6 +15,10 @@
 
 #include "base/process_util.h"
 
+#ifdef XP_WIN
+#include <windows.h>
+#endif
+
 #ifdef DEBUG
 /**
  * If defined, this makes SourceSurfaceSharedData::Finalize memory protect the
@@ -29,6 +33,25 @@ using namespace mozilla::layers;
 
 namespace mozilla {
 namespace gfx {
+
+static Atomic<uint32_t> gTotalWrappers(0);
+static Atomic<uint32_t> gTotalMapped(0);
+
+SourceSurfaceSharedDataWrapper::SourceSurfaceSharedDataWrapper()
+      : mStride(0),
+        mConsumers(0),
+        mFormat(SurfaceFormat::UNKNOWN),
+        mCreatorPid(0),
+        mCreatorRef(true) {
+  ++gTotalWrappers;
+}
+
+SourceSurfaceSharedDataWrapper::~SourceSurfaceSharedDataWrapper() {
+  --gTotalWrappers;
+  if (mBuf && mBuf->memory()) {
+    --gTotalMapped;
+  }
+}
 
 void SourceSurfaceSharedDataWrapper::Init(
     const IntSize& aSize, int32_t aStride, SurfaceFormat aFormat,
@@ -71,6 +94,18 @@ void SourceSurfaceSharedDataWrapper::EnsureMapped(size_t aLength) {
   MOZ_ASSERT(!GetData());
 
   while (!mBuf->Map(aLength)) {
+#ifdef XP_WIN
+    printf_stderr("[AO] failed to map %p, len %u, size %dx%d, stride %d, format %u, error %08x\n", this, aLength, mSize.width, mSize.height, mStride, (uint32_t)mFormat, ::GetLastError());
+
+    MEMORYSTATUSEX stat;
+    stat.dwLength = sizeof(stat);
+    if (GlobalMemoryStatusEx(&stat)) {
+      printf_stderr("[AO] load %u, phys total %lx avail %lx, page total %lx avail %lx, virt total %lx avail %lx ext %lx\n", stat.dwMemoryLoad, stat.ullTotalPhys, stat.ullAvailPhys, stat.ullTotalPageFile, stat.ullAvailPageFile, stat.ullTotalVirtual, stat.ullAvailVirtual, stat.ullAvailExtendedVirtual);
+    } else {
+      printf_stderr("[AO] mem status failed %08x\n", ::GetLastError());
+    }
+#endif
+    printf_stderr("[AO] mapped %u/%u\n", (uint32_t)gTotalMapped, (uint32_t)gTotalWrappers);
     nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>> expired;
     if (!SharedSurfacesParent::AgeOneGeneration(expired)) {
       NS_ABORT_OOM(aLength);
@@ -78,6 +113,8 @@ void SourceSurfaceSharedDataWrapper::EnsureMapped(size_t aLength) {
     MOZ_ASSERT(!expired.Contains(this));
     SharedSurfacesParent::ExpireMap(expired);
   }
+
+  ++gTotalMapped;
 }
 
 bool SourceSurfaceSharedDataWrapper::Map(MapType,
@@ -122,7 +159,9 @@ void SourceSurfaceSharedDataWrapper::Unmap() {
 void SourceSurfaceSharedDataWrapper::ExpireMap() {
   MutexAutoLock lock(*mHandleLock);
   if (mMapCount == 0) {
+    MOZ_ASSERT(mBuf->memory());
     mBuf->Unmap();
+    --gTotalMapped;
   }
 }
 
