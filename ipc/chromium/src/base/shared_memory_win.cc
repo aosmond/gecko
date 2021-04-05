@@ -12,6 +12,7 @@
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/RandomNum.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/gfx/Logging.h"
 #include "nsDebug.h"
 #include "nsString.h"
 
@@ -48,10 +49,15 @@ bool IsSectionSafeToMap(HANDLE handle) {
       nt_query_section_func(handle, SectionBasicInformation, &basic_information,
                             sizeof(basic_information), nullptr);
   if (status) {
+    gfxCriticalNote << "IsSectionSafeToMap status " << status << " " << GetLastError();
     return false;
   }
 
-  return (basic_information.Attributes & SEC_IMAGE) != SEC_IMAGE;
+  bool safe = (basic_information.Attributes & SEC_IMAGE) != SEC_IMAGE;
+  if (!safe) {
+    gfxCriticalNote << "IsSectionSafeToMap attrib " << basic_information.Attributes;
+  }
+  return safe;
 }
 
 }  // namespace
@@ -163,6 +169,7 @@ bool SharedMemory::ReadOnlyCopy(SharedMemory* ro_out) {
 
 bool SharedMemory::Map(size_t bytes, void* fixed_address) {
   if (!mapped_file_) {
+    gfxCriticalNote << "SharedMemory::Map no file";
     return false;
   }
 
@@ -180,6 +187,8 @@ bool SharedMemory::Map(size_t bytes, void* fixed_address) {
     memory_.reset(mem);
     return true;
   }
+
+  gfxCriticalNote << "SharedMemory::Map " << GetLastError();
   return false;
 }
 
