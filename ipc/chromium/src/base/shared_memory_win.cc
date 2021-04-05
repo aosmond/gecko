@@ -12,6 +12,7 @@
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/RandomNum.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/gfx/Logging.h"
 #include "nsDebug.h"
 #include "nsString.h"
 
@@ -34,6 +35,17 @@ typedef ULONG(__stdcall* NtQuerySectionType)(
     PVOID SectionInformation, ULONG SectionInformationLength,
     PULONG ResultLength);
 
+static void DumpMemStats() {
+  MEMORYSTATUSEX stat;
+  stat.dwLength = sizeof(stat);
+  if (!GlobalMemoryStatusEx(&stat)) {
+    gfxCriticalNote << "GMS err " << GetLastError();
+    return;
+  }
+
+  gfxCriticalNote << "V " << stat.ullAvailVirtual << " PH " << stat.ullAvailPhys << " PA " << stat.ullAvailPageFile << " L " << stat.dwMemoryLoad;
+}
+
 // Checks if the section object is safe to map. At the moment this just means
 // it's not an image section.
 bool IsSectionSafeToMap(HANDLE handle) {
@@ -48,10 +60,17 @@ bool IsSectionSafeToMap(HANDLE handle) {
       nt_query_section_func(handle, SectionBasicInformation, &basic_information,
                             sizeof(basic_information), nullptr);
   if (status) {
+    gfxCriticalNote << "IsSectionSafeToMap status " << status << " " << GetLastError();
+    DumpMemStats();
     return false;
   }
 
-  return (basic_information.Attributes & SEC_IMAGE) != SEC_IMAGE;
+  bool safe = (basic_information.Attributes & SEC_IMAGE) != SEC_IMAGE;
+  if (!safe) {
+    gfxCriticalNote << "IsSectionSafeToMap attrib " << basic_information.Attributes;
+    DumpMemStats();
+  }
+  return safe;
 }
 
 }  // namespace
@@ -163,6 +182,8 @@ bool SharedMemory::ReadOnlyCopy(SharedMemory* ro_out) {
 
 bool SharedMemory::Map(size_t bytes, void* fixed_address) {
   if (!mapped_file_) {
+    gfxCriticalNote << "SharedMemory::Map no file " << bytes;
+    DumpMemStats();
     return false;
   }
 
@@ -180,6 +201,9 @@ bool SharedMemory::Map(size_t bytes, void* fixed_address) {
     memory_.reset(mem);
     return true;
   }
+
+  gfxCriticalNote << "Shm " << bytes << " " << GetLastError();
+  DumpMemStats();
   return false;
 }
 
