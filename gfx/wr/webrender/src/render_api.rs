@@ -13,7 +13,7 @@ use std::u32;
 use time::precise_time_ns;
 //use crate::api::peek_poke::PeekPoke;
 use crate::api::channel::{Sender, single_msg_channel, unbounded_channel};
-use crate::api::{ColorF, BuiltDisplayList, IdNamespace, ExternalScrollId};
+use crate::api::{ColorF, BuiltDisplayList, IdNamespace, ExternalScrollId, BlobMsg};
 use crate::api::{SharedFontInstanceMap, FontKey, FontInstanceKey, NativeFontHandle, ZoomFactor};
 use crate::api::{BlobImageData, BlobImageKey, ImageData, ImageDescriptor, ImageKey, Epoch, QualitySettings};
 use crate::api::{BlobImageParams, BlobImageRequest, BlobImageResult, AsyncBlobImageRasterizer, BlobImageHandler};
@@ -968,6 +968,8 @@ pub enum ApiMsg {
     DebugCommand(DebugCommand),
     /// Message from the scene builder thread.
     SceneBuilderResult(SceneBuilderResult),
+    /// Message from the deferred blob worker threads.
+    Blob(BlobMsg),
 }
 
 impl fmt::Debug for ApiMsg {
@@ -981,6 +983,9 @@ impl fmt::Debug for ApiMsg {
             ApiMsg::ReportMemory(..) => "ApiMsg::ReportMemory",
             ApiMsg::DebugCommand(..) => "ApiMsg::DebugCommand",
             ApiMsg::SceneBuilderResult(..) => "ApiMsg::SceneBuilderResult",
+            ApiMsg::Blob(ref msg) => match msg {
+                BlobMsg::Rasterized(..) => "ApiMsg::Blob::Rasterize",
+            }
         })
     }
 }

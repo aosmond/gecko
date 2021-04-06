@@ -544,7 +544,7 @@ extern "C" {
     fn wr_notifier_new_frame_ready(window_id: WrWindowId);
     fn wr_notifier_nop_frame_done(window_id: WrWindowId);
     fn wr_notifier_external_event(window_id: WrWindowId, raw_event: usize);
-    fn wr_schedule_render(window_id: WrWindowId);
+    fn wr_schedule_render(window_id: WrWindowId, force: bool);
     // NOTE: This moves away from pipeline_info.
     fn wr_finished_scene_build(window_id: WrWindowId, pipeline_info: &mut WrPipelineInfo);
 
@@ -580,6 +580,12 @@ impl RenderNotifier for CppNotifier {
     fn external_event(&self, event: ExternalEvent) {
         unsafe {
             wr_notifier_external_event(self.window_id, event.unwrap());
+        }
+    }
+
+    fn schedule_render(&self, force: bool) {
+        unsafe {
+            wr_schedule_render(self.window_id, force);
         }
     }
 }
@@ -989,7 +995,7 @@ impl SceneBuilderHooks for APZCallbacks {
     }
 
     fn post_resource_update(&self, _document_ids: &Vec<DocumentId>) {
-        unsafe { wr_schedule_render(self.window_id) }
+        unsafe { wr_schedule_render(self.window_id, false) }
         unsafe {
             gecko_profiler_end_marker(b"SceneBuilding\0".as_ptr() as *const c_char);
         }

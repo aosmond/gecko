@@ -28,6 +28,8 @@ use std::mem;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 use dwrote;
@@ -520,6 +522,13 @@ struct Job {
     dirty_rect: BlobDirtyRect,
     visible_rect: DeviceIntRect,
     tile_size: TileSize,
+    generation: BlobImageGeneration,
+}
+
+struct DeferrableJob {
+    job: Job,
+    document_id: DocumentId,
+    tx: Box<dyn BlobSender>,
 }
 
 /// Rasterizes gecko blob images.
@@ -532,6 +541,24 @@ struct Moz2dBlobRasterizer {
     blob_commands: HashMap<BlobImageKey, BlobCommand>,
     ///
     enable_multithreading: bool,
+}
+
+impl Moz2dBlobRasterizer {
+    fn into_job(&self, params: &BlobImageParams) -> Job {
+        let command = &self.blob_commands[&params.request.key];
+        let blob = Arc::clone(&command.data);
+        assert!(params.descriptor.rect.size.width > 0 && params.descriptor.rect.size.height > 0);
+
+        Job {
+            request: params.request,
+            descriptor: params.descriptor,
+            commands: blob,
+            visible_rect: command.visible_rect,
+            dirty_rect: params.dirty_rect,
+            tile_size: command.tile_size,
+            generation: params.generation,
+        }
+    }
 }
 
 struct GeckoProfilerMarker {
@@ -566,18 +593,11 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
 
         let requests: Vec<Job> = requests
             .iter()
-            .map(|params| {
-                let command = &self.blob_commands[&params.request.key];
-                let blob = Arc::clone(&command.data);
-                assert!(params.descriptor.rect.size.width > 0 && params.descriptor.rect.size.height > 0);
-
-                Job {
-                    request: params.request,
-                    descriptor: params.descriptor,
-                    commands: blob,
-                    visible_rect: command.visible_rect,
-                    dirty_rect: params.dirty_rect,
-                    tile_size: command.tile_size,
+            .filter_map(|params| {
+                if !params.descriptor.deferrable {
+                    Some(self.into_job(params))
+                } else {
+                    None
                 }
             })
             .collect();
@@ -599,7 +619,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             // Parallel version synchronously installs a job on the thread pool which will
             // try to do the work in parallel.
             // This thread is blocked until the thread pool is done doing the work.
-            let lambda = || requests.into_par_iter().map(rasterize_blob).collect();
+            let lambda = || requests.into_par_iter().map(rasterize_sync_blob).collect();
             if low_priority {
                 //TODO --bpe runtime flag to A/B test these two
                 self.workers_low_priority.install(lambda)
@@ -608,8 +628,64 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
                 self.workers.install(lambda)
             }
         } else {
-            requests.into_iter().map(rasterize_blob).collect()
+            requests.into_iter().map(rasterize_sync_blob).collect()
         }
+    }
+
+    fn rasterize_deferrable(
+        &mut self,
+        requests: &[BlobImageParams],
+        document_id: DocumentId,
+        tx: &Box<dyn BlobSender>
+    ) -> Vec<(BlobImageRequest, BlobImageResult)> {
+        // All we do here is spin up our workers to callback into gecko to replay the drawing commands.
+        let _marker = GeckoProfilerMarker::new(b"DeferrableBlobRasterization\0");
+
+        let jobs: Vec<DeferrableJob> = requests
+            .into_iter()
+            .filter_map(|params| {
+                if params.descriptor.deferrable {
+                    // TODO(aosmond): Because we might resolve the tiles out of order, we always
+                    // set the dirty rect as the whole tile. This allows us to just always take the
+                    // most recent blob rasterize result as the preferred. A potential optimization
+                    // is to merge the results of the tiles in case it is a blob with an animation.
+                    Some(DeferrableJob {
+                        job: Job {
+                            dirty_rect: DirtyRect::All,
+                            ..self.into_job(params)
+                        },
+                        document_id,
+                        tx: tx.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if self.enable_multithreading {
+            // Run the deferrable jobs asynchronously on the thread pool which will try to do the
+            // work in parallel. The workers will post the results directly to the render backend
+            // thread. Anything that gets posted before us will be included in this frame, otherwise
+            // they will request a new frame be generated.
+            let lambda = move || jobs.into_par_iter().map(rasterize_deferrable_blob).collect();
+            self.workers_low_priority.spawn(lambda);
+        } else {
+            jobs.into_iter().for_each(rasterize_deferrable_blob);
+        }
+
+        requests
+            .into_iter()
+            .filter_map(|params| {
+                if params.descriptor.deferrable {
+                    Some((params.request, BlobImageResult::Err(
+                        BlobImageError::Deferred((params.descriptor, params.generation))
+                    )))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -626,7 +702,7 @@ fn autoreleasepool<T, F: FnOnce() -> T>(f: F) -> T {
     }
 }
 
-fn rasterize_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
+fn rasterize_blob(job: &Job) -> (BlobImageRequest, BlobImageResult) {
     let descriptor = job.descriptor;
     let buf_size =
         (descriptor.rect.size.width * descriptor.rect.size.height * descriptor.format.bytes_per_pixel()) as usize;
@@ -660,6 +736,7 @@ fn rasterize_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
                 Ok(RasterizedBlobImage {
                     rasterized_rect,
                     data: Arc::new(output),
+                    generation: job.generation,
                 })
             } else {
                 panic!("Moz2D replay problem");
@@ -668,6 +745,16 @@ fn rasterize_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
     });
 
     (job.request, result)
+}
+
+fn rasterize_deferrable_blob(job: DeferrableJob) {
+    let (request, result) = rasterize_blob(&job.job);
+    thread::sleep(Duration::from_millis(5000));
+    job.tx.send(BlobMsg::Rasterized(job.document_id, request, result));
+}
+
+fn rasterize_sync_blob(job: Job) -> (BlobImageRequest, BlobImageResult) {
+    rasterize_blob(&job)
 }
 
 impl BlobImageHandler for Moz2dBlobImageHandler {

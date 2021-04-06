@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use api::{AsyncBlobImageRasterizer, BlobImageResult};
+use api::{AsyncBlobImageRasterizer, BlobImageResult, BlobSender, BlobMsg};
 use api::{DocumentId, PipelineId, ExternalEvent, BlobImageRequest};
 use api::{NotificationRequest, Checkpoint, IdNamespace, QualitySettings};
 use api::{PrimitiveKeyKind, SharedFontInstanceMap};
@@ -41,11 +41,19 @@ use crate::debug_server;
 #[cfg(feature = "debugger")]
 use api::{BuiltDisplayListIter, DisplayItem};
 
-fn rasterize_blobs(txn: &mut TransactionMsg, is_low_priority: bool) {
+fn rasterize_blobs(txn: &mut TransactionMsg, tx: &Box<dyn BlobSender>, is_low_priority: bool) {
     profile_scope!("rasterize_blobs");
 
     if let Some(ref mut rasterizer) = txn.blob_rasterizer {
-        let mut rasterized_blobs = rasterizer.rasterize(&txn.blob_requests, is_low_priority);
+        let mut rasterized_blobs = rasterizer.rasterize_deferrable(&txn.blob_requests, txn.document_id, tx);
+        // try using the existing allocation if our current list is empty
+        if txn.rasterized_blobs.is_empty() {
+            txn.rasterized_blobs = rasterized_blobs;
+        } else {
+            txn.rasterized_blobs.append(&mut rasterized_blobs);
+        }
+
+        rasterized_blobs = rasterizer.rasterize(&txn.blob_requests, is_low_priority);
         // try using the existing allocation if our current list is empty
         if txn.rasterized_blobs.is_empty() {
             txn.rasterized_blobs = rasterized_blobs;
@@ -231,6 +239,7 @@ pub struct SceneBuilderThread {
     documents: FastHashMap<DocumentId, Document>,
     rx: Receiver<SceneBuilderRequest>,
     tx: Sender<ApiMsg>,
+    blob_tx: Box<dyn BlobSender>,
     config: FrameBuilderConfig,
     default_device_pixel_ratio: f32,
     font_instances: SharedFontInstanceMap,
@@ -245,17 +254,50 @@ pub struct SceneBuilderThread {
 pub struct SceneBuilderThreadChannels {
     rx: Receiver<SceneBuilderRequest>,
     tx: Sender<ApiMsg>,
+    blob_tx: Box<dyn BlobSender>,
 }
+
+#[derive(Clone)]
+pub struct SceneBuilderBlobSender {
+    tx: Sender<ApiMsg>,
+}
+
+impl SceneBuilderBlobSender {
+    pub fn new(
+        tx: Sender<ApiMsg>,
+    ) -> Box<dyn BlobSender> {
+        Box::new(Self {
+            tx,
+        })
+    }
+}
+
+impl BlobSender for SceneBuilderBlobSender {
+    fn send(
+        &self,
+        msg: BlobMsg
+    ) {
+        self.tx.send(ApiMsg::Blob(msg)).unwrap();
+    }
+
+    fn box_clone(&self) -> Box<dyn BlobSender> {
+        Box::new(self.clone())
+    }
+}
+
+unsafe impl Send for SceneBuilderBlobSender {}
 
 impl SceneBuilderThreadChannels {
     pub fn new(
         tx: Sender<ApiMsg>
     ) -> (Self, Sender<SceneBuilderRequest>) {
         let (in_tx, in_rx) = unbounded_channel();
+        let blob_tx = SceneBuilderBlobSender::new(tx.clone());
         (
             Self {
                 rx: in_rx,
                 tx,
+                blob_tx,
             },
             in_tx,
         )
@@ -271,12 +313,13 @@ impl SceneBuilderThread {
         hooks: Option<Box<dyn SceneBuilderHooks + Send>>,
         channels: SceneBuilderThreadChannels,
     ) -> Self {
-        let SceneBuilderThreadChannels { rx, tx } = channels;
+        let SceneBuilderThreadChannels { rx, tx, blob_tx } = channels;
 
         Self {
             documents: Default::default(),
             rx,
             tx,
+            blob_tx,
             config,
             default_device_pixel_ratio,
             font_instances,
@@ -686,7 +729,7 @@ impl SceneBuilderThread {
             profile.start_time(profiler::BLOB_RASTERIZATION_TIME);
 
             let is_low_priority = false;
-            rasterize_blobs(&mut txn, is_low_priority);
+            rasterize_blobs(&mut txn, &self.blob_tx, is_low_priority);
 
             profile.end_time(profiler::BLOB_RASTERIZATION_TIME);
         }
@@ -811,6 +854,7 @@ impl SceneBuilderThread {
 pub struct LowPrioritySceneBuilderThread {
     pub rx: Receiver<SceneBuilderRequest>,
     pub tx: Sender<SceneBuilderRequest>,
+    pub blob_tx: Box<dyn BlobSender>,
 }
 
 impl LowPrioritySceneBuilderThread {
@@ -839,7 +883,7 @@ impl LowPrioritySceneBuilderThread {
 
     fn process_transaction(&mut self, mut txn: Box<TransactionMsg>) -> Box<TransactionMsg> {
         let is_low_priority = true;
-        rasterize_blobs(&mut txn, is_low_priority);
+        rasterize_blobs(&mut txn, &self.blob_tx, is_low_priority);
         txn.blob_requests = Vec::new();
 
         txn

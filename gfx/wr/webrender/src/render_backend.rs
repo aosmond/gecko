@@ -8,7 +8,7 @@
 //! See the comment at the top of the `renderer` module for a description of
 //! how these two pieces interact.
 
-use api::{DebugFlags, BlobImageHandler};
+use api::{DebugFlags, BlobImageHandler, BlobMsg};
 use api::{DocumentId, ExternalScrollId, HitTestResult};
 use api::{IdNamespace, PipelineId, RenderNotifier, ScrollClamping};
 use api::{NotificationRequest, Checkpoint, QualitySettings};
@@ -1239,6 +1239,9 @@ impl RenderBackend {
             ApiMsg::SceneBuilderResult(msg) => {
                 return self.process_scene_builder_result(msg, frame_counter);
             }
+            ApiMsg::Blob(msg) => {
+                self.process_blob_msg(msg);
+            }
         }
 
         RenderBackendStatus::Continue
@@ -1335,6 +1338,30 @@ impl RenderBackend {
         }
 
         RenderBackendStatus::Continue
+    }
+
+    fn process_blob_msg(
+        &mut self,
+        msg: BlobMsg,
+    ) {
+        match msg {
+            BlobMsg::Rasterized(doc_id, request, result) => {
+                if let Some(doc) = self.documents.get_mut(&doc_id) {
+                    let schedule_render = self.resource_cache.add_rasterized_blob_image(
+                          request,
+                          result,
+                          true,
+                          &mut doc.profile,
+                    );
+
+                    if schedule_render {
+                        // FIXME(aosmond): Does this schedule a single frame, or one frame for every
+                        // blob?
+                        self.notifier.schedule_render(true);
+                    }
+                }
+            }
+        }
     }
 
     fn update_frame_builder_config(&self) {

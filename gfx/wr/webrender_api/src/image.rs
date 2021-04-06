@@ -9,7 +9,7 @@ use peek_poke::PeekPoke;
 use std::ops::{Add, Sub};
 use std::sync::Arc;
 // local imports
-use crate::{IdNamespace, TileSize};
+use crate::{IdNamespace, TileSize, DocumentId};
 use crate::display_item::ImageRendering;
 use crate::font::{FontInstanceKey, FontInstanceData, FontKey, FontTemplate};
 use crate::units::*;
@@ -241,6 +241,10 @@ bitflags! {
         ///
         /// See https://github.com/servo/webrender/pull/2555/
         const ALLOW_MIPMAPS = 2;
+        /// Whether to allow deferring processing of this (blob) image is allowed or
+        /// not. This is used to rasterize blobs without blocking and be deferred to
+        /// a future frame if necessary.
+        const IS_DEFERRABLE = 4;
     }
 }
 
@@ -310,6 +314,12 @@ impl ImageDescriptor {
     /// Returns true if this descriptor allows mipmaps
     pub fn allow_mipmaps(&self) -> bool {
         self.flags.contains(ImageDescriptorFlags::ALLOW_MIPMAPS)
+    }
+
+    /// Returns true if this descriptor is deferrable.
+    pub fn is_deferrable(&self) -> bool {
+        true
+        //self.flags.contains(ImageDescriptorFlags::IS_DEFERRABLE)
     }
 }
 
@@ -409,6 +419,30 @@ pub trait BlobImageHandler: Send {
     fn enable_multithreading(&mut self, enable: bool);
 }
 
+/// Message sent by the blob workers to the render backend thread.
+pub enum BlobMsg {
+    /// Deferred rasterized blob result.
+    Rasterized(DocumentId, BlobImageRequest, BlobImageResult),
+}
+
+/// Sender for blob messages to the render backend thread.
+pub trait BlobSender : Send {
+    /// Send message to the render backend thread.
+    fn send(
+        &self,
+        msg: BlobMsg
+    );
+
+    /// Clone directly into a box, avoiding dependency on the Sized trait.
+    fn box_clone(&self) -> Box<dyn BlobSender>;
+}
+
+impl Clone for Box<dyn BlobSender> {
+    fn clone(&self) -> Box<dyn BlobSender> {
+        self.box_clone()
+    }
+}
+
 /// A group of rasterization requests to execute synchronously on the scene builder thread.
 pub trait AsyncBlobImageRasterizer : Send {
     /// Rasterize the requests.
@@ -420,8 +454,27 @@ pub trait AsyncBlobImageRasterizer : Send {
         requests: &[BlobImageParams],
         low_priority: bool
     ) -> Vec<(BlobImageRequest, BlobImageResult)>;
+
+    /// Rasterize the deferrable requests.
+    ///
+    /// Gecko uses te priority hint to schedule work in a way that minimizes the risk
+    /// of high priority work being blocked by (or enqued behind) low priority work.
+    fn rasterize_deferrable(
+        &mut self,
+        requests: &[BlobImageParams],
+        document_id: DocumentId,
+        tx: &Box<dyn BlobSender>
+    ) -> Vec<(BlobImageRequest, BlobImageResult)>;
 }
 
+/// Generation counter tracking changes in the blob image.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct BlobImageGeneration(pub u32);
+
+impl BlobImageGeneration {
+    /// Placeholder used to mark blob data as invalid.
+    pub const INVALID: BlobImageGeneration = BlobImageGeneration(u32::MAX);
+}
 
 /// Input parameters for the BlobImageRasterizer.
 #[derive(Copy, Clone, Debug)]
@@ -435,6 +488,8 @@ pub struct BlobImageParams {
     ///
     /// If set to None the entire image is rasterized.
     pub dirty_rect: BlobDirtyRect,
+    /// Age of the blob image.
+    pub generation: BlobImageGeneration,
 }
 
 /// The possible states of a Dirty rect.
@@ -547,6 +602,8 @@ pub struct BlobImageDescriptor {
     pub rect: LayoutIntRect,
     /// Format for the data in the backing store.
     pub format: ImageFormat,
+    /// Whether the blob can be deferred to a future frame.
+    pub deferrable: bool,
 }
 
 /// Representation of a rasterized blob image. This is obtained by passing
@@ -557,6 +614,8 @@ pub struct RasterizedBlobImage {
     pub rasterized_rect: DeviceIntRect,
     /// Backing store. The format is stored out of band in `BlobImageDescriptor`.
     pub data: Arc<Vec<u8>>,
+    /// Age of the rasterized blob.
+    pub generation: BlobImageGeneration,
 }
 
 /// Error code for when blob rasterization failed.
@@ -566,6 +625,8 @@ pub enum BlobImageError {
     Oom,
     /// Other failure, embedding-specified.
     Other(String),
+    /// Deferred, with the generation requested.
+    Deferred((BlobImageDescriptor, BlobImageGeneration)),
 }
 
 

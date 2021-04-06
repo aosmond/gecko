@@ -1209,11 +1209,15 @@ void wr_notifier_external_event(mozilla::wr::WrWindowId aWindowId,
                                              std::move(evt));
 }
 
-void wr_schedule_render(mozilla::wr::WrWindowId aWindowId) {
+void wr_schedule_render(mozilla::wr::WrWindowId aWindowId, bool aForce) {
   RefPtr<mozilla::layers::CompositorBridgeParent> cbp = mozilla::layers::
       CompositorBridgeParent::GetCompositorBridgeParentFromWindowId(aWindowId);
   if (cbp) {
-    cbp->ScheduleRenderOnCompositorThread();
+    if (aForce) {
+      cbp->ScheduleForcedRenderOnCompositorThread();
+    } else {
+      cbp->ScheduleRenderOnCompositorThread();
+    }
   }
 }
 

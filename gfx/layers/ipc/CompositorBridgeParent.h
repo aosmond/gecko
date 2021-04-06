@@ -482,8 +482,10 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase,
 
   // Can be called from any thread
   void ScheduleRenderOnCompositorThread() override;
+  void ScheduleForcedRenderOnCompositorThread();
 
   void ScheduleComposition();
+  void ScheduleForcedComposition();
 
   void NotifyShadowTreeTransaction(LayersId aId, bool aIsFirstPaint,
                                    const FocusTarget& aFocusTarget,

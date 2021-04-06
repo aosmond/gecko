@@ -86,7 +86,7 @@ use crate::render_backend::{FrameId, RenderBackend};
 use crate::render_task_graph::RenderTaskGraph;
 use crate::render_task::{RenderTask, RenderTaskKind, ReadbackTask};
 use crate::resource_cache::ResourceCache;
-use crate::scene_builder_thread::{SceneBuilderThread, SceneBuilderThreadChannels, LowPrioritySceneBuilderThread};
+use crate::scene_builder_thread::{SceneBuilderThread, SceneBuilderThreadChannels, LowPrioritySceneBuilderThread, SceneBuilderBlobSender};
 use crate::screen_capture::AsyncScreenshotGrabber;
 use crate::render_target::{AlphaRenderTarget, ColorRenderTarget, PictureCacheTarget};
 use crate::render_target::{RenderTarget, TextureCacheRenderTarget};
@@ -1211,6 +1211,7 @@ impl Renderer {
             let lp_builder = LowPrioritySceneBuilderThread {
                 rx: low_priority_scene_rx,
                 tx: scene_tx.clone(),
+                blob_tx: SceneBuilderBlobSender::new(api_tx.clone()),
             };
 
             thread::Builder::new().name(lp_scene_thread_name.clone()).spawn(move || {
