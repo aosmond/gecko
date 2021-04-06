@@ -5866,32 +5866,37 @@ impl Renderer {
         }
 
         if config.bits.contains(CaptureBits::FRAME) {
-            let path_textures = root.join("textures");
-            if !path_textures.is_dir() {
-                fs::create_dir(&path_textures).unwrap();
+            if !self.pending_gpu_cache_updates.is_empty() {
+                self.update_gpu_cache(); // flush pending updates
             }
 
-            info!("saving GPU cache");
-            self.update_gpu_cache(); // flush pending updates
-            let mut plain_self = PlainRenderer {
-                device_size: self.device_size,
-                gpu_cache: Self::save_texture(
-                    self.gpu_cache_texture.get_texture(),
-                    "gpu", &root, &mut self.device,
-                ),
-                gpu_cache_frame_id: self.gpu_cache_frame_id,
-                textures: FastHashMap::default(),
-            };
+            if self.gpu_cache_texture.has_texture() {
+                info!("saving GPU cache");
+                let path_textures = root.join("textures");
+                if !path_textures.is_dir() {
+                    fs::create_dir(&path_textures).unwrap();
+                }
 
-            info!("saving cached textures");
-            for (id, texture) in &self.texture_resolver.texture_cache_map {
-                let file_name = format!("cache-{}", plain_self.textures.len() + 1);
-                info!("\t{}", file_name);
-                let plain = Self::save_texture(texture, &file_name, &root, &mut self.device);
-                plain_self.textures.insert(*id, plain);
+                let mut plain_self = PlainRenderer {
+                    device_size: self.device_size,
+                    gpu_cache: Self::save_texture(
+                        self.gpu_cache_texture.get_texture(),
+                        "gpu", &root, &mut self.device,
+                    ),
+                    gpu_cache_frame_id: self.gpu_cache_frame_id,
+                    textures: FastHashMap::default(),
+                };
+
+                info!("saving cached textures");
+                for (id, texture) in &self.texture_resolver.texture_cache_map {
+                    let file_name = format!("cache-{}", plain_self.textures.len() + 1);
+                    info!("\t{}", file_name);
+                    let plain = Self::save_texture(texture, &file_name, &root, &mut self.device);
+                    plain_self.textures.insert(*id, plain);
+                }
+
+                config.serialize_for_resource(&plain_self, "renderer");
             }
-
-            config.serialize_for_resource(&plain_self, "renderer");
         }
 
         self.device.reset_read_target();

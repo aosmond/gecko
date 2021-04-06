@@ -91,6 +91,10 @@ pub struct GpuCacheTexture {
 }
 
 impl GpuCacheTexture {
+    pub fn has_texture(&self) -> bool {
+        self.texture.is_some()
+    }
+
     /// Ensures that we have an appropriately-sized texture.
     fn ensure_texture(&mut self, device: &mut Device, height: i32) {
         // If we already have a texture that works, we're done.

@@ -1715,6 +1715,10 @@ impl RenderBackend {
 
         for (&id, doc) in &mut self.documents {
             debug!("\tdocument {:?}", id);
+            if doc.scene.pipeline_epochs.is_empty() {
+                debug!("\tdocument {:?} has empty scene", id);
+                continue;
+            }
             if config.bits.contains(CaptureBits::FRAME) {
                 let rendered_document = doc.build_frame(
                     &mut self.resource_cache,
