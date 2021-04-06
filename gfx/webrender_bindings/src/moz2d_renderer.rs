@@ -28,8 +28,8 @@ use std::mem;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
+//use std::thread;
+//use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 use dwrote;
@@ -749,7 +749,7 @@ fn rasterize_blob(job: &Job) -> (BlobImageRequest, BlobImageResult) {
 
 fn rasterize_deferrable_blob(job: DeferrableJob) {
     let (request, result) = rasterize_blob(&job.job);
-    thread::sleep(Duration::from_millis(5000));
+    //thread::sleep(Duration::from_millis(5000));
     job.tx.send(BlobMsg::Rasterized(job.document_id, request, result));
 }
 
