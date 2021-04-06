@@ -272,9 +272,15 @@ impl ApiResources {
                     return;
                 }
 
+                let visible_rect = if template.descriptor.is_deferrable() {
+                    DeviceIntRect::new(DeviceIntPoint::zero(), template.descriptor.size)
+                } else {
+                    template.visible_rect
+                };
+
                 let descriptor = BlobImageDescriptor {
                     rect: compute_tile_rect(
-                        &template.visible_rect,
+                        &visible_rect,
                         template.tile_size,
                         tile,
                     ).cast_unit(),
