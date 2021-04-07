@@ -68,7 +68,7 @@ class SourceSurfaceSharedDataWrapper final : public DataSourceSurface {
 
   void Unmap() final;
 
-  void ExpireMap();
+  bool ExpireMap();
 
   bool AddConsumer() { return ++mConsumers == 1; }
 
@@ -93,13 +93,13 @@ class SourceSurfaceSharedDataWrapper final : public DataSourceSurface {
 
   nsExpirationState* GetExpirationState() { return &mExpirationState; }
 
+  size_t GetAlignedDataLength() const {
+    return mozilla::ipc::SharedMemory::PageAlignedSize(GetDataLength());
+  }
+
  private:
   size_t GetDataLength() const {
     return static_cast<size_t>(mStride) * mSize.height;
-  }
-
-  size_t GetAlignedDataLength() const {
-    return mozilla::ipc::SharedMemory::PageAlignedSize(GetDataLength());
   }
 
   void EnsureMapped(size_t aLength);

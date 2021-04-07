@@ -119,11 +119,13 @@ void SourceSurfaceSharedDataWrapper::Unmap() {
   MOZ_ASSERT(mMapCount >= 0);
 }
 
-void SourceSurfaceSharedDataWrapper::ExpireMap() {
+bool SourceSurfaceSharedDataWrapper::ExpireMap() {
   MutexAutoLock lock(*mHandleLock);
   if (mMapCount == 0) {
     mBuf->Unmap();
+    return true;
   }
+  return false;
 }
 
 bool SourceSurfaceSharedData::Init(const IntSize& aSize, int32_t aStride,

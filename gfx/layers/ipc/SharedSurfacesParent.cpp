@@ -313,8 +313,31 @@ bool SharedSurfacesParent::AgeAndExpireOneGeneration() {
 /* static */
 void SharedSurfacesParent::ExpireMap(
     nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>>& aExpired) {
+  MEMORYSTATUSEX before;
+  before.dwLength = sizeof(before);
+  if (!GlobalMemoryStatusEx(&before)) {
+    MOZ_CRASH("GlobalMemoryStatusEx failed!");
+  }
+
+  size_t len = 0;
   for (auto& surface : aExpired) {
-    surface->ExpireMap();
+    if (surface->ExpireMap()) {
+      len += surface->GetAlignedDataLength();
+    }
+  }
+
+  if (len == 0) {
+    return;
+  }
+
+  MEMORYSTATUSEX after;
+  after.dwLength = sizeof(after);
+  if (!GlobalMemoryStatusEx(&after)) {
+    MOZ_CRASH("GlobalMemoryStatusEx failed!");
+  }
+
+  if (after.ullAvailVirtual == before.ullAvailVirtual) {
+    gfxCriticalNoteOnce << "Released " << len << " but vmem same";
   }
 }
 
