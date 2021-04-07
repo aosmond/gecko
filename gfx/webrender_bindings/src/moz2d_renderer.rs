@@ -645,6 +645,7 @@ impl AsyncBlobImageRasterizer for Moz2dBlobRasterizer {
             .into_iter()
             .filter_map(|params| {
                 if params.descriptor.deferrable {
+                    println!("[AO] rasterizing {:?}", params);
                     // TODO(aosmond): Because we might resolve the tiles out of order, we always
                     // set the dirty rect as the whole tile. This allows us to just always take the
                     // most recent blob rasterize result as the preferred. A potential optimization

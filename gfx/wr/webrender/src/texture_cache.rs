@@ -1793,6 +1793,7 @@ impl TextureCacheUpdate {
                 let finish = descriptor.offset +
                     descriptor.size.width * descriptor.format.bytes_per_pixel() +
                     (descriptor.size.height - 1) * descriptor.compute_stride();
+                println!("[AO] descriptor {:?}, have {} bytes, want {} bytes", descriptor, bytes.len(), finish);
                 assert!(bytes.len() >= finish as usize);
 
                 TextureUpdateSource::Bytes { data: bytes }
