@@ -9,6 +9,7 @@
 #include "gfxContext.h"
 #include "gfxTypes.h"
 #include "ImageRegion.h"
+#include "mozilla/Attributes.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/gfx/Types.h"
 #include "mozilla/Maybe.h"
@@ -18,7 +19,7 @@
 namespace mozilla {
 namespace image {
 
-struct SVGDrawingParameters {
+struct MOZ_STACK_CLASS SVGDrawingParameters {
   typedef mozilla::gfx::IntSize IntSize;
   typedef mozilla::gfx::SamplingFilter SamplingFilter;
 

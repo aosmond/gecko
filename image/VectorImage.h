@@ -19,6 +19,7 @@ struct MediaFeatureChange;
 
 namespace image {
 
+class SourceSurfaceBlobImage;
 struct SVGDrawingParameters;
 class SVGDocumentWrapper;
 class SVGRootRenderingObserver;
@@ -80,6 +81,8 @@ class VectorImage final : public ImageResource, public nsIStreamListener {
   virtual bool ShouldAnimate() override;
 
  private:
+  friend class SourceSurfaceBlobImage;
+
   Tuple<ImgDrawResult, gfx::IntSize, RefPtr<gfx::SourceSurface>>
   GetFrameInternal(const gfx::IntSize& aSize,
                    const Maybe<SVGImageContext>& aSVGContext,
@@ -111,6 +114,11 @@ class VectorImage final : public ImageResource, public nsIStreamListener {
   already_AddRefed<gfx::SourceSurface> CreateSurface(
       const SVGDrawingParameters& aParams, gfxDrawable* aSVGDrawable,
       bool& aWillCache);
+
+  bool MayCache(const SVGDrawingParameters& aParams) const;
+
+  bool CacheSurface(const SVGDrawingParameters& aParams,
+                    NotNull<imgFrame*> aFrame);
 
   /// Send a frame complete notification if appropriate. Must be called only
   /// after all drawing has been completed.
@@ -169,5 +177,12 @@ inline NS_IMETHODIMP VectorImage::SetAnimationMode(uint16_t aAnimationMode) {
 
 }  // namespace image
 }  // namespace mozilla
+
+/**
+ * Casting VectorImage to nsISupports is ambiguous. This method handles that.
+ */
+inline nsISupports* ToSupports(mozilla::image::VectorImage* p) {
+  return NS_ISUPPORTS_CAST(mozilla::image::ImageResource*, p);
+}
 
 #endif  // mozilla_image_VectorImage_h

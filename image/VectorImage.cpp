@@ -5,13 +5,13 @@
 
 #include "VectorImage.h"
 
+#include "AutoRestoreSVGState.h"
 #include "gfx2DGlue.h"
 #include "gfxContext.h"
 #include "gfxDrawable.h"
 #include "gfxPlatform.h"
 #include "gfxUtils.h"
 #include "imgFrame.h"
-#include "mozilla/AutoRestore.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/MediaFeatureChange.h"
 #include "mozilla/dom/Event.h"
@@ -304,39 +304,6 @@ bool SVGDrawingCallback::operator()(gfxContext* aContext,
 
   return true;
 }
-
-class MOZ_STACK_CLASS AutoRestoreSVGState final {
- public:
-  AutoRestoreSVGState(const SVGDrawingParameters& aParams,
-                      SVGDocumentWrapper* aSVGDocumentWrapper, bool& aIsDrawing,
-                      bool aContextPaint)
-      : mIsDrawing(aIsDrawing)
-        // Apply any 'preserveAspectRatio' override (if specified) to the root
-        // element:
-        ,
-        mPAR(aParams.svgContext, aSVGDocumentWrapper->GetRootSVGElem())
-        // Set the animation time:
-        ,
-        mTime(aSVGDocumentWrapper->GetRootSVGElem(), aParams.animationTime) {
-    MOZ_ASSERT(!aIsDrawing);
-    MOZ_ASSERT(aSVGDocumentWrapper->GetDocument());
-
-    aIsDrawing = true;
-
-    // Set context paint (if specified) on the document:
-    if (aContextPaint) {
-      MOZ_ASSERT(aParams.svgContext->GetContextPaint());
-      mContextPaint.emplace(*aParams.svgContext->GetContextPaint(),
-                            *aSVGDocumentWrapper->GetDocument());
-    }
-  }
-
- private:
-  AutoRestore<bool> mIsDrawing;
-  AutoPreserveAspectRatioOverride mPAR;
-  AutoSVGTimeSetRestore mTime;
-  Maybe<AutoSetRestoreSVGContextPaint> mContextPaint;
-};
 
 // Implement VectorImage's nsISupports-inherited methods
 NS_IMPL_ISUPPORTS(VectorImage, imgIContainer, nsIStreamListener,
@@ -774,6 +741,22 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
       SamplingFilter::POINT, aSVGContext,
       mSVGDocumentWrapper->GetCurrentTimeAsFloat(), aFlags, 1.0);
 
+  // Blob recorded vector images just create a simple surface responsible for
+  // generating blob keys and recording bindings. The recording won't happen
+  // until the caller requests the key after GetImageContainerAtSize.
+  if (aFlags & FLAG_RECORD_BLOB) {
+    RefPtr<SourceSurface> surface =
+        new SourceSurfaceBlobImage(this, aSVGContext, decodeSize, aFlags);
+
+    if (MayCache(params)) {
+      auto frame = MakeNotNull<RefPtr<imgFrame>>();
+      frame->InitWithSurface(surface);
+      CacheSurface(params, frame);
+    }
+
+    return MakeTuple(ImgDrawResult::SUCCESS, decodeSize, std::move(surface));
+  }
+
   bool didCache;  // Was the surface put into the cache?
   bool contextPaint = aSVGContext && aSVGContext->GetContextPaint();
 
@@ -803,8 +786,7 @@ Tuple<ImgDrawResult, IntSize> VectorImage::GetImageContainerSize(
     return MakeTuple(ImgDrawResult::NOT_READY, IntSize(0, 0));
   }
 
-  if (mHaveAnimations ||
-      aManager->GetBackendType() != LayersBackend::LAYERS_WR) {
+  if (aManager->GetBackendType() != LayersBackend::LAYERS_WR) {
     return MakeTuple(ImgDrawResult::NOT_SUPPORTED, IntSize(0, 0));
   }
 
@@ -820,7 +802,7 @@ Tuple<ImgDrawResult, IntSize> VectorImage::GetImageContainerSize(
 NS_IMETHODIMP_(bool)
 VectorImage::IsImageContainerAvailable(LayerManager* aManager,
                                        uint32_t aFlags) {
-  if (mError || !mIsFullyLoaded || mHaveAnimations ||
+  if (mError || !mIsFullyLoaded ||
       aManager->GetBackendType() != LayersBackend::LAYERS_WR) {
     return false;
   }
@@ -857,7 +839,8 @@ VectorImage::GetImageContainerAtSize(layers::LayerManager* aManager,
   MaybeRestrictSVGContext(newSVGContext, aSVGContext, aFlags);
 
   // The aspect ratio flag was already handled as part of the SVG context
-  // restriction above.
+  // restriction above. We only support image containers with WebRender and we
+  // always want to use blob recordings where we can.
   uint32_t flags = aFlags & ~(FLAG_FORCE_PRESERVEASPECTRATIO_NONE);
   return GetImageContainerImpl(aManager, aSize,
                                newSVGContext ? newSVGContext : aSVGContext,
@@ -1056,6 +1039,7 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
     const SVGDrawingParameters& aParams, gfxDrawable* aSVGDrawable,
     bool& aWillCache) {
   MOZ_ASSERT(mIsDrawing);
+  MOZ_ASSERT(!(aParams.flags & FLAG_RECORD_BLOB));
 
   mSVGDocumentWrapper->UpdateViewportBounds(aParams.viewportSize);
   mSVGDocumentWrapper->FlushImageTransformInvalidation();
@@ -1063,12 +1047,7 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   // Determine whether or not we should put the surface to be created into
   // the cache. If we fail, we need to reset this to false to let the caller
   // know nothing was put in the cache.
-  aWillCache = !(aParams.flags & FLAG_BYPASS_SURFACE_CACHE) &&
-               // Refuse to cache animated images:
-               // XXX(seth): We may remove this restriction in bug 922893.
-               !mHaveAnimations &&
-               // The image is too big to fit in the cache:
-               SurfaceCache::CanHold(aParams.size);
+  aWillCache = MayCache(aParams);
 
   // If we weren't given a context, then we know we just want the rasterized
   // surface. We will create the frame below but only insert it into the cache
@@ -1100,8 +1079,8 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
       aParams.flags, backend);
 
   // If we couldn't create the frame, it was probably because it would end
-  // up way too big. Generally it also wouldn't fit in the cache, but the prefs
-  // could be set such that the cache isn't the limiting factor.
+  // up way too big. Generally it also wouldn't fit in the cache, but the
+  // prefs could be set such that the cache isn't the limiting factor.
   if (NS_FAILED(rv)) {
     aWillCache = false;
     return nullptr;
@@ -1122,22 +1101,40 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   }
 
   // Attempt to cache the frame.
-  SurfaceKey surfaceKey = VectorSurfaceKey(aParams.size, aParams.svgContext);
-  NotNull<RefPtr<ISurfaceProvider>> provider =
-      MakeNotNull<SimpleSurfaceProvider*>(ImageKey(this), surfaceKey, frame);
-
-  if (SurfaceCache::Insert(provider) == InsertOutcome::SUCCESS) {
-    if (aParams.size != aParams.drawSize) {
-      // We created a new surface that wasn't the size we requested, which means
-      // we entered factor-of-2 mode. We should purge any surfaces we no longer
-      // need rather than waiting for the cache to expire them.
-      SurfaceCache::PruneImage(ImageKey(this));
-    }
-  } else {
+  if (!CacheSurface(aParams, frame)) {
     aWillCache = false;
   }
 
   return surface.forget();
+}
+
+bool VectorImage::MayCache(const SVGDrawingParameters& aParams) const {
+  return !(aParams.flags & FLAG_BYPASS_SURFACE_CACHE) &&
+         // Refuse to cache animated images:
+         // XXX(seth): We may remove this restriction in bug 922893.
+         !mHaveAnimations &&
+         // The image is too big to fit in the cache:
+         SurfaceCache::CanHold(aParams.size);
+}
+
+bool VectorImage::CacheSurface(const SVGDrawingParameters& aParams,
+                               NotNull<imgFrame*> aFrame) {
+  SurfaceKey surfaceKey = VectorSurfaceKey(aParams.size, aParams.svgContext);
+  NotNull<RefPtr<ISurfaceProvider>> provider =
+      MakeNotNull<SimpleSurfaceProvider*>(ImageKey(this), surfaceKey, aFrame);
+
+  if (SurfaceCache::Insert(provider) != InsertOutcome::SUCCESS) {
+    return false;
+  }
+
+  if (aParams.size != aParams.drawSize) {
+    // We created a new surface that wasn't the size we requested, which means
+    // we entered factor-of-2 mode. We should purge any surfaces we no longer
+    // need rather than waiting for the cache to expire them.
+    SurfaceCache::PruneImage(ImageKey(this));
+  }
+
+  return true;
 }
 
 void VectorImage::SendFrameComplete(bool aDidCache, uint32_t aFlags) {

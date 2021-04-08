@@ -61,6 +61,7 @@ EXPORTS.mozilla.image += [
     "encoders/png/nsPNGEncoder.h",
     "ICOFileHeaders.h",
     "ImageMemoryReporter.h",
+    "SourceSurfaceBlobImage.h",
 ]
 
 UNIFIED_SOURCES += [
@@ -93,6 +94,7 @@ UNIFIED_SOURCES += [
     "ScriptedNotificationObserver.cpp",
     "ShutdownTracker.cpp",
     "SourceBuffer.cpp",
+    "SourceSurfaceBlobImage.cpp",
     "SurfaceCache.cpp",
     "SurfaceCacheUtils.cpp",
     "SurfacePipe.cpp",
