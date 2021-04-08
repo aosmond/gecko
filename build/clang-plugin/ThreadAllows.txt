@@ -66,6 +66,7 @@ RemVidChild
 ResetCleanup
 Sandbox Testing
 SaveScripts
+SharedUnmapper
 Socket Thread
 SpeechWorker
 SpinEventLoop

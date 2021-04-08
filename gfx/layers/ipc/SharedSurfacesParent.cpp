@@ -17,6 +17,23 @@
 #include "mozilla/webrender/RenderThread.h"
 #include "nsThreadUtils.h"  // for GetCurrentEventTarget
 
+#ifdef XP_WIN
+#  include "mozilla/DynamicallyLinkedFunctionPtr.h"
+#  include "mozilla/WindowsVersion.h"
+#  include <windows.h>
+
+#  if NTDDI_VERSION < NTDDI_WIN8
+struct MEMORY_PRIORITY_INFORMATION {
+  ULONG MemoryPriority;
+};
+
+BOOL SetThreadInformation(HANDLE hThread,
+                          THREAD_INFORMATION_CLASS ThreadInformationClass,
+                          LPVOID ThreadInformation,
+                          DWORD ThreadInformationSize);
+#  endif
+#endif
+
 namespace mozilla {
 namespace layers {
 
@@ -48,17 +65,63 @@ void SharedSurfacesParent::MappingTracker::NotifyHandlerEnd() {
   SharedSurfacesParent::ExpireMap(expired);
 }
 
-SharedSurfacesParent::SharedSurfacesParent()
+SharedSurfacesParent::SharedSurfacesParent(nsCOMPtr<nsIThread>&& aUnmapThread)
     : mTracker(
           StaticPrefs::image_mem_shared_unmap_min_expiration_ms_AtStartup(),
-          mozilla::GetCurrentEventTarget()) {}
+          mozilla::GetCurrentEventTarget()),
+      mUnmapThread(std::move(aUnmapThread)) {}
 
 /* static */
 void SharedSurfacesParent::Initialize() {
   MOZ_ASSERT(NS_IsMainThread());
   StaticMutexAutoLock lock(sMutex);
   if (!sInstance) {
-    sInstance = new SharedSurfacesParent();
+    nsCOMPtr<nsIRunnable> initialEvent;
+    bool threaded =
+        StaticPrefs::image_mem_shared_unmap_force_threaded_AtStartup();
+#ifdef XP_WIN
+    threaded |=
+        StaticPrefs::image_mem_shared_unmap_allow_threaded_AtStartup() &&
+        IsWin8OrLater() && sizeof(uintptr_t) <= 4;
+
+    class UnmapThreadInitRunnable final : public Runnable {
+     public:
+      UnmapThreadInitRunnable()
+          : Runnable("SharedSurfacesParent::UnmapThreadInitRunnable") {}
+
+      NS_IMETHOD Run() override {
+        static const StaticDynamicallyLinkedFunctionPtr<decltype(
+            &SetThreadInformation)>
+            pSetThreadInformation(L"kernel32.dll", "SetThreadInformation");
+        if (!pSetThreadInformation) {
+          return NS_OK;
+        }
+
+        MEMORY_PRIORITY_INFORMATION info;
+        memset(&info, 0, sizeof(info));
+        info.MemoryPriority = MEMORY_PRIORITY_VERY_LOW;
+
+        DebugOnly<BOOL> success = pSetThreadInformation(
+            GetCurrentThread(), ThreadMemoryPriority, &info, sizeof(info));
+        MOZ_ASSERT(success);
+        return NS_OK;
+      }
+    };
+
+    if (IsWin8OrLater()) {
+      initialEvent = new UnmapThreadInitRunnable();
+    }
+#endif
+
+    nsCOMPtr<nsIThread> unmapThread;
+    if (threaded) {
+      DebugOnly<nsresult> rv =
+          NS_NewNamedThread("SharedUnmapper",
+                            getter_AddRefs(unmapThread), initialEvent);
+      MOZ_ASSERT(NS_SUCCEEDED(rv), "Failed to create unmap thread");
+    }
+
+    sInstance = new SharedSurfacesParent(std::move(unmapThread));
   }
 }
 
@@ -71,18 +134,18 @@ void SharedSurfacesParent::ShutdownRenderThread() {
   MOZ_ASSERT(sInstance);
 
   for (const auto& key : sInstance->mSurfaces.Keys()) {
-    // There may be lingering consumers of the surfaces that didn't get shutdown
-    // yet but since we are here, we know the render thread is finished and we
-    // can unregister everything.
+    // There may be lingering consumers of the surfaces that didn't get
+    // shutdown yet but since we are here, we know the render thread is
+    // finished and we can unregister everything.
     wr::RenderThread::Get()->UnregisterExternalImageDuringShutdown(key);
   }
 }
 
 /* static */
 void SharedSurfacesParent::Shutdown() {
-  // The compositor thread and render threads are shutdown, so this is the last
-  // thread that could use it. The expiration tracker needs to be freed on the
-  // main thread.
+  // The compositor thread and render threads are shutdown, so this is the
+  // last thread that could use it. The expiration tracker needs to be freed
+  // on the main thread.
   MOZ_ASSERT(NS_IsMainThread());
   StaticMutexAutoLock lock(sMutex);
   sInstance = nullptr;
@@ -207,9 +270,9 @@ void SharedSurfacesParent::Add(const wr::ExternalImageId& aId,
 
   // We preferentially map in new surfaces when they are initially received
   // because we are likely to reference them in a display list soon. The unmap
-  // will ensure we add the surface to the expiration tracker. We do it outside
-  // the mutex to ensure we always lock the surface mutex first, and our mutex
-  // second, to avoid deadlock.
+  // will ensure we add the surface to the expiration tracker. We do it
+  // outside the mutex to ensure we always lock the surface mutex first, and
+  // our mutex second, to avoid deadlock.
   //
   // Note that the surface wrapper maps in the given handle as read only.
   surface->Init(aDesc.size(), aDesc.stride(), aDesc.format(), aDesc.handle(),
@@ -313,32 +376,87 @@ bool SharedSurfacesParent::AgeAndExpireOneGeneration() {
 /* static */
 void SharedSurfacesParent::ExpireMap(
     nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>>& aExpired) {
-  MEMORYSTATUSEX before;
-  before.dwLength = sizeof(before);
-  if (!GlobalMemoryStatusEx(&before)) {
-    MOZ_CRASH("GlobalMemoryStatusEx failed!");
-  }
-
-  size_t len = 0;
-  for (auto& surface : aExpired) {
-    if (surface->ExpireMap()) {
-      len += surface->GetAlignedDataLength();
+  nsCOMPtr<nsIThread> unmapThread;
+  {
+    StaticMutexAutoLock lock(sMutex);
+    if (sInstance) {
+      unmapThread = sInstance->mUnmapThread;
     }
   }
 
-  if (len == 0) {
+  if (!unmapThread) {
+    MEMORYSTATUSEX before;
+    before.dwLength = sizeof(before);
+    if (!GlobalMemoryStatusEx(&before)) {
+      MOZ_CRASH("GlobalMemoryStatusEx failed!");
+    }
+
+    size_t len = 0;
+    for (auto& surface : aExpired) {
+      if (surface->ExpireMap()) {
+        len += surface->GetAlignedDataLength();
+      }
+    }
+
+    if (len == 0) {
+      return;
+    }
+
+    MEMORYSTATUSEX after;
+    after.dwLength = sizeof(after);
+    if (!GlobalMemoryStatusEx(&after)) {
+      MOZ_CRASH("GlobalMemoryStatusEx failed!");
+    }
+
+    if (after.ullAvailVirtual == before.ullAvailVirtual) {
+      gfxCriticalNoteOnce << "Released " << len << " but vmem same";
+    }
     return;
   }
 
-  MEMORYSTATUSEX after;
-  after.dwLength = sizeof(after);
-  if (!GlobalMemoryStatusEx(&after)) {
-    MOZ_CRASH("GlobalMemoryStatusEx failed!");
-  }
+  class ExpireRunnable final : public Runnable {
+   public:
+    explicit ExpireRunnable(nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>>&& aExpired)
+        : Runnable("SharedSurfacesParent::ExpireRunnable"),
+          mExpired(std::move(aExpired)) {}
 
-  if (after.ullAvailVirtual == before.ullAvailVirtual) {
-    gfxCriticalNoteOnce << "Released " << len << " but vmem same";
-  }
+    NS_IMETHOD Run() override {
+      MEMORYSTATUSEX before;
+      before.dwLength = sizeof(before);
+      if (!GlobalMemoryStatusEx(&before)) {
+        MOZ_CRASH("GlobalMemoryStatusEx failed!");
+      }
+
+      size_t len = 0;
+      for (auto& surface : mExpired) {
+        if (surface->ExpireMap()) {
+          len += surface->GetAlignedDataLength();
+        }
+      }
+
+      if (len == 0) {
+        return NS_OK;
+      }
+
+      MEMORYSTATUSEX after;
+      after.dwLength = sizeof(after);
+      if (!GlobalMemoryStatusEx(&after)) {
+        MOZ_CRASH("GlobalMemoryStatusEx failed!");
+      }
+
+      if (after.ullAvailVirtual == before.ullAvailVirtual) {
+        gfxCriticalNoteOnce << "Released " << len << " but vmem same";
+      }
+
+      return NS_OK;
+    }
+
+   private:
+    nsTArray<RefPtr<SourceSurfaceSharedDataWrapper>> mExpired;
+  };
+
+  nsCOMPtr<nsIRunnable> runnable = new ExpireRunnable(std::move(aExpired));
+  unmapThread->Dispatch(runnable.forget(), nsIEventTarget::DISPATCH_SYNC);
 }
 
 /* static */

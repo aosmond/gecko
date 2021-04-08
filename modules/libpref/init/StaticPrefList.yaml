@@ -5305,6 +5305,21 @@
   value: 100
   mirror: once
 
+#ifdef XP_WIN
+  # Allow dispatching of unmapping to another dedicated thread if on Windows 8+
+  # using 32-bit Firefox.
+-   name: image.mem.shared.unmap.allow-threaded
+    type: bool
+    value: true
+    mirror: once
+#endif
+
+# Force dispatching of unmapping to another dedicated thread.
+- name: image.mem.shared.unmap.force-threaded
+  type: bool
+  value: false
+  mirror: once
+
 # How much of the data in the surface cache is discarded when we get a memory
 # pressure notification, as a fraction. The discard factor is interpreted as a
 # reciprocal, so a discard factor of 1 means to discard everything in the

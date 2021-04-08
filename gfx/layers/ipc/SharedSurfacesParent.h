@@ -72,7 +72,7 @@ class SharedSurfacesParent final {
   friend class SharedSurfacesChild;
   friend class gfx::SourceSurfaceSharedDataWrapper;
 
-  SharedSurfacesParent();
+  explicit SharedSurfacesParent(nsCOMPtr<nsIThread>&& aUnmapThread);
 
   static void AddSameProcess(const wr::ExternalImageId& aId,
                              gfx::SourceSurfaceSharedData* aSurface);
@@ -127,6 +127,8 @@ class SharedSurfacesParent final {
   };
 
   MappingTracker mTracker;
+
+  nsCOMPtr<nsIThread> mUnmapThread;
 };
 
 }  // namespace layers
