@@ -1987,6 +1987,9 @@ bool nsDisplayImage::CreateWebRenderCommands(
   if (aDisplayListBuilder->UseHighQualityScaling()) {
     flags |= imgIContainer::FLAG_HIGH_QUALITY_SCALING;
   }
+  if (mImage->GetType() == imgIContainer::TYPE_VECTOR) {
+    flags |= imgIContainer::FLAG_RECORD_BLOB;
+  }
 
   const int32_t factor = mFrame->PresContext()->AppUnitsPerDevPixel();
   LayoutDeviceRect destRect(
@@ -2043,8 +2046,13 @@ bool nsDisplayImage::CreateWebRenderCommands(
   // failure will be due to resource constraints and fallback is unlikely to
   // help us. Hence we can ignore the return value from PushImage.
   if (container) {
-    aManager->CommandBuilder().PushImage(this, container, aBuilder, aResources,
-                                         aSc, destRect, destRect);
+    if (flags & imgIContainer::FLAG_RECORD_BLOB) {
+      aManager->CommandBuilder().PushBlobImage(this, container, aBuilder,
+                                               aResources, destRect, destRect);
+    } else {
+      aManager->CommandBuilder().PushImage(this, container, aBuilder,
+                                           aResources, aSc, destRect, destRect);
+    }
   }
 
   nsDisplayItemGenericImageGeometry::UpdateDrawResult(this, drawResult);

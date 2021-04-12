@@ -587,6 +587,10 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       if (mFlags & nsImageRenderer::FLAG_SYNC_DECODE_IMAGES) {
         containerFlags |= imgIContainer::FLAG_SYNC_DECODE;
       }
+      if (mExtendMode == ExtendMode::CLAMP &&
+          mImageContainer->GetType() == imgIContainer::TYPE_VECTOR) {
+        containerFlags |= imgIContainer::FLAG_RECORD_BLOB;
+      }
 
       CSSIntSize destCSSSize{
           nsPresContext::AppUnitsToIntCSSPixels(aDest.width),
@@ -612,6 +616,15 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
           getter_AddRefs(container));
       if (!container) {
         NS_WARNING("Failed to get image container");
+        break;
+      }
+
+      if (containerFlags & imgIContainer::FLAG_RECORD_BLOB) {
+        MOZ_ASSERT(mExtendMode == ExtendMode::CLAMP);
+        LayoutDeviceRect clipRect =
+            LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel);
+        aManager->CommandBuilder().PushBlobImage(
+            aItem, container, aBuilder, aResources, destRect, clipRect);
         break;
       }
 
