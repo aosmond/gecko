@@ -134,13 +134,13 @@ SourceSurfaceBlobImage::RecordDrawing(WebRenderLayerManager* aManager,
   auto* wrBridge = aManager->WrBridge();
   IntRect imageRect(IntPoint(0, 0), mSize);
 
-  std::vector<RefPtr<ScaledFont>> fonts;
+  nsTArray<RefPtr<ScaledFont>> fonts;
   bool validFonts = true;
   RefPtr<WebRenderDrawEventRecorder> recorder =
       MakeAndAddRef<WebRenderDrawEventRecorder>(
           [&](MemStream& aStream,
-              std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-            size_t count = aScaledFonts.size();
+              nsTArray<RefPtr<ScaledFont>>& aScaledFonts) {
+            size_t count = aScaledFonts.Length();
             aStream.write((const char*)&count, sizeof(count));
 
             for (auto& scaled : aScaledFonts) {
@@ -217,7 +217,7 @@ SourceSurfaceBlobImage::RecordDrawing(WebRenderLayerManager* aManager,
     return Nothing();
   }
 
-  std::vector<RefPtr<SourceSurface>> externalSurfaces;
+  nsTArray<RefPtr<SourceSurface>> externalSurfaces;
   recorder->TakeExternalSurfaces(externalSurfaces);
 
   for (auto& surface : externalSurfaces) {

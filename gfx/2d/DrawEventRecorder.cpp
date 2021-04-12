@@ -19,7 +19,7 @@ DrawEventRecorderPrivate::DrawEventRecorderPrivate() : mExternalFonts(false) {}
 void DrawEventRecorderPrivate::StoreExternalSurfaceRecording(
     SourceSurface* aSurface, uint64_t aKey) {
   RecordEvent(RecordedExternalSurfaceCreation(aSurface, aKey));
-  mExternalSurfaces.push_back(aSurface);
+  mExternalSurfaces.AppendElement(aSurface);
 }
 
 void DrawEventRecorderPrivate::StoreSourceSurfaceRecording(

@@ -7,7 +7,6 @@
 #ifndef GFX_WEBRENDERUSERDATA_H
 #define GFX_WEBRENDERUSERDATA_H
 
-#include <vector>
 #include "mozilla/webrender/WebRenderAPI.h"
 #include "mozilla/layers/AnimationInfo.h"
 #include "mozilla/dom/RemoteBrowser.h"
@@ -222,8 +221,8 @@ class WebRenderFallbackData : public WebRenderUserData {
 
   void SetInvalid(bool aInvalid) { mInvalid = aInvalid; }
   bool IsInvalid() { return mInvalid; }
-  void SetFonts(const std::vector<RefPtr<gfx::ScaledFont>>& aFonts) {
-    mFonts = aFonts;
+  void SetFonts(nsTArray<RefPtr<gfx::ScaledFont>>&& aFonts) {
+    mFonts = std::move(aFonts);
   }
   Maybe<wr::BlobImageKey> GetBlobImageKey() { return mBlobKey; }
   void SetBlobImageKey(const wr::BlobImageKey& aKey);
@@ -233,7 +232,7 @@ class WebRenderFallbackData : public WebRenderUserData {
   /// into.
   WebRenderImageData* PaintIntoImage();
 
-  std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
+  nsTArray<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
   RefPtr<BasicLayerManager> mBasicLayerManager;
   UniquePtr<nsDisplayItemGeometry> mGeometry;
   nsRect mBounds;
@@ -243,7 +242,7 @@ class WebRenderFallbackData : public WebRenderUserData {
  protected:
   void ClearImageKey();
 
-  std::vector<RefPtr<gfx::ScaledFont>> mFonts;
+  nsTArray<RefPtr<gfx::ScaledFont>> mFonts;
   Maybe<wr::BlobImageKey> mBlobKey;
   // When rendering into a blob image, mImageData is null. It is non-null only
   // when we render directly into a texture on the content side.

@@ -7,7 +7,6 @@
 #ifndef MOZILLA_IMAGE_SOURCESURFACEBLOBIMAGE_H_
 #define MOZILLA_IMAGE_SOURCESURFACEBLOBIMAGE_H_
 
-#include <vector>
 #include "mozilla/Maybe.h"
 #include "mozilla/SVGImageContext.h"
 #include "mozilla/gfx/2D.h"
@@ -61,8 +60,8 @@ class SourceSurfaceBlobImage final : public gfx::SourceSurface {
    public:
     ImageKeyData(layers::WebRenderLayerManager* aManager,
                  const wr::BlobImageKey& aBlobKey,
-                 std::vector<RefPtr<gfx::ScaledFont>>&& aScaledFonts,
-                 std::vector<RefPtr<gfx::SourceSurface>>&& aExternalSurfaces)
+                 nsTArray<RefPtr<gfx::ScaledFont>>&& aScaledFonts,
+                 nsTArray<RefPtr<gfx::SourceSurface>>&& aExternalSurfaces)
         : mManager(aManager),
           mBlobKey(aBlobKey),
           mScaledFonts(std::move(aScaledFonts)),
@@ -89,8 +88,8 @@ class SourceSurfaceBlobImage final : public gfx::SourceSurface {
 
     RefPtr<layers::WebRenderLayerManager> mManager;
     wr::BlobImageKey mBlobKey;
-    std::vector<RefPtr<gfx::ScaledFont>> mScaledFonts;
-    std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
+    nsTArray<RefPtr<gfx::ScaledFont>> mScaledFonts;
+    nsTArray<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
     bool mDirty;
   };
 

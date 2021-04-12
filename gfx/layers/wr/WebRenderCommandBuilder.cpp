@@ -106,7 +106,7 @@ struct BlobItemData {
   // We need to keep a list of all the external surfaces used by the blob image.
   // We do this on a per-display item basis so that the lists remains correct
   // during invalidations.
-  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
+  nsTArray<RefPtr<SourceSurface>> mExternalSurfaces;
 
   IntRect mImageRect;
 
@@ -183,7 +183,7 @@ static void DestroyBlobGroupDataProperty(nsTArray<BlobItemData*>* aArray) {
 
 static void TakeExternalSurfaces(
     WebRenderDrawEventRecorder* aRecorder,
-    std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
+    nsTArray<RefPtr<SourceSurface>>& aExternalSurfaces,
     RenderRootStateManager* aManager, wr::IpcResourceUpdateQueue& aResources) {
   aRecorder->TakeExternalSurfaces(aExternalSurfaces);
 
@@ -316,7 +316,7 @@ struct DIGroup {
   IntRect mClippedImageBounds;  // mLayerBounds with the clipping of any
                                 // containers applied
   Maybe<wr::BlobImageKey> mKey;
-  std::vector<RefPtr<ScaledFont>> mFonts;
+  nsTArray<RefPtr<ScaledFont>> mFonts;
 
   DIGroup()
       : mAppUnitsPerDevPixel(0),
@@ -351,7 +351,7 @@ struct DIGroup {
       aManager->AddBlobImageKeyForDiscard(*mKey);
       mKey = Nothing();
     }
-    mFonts.clear();
+    mFonts.Clear();
   }
 
   static IntRect ToDeviceSpace(nsRect aBounds, Matrix& aMatrix,
@@ -629,13 +629,13 @@ struct DIGroup {
     }
 
     gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
-    std::vector<RefPtr<ScaledFont>> fonts;
+    nsTArray<RefPtr<ScaledFont>> fonts;
     bool validFonts = true;
     RefPtr<WebRenderDrawEventRecorder> recorder =
         MakeAndAddRef<WebRenderDrawEventRecorder>(
             [&](MemStream& aStream,
-                std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-              size_t count = aScaledFonts.size();
+                nsTArray<RefPtr<ScaledFont>>& aScaledFonts) {
+              size_t count = aScaledFonts.Length();
               aStream.write((const char*)&count, sizeof(count));
               for (auto& scaled : aScaledFonts) {
                 Maybe<wr::FontInstanceKey> key =
@@ -2315,13 +2315,13 @@ WebRenderCommandBuilder::GenerateFallbackData(
     if (useBlobImage) {
       MOZ_ASSERT(!opaqueRegion.IsComplex());
 
-      std::vector<RefPtr<ScaledFont>> fonts;
+      nsTArray<RefPtr<ScaledFont>> fonts;
       bool validFonts = true;
       RefPtr<WebRenderDrawEventRecorder> recorder =
           MakeAndAddRef<WebRenderDrawEventRecorder>(
               [&](MemStream& aStream,
-                  std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-                size_t count = aScaledFonts.size();
+                  nsTArray<RefPtr<ScaledFont>>& aScaledFonts) {
+                size_t count = aScaledFonts.Length();
                 aStream.write((const char*)&count, sizeof(count));
                 for (auto& scaled : aScaledFonts) {
                   Maybe<wr::FontInstanceKey> key =
@@ -2383,7 +2383,7 @@ WebRenderCommandBuilder::GenerateFallbackData(
         TakeExternalSurfaces(recorder, fallbackData->mExternalSurfaces,
                              mManager->GetRenderRootStateManager(), aResources);
         fallbackData->SetBlobImageKey(key);
-        fallbackData->SetFonts(fonts);
+        fallbackData->SetFonts(std::move(fonts));
       } else {
         // If there is no invalidation region and we don't have a image key,
         // it means we don't need to push image for the item.
@@ -2491,8 +2491,8 @@ class WebRenderMaskData : public WebRenderUserData {
   static UserDataType Type() { return UserDataType::eMask; }
 
   Maybe<wr::BlobImageKey> mBlobKey;
-  std::vector<RefPtr<gfx::ScaledFont>> mFonts;
-  std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
+  nsTArray<RefPtr<gfx::ScaledFont>> mFonts;
+  nsTArray<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
   LayerIntRect mItemRect;
   nsPoint mMaskOffset;
   nsStyleImageLayers mMaskStyle;
@@ -2550,13 +2550,13 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
       aMaskItem->ShouldHandleOpacity() != maskData->mShouldHandleOpacity) {
     IntSize size = itemRect.Size().ToUnknownSize();
 
-    std::vector<RefPtr<ScaledFont>> fonts;
+    nsTArray<RefPtr<ScaledFont>> fonts;
     bool validFonts = true;
     RefPtr<WebRenderDrawEventRecorder> recorder =
         MakeAndAddRef<WebRenderDrawEventRecorder>(
             [&](MemStream& aStream,
-                std::vector<RefPtr<ScaledFont>>& aScaledFonts) {
-              size_t count = aScaledFonts.size();
+                nsTArray<RefPtr<ScaledFont>>& aScaledFonts) {
+              size_t count = aScaledFonts.Length();
               aStream.write((const char*)&count, sizeof(count));
 
               for (auto& scaled : aScaledFonts) {
@@ -2631,7 +2631,7 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
     }
     maskData->ClearImageKey();
     maskData->mBlobKey = Some(key);
-    maskData->mFonts = fonts;
+    maskData->mFonts = std::move(fonts);
     TakeExternalSurfaces(recorder, maskData->mExternalSurfaces,
                          mManager->GetRenderRootStateManager(), aResources);
     if (maskIsComplete) {
