@@ -30,7 +30,7 @@ SourceSurfaceBlobImage::SourceSurfaceBlobImage(
       mWhichFrame(aWhichFrame),
       mImageFlags(aImageFlags) {
   MOZ_ASSERT(mSVGDocumentWrapper);
-  MOZ_ASSERT(aWhichFrame <= FRAME_MAX_VALUE);
+  MOZ_ASSERT(aWhichFrame <= imgIContainer::FRAME_MAX_VALUE);
   MOZ_ASSERT(aImageFlags & imgIContainer::FLAG_RECORD_BLOB);
 }
 
@@ -175,13 +175,14 @@ SourceSurfaceBlobImage::RecordDrawing(WebRenderLayerManager* aManager,
   {
     bool contextPaint = mSVGContext && mSVGContext->GetContextPaint();
 
-    float animTime = (mWhichFrame == FRAME_FIRST)
+    float animTime = (mWhichFrame == imgIContainer::FRAME_FIRST)
                          ? 0.0f
                          : mSVGDocumentWrapper->GetCurrentTimeAsFloat();
 
-    SVGDrawingParameters params(
-        nullptr, mSize, mSize, ImageRegion::Create(mSize),
-        SamplingFilter::POINT, mSVGContext, animTime, mImageFlags, 1.0);
+    SVGDrawingParameters params(nullptr, mSize, mSize,
+                                ImageRegion::Create(mSize),
+                                SamplingFilter::POINT, mSVGContext, animTime,
+                                mWhichFrame, mImageFlags, 1.0);
 
     AutoRestoreSVGState autoRestore(params, mSVGDocumentWrapper, contextPaint);
 
