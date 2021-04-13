@@ -727,7 +727,7 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
   RefPtr<SourceSurface> sourceSurface;
   IntSize decodeSize;
   Tie(sourceSurface, decodeSize) =
-      LookupCachedSurface(aSize, aSVGContext, aFlags);
+      LookupCachedSurface(aSize, aSVGContext, whichFrame, aFlags);
   if (sourceSurface) {
     return MakeTuple(ImgDrawResult::SUCCESS, decodeSize,
                      std::move(sourceSurface));
@@ -754,7 +754,7 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
   // cannot cache.
   SVGDrawingParameters params(nullptr, decodeSize, aSize, region,
                               SamplingFilter::POINT, aSVGContext, animTime,
-                              flags, 1.0);
+                              whichFrame, flags, 1.0);
 
   // Blob recorded vector images just create a simple surface responsible for
   // generating blob keys and recording bindings. The recording won't happen
@@ -763,6 +763,12 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
     RefPtr<SourceSurface> surface =
         new SourceSurfaceBlobImage(mSVGDocumentWrapper, aSVGContext, aRegion,
                                    decodeSize, whichFrame, flags);
+
+    if (MayCache(params)) {
+      auto frame = MakeNotNull<RefPtr<imgFrame>>();
+      frame->InitWithSurface(surface);
+      CacheSurface(params, frame);
+    }
 
     return MakeTuple(ImgDrawResult::SUCCESS, decodeSize, std::move(surface));
   }
@@ -975,13 +981,13 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
 
   SVGDrawingParameters params(aContext, aSize, aSize, aRegion, aSamplingFilter,
                               newSVGContext ? newSVGContext : aSVGContext,
-                              animTime, aFlags, aOpacity);
+                              animTime, whichFrame, aFlags, aOpacity);
 
   // If we have an prerasterized version of this image that matches the
   // drawing parameters, use that.
   RefPtr<SourceSurface> sourceSurface;
   Tie(sourceSurface, params.size) =
-      LookupCachedSurface(aSize, params.svgContext, aFlags);
+      LookupCachedSurface(aSize, params.svgContext, whichFrame, aFlags);
   if (sourceSurface) {
     RefPtr<gfxDrawable> drawable =
         new gfxSurfaceDrawable(sourceSurface, params.size);
@@ -1025,20 +1031,23 @@ already_AddRefed<gfxDrawable> VectorImage::CreateSVGDrawable(
 
 Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
     const IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
-    uint32_t aFlags) {
+    uint32_t aWhichFrame, uint32_t aFlags) {
   // If we're not allowed to use a cached surface, don't attempt a lookup.
   if (aFlags & FLAG_BYPASS_SURFACE_CACHE) {
     return MakeTuple(RefPtr<SourceSurface>(), aSize);
   }
 
-  // We don't do any caching if we have animation, so don't bother with a lookup
-  // in this case either.
-  if (mHaveAnimations) {
+  // We don't do any caching if we have animations unless we record blobs.
+  if (mHaveAnimations && !(aFlags & FLAG_RECORD_BLOB)) {
     return MakeTuple(RefPtr<SourceSurface>(), aSize);
   }
 
+  PlaybackType playbackType = ToPlaybackType(aWhichFrame);
+  SurfaceFlags surfaceFlags = ToSurfaceFlags(aFlags);
+
   LookupResult result(MatchType::NOT_FOUND);
-  SurfaceKey surfaceKey = VectorSurfaceKey(aSize, aSVGContext);
+  SurfaceKey surfaceKey =
+      VectorSurfaceKey(aSize, aSVGContext, playbackType, surfaceFlags);
   if ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
     result = SurfaceCache::Lookup(ImageKey(this), surfaceKey,
                                   /* aMarkUsed = */ true);
@@ -1078,12 +1087,7 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   // Determine whether or not we should put the surface to be created into
   // the cache. If we fail, we need to reset this to false to let the caller
   // know nothing was put in the cache.
-  aWillCache = !(aParams.flags & FLAG_BYPASS_SURFACE_CACHE) &&
-               // Refuse to cache animated images:
-               // XXX(seth): We may remove this restriction in bug 922893.
-               !mHaveAnimations &&
-               // The image is too big to fit in the cache:
-               SurfaceCache::CanHold(aParams.size);
+  aWillCache = MayCache(aParams);
 
   // If we weren't given a context, then we know we just want the rasterized
   // surface. We will create the frame below but only insert it into the cache
@@ -1115,8 +1119,8 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
       aParams.flags, backend);
 
   // If we couldn't create the frame, it was probably because it would end
-  // up way too big. Generally it also wouldn't fit in the cache, but the prefs
-  // could be set such that the cache isn't the limiting factor.
+  // up way too big. Generally it also wouldn't fit in the cache, but the
+  // prefs could be set such that the cache isn't the limiting factor.
   if (NS_FAILED(rv)) {
     aWillCache = false;
     return nullptr;
@@ -1137,22 +1141,42 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   }
 
   // Attempt to cache the frame.
-  SurfaceKey surfaceKey = VectorSurfaceKey(aParams.size, aParams.svgContext);
-  NotNull<RefPtr<ISurfaceProvider>> provider =
-      MakeNotNull<SimpleSurfaceProvider*>(ImageKey(this), surfaceKey, frame);
-
-  if (SurfaceCache::Insert(provider) == InsertOutcome::SUCCESS) {
-    if (aParams.size != aParams.drawSize) {
-      // We created a new surface that wasn't the size we requested, which means
-      // we entered factor-of-2 mode. We should purge any surfaces we no longer
-      // need rather than waiting for the cache to expire them.
-      SurfaceCache::PruneImage(ImageKey(this));
-    }
-  } else {
+  if (!CacheSurface(aParams, frame)) {
     aWillCache = false;
   }
 
   return surface.forget();
+}
+
+bool VectorImage::MayCache(const SVGDrawingParameters& aParams) const {
+  return !(aParams.flags & FLAG_BYPASS_SURFACE_CACHE) &&
+         // Refuse to cache animated images:
+         // XXX(seth): We may remove this restriction in bug 922893.
+         !mHaveAnimations &&
+         // The image is too big to fit in the cache:
+         SurfaceCache::CanHold(aParams.size);
+}
+
+bool VectorImage::CacheSurface(const SVGDrawingParameters& aParams,
+                               NotNull<imgFrame*> aFrame) {
+  SurfaceKey surfaceKey = VectorSurfaceKey(aParams.size, aParams.svgContext,
+                                           ToPlaybackType(aParams.whichFrame),
+                                           ToSurfaceFlags(aParams.flags));
+  NotNull<RefPtr<ISurfaceProvider>> provider =
+      MakeNotNull<SimpleSurfaceProvider*>(ImageKey(this), surfaceKey, aFrame);
+
+  if (SurfaceCache::Insert(provider) != InsertOutcome::SUCCESS) {
+    return false;
+  }
+
+  if (aParams.size != aParams.drawSize) {
+    // We created a new surface that wasn't the size we requested, which means
+    // we entered factor-of-2 mode. We should purge any surfaces we no longer
+    // need rather than waiting for the cache to expire them.
+    SurfaceCache::PruneImage(ImageKey(this));
+  }
+
+  return true;
 }
 
 void VectorImage::SendFrameComplete(bool aDidCache, uint32_t aFlags) {

@@ -100,7 +100,7 @@ class VectorImage final : public ImageResource, public nsIStreamListener {
    */
   Tuple<RefPtr<gfx::SourceSurface>, gfx::IntSize> LookupCachedSurface(
       const gfx::IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
-      uint32_t aFlags);
+      uint32_t aWhichFrame, uint32_t aFlags);
 
   bool MaybeRestrictSVGContext(Maybe<SVGImageContext>& aNewSVGContext,
                                const Maybe<SVGImageContext>& aSVGContext,
@@ -115,6 +115,11 @@ class VectorImage final : public ImageResource, public nsIStreamListener {
   already_AddRefed<gfx::SourceSurface> CreateSurface(
       const SVGDrawingParameters& aParams, gfxDrawable* aSVGDrawable,
       bool& aWillCache);
+
+  bool MayCache(const SVGDrawingParameters& aParams) const;
+
+  bool CacheSurface(const SVGDrawingParameters& aParams,
+                    NotNull<imgFrame*> aFrame);
 
   /// Send a frame complete notification if appropriate. Must be called only
   /// after all drawing has been completed.
