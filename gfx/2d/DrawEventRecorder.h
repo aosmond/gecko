@@ -53,7 +53,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
   void ClearResources() {
     mStoredObjects.clear();
     mStoredFontData.clear();
-    mScaledFonts.clear();
+    mScaledFonts.Clear();
   }
 
   template <class S>
@@ -92,7 +92,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
 
   void AddScaledFont(ScaledFont* aFont) {
     if (mStoredFonts.insert(aFont).second && WantsExternalFonts()) {
-      mScaledFonts.push_back(aFont);
+      mScaledFonts.AppendElement(aFont);
     }
   }
 
@@ -120,7 +120,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
 
   bool WantsExternalFonts() const { return mExternalFonts; }
 
-  void TakeExternalSurfaces(std::vector<RefPtr<SourceSurface>>& aSurfaces) {
+  void TakeExternalSurfaces(nsTArray<RefPtr<SourceSurface>>& aSurfaces) {
     aSurfaces = std::move(mExternalSurfaces);
   }
 
@@ -161,9 +161,9 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
 
   std::unordered_set<uint64_t> mStoredFontData;
   std::unordered_set<ScaledFont*> mStoredFonts;
-  std::vector<RefPtr<ScaledFont>> mScaledFonts;
+  nsTArray<RefPtr<ScaledFont>> mScaledFonts;
   std::unordered_set<SourceSurface*> mStoredSurfaces;
-  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
+  nsTArray<RefPtr<SourceSurface>> mExternalSurfaces;
   bool mExternalFonts;
 };
 
@@ -203,7 +203,7 @@ class DrawEventRecorderFile : public DrawEventRecorderPrivate {
 };
 
 typedef std::function<void(MemStream& aStream,
-                           std::vector<RefPtr<ScaledFont>>& aScaledFonts)>
+                           nsTArray<RefPtr<ScaledFont>>& aScaledFonts)>
     SerializeResourcesFn;
 
 // WARNING: This should not be used in its existing state because
