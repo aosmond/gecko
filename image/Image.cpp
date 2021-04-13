@@ -312,7 +312,8 @@ bool ImageResource::UpdateImageContainer(
     RefPtr<layers::ImageContainer> container(entry.mContainer);
     if (container) {
       // Blob recordings should just be marked as dirty. We will regenerate the
-      // recording when the display list update comes around.
+      // recording when the display list update comes around. They may already
+      // be marked dirty when the image went through its SurfaceCache.
       if (entry.mFlags & FLAG_RECORD_BLOB) {
         AutoTArray<layers::ImageContainer::OwningImage, 1> images;
         container->GetCurrentImages(&images);
