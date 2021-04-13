@@ -84,6 +84,11 @@ class imgFrame {
                             SamplingFilter aSamplingFilter,
                             uint32_t aImageFlags, gfx::BackendType aBackend);
 
+  /**
+   * Initialize this imgFrame with an already prepared surface.
+   */
+  void InitWithSurface(gfx::SourceSurface* aSurface);
+
   DrawableFrameRef DrawableRef();
 
   /**
