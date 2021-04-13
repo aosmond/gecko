@@ -193,7 +193,7 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
 
     SVGDrawingParameters params(nullptr, mSize, mSize, region,
                                 SamplingFilter::POINT, mSVGContext, animTime,
-                                mImageFlags, 1.0);
+                                mWhichFrame, mImageFlags, 1.0);
 
     AutoRestoreSVGState autoRestore(params, mSVGDocumentWrapper, contextPaint);
 

@@ -26,7 +26,8 @@ struct SVGDrawingParameters {
                        const nsIntSize& aDrawSize, const ImageRegion& aRegion,
                        SamplingFilter aSamplingFilter,
                        const Maybe<SVGImageContext>& aSVGContext,
-                       float aAnimationTime, uint32_t aFlags, float aOpacity)
+                       float aAnimationTime, uint32_t aWhichFrame,
+                       uint32_t aFlags, float aOpacity)
       : context(aContext),
         size(aRasterSize),
         drawSize(aDrawSize),
@@ -35,6 +36,7 @@ struct SVGDrawingParameters {
         svgContext(aSVGContext),
         viewportSize(aRasterSize),
         animationTime(aAnimationTime),
+        whichFrame(aWhichFrame),
         flags(aFlags),
         opacity(aOpacity) {
     if (aSVGContext) {
@@ -53,6 +55,7 @@ struct SVGDrawingParameters {
   const Maybe<SVGImageContext>& svgContext;
   nsIntSize viewportSize;
   float animationTime;
+  uint32_t whichFrame;
   uint32_t flags;
   gfxFloat opacity;
 };
