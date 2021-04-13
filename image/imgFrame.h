@@ -89,6 +89,12 @@ class imgFrame {
    */
   void InitWithSurface(gfx::SourceSurface* aSurface);
 
+  /**
+   * Invalidate the underlying surface if it is a blob image, and return true,
+   * else false.
+   */
+  bool InvalidateBlobImage();
+
   DrawableFrameRef DrawableRef();
 
   /**
