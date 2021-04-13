@@ -7,6 +7,7 @@
 #include "imgFrame.h"
 #include "ImageRegion.h"
 #include "ShutdownTracker.h"
+#include "SourceSurfaceBlobImage.h"
 #include "SurfaceCache.h"
 
 #include "prenv.h"
@@ -497,6 +498,16 @@ void imgFrame::InitWithSurface(gfx::SourceSurface* aSurface) {
   MonitorAutoLock lock(mMonitor);
   MOZ_ASSERT(AreAllPixelsWritten());
 #endif
+}
+
+bool imgFrame::InvalidateBlobImage() {
+  MonitorAutoLock lock(mMonitor);
+  if (!mOptSurface || mOptSurface->GetType() != SurfaceType::BLOB_IMAGE) {
+    return false;
+  }
+
+  static_cast<SourceSurfaceBlobImage*>(mOptSurface.get())->MarkDirty();
+  return true;
 }
 
 nsresult imgFrame::Optimize(DrawTarget* aTarget) {
