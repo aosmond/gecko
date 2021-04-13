@@ -48,6 +48,9 @@ class ISurfaceProvider {
   /// @return a (potentially lazily computed) drawable reference to a surface.
   virtual DrawableSurface Surface();
 
+  /// @return true if the surface was invalidated, else false.
+  virtual bool InvalidateBlobImage() { return false; }
+
   /// @return true if DrawableRef() will return a completely decoded surface.
   virtual bool IsFinished() const = 0;
 
@@ -280,6 +283,10 @@ class SimpleSurfaceProvider final : public ISurfaceProvider {
                          AvailabilityState::StartAvailable()),
         mSurface(aSurface) {
     MOZ_ASSERT(aSurfaceKey.Size() == mSurface->GetSize());
+  }
+
+  bool InvalidateBlobImage() override {
+    return mSurface->InvalidateBlobImage();
   }
 
   bool IsFinished() const override { return mSurface->IsFinished(); }
