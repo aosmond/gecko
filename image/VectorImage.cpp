@@ -37,6 +37,7 @@
 #include "ISurfaceProvider.h"
 #include "LookupResult.h"
 #include "Orientation.h"
+#include "SourceSurfaceBlobImage.h"
 #include "SVGDocumentWrapper.h"
 #include "SVGDrawingCallback.h"
 #include "SVGDrawingParameters.h"
@@ -735,6 +736,16 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
       nullptr, decodeSize, aSize, ImageRegion::Create(decodeSize),
       SamplingFilter::POINT, aSVGContext, animTime, aFlags, 1.0);
 
+  // Blob recorded vector images just create a simple surface responsible for
+  // generating blob keys and recording bindings. The recording won't happen
+  // until the caller requests the key after GetImageContainerAtSize.
+  if (aFlags & FLAG_RECORD_BLOB) {
+    RefPtr<SourceSurface> surface = new SourceSurfaceBlobImage(
+        mSVGDocumentWrapper, aSVGContext, decodeSize, aWhichFrame, aFlags);
+
+    return MakeTuple(ImgDrawResult::SUCCESS, decodeSize, std::move(surface));
+  }
+
   bool didCache;  // Was the surface put into the cache?
   bool contextPaint = aSVGContext && aSVGContext->GetContextPaint();
 
@@ -1015,6 +1026,7 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
     const SVGDrawingParameters& aParams, gfxDrawable* aSVGDrawable,
     bool& aWillCache) {
   MOZ_ASSERT(mSVGDocumentWrapper->IsDrawing());
+  MOZ_ASSERT(!(aParams.flags & FLAG_RECORD_BLOB));
 
   mSVGDocumentWrapper->UpdateViewportBounds(aParams.viewportSize);
   mSVGDocumentWrapper->FlushImageTransformInvalidation();
