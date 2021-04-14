@@ -269,9 +269,16 @@ linux1804-ccov-tests:
     # on ccov builds.
     - jittest
 
-linux-qr-smoketests:
+linux1804-asan-qr-tests:
+    - cppunit
     - crashtest
+    - gtest
+    - jsreftest
+    - marionette
+    - mochitest-a11y
     - reftest
+    - test-verify
+    - xpcshell
 
 linux-talos-flex:
     - talos-flex
@@ -288,6 +295,11 @@ windows-qr-tests:
     - mochitest-media
     - mochitest-webgl1-core
     - mochitest-webgl2-core
+    - reftest
+    - test-verify
+
+windows-asan-qr-tests:
+    - marionette
     - reftest
     - test-verify
 

@@ -141,7 +141,9 @@ linux1804-64-qr/debug:
 linux1804-64-asan-qr/opt:
     build-platform: linux64-asan/opt
     test-sets:
-        - linux-qr-smoketests
+        - linux1804-asan-qr-tests
+        - mochitest-webgpu
+        - web-platform-tests
 
 linux1804-64-ccov/opt:
     build-platform: linux64-ccov/opt
@@ -309,6 +311,13 @@ windows10-64-qr/opt:
         - windows-talos
         - raptor-firefox
         - browsertime
+        - web-platform-tests
+
+windows10-64-asan-qr/opt:
+    build-platform: win64-asan/opt
+    test-sets:
+        - windows-asan-qr-tests
+        - mochitest-webgpu
         - web-platform-tests
 
 windows10-64-shippable-qr/opt:
