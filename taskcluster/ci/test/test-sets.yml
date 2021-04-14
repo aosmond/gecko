@@ -269,10 +269,6 @@ linux1804-ccov-tests:
     # on ccov builds.
     - jittest
 
-linux-qr-smoketests:
-    - crashtest
-    - reftest
-
 linux-talos-flex:
     - talos-flex
 

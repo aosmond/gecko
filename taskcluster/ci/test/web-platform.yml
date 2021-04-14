@@ -13,7 +13,9 @@ job-defaults:
     variants:
         by-test-platform:
             linux1804-64-qr/debug: ['webrender-sw', 'fission']
+            linux1804-64-asan-qr/opt: ['webrender-sw', 'fission']
             windows10-64-qr/debug: ['webrender-sw', 'fission']
+            windows10-64-asan-qr/opt: ['webrender-sw', 'fission']
             linux.*64/debug: ['fission']
             default: ['fission']
     mozharness:
@@ -369,7 +371,9 @@ web-platform-tests-crashtest:
     variants:
         by-test-platform:
             linux1804-64-qr/debug: ['webrender-sw', 'fission']
+            linux1804-64-asan-qr/opt: ['webrender-sw', 'fission']
             windows10-64-qr/debug: ['webrender-sw', 'fission']
+            windows10-64-asan-qr/opt: ['webrender-sw', 'fission']
             macosx101.*64-qr/debug: ['webrender-sw', 'fission']
             linux.*64/debug: ['fission']
             default: ['fission']
