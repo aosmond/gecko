@@ -142,6 +142,8 @@ linux1804-64-asan-qr/opt:
     build-platform: linux64-asan/opt
     test-sets:
         - linux-qr-smoketests
+        - mochitest-webgpu
+        - web-platform-tests
 
 linux1804-64-ccov/opt:
     build-platform: linux64-ccov/opt

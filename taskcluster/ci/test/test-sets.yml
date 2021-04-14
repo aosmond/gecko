@@ -272,6 +272,12 @@ linux1804-ccov-tests:
 linux-qr-smoketests:
     - crashtest
     - reftest
+    - cppunit
+    - gtest
+    - jsreftest
+    - marionette
+    - test-verify
+    - xpcshell
 
 linux-talos-flex:
     - talos-flex
