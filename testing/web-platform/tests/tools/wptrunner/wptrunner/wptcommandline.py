@@ -282,7 +282,7 @@ scheme host and port.""")
                              default=None, help="Don't preload a gecko instance for faster restarts")
     gecko_group.add_argument("--disable-e10s", dest="gecko_e10s", action="store_false", default=True,
                              help="Run tests without electrolysis preferences")
-    gecko_group.add_argument("--enable-webrender", dest="enable_webrender", action="store_true", default=None,
+    gecko_group.add_argument("--enable-webrender", dest="enable_webrender", action="store_true", default=True,
                              help="Enable the WebRender compositor in Gecko (defaults to disabled).")
     gecko_group.add_argument("--no-enable-webrender", dest="enable_webrender", action="store_false",
                              help="Disable the WebRender compositor in Gecko.")

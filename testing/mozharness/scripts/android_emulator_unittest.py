@@ -100,7 +100,7 @@ class AndroidEmulatorTest(
                 {
                     "action": "store_true",
                     "dest": "enable_webrender",
-                    "default": False,
+                    "default": True,
                     "help": "Run with WebRender enabled.",
                 },
             ],

@@ -214,7 +214,7 @@ class DesktopUnittest(TestingMixin, MercurialScript, MozbaseMixin, CodeCoverageM
                 {
                     "action": "store_true",
                     "dest": "enable_webrender",
-                    "default": False,
+                    "default": True,
                     "help": "Enable the WebRender compositor in Gecko.",
                 },
             ],

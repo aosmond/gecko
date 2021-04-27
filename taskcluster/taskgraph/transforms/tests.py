@@ -680,10 +680,7 @@ def set_defaults(config, tasks):
         # the whole point of QuantumRender is to run with WebRender enabled.
         # This currently matches linux64-qr and windows10-64-qr; both of these
         # have /opt and /debug variants.
-        if "-qr/" in task["test-platform"]:
-            task["webrender"] = True
-        else:
-            task.setdefault("webrender", False)
+        task["webrender"] = True
 
         task.setdefault("e10s", True)
         task.setdefault("try-name", task["test-name"])

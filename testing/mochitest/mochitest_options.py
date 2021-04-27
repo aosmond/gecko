@@ -860,7 +860,7 @@ class MochitestArguments(ArgumentContainer):
             {
                 "action": "store_true",
                 "dest": "enable_webrender",
-                "default": False,
+                "default": True,
                 "help": "Enable the WebRender compositor in Gecko.",
             },
         ],

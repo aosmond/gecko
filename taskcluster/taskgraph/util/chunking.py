@@ -51,7 +51,7 @@ def guess_mozinfo_from_task(task):
         "fission": task["attributes"].get("unittest_variant") == "fission",
         "headless": "-headless" in task["test-name"],
         "tsan": "tsan" in task["build-attributes"]["build_platform"],
-        "webrender": task.get("webrender", False),
+        "webrender": task.get("webrender", True),
     }
     for platform in ("android", "linux", "mac", "win"):
         if platform in task["build-attributes"]["build_platform"]:

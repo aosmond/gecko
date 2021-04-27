@@ -432,7 +432,7 @@ class BaseMarionetteArguments(ArgumentParser):
             "--enable-webrender",
             action="store_true",
             dest="enable_webrender",
-            default=False,
+            default=True,
             help="Enable the WebRender compositor in Gecko.",
         )
         self.add_argument(
@@ -651,7 +651,7 @@ class BaseMarionetteTestRunner(object):
         emulator=False,
         headless=False,
         enable_fission=False,
-        enable_webrender=False,
+        enable_webrender=True,
         **kwargs
     ):
         self._appName = None
