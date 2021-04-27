@@ -128,7 +128,7 @@ class GeckoInstance(object):
         workspace=None,
         verbose=0,
         headless=False,
-        enable_webrender=False,
+        enable_webrender=True,
     ):
         self.runner_class = Runner
         self.app_args = app_args or []

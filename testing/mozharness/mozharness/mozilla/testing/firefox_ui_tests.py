@@ -42,7 +42,7 @@ firefox_ui_tests_config_options = (
             {
                 "action": "store_true",
                 "dest": "enable_webrender",
-                "default": False,
+                "default": True,
                 "help": "Enable the WebRender compositor in Gecko.",
             },
         ],

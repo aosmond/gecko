@@ -88,7 +88,7 @@ class RunInfo(dict):
                  browser_channel=None,
                  verify=None,
                  extras=None,
-                 enable_webrender=False):
+                 enable_webrender=True):
         import mozinfo
         self._update_mozinfo(metadata_root)
         self.update(mozinfo.info)
