@@ -85,7 +85,7 @@ class WebPlatformTest(TestingMixin, MercurialScript, CodeCoverageMixin, AndroidM
                 {
                     "action": "store_true",
                     "dest": "enable_webrender",
-                    "default": False,
+                    "default": True,
                     "help": "Enable the WebRender compositor in Gecko.",
                 },
             ],

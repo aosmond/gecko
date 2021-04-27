@@ -32,7 +32,7 @@ class GTests(object):
         cwd,
         symbols_path=None,
         utility_path=None,
-        enable_webrender=False,
+        enable_webrender=True,
     ):
         """
         Run a single C++ unit test program.
@@ -211,7 +211,7 @@ class gtestOptions(argparse.ArgumentParser):
             "--enable-webrender",
             action="store_true",
             dest="enable_webrender",
-            default=False,
+            default=True,
             help="Enable the WebRender compositor in Gecko.",
         )
         self.add_argument("args", nargs=argparse.REMAINDER)

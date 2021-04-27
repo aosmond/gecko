@@ -581,7 +581,7 @@ class GTestCommands(MachCommandBase):
     @CommandArgument(
         "--enable-webrender",
         action="store_true",
-        default=False,
+        default=True,
         dest="enable_webrender",
         help="Enable the WebRender compositor in Gecko.",
     )

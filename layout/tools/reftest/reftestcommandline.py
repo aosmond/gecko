@@ -341,7 +341,7 @@ class ReftestArgumentsParser(argparse.ArgumentParser):
             "--enable-webrender",
             action="store_true",
             dest="enable_webrender",
-            default=False,
+            default=True,
             help="Enable the WebRender compositor in Gecko.",
         )
 

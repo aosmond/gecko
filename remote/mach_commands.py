@@ -445,7 +445,7 @@ class PuppeteerRunner(MozbuildObject):
             env["BINARY"] = binary
             env["PUPPETEER_PRODUCT"] = "firefox"
 
-            env["MOZ_WEBRENDER"] = "%d" % params.get("enable_webrender", False)
+            env["MOZ_WEBRENDER"] = "%d" % params.get("enable_webrender", True)
 
         command = ["run", "unit", "--"] + mocha_options
 
@@ -590,7 +590,7 @@ class PuppeteerTest(MachCommandBase):
         binary=None,
         ci=False,
         enable_fission=False,
-        enable_webrender=False,
+        enable_webrender=True,
         headless=False,
         extra_prefs=None,
         extra_options=None,
