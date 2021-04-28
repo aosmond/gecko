@@ -5129,7 +5129,7 @@
 # Whether to use the WebRender software backend
 - name: gfx.webrender.software
   type: bool
-  value: false
+  value: true
   mirror: once
 
 # Whether to use the D3D11 RenderCompositor when using WebRender software backend
