@@ -2688,6 +2688,8 @@ void gfxPlatform::InitWebRenderConfig() {
 
   gfxVars::SetUseSoftwareWebRender(!hasHardware && hasSoftware);
 
+  MOZ_RELEASE_ASSERT(hasHardware);
+
   // gfxFeature is not usable in the GPU process, so we use gfxVars to transmit
   // this feature
   if (hasWebRender) {

@@ -13,7 +13,6 @@ UNIFIED_SOURCES += [
     "TestBSPTree.cpp",
     "TestBufferRotation.cpp",
     "TestColorNames.cpp",
-    "TestConfigManager.cpp",
     "TestGfxWidgets.cpp",
     "TestLayers.cpp",
     "TestMatrix.cpp",

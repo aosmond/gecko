@@ -177,35 +177,6 @@ void gfxConfigManager::ConfigureWebRenderQualified() {
   MOZ_ASSERT(mFeatureWrCompositor);
 
   mFeatureWrQualified->EnableByDefault();
-
-  nsCString failureId;
-  int32_t status;
-  if (NS_FAILED(mGfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_WEBRENDER,
-                                           failureId, &status))) {
-    mFeatureWrQualified->Disable(FeatureStatus::BlockedNoGfxInfo,
-                                 "gfxInfo is broken",
-                                 "FEATURE_FAILURE_WR_NO_GFX_INFO"_ns);
-    return;
-  }
-
-  switch (status) {
-    case nsIGfxInfo::FEATURE_ALLOW_ALWAYS:
-    case nsIGfxInfo::FEATURE_ALLOW_QUALIFIED:
-      break;
-    case nsIGfxInfo::FEATURE_DENIED:
-      mFeatureWrQualified->Disable(FeatureStatus::Denied, "Not on allowlist",
-                                   failureId);
-      break;
-    default:
-      mFeatureWrQualified->Disable(FeatureStatus::Blocklisted,
-                                   "No qualified hardware", failureId);
-      break;
-    case nsIGfxInfo::FEATURE_STATUS_OK:
-      MOZ_ASSERT_UNREACHABLE("We should still be rolling out WebRender!");
-      mFeatureWrQualified->Disable(FeatureStatus::Blocked,
-                                   "Not controlled by rollout", failureId);
-      break;
-  }
 }
 
 void gfxConfigManager::ConfigureWebRender() {
@@ -250,34 +221,6 @@ void gfxConfigManager::ConfigureWebRender() {
   ConfigureWebRenderQualified();
 
   mFeatureWr->EnableByDefault();
-
-  // envvar works everywhere; note that we need this for testing in CI.
-  // Prior to bug 1523788, the `prefEnabled` check was only done on Nightly,
-  // so as to prevent random users from easily enabling WebRender on
-  // unqualified hardware in beta/release.
-  if (mWrSoftwareForceEnabled) {
-    MOZ_ASSERT(mFeatureWrSoftware->IsEnabled());
-    mFeatureWr->UserDisable("User force-enabled software WR",
-                            "FEATURE_FAILURE_USER_FORCE_ENABLED_SW_WR"_ns);
-  } else if (mWrEnvForceEnabled) {
-    mFeatureWr->UserForceEnable("Force enabled by envvar");
-  } else if (mWrForceEnabled) {
-    mFeatureWr->UserForceEnable("Force enabled by pref");
-  } else if (mWrForceDisabled || mWrEnvForceDisabled) {
-    // If the user set the pref to force-disable, let's do that. This
-    // will override all the other enabling prefs
-    // (gfx.webrender.enabled, gfx.webrender.all, and
-    // gfx.webrender.all.qualified).
-    mFeatureWr->UserDisable("User force-disabled WR",
-                            "FEATURE_FAILURE_USER_FORCE_DISABLED"_ns);
-  }
-
-  if (!mFeatureWrQualified->IsEnabled()) {
-    // No qualified hardware. If we haven't allowed software fallback,
-    // then we need to disable WR.
-    mFeatureWr->Disable(FeatureStatus::Disabled, "Not qualified",
-                        "FEATURE_FAILURE_NOT_QUALIFIED"_ns);
-  }
 
   // HW_COMPOSITING being disabled implies interfacing with the GPU might break
   if (!mFeatureHwCompositing->IsEnabled()) {
