@@ -104,6 +104,7 @@ struct RectCornerRadii;
 enum class ShapedTextFlags : uint16_t;
 }  // namespace gfx
 namespace image {
+class ImageIntRegion;
 struct Resolution;
 }
 namespace layers {
@@ -1977,8 +1978,10 @@ class nsLayoutUtils {
    */
   static mozilla::gfx::IntSize ComputeImageContainerDrawingParameters(
       imgIContainer* aImage, nsIFrame* aForFrame,
-      const LayoutDeviceRect& aDestRect, const StackingContextHelper& aSc,
-      uint32_t aFlags, mozilla::Maybe<SVGImageContext>& aSVGContext);
+      const LayoutDeviceRect& aDestRect, const LayoutDeviceRect& aFillRect,
+      const StackingContextHelper& aSc, uint32_t aFlags,
+      mozilla::Maybe<SVGImageContext>& aSVGContext,
+      mozilla::Maybe<mozilla::image::ImageIntRegion>& aRegion);
 
   /**
    * Given a source area of an image (in appunits) and a destination area
