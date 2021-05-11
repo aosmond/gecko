@@ -751,6 +751,12 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
                        ? 0.0f
                        : mSVGDocumentWrapper->GetCurrentTimeAsFloat();
 
+  if (aRegion) {
+    printf_stderr("[AO] want %dx%d restriction (%d,%d) %dx%d\n", aSize.width,
+                  aSize.height, aRegion->Rect().x, aRegion->Rect().y,
+                  aRegion->Rect().width, aRegion->Rect().height);
+  }
+
   // If we aren't given a region, create one that covers the whole SVG image.
   ImageRegion region =
       aRegion ? aRegion->ToImageRegion() : ImageRegion::Create(decodeSize);
