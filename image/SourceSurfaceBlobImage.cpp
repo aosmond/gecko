@@ -22,10 +22,12 @@ namespace mozilla::image {
 
 SourceSurfaceBlobImage::SourceSurfaceBlobImage(
     image::SVGDocumentWrapper* aSVGDocumentWrapper,
-    const Maybe<SVGImageContext>& aSVGContext, const IntSize& aSize,
+    const Maybe<SVGImageContext>& aSVGContext,
+    const Maybe<ImageIntRegion>& aRegion, const IntSize& aSize,
     uint32_t aWhichFrame, uint32_t aImageFlags)
     : mSVGDocumentWrapper(aSVGDocumentWrapper),
       mSVGContext(aSVGContext),
+      mRegion(aRegion),
       mSize(aSize),
       mWhichFrame(aWhichFrame),
       mImageFlags(aImageFlags) {
@@ -193,13 +195,15 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     mSVGDocumentWrapper->UpdateViewportBounds(params.viewportSize);
     mSVGDocumentWrapper->FlushImageTransformInvalidation();
 
+    auto region = mRegion ? mRegion->ToImageRegion()
+                          : ImageRegion::Create(ThebesRect(imageRect));
+
     // Draw using the drawable the caller provided.
     RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     MOZ_ASSERT(ctx);  // Already checked the draw target above.
-    gfxUtils::DrawPixelSnapped(
-        ctx, svgDrawable, SizeDouble(mSize),
-        image::ImageRegion::Create(ThebesRect(imageRect)),
-        SurfaceFormat::OS_RGBA, SamplingFilter::POINT, mImageFlags);
+    gfxUtils::DrawPixelSnapped(ctx, svgDrawable, SizeDouble(mSize), region,
+                               SurfaceFormat::OS_RGBA, SamplingFilter::POINT,
+                               mImageFlags);
   }
 
   recorder->FlushItem(imageRect);

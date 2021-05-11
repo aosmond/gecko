@@ -607,12 +607,18 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
           mForFrame->PresContext()->AppUnitsPerDevPixel();
       LayoutDeviceRect destRect =
           LayoutDeviceRect::FromAppUnits(aDest, appUnitsPerDevPixel);
+      LayoutDeviceRect clipRect =
+          LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel);
       auto stretchSize = wr::ToLayoutSize(destRect.Size());
 
       gfx::IntSize decodeSize =
           nsLayoutUtils::ComputeImageContainerDrawingParameters(
-              mImageContainer, mForFrame, destRect, destRect, aSc,
+              mImageContainer, mForFrame, destRect, clipRect, aSc,
               containerFlags, svgContext, region);
+
+      if (mExtendMode != ExtendMode::CLAMP) {
+        region = Nothing();
+      }
 
       RefPtr<layers::ImageContainer> container;
       drawResult = mImageContainer->GetImageContainerAtSize(
@@ -644,9 +650,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       }
 
       wr::LayoutRect dest = wr::ToLayoutRect(destRect);
-
-      wr::LayoutRect clip = wr::ToLayoutRect(
-          LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel));
+      wr::LayoutRect clip = wr::ToLayoutRect(clipRect);
 
       if (mExtendMode == ExtendMode::CLAMP) {
         // The image is not repeating. Just push as a regular image.
