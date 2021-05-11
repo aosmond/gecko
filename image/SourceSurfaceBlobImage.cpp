@@ -140,7 +140,10 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
   // re-record the SVG image draw commands.
   auto* rootManager = aManager->GetRenderRootStateManager();
   auto* wrBridge = aManager->WrBridge();
-  IntRect imageRect(IntPoint(0, 0), mSize);
+
+  IntRect imageRect =
+      mRegion ? mRegion->Rect() : IntRect(IntPoint(0, 0), mSize);
+  IntRect imageRectOrigin = imageRect - imageRect.TopLeft();
 
   std::vector<RefPtr<ScaledFont>> fonts;
   bool validFonts = true;
@@ -168,7 +171,7 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
   RefPtr<DrawTarget> dummyDt = Factory::CreateDrawTarget(
       BackendType::SKIA, IntSize(1, 1), SurfaceFormat::OS_RGBA);
   RefPtr<DrawTarget> dt =
-      Factory::CreateRecordingDrawTarget(recorder, dummyDt, imageRect);
+      Factory::CreateRecordingDrawTarget(recorder, dummyDt, imageRectOrigin);
 
   if (!dt || !dt->IsValid()) {
     return Nothing();
@@ -181,8 +184,13 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
                          ? 0.0f
                          : mSVGDocumentWrapper->GetCurrentTimeAsFloat();
 
-    SVGDrawingParameters params(nullptr, mSize, mSize,
-                                ImageRegion::Create(mSize),
+    auto region =
+        mRegion
+            ? mRegion->ToImageRegion()
+            : ImageRegion::Create(gfxRect(imageRect.x, imageRect.y,
+                                          imageRect.width, imageRect.height));
+
+    SVGDrawingParameters params(nullptr, mSize, mSize, region,
                                 SamplingFilter::POINT, mSVGContext, animTime,
                                 mWhichFrame, mImageFlags, 1.0);
 
@@ -195,18 +203,19 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     mSVGDocumentWrapper->UpdateViewportBounds(params.viewportSize);
     mSVGDocumentWrapper->FlushImageTransformInvalidation();
 
-    auto region = mRegion ? mRegion->ToImageRegion()
-                          : ImageRegion::Create(ThebesRect(imageRect));
-
     // Draw using the drawable the caller provided.
     RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     MOZ_ASSERT(ctx);  // Already checked the draw target above.
+
+    ctx->SetMatrixDouble(
+        ctx->CurrentMatrixDouble().PreTranslate(-imageRect.x, -imageRect.y));
+
     gfxUtils::DrawPixelSnapped(ctx, svgDrawable, SizeDouble(mSize), region,
                                SurfaceFormat::OS_RGBA, SamplingFilter::POINT,
                                mImageFlags);
   }
 
-  recorder->FlushItem(imageRect);
+  recorder->FlushItem(imageRectOrigin);
   recorder->Finish();
 
   if (!validFonts) {
@@ -219,10 +228,10 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
   wr::BlobImageKey key = aBlobKey
                              ? aBlobKey.value()
                              : wr::BlobImageKey{wrBridge->GetNextImageKey()};
-  wr::ImageDescriptor descriptor(mSize, 0, SurfaceFormat::OS_RGBA,
+  wr::ImageDescriptor descriptor(imageRect.Size(), 0, SurfaceFormat::OS_RGBA,
                                  wr::OpacityType::HasAlphaChannel);
 
-  ImageIntRect visibleRect(0, 0, mSize.width, mSize.height);
+  auto visibleRect = ImageIntRect::FromUnknownRect(imageRect);
   if (aBlobKey) {
     if (!aResources.UpdateBlobImage(key, descriptor, bytes, visibleRect,
                                     visibleRect)) {

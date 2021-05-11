@@ -581,6 +581,11 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
     }
     case StyleImage::Tag::Rect:
     case StyleImage::Tag::Url: {
+      ExtendMode extendMode = mExtendMode;
+      if (aDest.Contains(aFill)) {
+        extendMode = ExtendMode::CLAMP;
+      }
+
       uint32_t containerFlags = imgIContainer::FLAG_ASYNC_NOTIFY;
       if (mFlags & (nsImageRenderer::FLAG_PAINTING_TO_WINDOW |
                     nsImageRenderer::FLAG_HIGH_QUALITY_SCALING)) {
@@ -589,7 +594,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       if (mFlags & nsImageRenderer::FLAG_SYNC_DECODE_IMAGES) {
         containerFlags |= imgIContainer::FLAG_SYNC_DECODE;
       }
-      if (mExtendMode == ExtendMode::CLAMP &&
+      if (extendMode == ExtendMode::CLAMP &&
           StaticPrefs::image_svg_blob_image() &&
           mImageContainer->GetType() == imgIContainer::TYPE_VECTOR) {
         containerFlags |= imgIContainer::FLAG_RECORD_BLOB;
@@ -616,7 +621,19 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
               mImageContainer, mForFrame, destRect, clipRect, aSc,
               containerFlags, svgContext, region);
 
-      if (mExtendMode != ExtendMode::CLAMP) {
+      if (XRE_IsContentProcess()) {
+        printf_stderr("[AO] render image type=%d flags=%08x extendMode=%hhd\n",
+                      mImageContainer->GetType(), containerFlags, mExtendMode);
+        printf_stderr("[AO] decodeSize=%dx%d\n", decodeSize.width,
+                      decodeSize.height);
+        if (region) {
+          printf_stderr("[AO] region=(%d,%d) %dx%d\n", region->Rect().x,
+                        region->Rect().y, region->Rect().width,
+                        region->Rect().height);
+        }
+      }
+
+      if (extendMode != ExtendMode::CLAMP) {
         region = Nothing();
       }
 
@@ -630,9 +647,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       }
 
       if (containerFlags & imgIContainer::FLAG_RECORD_BLOB) {
-        MOZ_ASSERT(mExtendMode == ExtendMode::CLAMP);
-        LayoutDeviceRect clipRect =
-            LayoutDeviceRect::FromAppUnits(aFill, appUnitsPerDevPixel);
+        MOZ_ASSERT(extendMode == ExtendMode::CLAMP);
         aManager->CommandBuilder().PushBlobImage(
             aItem, container, aBuilder, aResources, destRect, clipRect);
         break;
@@ -652,7 +667,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       wr::LayoutRect dest = wr::ToLayoutRect(destRect);
       wr::LayoutRect clip = wr::ToLayoutRect(clipRect);
 
-      if (mExtendMode == ExtendMode::CLAMP) {
+      if (extendMode == ExtendMode::CLAMP) {
         // The image is not repeating. Just push as a regular image.
         aBuilder.PushImage(dest, clip, !aItem->BackfaceIsHidden(), rendering,
                            key.value());
@@ -666,7 +681,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
             appUnitsPerDevPixel);
         wr::LayoutRect fill = wr::ToLayoutRect(fillRect);
 
-        switch (mExtendMode) {
+        switch (extendMode) {
           case ExtendMode::REPEAT_Y:
             fill.origin.x = dest.origin.x;
             fill.size.width = dest.size.width;
@@ -683,6 +698,17 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
 
         LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
             aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
+
+        if (XRE_IsContentProcess()) {
+          printf_stderr("[AO] repeat dest=(%f,%f) (%fx%f)\n", destRect.x,
+                        destRect.y, destRect.width, destRect.height);
+          printf_stderr("[AO] repeat clip=(%f,%f) (%fx%f)\n", clipRect.x,
+                        clipRect.y, clipRect.width, clipRect.height);
+          printf_stderr("[AO] repeat fill=(%f,%f) (%fx%f)\n", fill.origin.x,
+                        fill.origin.y, fill.size.width, fill.size.height);
+          printf_stderr("[AO] repeat  gap=(%fx%f)\n", gapSize.width,
+                        gapSize.height);
+        }
 
         aBuilder.PushRepeatingImage(fill, clip, !aItem->BackfaceIsHidden(),
                                     stretchSize, wr::ToLayoutSize(gapSize),
