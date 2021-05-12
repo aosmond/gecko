@@ -19,6 +19,8 @@
 #include "RecordingTypes.h"
 #include "RecordedEventImpl.h"
 
+bool IsAndrewDebug();
+
 namespace mozilla {
 namespace gfx {
 
@@ -200,6 +202,15 @@ DrawTargetRecording::~DrawTargetRecording() {
 
 void DrawTargetRecording::FillRect(const Rect& aRect, const Pattern& aPattern,
                                    const DrawOptions& aOptions) {
+  if (IsAndrewDebug()) {
+    printf_stderr("[AO] FillRect -- (%f,%f) %fx%f\n", aRect.x, aRect.y, aRect.width, aRect.height);
+    if (aPattern.GetType() == PatternType::COLOR) {
+      const ColorPattern* p = static_cast<const ColorPattern*>(&aPattern);
+      const DeviceColor& c = p->mColor;
+      printf_stderr("[AO] ColorPattern r=%f g=%f b=%f a=%f\n", c.r, c.g, c.b, c.a);
+    }
+  }
+
   EnsurePatternDependenciesStored(aPattern);
 
   mRecorder->RecordEvent(RecordedFillRect(this, aRect, aPattern, aOptions));
@@ -226,6 +237,15 @@ void DrawTargetRecording::StrokeLine(const Point& aBegin, const Point& aEnd,
 
 void DrawTargetRecording::Fill(const Path* aPath, const Pattern& aPattern,
                                const DrawOptions& aOptions) {
+  if (IsAndrewDebug()) {
+    printf_stderr("[AO] Fill\n");
+    if (aPattern.GetType() == PatternType::COLOR) {
+      const ColorPattern* p = static_cast<const ColorPattern*>(&aPattern);
+      const DeviceColor& c = p->mColor;
+      printf_stderr("[AO] ColorPattern r=%f g=%f b=%f a=%f\n", c.r, c.g, c.b, c.a);
+    }
+  }
+
   RefPtr<PathRecording> pathRecording = EnsurePathStored(aPath);
   EnsurePatternDependenciesStored(aPattern);
 
@@ -415,16 +435,26 @@ void DrawTargetRecording::CopySurface(SourceSurface* aSurface,
 }
 
 void DrawTargetRecording::PushClip(const Path* aPath) {
+  if (IsAndrewDebug()) {
+    printf_stderr("[AO] PushClip\n");
+  }
   RefPtr<PathRecording> pathRecording = EnsurePathStored(aPath);
 
   mRecorder->RecordEvent(RecordedPushClip(this, pathRecording));
 }
 
 void DrawTargetRecording::PushClipRect(const Rect& aRect) {
+  if (IsAndrewDebug()) {
+    printf_stderr("[AO] PushClipRect -- (%f,%f) %fx%f\n", aRect.x, aRect.y, aRect.width, aRect.height);
+  }
+
   mRecorder->RecordEvent(RecordedPushClipRect(this, aRect));
 }
 
 void DrawTargetRecording::PopClip() {
+  if (IsAndrewDebug()) {
+    printf_stderr("[AO] PopClip\n");
+  }
   mRecorder->RecordEvent(RecordedPopClip(static_cast<DrawTarget*>(this)));
 }
 
@@ -601,6 +631,11 @@ already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
 }
 
 void DrawTargetRecording::SetTransform(const Matrix& aTransform) {
+  if (IsAndrewDebug()) {
+    const Matrix& m = aTransform;
+    printf_stderr("[AO] SetTransform -- [%f %f; %f %f; %f %f]\n", m._11, m._12, m._21, m._22, m._31, m._32);
+  }
+
   mRecorder->RecordEvent(RecordedSetTransform(this, aTransform));
   DrawTarget::SetTransform(aTransform);
 }

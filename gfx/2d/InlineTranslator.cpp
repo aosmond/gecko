@@ -7,6 +7,7 @@
 #include "InlineTranslator.h"
 #include "RecordedEventImpl.h"
 #include "DrawEventRecorder.h"
+#include <iostream>
 
 #include "gfxContext.h"
 #include "nsDeviceContext.h"
@@ -21,6 +22,9 @@ InlineTranslator::InlineTranslator() : mFontContext(nullptr) {}
 
 InlineTranslator::InlineTranslator(DrawTarget* aDT, void* aFontContext)
     : mBaseDT(aDT), mFontContext(aFontContext) {}
+
+InlineTranslator::InlineTranslator(DrawTarget* aDT, bool aDebug, void* aFontContext)
+    : mBaseDT(aDT), mDebug(aDebug), mFontContext(aFontContext) {}
 
 bool InlineTranslator::TranslateRecording(char* aData, size_t aLen) {
   // an istream like class for reading from memory
@@ -78,6 +82,12 @@ bool InlineTranslator::TranslateRecording(char* aData, size_t aLen) {
             mError = " READ";
             return false;
           }
+
+	  if (mDebug) {
+	    std::stringstream msg;
+	    recordedEvent->OutputSimpleEventInfo(msg);
+	    std::cerr << "[AO] playback " << msg.rdbuf() << std::endl;
+	  }
 
           if (!recordedEvent->PlayEvent(this)) {
             mError = " PLAY";

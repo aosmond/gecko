@@ -33,6 +33,7 @@ class InlineTranslator : public Translator {
   InlineTranslator();
 
   explicit InlineTranslator(DrawTarget* aDT, void* aFontContext = nullptr);
+  InlineTranslator(DrawTarget* aDT, bool aDebug, void* aFontContext = nullptr);
 
   bool TranslateRecording(char*, size_t len);
 
@@ -172,6 +173,7 @@ class InlineTranslator : public Translator {
   nsRefPtrHashtable<nsPtrHashKey<void>, DrawTarget> mDrawTargets;
 
  private:
+  bool mDebug = false;
   void* mFontContext;
   std::string mError;
 

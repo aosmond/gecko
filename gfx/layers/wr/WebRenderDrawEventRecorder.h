@@ -35,9 +35,9 @@ class WebRenderDrawEventRecorder final : public gfx::DrawEventRecorderMemory {
 
 class WebRenderTranslator final : public gfx::InlineTranslator {
  public:
-  explicit WebRenderTranslator(gfx::DrawTarget* aDT,
+  explicit WebRenderTranslator(gfx::DrawTarget* aDT, bool aDebug,
                                void* aFontContext = nullptr)
-      : InlineTranslator(aDT, aFontContext) {}
+      : InlineTranslator(aDT, aDebug, aFontContext) {}
 
   already_AddRefed<gfx::SourceSurface> LookupExternalSurface(
       uint64_t aKey) final;

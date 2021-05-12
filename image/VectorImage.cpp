@@ -48,6 +48,8 @@
 #include "mozilla/dom/DocumentInlines.h"
 #include "mozilla/image/Resolution.h"
 
+bool IsAndrewDebug();
+
 namespace mozilla {
 
 using namespace dom;
@@ -263,6 +265,11 @@ bool SVGDrawingCallback::operator()(gfxContext* aContext,
 
   gfxContextAutoSaveRestore contextRestorer(aContext);
 
+  if (aFillRect.x > 0 || aFillRect.y > 0) {
+    auto m = aContext->CurrentMatrix();
+    printf_stderr("[AO] context matrix [%f %f; %f %f; %f %f]\n", m._11, m._12, m._21, m._22, m._31, m._32);
+  }
+
   // Clip to aFillRect so that we don't paint outside.
   aContext->NewPath();
   aContext->Rectangle(aFillRect);
@@ -272,16 +279,37 @@ bool SVGDrawingCallback::operator()(gfxContext* aContext,
   if (!matrix.Invert()) {
     return false;
   }
+
+  double scaleWidth = double(mSize.width) / mViewportSize.width;
+  double scaleHeight = double(mSize.height) / mViewportSize.height;
+
   aContext->SetMatrixDouble(
       aContext->CurrentMatrixDouble().PreMultiply(matrix).PreScale(
-          double(mSize.width) / mViewportSize.width,
-          double(mSize.height) / mViewportSize.height));
+          scaleWidth, scaleHeight));
 
   nsPresContext* presContext = presShell->GetPresContext();
   MOZ_ASSERT(presContext, "pres shell w/out pres context");
-
-  nsRect svgRect(0, 0, presContext->DevPixelsToAppUnits(mViewportSize.width),
+/*
+  nsRect svgRect(presContext->DevPixelsToAppUnits(aFillRect.x / scaleWidth),
+                 presContext->DevPixelsToAppUnits(aFillRect.y / scaleWidth),
+                 presContext->DevPixelsToAppUnits(mViewportSize.width),
+                 presContext->DevPixelsToAppUnits(mViewportSize.height));*/
+  nsRect svgRect(0, 0,
+                 presContext->DevPixelsToAppUnits(mViewportSize.width),
                  presContext->DevPixelsToAppUnits(mViewportSize.height));
+
+  if (aFillRect.x > 0 || aFillRect.y > 0) {
+    printf_stderr("[AO] svg rasterize callback fill=(%f,%f) %fx%f viewport=%dx%d raster=%dx%d\n"
+                  "[AO]                        rect=(%d,%d) %dx%d scale x=%f y=%f\n",
+      aFillRect.x, aFillRect.y, aFillRect.width, aFillRect.height,
+      mViewportSize.width, mViewportSize.height,
+      mSize.width, mSize.height,
+      svgRect.x, svgRect.y, svgRect.width, svgRect.height,
+      scaleWidth, scaleHeight);
+
+    auto m = aContext->CurrentMatrix();
+    printf_stderr("[AO] context matrix [%f %f; %f %f; %f %f]\n", m._11, m._12, m._21, m._22, m._31, m._32);
+  }
 
   RenderDocumentFlags renderDocFlags =
       RenderDocumentFlags::IgnoreViewportScrolling;

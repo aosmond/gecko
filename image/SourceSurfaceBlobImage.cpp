@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <unistd.h>
 #include "SourceSurfaceBlobImage.h"
 #include "AutoRestoreSVGState.h"
 #include "ImageRegion.h"
@@ -17,6 +18,16 @@
 
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
+
+static bool sAODebug = false;
+
+void ToggleAndrewDebug() {
+  sAODebug = !sAODebug;
+}
+
+extern bool IsAndrewDebug() {
+  return sAODebug;
+}
 
 namespace mozilla::image {
 
@@ -145,6 +156,11 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
       mRegion ? mRegion->Rect() : IntRect(IntPoint(0, 0), mSize);
   IntRect imageRectOrigin = imageRect - imageRect.TopLeft();
 
+  if (!imageRect.IsEqualEdges(imageRectOrigin)) {
+    printf_stderr("[AO] rasterizing non-zero origin -- pid %d\n", getpid());
+    ToggleAndrewDebug();
+  }
+
   std::vector<RefPtr<ScaledFont>> fonts;
   bool validFonts = true;
   RefPtr<WebRenderDrawEventRecorder> recorder =
@@ -207,6 +223,14 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     MOZ_ASSERT(ctx);  // Already checked the draw target above.
 
+    if (!imageRect.IsEqualEdges(imageRectOrigin)) {
+      printf_stderr("[AO] rasterize (%d,%d) %dx%d -- origin=(%d,%d) %dx%d size=%dx%d viewport=%dx%d region=(%f,%f) %fx%f\n",
+        imageRect.x, imageRect.y, imageRect.width, imageRect.height,
+        imageRectOrigin.x, imageRectOrigin.y, imageRectOrigin.width, imageRectOrigin.height,
+        mSize.width, mSize.height, params.viewportSize.width, params.viewportSize.height,
+        region.Rect().x, region.Rect().y, region.Rect().width, region.Rect().height);
+    }
+
     ctx->SetMatrixDouble(
         ctx->CurrentMatrixDouble().PreTranslate(-imageRect.x, -imageRect.y));
 
@@ -217,6 +241,10 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
 
   recorder->FlushItem(imageRectOrigin);
   recorder->Finish();
+
+  if (!imageRect.IsEqualEdges(imageRectOrigin)) {
+    ToggleAndrewDebug();
+  }
 
   if (!validFonts) {
     gfxCriticalNote << "Failed serializing fonts for blob vector image";
@@ -231,7 +259,7 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
   wr::ImageDescriptor descriptor(imageRect.Size(), 0, SurfaceFormat::OS_RGBA,
                                  wr::OpacityType::HasAlphaChannel);
 
-  auto visibleRect = ImageIntRect::FromUnknownRect(imageRect);
+  auto visibleRect = ImageIntRect::FromUnknownRect(imageRectOrigin);
   if (aBlobKey) {
     if (!aResources.UpdateBlobImage(key, descriptor, bytes, visibleRect,
                                     visibleRect)) {

@@ -621,7 +621,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
               mImageContainer, mForFrame, destRect, clipRect, aSc,
               containerFlags, svgContext, region);
 
-      if (XRE_IsContentProcess()) {
+      if (region) {
         printf_stderr("[AO] render image type=%d flags=%08x extendMode=%hhd\n",
                       mImageContainer->GetType(), containerFlags, mExtendMode);
         printf_stderr("[AO] decodeSize=%dx%d\n", decodeSize.width,
@@ -631,6 +631,8 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
                         region->Rect().y, region->Rect().width,
                         region->Rect().height);
         }
+	printf_stderr("[AO] dest=(%f, %f) %fx%f\n", destRect.x, destRect.y, destRect.width, destRect.height);
+	printf_stderr("[AO] clip=(%f, %f) %fx%f\n", clipRect.x, clipRect.y, clipRect.width, clipRect.height);
       }
 
       if (extendMode != ExtendMode::CLAMP) {
@@ -649,7 +651,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
       if (containerFlags & imgIContainer::FLAG_RECORD_BLOB) {
         MOZ_ASSERT(extendMode == ExtendMode::CLAMP);
         aManager->CommandBuilder().PushBlobImage(
-            aItem, container, aBuilder, aResources, destRect, clipRect);
+            aItem, container, aBuilder, aResources, clipRect, clipRect);
         break;
       }
 
@@ -669,6 +671,9 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
 
       if (extendMode == ExtendMode::CLAMP) {
         // The image is not repeating. Just push as a regular image.
+	if (region) {
+	  printf_stderr("[AO] non-repeating (%f,%f) %fx%f\n", clip.origin.x, clip.origin.y, clip.size.width, clip.size.height);
+	}
         aBuilder.PushImage(dest, clip, !aItem->BackfaceIsHidden(), rendering,
                            key.value());
       } else {
@@ -699,7 +704,7 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
         LayoutDeviceSize gapSize = LayoutDeviceSize::FromAppUnits(
             aRepeatSize - aDest.Size(), appUnitsPerDevPixel);
 
-        if (XRE_IsContentProcess()) {
+        if (region) {
           printf_stderr("[AO] repeat dest=(%f,%f) (%fx%f)\n", destRect.x,
                         destRect.y, destRect.width, destRect.height);
           printf_stderr("[AO] repeat clip=(%f,%f) (%fx%f)\n", clipRect.x,

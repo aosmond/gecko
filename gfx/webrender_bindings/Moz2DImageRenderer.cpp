@@ -338,6 +338,10 @@ struct Reader {
   layers::BlobFont ReadBlobFont() { return Read<layers::BlobFont>(); }
 };
 
+static bool IsAndrewBlobDebug(const mozilla::wr::DeviceIntRect* aVisibleRect) {
+  return aVisibleRect->origin.x == 0 && aVisibleRect->origin.y == 0 && aVisibleRect->size.width == 50 && aVisibleRect->size.height == 50;
+}
+
 static bool Moz2DRenderCallback(const Range<const uint8_t> aBlob,
                                 gfx::SurfaceFormat aFormat,
                                 const mozilla::wr::DeviceIntRect* aVisibleRect,
@@ -357,6 +361,13 @@ static bool Moz2DRenderCallback(const Range<const uint8_t> aBlob,
 
   if (aOutput.length() < static_cast<size_t>(size.height * stride)) {
     return false;
+  }
+
+  if (IsAndrewBlobDebug(aVisibleRect)) {
+    printf_stderr("[AO] playback visible=(%d,%d) %dx%d render=(%d,%d) %dx%d tileSize=%u\n",
+      aVisibleRect->origin.x, aVisibleRect->origin.y, aVisibleRect->size.width, aVisibleRect->size.height,
+      aRenderRect->origin.x, aRenderRect->origin.y, aRenderRect->size.width, aRenderRect->size.height,
+      aTileSize);
   }
 
   // In bindings.rs we allocate a buffer filled with opaque white.
@@ -400,6 +411,9 @@ static bool Moz2DRenderCallback(const Range<const uint8_t> aBlob,
   bool ret = true;
   size_t offset = 0;
   auto absBounds = IntRectAbsolute::FromRect(bounds);
+  if (IsAndrewBlobDebug(aVisibleRect)) {
+      printf_stderr("[AO] absBounds=(%d,%d) %dx%d\n", absBounds.X(), absBounds.Y(), absBounds.Width(), absBounds.Height());
+  }
   while (reader.pos < reader.len) {
     size_t end = reader.ReadSize();
     size_t extra_end = reader.ReadSize();
@@ -407,12 +421,15 @@ static bool Moz2DRenderCallback(const Range<const uint8_t> aBlob,
     MOZ_RELEASE_ASSERT(extra_end < aBlob.length());
 
     auto combinedBounds = absBounds.Intersect(reader.ReadBounds());
+    if (IsAndrewBlobDebug(aVisibleRect)) {
+      printf_stderr("[AO] combinedBounds=(%d,%d) %dx%d\n", combinedBounds.X(), combinedBounds.Y(), combinedBounds.Width(), combinedBounds.Height());
+    }
     if (combinedBounds.IsEmpty()) {
       offset = extra_end;
       continue;
     }
 
-    layers::WebRenderTranslator translator(dt);
+    layers::WebRenderTranslator translator(dt, IsAndrewBlobDebug(aVisibleRect));
     Reader fontReader(aBlob.begin().get() + end, extra_end - end);
     size_t count = fontReader.ReadSize();
     for (size_t i = 0; i < count; i++) {
@@ -446,10 +463,12 @@ static bool Moz2DRenderCallback(const Range<const uint8_t> aBlob,
   }
 
 #if 0
+  if (IsAndrewBlobDebug(aVisibleRect)) {
   static int i = 0;
   char filename[40];
   sprintf(filename, "out%d.png", i++);
   gfxUtils::WriteAsPNG(dt, filename);
+  }
 #endif
 
   return ret;

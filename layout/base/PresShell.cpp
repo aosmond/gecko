@@ -210,6 +210,8 @@
 #include "VisualViewport.h"
 #include "ZoomConstraintsClient.h"
 
+bool IsAndrewDebug();
+
 #ifdef MOZ_TASK_TRACER
 #  include "GeckoTaskTracer.h"
 using namespace mozilla::tasktracer;
@@ -4559,6 +4561,11 @@ nsresult PresShell::RenderDocument(const nsRect& aRect,
                         .PreScale(scale, scale)
                         .NudgeToIntegers();
   aThebesContext->SetMatrixDouble(newTM);
+
+  if (IsAndrewDebug()) {
+    auto m = aThebesContext->CurrentMatrix();
+    printf_stderr("[AO] pres shell context matrix [%f %f; %f %f; %f %f]\n", m._11, m._12, m._21, m._22, m._31, m._32);
+  }
 
   AutoSaveRestoreRenderingState _(this);
 
