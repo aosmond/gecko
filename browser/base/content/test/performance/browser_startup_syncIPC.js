@@ -36,6 +36,12 @@ const startupPhases = {
     },
     {
       name: "PLayerTransaction::Msg_GetTextureFactoryIdentifier",
+      condition: LINUX && WEBRENDER,
+      ignoreIfUnused: true, // Sometimes in the next phase on Linux QR
+      maxCount: 1,
+    },
+    {
+      name: "PLayerTransaction::Msg_GetTextureFactoryIdentifier",
       condition: WIN && !WEBRENDER,
       maxCount: 3,
     },
@@ -46,7 +52,7 @@ const startupPhases = {
     },
     {
       name: "PWebRenderBridge::Msg_EnsureConnected",
-      condition: MAC && WEBRENDER,
+      condition: !WIN && WEBRENDER,
       maxCount: 1,
     },
     {
@@ -145,7 +151,7 @@ const startupPhases = {
     },
     {
       name: "PLayerTransaction::Msg_GetTextureFactoryIdentifier",
-      condition: (!MAC && !WEBRENDER) || (WIN && WEBRENDER),
+      condition: (!MAC && !WEBRENDER) || WEBRENDER,
       ignoreIfUnused: true, // intermittently occurs in "before becoming idle"
       maxCount: 1,
     },
