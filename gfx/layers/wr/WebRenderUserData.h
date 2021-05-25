@@ -234,12 +234,12 @@ class WebRenderFallbackData : public WebRenderUserData {
   /// into.
   WebRenderImageData* PaintIntoImage();
 
-  std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
   UniquePtr<nsDisplayItemGeometry> mGeometry;
   DisplayItemClip mClip;
   nsRect mBounds;
   nsRect mBuildingRect;
   gfx::Size mScale;
+  bool mHasExternalSurfaces = false;
 
  protected:
   void ClearImageKey();

@@ -379,7 +379,13 @@ class WebRenderBridgeParent final : public PWebRenderBridgeParent,
                                        wr::TransactionBuilder& aTxn);
 
   void DeleteImage(const wr::ImageKey& aKey, wr::TransactionBuilder& aUpdates);
+  void DeleteBlobImage(const wr::BlobImageKey& aKey,
+                       wr::TransactionBuilder& aUpdates);
   void ReleaseTextureOfImage(const wr::ImageKey& aKey);
+
+  void SetBlobImageResources(
+      const wr::BlobImageKey& aKey,
+      const nsTArray<wr::ExternalImageId>& aExternalImages);
 
   bool ProcessWebRenderParentCommands(
       const nsTArray<WebRenderParentCommand>& aCommands,
@@ -476,6 +482,7 @@ class WebRenderBridgeParent final : public PWebRenderBridgeParent,
   std::unordered_map<uint64_t, RefPtr<WebRenderImageHost>> mAsyncCompositables;
   std::unordered_map<uint64_t, CompositableTextureHostRef> mTextureHosts;
   std::unordered_map<uint64_t, wr::ExternalImageId> mSharedSurfaceIds;
+  std::unordered_map<uint64_t, nsTArray<wr::ExternalImageId>> mBlobResources;
 
   TimeDuration mVsyncRate;
   TimeStamp mPreviousFrameTimeStamp;

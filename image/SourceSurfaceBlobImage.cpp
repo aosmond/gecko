@@ -84,8 +84,8 @@ Maybe<wr::BlobImageKey> SourceSurfaceBlobImage::UpdateKey(
       // can change state. Either our namespace differs, and our old key has
       // already been discarded, or the blob has changed. Either way, we need
       // to rerecord it.
-      auto newEntry = RecordDrawing(aManager, aResources,
-                                    ownsKey ? Some(entry.mBlobKey) : Nothing());
+      auto newEntry =
+          RecordDrawing(aManager, aResources, ownsKey ? &entry : nullptr);
       if (!newEntry) {
         if (ownsKey) {
           aManager->GetRenderRootStateManager()->AddBlobImageKeyForDiscard(
@@ -102,7 +102,7 @@ Maybe<wr::BlobImageKey> SourceSurfaceBlobImage::UpdateKey(
 
   // We didn't find an entry. Attempt to record the blob with a new key.
   if (!key) {
-    auto newEntry = RecordDrawing(aManager, aResources, Nothing());
+    auto newEntry = RecordDrawing(aManager, aResources, nullptr);
     if (newEntry) {
       key.emplace(newEntry.ref().mBlobKey);
       mKeys.AppendElement(std::move(newEntry.ref()));
@@ -129,7 +129,7 @@ void SourceSurfaceBlobImage::MarkDirty() {
 
 Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     WebRenderLayerManager* aManager, wr::IpcResourceUpdateQueue& aResources,
-    Maybe<wr::BlobImageKey> aBlobKey) {
+    BlobImageKeyData* aPrevEntry) {
   MOZ_ASSERT(!aManager->IsDestroyed());
 
   if (mSVGDocumentWrapper->IsDrawing()) {
@@ -138,7 +138,6 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
 
   // This is either our first pass, or we have a stale key requiring us to
   // re-record the SVG image draw commands.
-  auto* rootManager = aManager->GetRenderRootStateManager();
   auto* wrBridge = aManager->WrBridge();
 
   IntRect imageRect =
@@ -225,14 +224,14 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
 
   Range<uint8_t> bytes((uint8_t*)recorder->mOutputStream.mData,
                        recorder->mOutputStream.mLength);
-  wr::BlobImageKey key = aBlobKey
-                             ? aBlobKey.value()
+  wr::BlobImageKey key = aPrevEntry
+                             ? aPrevEntry->mBlobKey
                              : wr::BlobImageKey{wrBridge->GetNextImageKey()};
   wr::ImageDescriptor descriptor(imageRect.Size(), 0, SurfaceFormat::OS_RGBA,
                                  wr::OpacityType::HasAlphaChannel);
 
   auto visibleRect = ImageIntRect::FromUnknownRect(imageRectOrigin);
-  if (aBlobKey) {
+  if (aPrevEntry) {
     if (!aResources.UpdateBlobImage(key, descriptor, bytes, visibleRect,
                                     visibleRect)) {
       return Nothing();
@@ -241,22 +240,16 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     return Nothing();
   }
 
-  std::vector<RefPtr<SourceSurface>> externalSurfaces;
+  std::vector<uint64_t> externalSurfaces;
   recorder->TakeExternalSurfaces(externalSurfaces);
 
-  for (auto& surface : externalSurfaces) {
-    // While we don't use the image key with the surface, because the blob image
-    // renderer doesn't have easy access to the resource set, we still want to
-    // ensure one is generated. That will ensure the surface remains alive until
-    // at least the last epoch which the blob image could be used in.
-    wr::ImageKey key = {};
-    DebugOnly<nsresult> rv =
-        SharedSurfacesChild::Share(surface, rootManager, aResources, key);
-    MOZ_ASSERT(rv.value != NS_ERROR_NOT_IMPLEMENTED);
+  bool usesExternalSurfaces = !externalSurfaces.empty();
+  if (usesExternalSurfaces ||
+      (aPrevEntry && aPrevEntry->mUsesExternalSurfaces)) {
+    aResources.SetBlobImageResources(key, externalSurfaces);
   }
 
-  return Some(BlobImageKeyData(aManager, key, std::move(fonts),
-                               std::move(externalSurfaces)));
+  return Some(BlobImageKeyData(aManager, key, std::move(fonts), usesExternalSurfaces));
 }
 
 }  // namespace mozilla::image

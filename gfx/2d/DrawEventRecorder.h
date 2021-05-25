@@ -120,7 +120,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
 
   bool WantsExternalFonts() const { return mExternalFonts; }
 
-  void TakeExternalSurfaces(std::vector<RefPtr<SourceSurface>>& aSurfaces) {
+  void TakeExternalSurfaces(std::vector<uint64_t>& aSurfaces) {
     aSurfaces = std::move(mExternalSurfaces);
   }
 
@@ -163,7 +163,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
   std::unordered_set<ScaledFont*> mStoredFonts;
   std::vector<RefPtr<ScaledFont>> mScaledFonts;
   std::unordered_set<SourceSurface*> mStoredSurfaces;
-  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
+  std::vector<uint64_t> mExternalSurfaces;
   bool mExternalFonts;
 };
 

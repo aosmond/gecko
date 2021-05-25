@@ -139,6 +139,11 @@ struct OpSetBlobImageVisibleArea {
   BlobImageKey key;
 };
 
+struct OpSetBlobImageResources {
+  BlobImageKey key;
+  ExternalImageId[] externalImages;
+};
+
 struct OpUpdatePrivateExternalImage {
   ExternalImageId externalImageId;
   ImageKey key;
@@ -195,6 +200,7 @@ union OpUpdateResource {
   OpUpdateImage;
   OpUpdateBlobImage;
   OpSetBlobImageVisibleArea;
+  OpSetBlobImageResources;
   OpDeleteImage;
   OpDeleteBlobImage;
   OpAddRawFont;

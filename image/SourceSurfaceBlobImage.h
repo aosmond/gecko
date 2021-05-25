@@ -23,25 +23,25 @@ class BlobImageKeyData final {
   BlobImageKeyData(layers::WebRenderLayerManager* aManager,
                    const wr::BlobImageKey& aBlobKey,
                    std::vector<RefPtr<gfx::ScaledFont>>&& aScaledFonts,
-                   std::vector<RefPtr<gfx::SourceSurface>>&& aExternalSurfaces)
+                   bool aUsesExternalSurfaces)
       : mManager(aManager),
         mBlobKey(aBlobKey),
         mScaledFonts(std::move(aScaledFonts)),
-        mExternalSurfaces(std::move(aExternalSurfaces)),
+        mUsesExternalSurfaces(aUsesExternalSurfaces),
         mDirty(false) {}
 
   BlobImageKeyData(BlobImageKeyData&& aOther) noexcept
       : mManager(std::move(aOther.mManager)),
         mBlobKey(aOther.mBlobKey),
         mScaledFonts(std::move(aOther.mScaledFonts)),
-        mExternalSurfaces(std::move(aOther.mExternalSurfaces)),
+        mUsesExternalSurfaces(aOther.mUsesExternalSurfaces),
         mDirty(false) {}
 
   BlobImageKeyData& operator=(BlobImageKeyData&& aOther) noexcept {
     mManager = std::move(aOther.mManager);
     mBlobKey = aOther.mBlobKey;
     mScaledFonts = std::move(aOther.mScaledFonts);
-    mExternalSurfaces = std::move(aOther.mExternalSurfaces);
+    mUsesExternalSurfaces = aOther.mUsesExternalSurfaces;
     return *this;
   }
 
@@ -51,7 +51,7 @@ class BlobImageKeyData final {
   RefPtr<layers::WebRenderLayerManager> mManager;
   wr::BlobImageKey mBlobKey;
   std::vector<RefPtr<gfx::ScaledFont>> mScaledFonts;
-  std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
+  bool mUsesExternalSurfaces;
   bool mDirty;
 };
 
@@ -111,7 +111,7 @@ class SourceSurfaceBlobImage final : public gfx::SourceSurface {
 
   Maybe<BlobImageKeyData> RecordDrawing(layers::WebRenderLayerManager* aManager,
                                         wr::IpcResourceUpdateQueue& aResources,
-                                        Maybe<wr::BlobImageKey> aBlobKey);
+                                        BlobImageKeyData* aPrevEntry);
 
   static void DestroyKeys(const AutoTArray<BlobImageKeyData, 1>& aKeys);
 

@@ -156,7 +156,11 @@ class IpcResourceUpdateQueue {
   void UpdateSharedExternalImage(ExternalImageId aExtID, ImageKey aKey,
                                  ImageIntRect aDirtyRect);
 
-  void SetBlobImageVisibleArea(BlobImageKey aKey, const ImageIntRect& aArea);
+  void SetBlobImageVisibleArea(wr::BlobImageKey aKey,
+                               const ImageIntRect& aArea);
+
+  void SetBlobImageResources(wr::BlobImageKey aKey,
+                             const std::vector<uint64_t>& aExternalImageIds);
 
   void DeleteImage(wr::ImageKey aKey);
 
