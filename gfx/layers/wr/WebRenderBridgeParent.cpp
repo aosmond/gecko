@@ -569,6 +569,16 @@ bool WebRenderBridgeParent::UpdateResources(
                                          wr::ToDeviceIntRect(op.area()));
         break;
       }
+      case OpUpdateResource::TOpSetBlobImageResources: {
+        const auto& op = cmd.get_OpSetBlobImageResources();
+        if (!MatchesNamespace(op.key())) {
+          MOZ_ASSERT_UNREACHABLE("Stale blob image key (resources)!");
+          break;
+        }
+
+        SetBlobImageResources(op.key(), op.externalImages());
+        break;
+      }
       case OpUpdateResource::TOpAddPrivateExternalImage: {
         const auto& op = cmd.get_OpAddPrivateExternalImage();
         AddPrivateExternalImage(op.externalImageId(), op.key(), op.descriptor(),
@@ -670,7 +680,7 @@ bool WebRenderBridgeParent::UpdateResources(
           break;
         }
 
-        aUpdates.DeleteBlobImage(op.key());
+        DeleteBlobImage(op.key(), aUpdates);
         break;
       }
       case OpUpdateResource::TOpDeleteFont: {
@@ -902,6 +912,35 @@ void WebRenderBridgeParent::ObserveSharedSurfaceRelease(
   }
   for (const auto& pair : aPairs) {
     SharedSurfacesParent::Release(pair.id);
+  }
+}
+
+void WebRenderBridgeParent::SetBlobImageResources(
+    const wr::BlobImageKey& aKey,
+    const nsTArray<wr::ExternalImageId>& aExternalImages) {
+  if (mDestroyed) {
+    return;
+  }
+
+  auto key = wr::AsUint64(wr::AsImageKey(aKey));
+  auto it = mBlobResources.find(key);
+  if (it != mBlobResources.end() && it->second == aExternalImages) {
+    return;
+  }
+
+  nsTArray<wr::ExternalImageId> externalImages(aExternalImages.Length());
+  for (const auto& id : aExternalImages) {
+    RefPtr<DataSourceSurface> surf = SharedSurfacesParent::Acquire(id);
+    externalImages.AppendElement(id);
+  }
+
+  if (it == mBlobResources.end()) {
+    mBlobResources.insert(std::make_pair(key, std::move(externalImages)));
+  } else {
+    for (const auto& id : it->second) {
+      mAsyncImageManager->HoldExternalImage(mPipelineId, mWrEpoch, id);
+    }
+    it->second = std::move(externalImages);
   }
 }
 
@@ -1793,6 +1832,23 @@ void WebRenderBridgeParent::DeleteImage(const ImageKey& aKey,
   }
 
   aUpdates.DeleteImage(aKey);
+}
+void WebRenderBridgeParent::DeleteBlobImage(const BlobImageKey& aKey,
+                                            wr::TransactionBuilder& aUpdates) {
+  if (mDestroyed) {
+    return;
+  }
+
+  auto key = wr::AsUint64(wr::AsImageKey(aKey));
+  auto it = mBlobResources.find(key);
+  if (it != mBlobResources.end()) {
+    for (const auto& id : it->second) {
+      mAsyncImageManager->HoldExternalImage(mPipelineId, mWrEpoch, id);
+    }
+    mBlobResources.erase(it);
+  }
+
+  aUpdates.DeleteBlobImage(aKey);
 }
 
 void WebRenderBridgeParent::ReleaseTextureOfImage(const wr::ImageKey& aKey) {

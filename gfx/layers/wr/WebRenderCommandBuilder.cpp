@@ -97,7 +97,7 @@ struct BlobItemData {
   // We need to keep a list of all the external surfaces used by the blob image.
   // We do this on a per-display item basis so that the lists remains correct
   // during invalidations.
-  std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
+  std::vector<uint64_t> mExternalSurfaces;
 
   IntRect mImageRect;
 
@@ -172,22 +172,18 @@ static void DestroyBlobGroupDataProperty(nsTArray<BlobItemData*>* aArray) {
   delete aArray;
 }
 
-static void TakeExternalSurfaces(
-    WebRenderDrawEventRecorder* aRecorder,
-    std::vector<RefPtr<SourceSurface>>& aExternalSurfaces,
-    RenderRootStateManager* aManager, wr::IpcResourceUpdateQueue& aResources) {
-  aRecorder->TakeExternalSurfaces(aExternalSurfaces);
+static bool TakeExternalSurfaces(WebRenderDrawEventRecorder* aRecorder,
+                                 wr::BlobImageKey aKey,
+                                 bool aHadExternalSurfaces,
+                                 RenderRootStateManager* aManager,
+                                 wr::IpcResourceUpdateQueue& aResources) {
+  std::vector<uint64_t> externalSurfaces = aRecorder->TakeExternalSurfaces();
 
-  for (auto& surface : aExternalSurfaces) {
-    // While we don't use the image key with the surface, because the blob image
-    // renderer doesn't have easy access to the resource set, we still want to
-    // ensure one is generated. That will ensure the surface remains alive until
-    // at least the last epoch which the blob image could be used in.
-    wr::ImageKey key;
-    DebugOnly<nsresult> rv =
-        SharedSurfacesChild::Share(surface, aManager, aResources, key);
-    MOZ_ASSERT(rv.value != NS_ERROR_NOT_IMPLEMENTED);
+  bool hasExternalSurfaces = !externalSurfaces.empty();
+  if (aHadExternalSurfaces || hasExternalSurfaces) {
+    aResources.SetBlobImageResources(aKey, externalSurfaces);
   }
+  return hasExternalSurfaces;
 }
 
 struct DIGroup;
@@ -303,6 +299,8 @@ struct DIGroup {
                                 // containers applied
   Maybe<wr::BlobImageKey> mKey;
   std::vector<RefPtr<ScaledFont>> mFonts;
+  std::vector<uint64_t> mExternalSurfaces;  // temporary used during recording
+  bool mHasExternalSurfaces = false;
   bool mSuppressInvalidations = false;
 
   DIGroup()
@@ -342,6 +340,12 @@ struct DIGroup {
       mKey = Nothing();
     }
     mFonts.clear();
+  }
+
+  void MergeExternalSurfaces(const std::vector<uint64_t>& aExternalSurfaces) {
+    mExternalSurfaces.insert(mExternalSurfaces.begin(),
+                             aExternalSurfaces.begin(),
+                             aExternalSurfaces.end());
   }
 
   static IntRect ToDeviceSpace(nsRect aBounds, Matrix& aMatrix,
@@ -705,6 +709,13 @@ struct DIGroup {
         return;
       }
     }
+
+    if (mHasExternalSurfaces || !mExternalSurfaces.empty()) {
+      aResources.SetBlobImageResources(*mKey, mExternalSurfaces);
+    }
+    mHasExternalSurfaces = !mExternalSurfaces.empty();
+    mExternalSurfaces.clear();
+
     mFonts = std::move(fonts);
     aResources.SetBlobImageVisibleArea(
         *mKey,
@@ -829,13 +840,13 @@ struct DIGroup {
         }
 
         paintedItem->Paint(aGrouper->mDisplayListBuilder, aContext);
-        TakeExternalSurfaces(aRecorder, data->mExternalSurfaces, aRootManager,
-                             aResources);
+        data->mExternalSurfaces = aRecorder->TakeExternalSurfaces();
 
         if (currentClip.HasClip()) {
           aContext->Restore();
         }
       }
+      MergeExternalSurfaces(data->mExternalSurfaces);
       aContext->GetDrawTarget()->FlushItem(bounds);
     }
   }
@@ -909,9 +920,9 @@ void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
           aItem->SetPaintRect(aItem->GetClippedBounds(mDisplayListBuilder));
 
           aItem->AsPaintedDisplayItem()->Paint(mDisplayListBuilder, aContext);
-          TakeExternalSurfaces(aRecorder, aData->mExternalSurfaces,
-                               aRootManager, aResources);
+          aData->mExternalSurfaces = aRecorder->TakeExternalSurfaces();
         }
+        aGroup->MergeExternalSurfaces(aData->mExternalSurfaces);
         aContext->GetDrawTarget()->FlushItem(aItemBounds);
       } else {
         aContext->Multiply(ThebesMatrix(trans2d));
@@ -993,8 +1004,8 @@ void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
               GP("endGroup %s %p-%d\n", aItem->Name(), aItem->Frame(),
                  aItem->GetPerFrameKey());
             });
-        TakeExternalSurfaces(aRecorder, aData->mExternalSurfaces, aRootManager,
-                             aResources);
+        aData->mExternalSurfaces = aRecorder->TakeExternalSurfaces();
+        aGroup->MergeExternalSurfaces(aData->mExternalSurfaces);
         aContext->GetDrawTarget()->FlushItem(aItemBounds);
       }
       break;
@@ -1012,9 +1023,9 @@ void Grouper::PaintContainerItem(DIGroup* aGroup, nsDisplayItem* aItem,
             filterItem->GetClippedBounds(mDisplayListBuilder));
 
         filterItem->Paint(mDisplayListBuilder, aContext);
-        TakeExternalSurfaces(aRecorder, aData->mExternalSurfaces, aRootManager,
-                             aResources);
+        aData->mExternalSurfaces = aRecorder->TakeExternalSurfaces();
       }
+      aGroup->MergeExternalSurfaces(aData->mExternalSurfaces);
       aContext->GetDrawTarget()->FlushItem(aItemBounds);
       break;
     }
@@ -2295,8 +2306,9 @@ WebRenderCommandBuilder::GenerateFallbackData(
                                  PixelCastJustification::LayerIsImage))) {
         return nullptr;
       }
-      TakeExternalSurfaces(recorder, fallbackData->mExternalSurfaces,
-                           mManager->GetRenderRootStateManager(), aResources);
+      fallbackData->mHasExternalSurfaces = TakeExternalSurfaces(
+          recorder, key, fallbackData->mHasExternalSurfaces,
+          mManager->GetRenderRootStateManager(), aResources);
       fallbackData->SetBlobImageKey(key);
       fallbackData->SetFonts(fonts);
     } else {
@@ -2385,12 +2397,12 @@ class WebRenderMaskData : public WebRenderUserData {
 
   Maybe<wr::BlobImageKey> mBlobKey;
   std::vector<RefPtr<gfx::ScaledFont>> mFonts;
-  std::vector<RefPtr<gfx::SourceSurface>> mExternalSurfaces;
   LayerIntRect mItemRect;
   nsPoint mMaskOffset;
   nsStyleImageLayers mMaskStyle;
   gfx::Size mScale;
   bool mShouldHandleOpacity;
+  bool mHasExternalSurfaces = false;
 };
 
 Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
@@ -2531,8 +2543,9 @@ Maybe<wr::ImageMask> WebRenderCommandBuilder::BuildWrMaskImage(
     maskData->ClearImageKey();
     maskData->mBlobKey = Some(key);
     maskData->mFonts = fonts;
-    TakeExternalSurfaces(recorder, maskData->mExternalSurfaces,
-                         mManager->GetRenderRootStateManager(), aResources);
+    maskData->mHasExternalSurfaces =
+        TakeExternalSurfaces(recorder, key, maskData->mHasExternalSurfaces,
+                             mManager->GetRenderRootStateManager(), aResources);
     if (maskIsComplete) {
       maskData->mItemRect = itemRect;
       maskData->mMaskOffset = maskOffset;

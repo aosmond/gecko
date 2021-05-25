@@ -404,6 +404,17 @@ void IpcResourceUpdateQueue::SetBlobImageVisibleArea(
   mUpdates.AppendElement(layers::OpSetBlobImageVisibleArea(aArea, aKey));
 }
 
+void IpcResourceUpdateQueue::SetBlobImageResources(
+    wr::BlobImageKey aKey, const std::vector<uint64_t>& aExternalImageIds) {
+  layers::OpSetBlobImageResources op;
+  op.key() = aKey;
+  op.externalImages().SetCapacity(aExternalImageIds.size());
+  for (const auto& id : aExternalImageIds) {
+    op.externalImages().AppendElement(wr::ToExternalImageId(id));
+  }
+  mUpdates.AppendElement(std::move(op));
+}
+
 void IpcResourceUpdateQueue::DeleteImage(ImageKey aKey) {
   mUpdates.AppendElement(layers::OpDeleteImage(aKey));
 }
