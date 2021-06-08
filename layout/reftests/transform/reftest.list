@@ -141,7 +141,7 @@ fuzzy-if(webrender&&swgl,0-1,0-2) == animate-layer-scale-inherit-2.html animate-
 == animate-layer-scale-inherit-3.html animate-layer-scale-inherit-1-ref.html
 # Bug 1301500
 == dynamic-add-without-change-cb-1.html dynamic-add-without-change-cb-1-ref.html
-fuzzy-if(d2d,0-1,0-5) fuzzy-if(skiaContent,0-26,0-208) == table-overflowed-by-animation.html table-overflowed-by-animation-ref.html
+skip-if(useDrawSnapshot&&webrender) fuzzy-if(d2d,0-1,0-5) fuzzy-if(skiaContent,0-26,0-208) == table-overflowed-by-animation.html table-overflowed-by-animation-ref.html # Bug 1715402 for useDrawSnapshot&&webrender
 == translate-rounding-1.html translate-rounding-ref.html
 == translate-rounding-2.html translate-rounding-ref.html
 fails == translate-rounding-3.html translate-rounding-viewport-ref.html # bug 1397146
