@@ -139,6 +139,11 @@ linux1804-64-asan-qr/opt:
         - web-platform-tests
         - web-platform-tests-wdspec-headless
 
+linux1804-64-tsan-qr/opt:
+    build-platform: linux64-tsan/opt
+    test-sets:
+        - linux-tsan-tests
+
 linux1804-64-ccov/opt:
     build-platform: linux64-ccov/opt
     test-sets:
