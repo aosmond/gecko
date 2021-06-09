@@ -84,7 +84,7 @@ WINDOWS_WORKER_TYPES = {
         "virtual-with-gpu": "t-win7-32-gpu",
         "hardware": "t-win10-64-1803-hw",
     },
-    "windows10-32-mingwclang": {
+    "windows10-32-mingwclang-qr": {
         "virtual": "t-win10-64",
         "virtual-with-gpu": "t-win10-64-gpu-s",
         "hardware": "t-win10-64-1803-hw",
@@ -154,7 +154,7 @@ WINDOWS_WORKER_TYPES = {
         "virtual-with-gpu": "t-win10-64-gpu-s",
         "hardware": "t-win10-64-1803-hw",
     },
-    "windows10-64-mingwclang": {
+    "windows10-64-mingwclang-qr": {
         "virtual": "t-win10-64",
         "virtual-with-gpu": "t-win10-64-gpu-s",
         "hardware": "t-win10-64-1803-hw",
