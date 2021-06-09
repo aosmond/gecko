@@ -339,6 +339,12 @@ windows10-64-shippable-qr/opt:
         - web-platform-tests
         - mochitest-webgpu
 
+windows10-64-asan-qr/opt:
+    build-platform: win64-asan/opt
+    test-sets:
+        - windows-qr-tests
+        - mochitest-webgpu
+
 windows10-64-mingwclang-qr/debug:
     build-platform: win64-mingwclang/debug
     test-sets:
