@@ -99,6 +99,11 @@ WINDOWS_WORKER_TYPES = {
         "virtual-with-gpu": "t-win7-32-gpu",
         "hardware": "t-win10-64-1803-hw",
     },
+    "windows7-32-devedition-qr": {  # build only, tests have no value
+        "virtual": "t-win7-32",
+        "virtual-with-gpu": "t-win7-32-gpu",
+        "hardware": "t-win10-64-1803-hw",
+    },
     "windows10-32": {
         "virtual": "t-win10-64",
         "virtual-with-gpu": "t-win10-64-gpu-s",
