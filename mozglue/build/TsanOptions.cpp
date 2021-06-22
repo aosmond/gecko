@@ -73,6 +73,8 @@ extern "C" const char* __tsan_default_suppressions() {
          // This is likely a false positive involving a mutex from GTK.
          // See also bug 1642653 - permanent.
          "mutex:GetMaiAtkType\n"
+         // This is likely a false positive with llvmpipe.
+         "race:swrast_dri.so\n"
          // Bug 1688716 - Failure due to fire_glxtest_process
          // calling into uninstrumented external graphics driver code.
          // For example: iris_dri.so and swrast_dri.so.
@@ -283,6 +285,9 @@ extern "C" const char* __tsan_default_suppressions() {
          // Bug 1683357
          "race:image::ImageSurfaceCache::SuggestedSizeInternal\n"
          "race:image::RasterImage::SetMetadata\n"
+
+         // No bug, this is a benign race creating worker/SW compositor threads.
+         "race:webrender::profiler::register_thread\n"
 
       // End of suppressions.
       ;  // Please keep this semicolon.
