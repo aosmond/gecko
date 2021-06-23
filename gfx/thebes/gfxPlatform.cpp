@@ -2762,6 +2762,11 @@ void gfxPlatform::InitWebRenderConfig() {
       gfxVars::SetUseWebRenderTripleBufferingWin(true);
     }
   }
+
+  MOZ_RELEASE_ASSERT(!hasHardware);
+  MOZ_RELEASE_ASSERT(hasSoftware);
+  MOZ_RELEASE_ASSERT(gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING));
+  MOZ_RELEASE_ASSERT(gfxVars::AllowSoftwareWebRenderD3D11());
 #endif
 
   if (gfxConfig::IsEnabled(Feature::WEBRENDER_COMPOSITOR)) {
