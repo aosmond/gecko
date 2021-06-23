@@ -63,15 +63,11 @@ Browsertime tests that use a custom pageload test script. These use the pageload
             * browsertime-custom-firefox-process-switch-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-custom-firefox-process-switch-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-custom-firefox-process-switch-e10s: None
       * test-windows10-64-shippable-qr/opt
             * browsertime-custom-firefox-process-switch-e10s: mozilla-central
             * browsertime-custom-firefox-process-switch-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
-            * browsertime-custom-firefox-process-switch-e10s: None
-      * test-windows10-64/opt
-            * browsertime-custom-firefox-process-switch-e10s: None
 
 
 .. dropdown:: welcome (Measures pageload metrics for the first-install about:welcome page)
@@ -122,15 +118,11 @@ Browsertime tests that use a custom pageload test script. These use the pageload
             * browsertime-first-install-firefox-welcome-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-first-install-firefox-welcome-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-first-install-firefox-welcome-e10s: None
       * test-windows10-64-shippable-qr/opt
             * browsertime-first-install-firefox-welcome-e10s: autoland, mozilla-central
             * browsertime-first-install-firefox-welcome-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
-            * browsertime-first-install-firefox-welcome-e10s: None
-      * test-windows10-64/opt
-            * browsertime-first-install-firefox-welcome-e10s: None
 
 
 
@@ -166,8 +158,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-amazon-e10s: None
+            * browsertime-tp6-essential-chromium-amazon-e10s: None
             * browsertime-tp6-essential-firefox-amazon-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-amazon-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-amazon-e10s: None
+            * browsertime-tp6-live-chromium-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-fis-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
@@ -185,15 +181,23 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-amazon-e10s: None
+            * browsertime-tp6-essential-chromium-amazon-e10s: None
             * browsertime-tp6-essential-firefox-amazon-e10s: trunk
             * browsertime-tp6-essential-firefox-amazon-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-amazon-e10s: None
+            * browsertime-tp6-live-chromium-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-fis-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-amazon-e10s: None
+            * browsertime-tp6-essential-chromium-amazon-e10s: None
             * browsertime-tp6-essential-firefox-amazon-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-amazon-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-amazon-e10s: None
+            * browsertime-tp6-live-chromium-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-fis-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
@@ -211,8 +215,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-amazon-e10s: None
+            * browsertime-tp6-essential-chromium-amazon-e10s: None
             * browsertime-tp6-essential-firefox-amazon-e10s: None
             * browsertime-tp6-essential-firefox-amazon-fis-e10s: None
+            * browsertime-tp6-live-chrome-amazon-e10s: None
+            * browsertime-tp6-live-chromium-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-fis-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
@@ -221,29 +229,22 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
       * test-windows10-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-amazon-e10s: None
+            * browsertime-tp6-essential-chromium-amazon-e10s: None
             * browsertime-tp6-essential-firefox-amazon-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-amazon-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-amazon-noqr-e10s: mozilla-beta, trunk
+            * browsertime-tp6-live-chrome-amazon-e10s: None
+            * browsertime-tp6-live-chromium-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-e10s: None
             * browsertime-tp6-live-firefox-amazon-fis-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-e10s: None
             * browsertime-tp6-profiling-firefox-amazon-fis-e10s: None
-      * test-windows10-64-shippable/opt
-            * browsertime-tp6-essential-chrome-amazon-e10s: None
-            * browsertime-tp6-essential-chromium-amazon-e10s: None
-            * browsertime-tp6-essential-firefox-amazon-e10s: mozilla-beta, trunk
-            * browsertime-tp6-live-chrome-amazon-e10s: None
-            * browsertime-tp6-live-chromium-amazon-e10s: None
-            * browsertime-tp6-live-firefox-amazon-e10s: None
-            * browsertime-tp6-profiling-firefox-amazon-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-amazon-e10s: None
-            * browsertime-tp6-live-firefox-amazon-e10s: None
-            * browsertime-tp6-profiling-firefox-amazon-e10s: None
 
 
 .. dropdown:: bing-search (BT, FF, CH, CU)
@@ -273,8 +274,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-bing-search-e10s: None
+            * browsertime-tp6-essential-chromium-bing-search-e10s: None
             * browsertime-tp6-essential-firefox-bing-search-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-bing-search-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-bing-search-e10s: None
+            * browsertime-tp6-live-chromium-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -288,13 +293,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-bing-search-e10s: None
+            * browsertime-tp6-essential-chromium-bing-search-e10s: None
             * browsertime-tp6-essential-firefox-bing-search-e10s: trunk
             * browsertime-tp6-essential-firefox-bing-search-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-bing-search-e10s: None
+            * browsertime-tp6-live-chromium-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-bing-search-e10s: None
+            * browsertime-tp6-essential-chromium-bing-search-e10s: None
             * browsertime-tp6-essential-firefox-bing-search-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-bing-search-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-bing-search-e10s: None
+            * browsertime-tp6-live-chromium-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -308,31 +321,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-bing-search-e10s: None
+            * browsertime-tp6-essential-chromium-bing-search-e10s: None
             * browsertime-tp6-essential-firefox-bing-search-e10s: None
             * browsertime-tp6-essential-firefox-bing-search-fis-e10s: None
+            * browsertime-tp6-live-chrome-bing-search-e10s: None
+            * browsertime-tp6-live-chromium-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-bing-search-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-bing-search-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-bing-search-e10s: None
-            * browsertime-tp6-live-firefox-bing-search-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-bing-search-e10s: None
             * browsertime-tp6-essential-chromium-bing-search-e10s: None
             * browsertime-tp6-essential-firefox-bing-search-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-bing-search-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-bing-search-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-bing-search-e10s: None
             * browsertime-tp6-live-chromium-bing-search-e10s: None
             * browsertime-tp6-live-firefox-bing-search-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-bing-search-e10s: None
-            * browsertime-tp6-live-firefox-bing-search-e10s: None
+            * browsertime-tp6-live-firefox-bing-search-fis-e10s: None
 
 
 .. dropdown:: buzzfeed (BT, FF, CH, CU)
@@ -361,6 +373,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64-qr/opt
             * browsertime-tp6-firefox-buzzfeed-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-buzzfeed-e10s: None
+            * browsertime-tp6-chromium-buzzfeed-e10s: None
             * browsertime-tp6-firefox-buzzfeed-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-buzzfeed-fis-e10s: mozilla-central
       * test-linux1804-64-shippable/opt
@@ -370,9 +384,13 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64/opt
             * browsertime-tp6-firefox-buzzfeed-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-buzzfeed-e10s: None
+            * browsertime-tp6-chromium-buzzfeed-e10s: None
             * browsertime-tp6-firefox-buzzfeed-e10s: trunk
             * browsertime-tp6-firefox-buzzfeed-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-buzzfeed-e10s: None
+            * browsertime-tp6-chromium-buzzfeed-e10s: None
             * browsertime-tp6-firefox-buzzfeed-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-buzzfeed-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable/opt
@@ -382,21 +400,19 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-32-qr/opt
             * browsertime-tp6-firefox-buzzfeed-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-buzzfeed-e10s: None
+            * browsertime-tp6-chromium-buzzfeed-e10s: None
             * browsertime-tp6-firefox-buzzfeed-e10s: None
             * browsertime-tp6-firefox-buzzfeed-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-buzzfeed-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-buzzfeed-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-buzzfeed-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-buzzfeed-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-buzzfeed-e10s: None
             * browsertime-tp6-chromium-buzzfeed-e10s: None
-            * browsertime-tp6-firefox-buzzfeed-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-buzzfeed-e10s: None
+            * browsertime-tp6-firefox-buzzfeed-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-buzzfeed-fis-e10s: mozilla-central
 
 
 .. dropdown:: cnn (BT, FF, CH, CU)
@@ -426,6 +442,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-cnn-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-cnn-e10s: None
+            * browsertime-tp6-essential-chromium-cnn-e10s: None
             * browsertime-tp6-essential-firefox-cnn-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-cnn-fis-e10s: mozilla-central
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
@@ -439,11 +457,15 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-cnn-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-cnn-e10s: None
+            * browsertime-tp6-essential-chromium-cnn-e10s: None
             * browsertime-tp6-essential-firefox-cnn-e10s: trunk
             * browsertime-tp6-essential-firefox-cnn-fis-e10s: mozilla-central
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-cnn-e10s: None
+            * browsertime-tp6-essential-chromium-cnn-e10s: None
             * browsertime-tp6-essential-firefox-cnn-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-cnn-fis-e10s: mozilla-central
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
@@ -457,6 +479,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-cnn-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-cnn-e10s: None
+            * browsertime-tp6-essential-chromium-cnn-e10s: None
             * browsertime-tp6-essential-firefox-cnn-e10s: None
             * browsertime-tp6-essential-firefox-cnn-fis-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
@@ -464,22 +488,17 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-cnn-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-cnn-e10s: None
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-cnn-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-cnn-fis-e10s: mozilla-central
-            * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
-            * browsertime-tp6-live-sheriffed-firefox-cnn-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-cnn-e10s: None
             * browsertime-tp6-essential-chromium-cnn-e10s: None
             * browsertime-tp6-essential-firefox-cnn-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-cnn-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-cnn-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-cnn-e10s: None
-            * browsertime-tp6-live-sheriffed-firefox-cnn-e10s: None
+            * browsertime-tp6-live-sheriffed-firefox-cnn-fis-e10s: None
 
 
 .. dropdown:: ebay (BT, FF, CH, CU)
@@ -509,8 +528,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-ebay-e10s: None
+            * browsertime-tp6-chromium-ebay-e10s: None
             * browsertime-tp6-firefox-ebay-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-ebay-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-ebay-e10s: None
+            * browsertime-tp6-live-chromium-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -524,13 +547,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-ebay-e10s: None
+            * browsertime-tp6-chromium-ebay-e10s: None
             * browsertime-tp6-firefox-ebay-e10s: trunk
             * browsertime-tp6-firefox-ebay-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-ebay-e10s: None
+            * browsertime-tp6-live-chromium-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-ebay-e10s: None
+            * browsertime-tp6-chromium-ebay-e10s: None
             * browsertime-tp6-firefox-ebay-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-ebay-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-ebay-e10s: None
+            * browsertime-tp6-live-chromium-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -544,31 +575,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-ebay-e10s: None
+            * browsertime-tp6-chromium-ebay-e10s: None
             * browsertime-tp6-firefox-ebay-e10s: None
             * browsertime-tp6-firefox-ebay-fis-e10s: None
+            * browsertime-tp6-live-chrome-ebay-e10s: None
+            * browsertime-tp6-live-chromium-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-ebay-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-ebay-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-ebay-e10s: None
-            * browsertime-tp6-live-firefox-ebay-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-ebay-e10s: None
             * browsertime-tp6-chromium-ebay-e10s: None
-            * browsertime-tp6-firefox-ebay-e10s: None
+            * browsertime-tp6-firefox-ebay-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-ebay-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-ebay-e10s: None
             * browsertime-tp6-live-chromium-ebay-e10s: None
             * browsertime-tp6-live-firefox-ebay-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-ebay-e10s: None
-            * browsertime-tp6-live-firefox-ebay-e10s: None
+            * browsertime-tp6-live-firefox-ebay-fis-e10s: None
 
 
 .. dropdown:: espn (BT, FF, CH, CU)
@@ -597,6 +626,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64-qr/opt
             * browsertime-tp6-firefox-espn-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-espn-e10s: None
+            * browsertime-tp6-chromium-espn-e10s: None
             * browsertime-tp6-firefox-espn-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-espn-fis-e10s: mozilla-central
       * test-linux1804-64-shippable/opt
@@ -606,9 +637,13 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64/opt
             * browsertime-tp6-firefox-espn-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-espn-e10s: None
+            * browsertime-tp6-chromium-espn-e10s: None
             * browsertime-tp6-firefox-espn-e10s: trunk
             * browsertime-tp6-firefox-espn-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-espn-e10s: None
+            * browsertime-tp6-chromium-espn-e10s: None
             * browsertime-tp6-firefox-espn-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-espn-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable/opt
@@ -618,21 +653,19 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-32-qr/opt
             * browsertime-tp6-firefox-espn-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-espn-e10s: None
+            * browsertime-tp6-chromium-espn-e10s: None
             * browsertime-tp6-firefox-espn-e10s: None
             * browsertime-tp6-firefox-espn-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-espn-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-espn-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-espn-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-espn-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-espn-e10s: None
             * browsertime-tp6-chromium-espn-e10s: None
-            * browsertime-tp6-firefox-espn-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-espn-e10s: None
+            * browsertime-tp6-firefox-espn-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-espn-fis-e10s: mozilla-central
 
 
 .. dropdown:: expedia (BT, FF, CH, CU)
@@ -661,6 +694,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64-qr/opt
             * browsertime-tp6-firefox-expedia-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-expedia-e10s: None
+            * browsertime-tp6-chromium-expedia-e10s: None
             * browsertime-tp6-firefox-expedia-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-expedia-fis-e10s: mozilla-central
       * test-linux1804-64-shippable/opt
@@ -670,9 +705,13 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64/opt
             * browsertime-tp6-firefox-expedia-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-expedia-e10s: None
+            * browsertime-tp6-chromium-expedia-e10s: None
             * browsertime-tp6-firefox-expedia-e10s: trunk
             * browsertime-tp6-firefox-expedia-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-expedia-e10s: None
+            * browsertime-tp6-chromium-expedia-e10s: None
             * browsertime-tp6-firefox-expedia-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-expedia-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable/opt
@@ -682,21 +721,19 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-32-qr/opt
             * browsertime-tp6-firefox-expedia-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-expedia-e10s: None
+            * browsertime-tp6-chromium-expedia-e10s: None
             * browsertime-tp6-firefox-expedia-e10s: None
             * browsertime-tp6-firefox-expedia-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-expedia-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-expedia-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-expedia-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-expedia-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-expedia-e10s: None
             * browsertime-tp6-chromium-expedia-e10s: None
-            * browsertime-tp6-firefox-expedia-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-expedia-e10s: None
+            * browsertime-tp6-firefox-expedia-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-expedia-fis-e10s: mozilla-central
 
 
 .. dropdown:: facebook (BT, FF, CH, CU)
@@ -726,8 +763,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-facebook-e10s: None
+            * browsertime-tp6-chromium-facebook-e10s: None
             * browsertime-tp6-firefox-facebook-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-facebook-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-facebook-e10s: None
+            * browsertime-tp6-live-chromium-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -741,13 +782,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-facebook-e10s: None
+            * browsertime-tp6-chromium-facebook-e10s: None
             * browsertime-tp6-firefox-facebook-e10s: trunk
             * browsertime-tp6-firefox-facebook-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-facebook-e10s: None
+            * browsertime-tp6-live-chromium-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-facebook-e10s: None
+            * browsertime-tp6-chromium-facebook-e10s: None
             * browsertime-tp6-firefox-facebook-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-facebook-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-facebook-e10s: None
+            * browsertime-tp6-live-chromium-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -761,31 +810,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-facebook-e10s: None
+            * browsertime-tp6-chromium-facebook-e10s: None
             * browsertime-tp6-firefox-facebook-e10s: None
             * browsertime-tp6-firefox-facebook-fis-e10s: None
+            * browsertime-tp6-live-chrome-facebook-e10s: None
+            * browsertime-tp6-live-chromium-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-facebook-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-facebook-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-facebook-e10s: None
-            * browsertime-tp6-live-firefox-facebook-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-facebook-e10s: None
             * browsertime-tp6-chromium-facebook-e10s: None
-            * browsertime-tp6-firefox-facebook-e10s: None
+            * browsertime-tp6-firefox-facebook-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-facebook-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-facebook-e10s: None
             * browsertime-tp6-live-chromium-facebook-e10s: None
             * browsertime-tp6-live-firefox-facebook-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-facebook-e10s: None
-            * browsertime-tp6-live-firefox-facebook-e10s: None
+            * browsertime-tp6-live-firefox-facebook-fis-e10s: None
 
 
 .. dropdown:: fandom (BT, FF, CH, CU)
@@ -815,8 +862,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-fandom-e10s: None
+            * browsertime-tp6-essential-chromium-fandom-e10s: None
             * browsertime-tp6-essential-firefox-fandom-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-fandom-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-fandom-e10s: None
+            * browsertime-tp6-live-chromium-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -830,13 +881,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-fandom-e10s: None
+            * browsertime-tp6-essential-chromium-fandom-e10s: None
             * browsertime-tp6-essential-firefox-fandom-e10s: trunk
             * browsertime-tp6-essential-firefox-fandom-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-fandom-e10s: None
+            * browsertime-tp6-live-chromium-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-fandom-e10s: None
+            * browsertime-tp6-essential-chromium-fandom-e10s: None
             * browsertime-tp6-essential-firefox-fandom-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-fandom-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-fandom-e10s: None
+            * browsertime-tp6-live-chromium-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -850,31 +909,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-fandom-e10s: None
+            * browsertime-tp6-essential-chromium-fandom-e10s: None
             * browsertime-tp6-essential-firefox-fandom-e10s: None
             * browsertime-tp6-essential-firefox-fandom-fis-e10s: None
+            * browsertime-tp6-live-chrome-fandom-e10s: None
+            * browsertime-tp6-live-chromium-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-fandom-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-fandom-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-fandom-e10s: None
-            * browsertime-tp6-live-firefox-fandom-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-fandom-e10s: None
             * browsertime-tp6-essential-chromium-fandom-e10s: None
             * browsertime-tp6-essential-firefox-fandom-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-fandom-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-fandom-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-fandom-e10s: None
             * browsertime-tp6-live-chromium-fandom-e10s: None
             * browsertime-tp6-live-firefox-fandom-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-fandom-e10s: None
-            * browsertime-tp6-live-firefox-fandom-e10s: None
+            * browsertime-tp6-live-firefox-fandom-fis-e10s: None
 
 
 .. dropdown:: google-docs (BT, FF, CH, CU)
@@ -904,8 +962,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-docs-e10s: None
+            * browsertime-tp6-chromium-google-docs-e10s: None
             * browsertime-tp6-firefox-google-docs-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-google-docs-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-docs-e10s: None
+            * browsertime-tp6-live-chromium-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -919,13 +981,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-docs-e10s: None
+            * browsertime-tp6-chromium-google-docs-e10s: None
             * browsertime-tp6-firefox-google-docs-e10s: trunk
             * browsertime-tp6-firefox-google-docs-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-docs-e10s: None
+            * browsertime-tp6-live-chromium-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-docs-e10s: None
+            * browsertime-tp6-chromium-google-docs-e10s: None
             * browsertime-tp6-firefox-google-docs-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-google-docs-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-docs-e10s: None
+            * browsertime-tp6-live-chromium-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -939,31 +1009,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-google-docs-e10s: None
+            * browsertime-tp6-chromium-google-docs-e10s: None
             * browsertime-tp6-firefox-google-docs-e10s: None
             * browsertime-tp6-firefox-google-docs-fis-e10s: None
+            * browsertime-tp6-live-chrome-google-docs-e10s: None
+            * browsertime-tp6-live-chromium-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-google-docs-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-google-docs-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-google-docs-e10s: None
-            * browsertime-tp6-live-firefox-google-docs-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-google-docs-e10s: None
             * browsertime-tp6-chromium-google-docs-e10s: None
-            * browsertime-tp6-firefox-google-docs-e10s: None
+            * browsertime-tp6-firefox-google-docs-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-google-docs-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-google-docs-e10s: None
             * browsertime-tp6-live-chromium-google-docs-e10s: None
             * browsertime-tp6-live-firefox-google-docs-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-google-docs-e10s: None
-            * browsertime-tp6-live-firefox-google-docs-e10s: None
+            * browsertime-tp6-live-firefox-google-docs-fis-e10s: None
 
 
 .. dropdown:: google-mail (BT, FF, CH, CU)
@@ -993,8 +1061,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-mail-e10s: None
+            * browsertime-tp6-chromium-google-mail-e10s: None
             * browsertime-tp6-firefox-google-mail-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-google-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-mail-e10s: None
+            * browsertime-tp6-live-chromium-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1008,13 +1080,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-mail-e10s: None
+            * browsertime-tp6-chromium-google-mail-e10s: None
             * browsertime-tp6-firefox-google-mail-e10s: trunk
             * browsertime-tp6-firefox-google-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-mail-e10s: None
+            * browsertime-tp6-live-chromium-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-mail-e10s: None
+            * browsertime-tp6-chromium-google-mail-e10s: None
             * browsertime-tp6-firefox-google-mail-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-google-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-mail-e10s: None
+            * browsertime-tp6-live-chromium-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1028,31 +1108,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-google-mail-e10s: None
+            * browsertime-tp6-chromium-google-mail-e10s: None
             * browsertime-tp6-firefox-google-mail-e10s: None
             * browsertime-tp6-firefox-google-mail-fis-e10s: None
+            * browsertime-tp6-live-chrome-google-mail-e10s: None
+            * browsertime-tp6-live-chromium-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-google-mail-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-google-mail-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-google-mail-e10s: None
-            * browsertime-tp6-live-firefox-google-mail-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-google-mail-e10s: None
             * browsertime-tp6-chromium-google-mail-e10s: None
-            * browsertime-tp6-firefox-google-mail-e10s: None
+            * browsertime-tp6-firefox-google-mail-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-google-mail-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-google-mail-e10s: None
             * browsertime-tp6-live-chromium-google-mail-e10s: None
             * browsertime-tp6-live-firefox-google-mail-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-google-mail-e10s: None
-            * browsertime-tp6-live-firefox-google-mail-e10s: None
+            * browsertime-tp6-live-firefox-google-mail-fis-e10s: None
 
 
 .. dropdown:: google-search (BT, FF, CH, CU)
@@ -1082,8 +1160,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-search-e10s: None
+            * browsertime-tp6-chromium-google-search-e10s: None
             * browsertime-tp6-firefox-google-search-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-google-search-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-search-e10s: None
+            * browsertime-tp6-live-chromium-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1097,13 +1179,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-search-e10s: None
+            * browsertime-tp6-chromium-google-search-e10s: None
             * browsertime-tp6-firefox-google-search-e10s: trunk
             * browsertime-tp6-firefox-google-search-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-search-e10s: None
+            * browsertime-tp6-live-chromium-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-google-search-e10s: None
+            * browsertime-tp6-chromium-google-search-e10s: None
             * browsertime-tp6-firefox-google-search-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-google-search-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-search-e10s: None
+            * browsertime-tp6-live-chromium-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1117,31 +1207,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-google-search-e10s: None
+            * browsertime-tp6-chromium-google-search-e10s: None
             * browsertime-tp6-firefox-google-search-e10s: None
             * browsertime-tp6-firefox-google-search-fis-e10s: None
+            * browsertime-tp6-live-chrome-google-search-e10s: None
+            * browsertime-tp6-live-chromium-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-google-search-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-google-search-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-google-search-e10s: None
-            * browsertime-tp6-live-firefox-google-search-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-google-search-e10s: None
             * browsertime-tp6-chromium-google-search-e10s: None
-            * browsertime-tp6-firefox-google-search-e10s: None
+            * browsertime-tp6-firefox-google-search-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-google-search-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-google-search-e10s: None
             * browsertime-tp6-live-chromium-google-search-e10s: None
             * browsertime-tp6-live-firefox-google-search-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-google-search-e10s: None
-            * browsertime-tp6-live-firefox-google-search-e10s: None
+            * browsertime-tp6-live-firefox-google-search-fis-e10s: None
 
 
 .. dropdown:: google-slides (BT, FF, CH, CU)
@@ -1171,8 +1259,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-google-slides-e10s: None
+            * browsertime-tp6-essential-chromium-google-slides-e10s: None
             * browsertime-tp6-essential-firefox-google-slides-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-google-slides-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-slides-e10s: None
+            * browsertime-tp6-live-chromium-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1186,13 +1278,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-google-slides-e10s: None
+            * browsertime-tp6-essential-chromium-google-slides-e10s: None
             * browsertime-tp6-essential-firefox-google-slides-e10s: trunk
             * browsertime-tp6-essential-firefox-google-slides-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-slides-e10s: None
+            * browsertime-tp6-live-chromium-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-google-slides-e10s: None
+            * browsertime-tp6-essential-chromium-google-slides-e10s: None
             * browsertime-tp6-essential-firefox-google-slides-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-google-slides-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-google-slides-e10s: None
+            * browsertime-tp6-live-chromium-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1206,31 +1306,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-google-slides-e10s: None
+            * browsertime-tp6-essential-chromium-google-slides-e10s: None
             * browsertime-tp6-essential-firefox-google-slides-e10s: None
             * browsertime-tp6-essential-firefox-google-slides-fis-e10s: None
+            * browsertime-tp6-live-chrome-google-slides-e10s: None
+            * browsertime-tp6-live-chromium-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-google-slides-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-google-slides-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-google-slides-e10s: None
-            * browsertime-tp6-live-firefox-google-slides-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-google-slides-e10s: None
             * browsertime-tp6-essential-chromium-google-slides-e10s: None
             * browsertime-tp6-essential-firefox-google-slides-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-google-slides-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-google-slides-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-google-slides-e10s: None
             * browsertime-tp6-live-chromium-google-slides-e10s: None
             * browsertime-tp6-live-firefox-google-slides-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-google-slides-e10s: None
-            * browsertime-tp6-live-firefox-google-slides-e10s: None
+            * browsertime-tp6-live-firefox-google-slides-fis-e10s: None
 
 
 .. dropdown:: imdb (BT, FF, CH, CU)
@@ -1260,8 +1359,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-imdb-e10s: None
+            * browsertime-tp6-chromium-imdb-e10s: None
             * browsertime-tp6-firefox-imdb-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-imdb-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-imdb-e10s: None
+            * browsertime-tp6-live-chromium-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1275,13 +1378,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-imdb-e10s: None
+            * browsertime-tp6-chromium-imdb-e10s: None
             * browsertime-tp6-firefox-imdb-e10s: trunk
             * browsertime-tp6-firefox-imdb-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-imdb-e10s: None
+            * browsertime-tp6-live-chromium-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-imdb-e10s: None
+            * browsertime-tp6-chromium-imdb-e10s: None
             * browsertime-tp6-firefox-imdb-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-imdb-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-imdb-e10s: None
+            * browsertime-tp6-live-chromium-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1295,31 +1406,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-imdb-e10s: None
+            * browsertime-tp6-chromium-imdb-e10s: None
             * browsertime-tp6-firefox-imdb-e10s: None
             * browsertime-tp6-firefox-imdb-fis-e10s: None
+            * browsertime-tp6-live-chrome-imdb-e10s: None
+            * browsertime-tp6-live-chromium-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-imdb-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-imdb-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-imdb-e10s: None
-            * browsertime-tp6-live-firefox-imdb-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-imdb-e10s: None
             * browsertime-tp6-chromium-imdb-e10s: None
-            * browsertime-tp6-firefox-imdb-e10s: None
+            * browsertime-tp6-firefox-imdb-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-imdb-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-imdb-e10s: None
             * browsertime-tp6-live-chromium-imdb-e10s: None
             * browsertime-tp6-live-firefox-imdb-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-imdb-e10s: None
-            * browsertime-tp6-live-firefox-imdb-e10s: None
+            * browsertime-tp6-live-firefox-imdb-fis-e10s: None
 
 
 .. dropdown:: imgur (BT, FF, CH, CU)
@@ -1349,8 +1458,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-imgur-e10s: None
+            * browsertime-tp6-chromium-imgur-e10s: None
             * browsertime-tp6-firefox-imgur-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-imgur-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-imgur-e10s: None
+            * browsertime-tp6-live-chromium-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1364,13 +1477,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-imgur-e10s: None
+            * browsertime-tp6-chromium-imgur-e10s: None
             * browsertime-tp6-firefox-imgur-e10s: trunk
             * browsertime-tp6-firefox-imgur-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-imgur-e10s: None
+            * browsertime-tp6-live-chromium-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-imgur-e10s: None
+            * browsertime-tp6-chromium-imgur-e10s: None
             * browsertime-tp6-firefox-imgur-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-imgur-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-imgur-e10s: None
+            * browsertime-tp6-live-chromium-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1384,31 +1505,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-imgur-e10s: None
+            * browsertime-tp6-chromium-imgur-e10s: None
             * browsertime-tp6-firefox-imgur-e10s: None
             * browsertime-tp6-firefox-imgur-fis-e10s: None
+            * browsertime-tp6-live-chrome-imgur-e10s: None
+            * browsertime-tp6-live-chromium-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-imgur-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-imgur-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-imgur-e10s: None
-            * browsertime-tp6-live-firefox-imgur-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-imgur-e10s: None
             * browsertime-tp6-chromium-imgur-e10s: None
-            * browsertime-tp6-firefox-imgur-e10s: None
+            * browsertime-tp6-firefox-imgur-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-imgur-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-imgur-e10s: None
             * browsertime-tp6-live-chromium-imgur-e10s: None
             * browsertime-tp6-live-firefox-imgur-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-imgur-e10s: None
-            * browsertime-tp6-live-firefox-imgur-e10s: None
+            * browsertime-tp6-live-firefox-imgur-fis-e10s: None
 
 
 .. dropdown:: instagram (BT, FF, CH, CU)
@@ -1438,8 +1557,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-instagram-e10s: None
+            * browsertime-tp6-essential-chromium-instagram-e10s: None
             * browsertime-tp6-essential-firefox-instagram-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-instagram-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-instagram-e10s: None
+            * browsertime-tp6-live-chromium-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1453,13 +1576,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-instagram-e10s: None
+            * browsertime-tp6-essential-chromium-instagram-e10s: None
             * browsertime-tp6-essential-firefox-instagram-e10s: trunk
             * browsertime-tp6-essential-firefox-instagram-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-instagram-e10s: None
+            * browsertime-tp6-live-chromium-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-instagram-e10s: None
+            * browsertime-tp6-essential-chromium-instagram-e10s: None
             * browsertime-tp6-essential-firefox-instagram-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-instagram-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-instagram-e10s: None
+            * browsertime-tp6-live-chromium-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1473,31 +1604,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-instagram-e10s: None
+            * browsertime-tp6-essential-chromium-instagram-e10s: None
             * browsertime-tp6-essential-firefox-instagram-e10s: None
             * browsertime-tp6-essential-firefox-instagram-fis-e10s: None
+            * browsertime-tp6-live-chrome-instagram-e10s: None
+            * browsertime-tp6-live-chromium-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-instagram-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-instagram-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-instagram-e10s: None
-            * browsertime-tp6-live-firefox-instagram-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-instagram-e10s: None
             * browsertime-tp6-essential-chromium-instagram-e10s: None
             * browsertime-tp6-essential-firefox-instagram-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-instagram-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-instagram-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-instagram-e10s: None
             * browsertime-tp6-live-chromium-instagram-e10s: None
             * browsertime-tp6-live-firefox-instagram-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-instagram-e10s: None
-            * browsertime-tp6-live-firefox-instagram-e10s: None
+            * browsertime-tp6-live-firefox-instagram-fis-e10s: None
 
 
 .. dropdown:: linkedin (BT, FF, CH, CU)
@@ -1527,8 +1657,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-linkedin-e10s: None
+            * browsertime-tp6-chromium-linkedin-e10s: None
             * browsertime-tp6-firefox-linkedin-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-linkedin-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-linkedin-e10s: None
+            * browsertime-tp6-live-chromium-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1542,13 +1676,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-linkedin-e10s: None
+            * browsertime-tp6-chromium-linkedin-e10s: None
             * browsertime-tp6-firefox-linkedin-e10s: trunk
             * browsertime-tp6-firefox-linkedin-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-linkedin-e10s: None
+            * browsertime-tp6-live-chromium-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-linkedin-e10s: None
+            * browsertime-tp6-chromium-linkedin-e10s: None
             * browsertime-tp6-firefox-linkedin-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-linkedin-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-linkedin-e10s: None
+            * browsertime-tp6-live-chromium-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1562,31 +1704,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-linkedin-e10s: None
+            * browsertime-tp6-chromium-linkedin-e10s: None
             * browsertime-tp6-firefox-linkedin-e10s: None
             * browsertime-tp6-firefox-linkedin-fis-e10s: None
+            * browsertime-tp6-live-chrome-linkedin-e10s: None
+            * browsertime-tp6-live-chromium-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-linkedin-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-linkedin-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-linkedin-e10s: None
-            * browsertime-tp6-live-firefox-linkedin-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-linkedin-e10s: None
             * browsertime-tp6-chromium-linkedin-e10s: None
-            * browsertime-tp6-firefox-linkedin-e10s: None
+            * browsertime-tp6-firefox-linkedin-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-linkedin-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-linkedin-e10s: None
             * browsertime-tp6-live-chromium-linkedin-e10s: None
             * browsertime-tp6-live-firefox-linkedin-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-linkedin-e10s: None
-            * browsertime-tp6-live-firefox-linkedin-e10s: None
+            * browsertime-tp6-live-firefox-linkedin-fis-e10s: None
 
 
 .. dropdown:: microsoft (BT, FF, CH, CU)
@@ -1616,8 +1756,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-microsoft-e10s: None
+            * browsertime-tp6-chromium-microsoft-e10s: None
             * browsertime-tp6-firefox-microsoft-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-microsoft-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-microsoft-e10s: None
+            * browsertime-tp6-live-chromium-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1631,13 +1775,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-microsoft-e10s: None
+            * browsertime-tp6-chromium-microsoft-e10s: None
             * browsertime-tp6-firefox-microsoft-e10s: trunk
             * browsertime-tp6-firefox-microsoft-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-microsoft-e10s: None
+            * browsertime-tp6-live-chromium-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-microsoft-e10s: None
+            * browsertime-tp6-chromium-microsoft-e10s: None
             * browsertime-tp6-firefox-microsoft-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-microsoft-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-microsoft-e10s: None
+            * browsertime-tp6-live-chromium-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1651,31 +1803,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-microsoft-e10s: None
+            * browsertime-tp6-chromium-microsoft-e10s: None
             * browsertime-tp6-firefox-microsoft-e10s: None
             * browsertime-tp6-firefox-microsoft-fis-e10s: None
+            * browsertime-tp6-live-chrome-microsoft-e10s: None
+            * browsertime-tp6-live-chromium-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-microsoft-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-microsoft-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-microsoft-e10s: None
-            * browsertime-tp6-live-firefox-microsoft-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-microsoft-e10s: None
             * browsertime-tp6-chromium-microsoft-e10s: None
-            * browsertime-tp6-firefox-microsoft-e10s: None
+            * browsertime-tp6-firefox-microsoft-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-microsoft-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-microsoft-e10s: None
             * browsertime-tp6-live-chromium-microsoft-e10s: None
             * browsertime-tp6-live-firefox-microsoft-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-microsoft-e10s: None
-            * browsertime-tp6-live-firefox-microsoft-e10s: None
+            * browsertime-tp6-live-firefox-microsoft-fis-e10s: None
 
 
 .. dropdown:: netflix (BT, FF, CH, CU)
@@ -1705,8 +1855,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-netflix-e10s: None
+            * browsertime-tp6-chromium-netflix-e10s: None
             * browsertime-tp6-firefox-netflix-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-netflix-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-netflix-e10s: None
+            * browsertime-tp6-live-chromium-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1720,13 +1874,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-netflix-e10s: None
+            * browsertime-tp6-chromium-netflix-e10s: None
             * browsertime-tp6-firefox-netflix-e10s: trunk
             * browsertime-tp6-firefox-netflix-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-netflix-e10s: None
+            * browsertime-tp6-live-chromium-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-netflix-e10s: None
+            * browsertime-tp6-chromium-netflix-e10s: None
             * browsertime-tp6-firefox-netflix-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-netflix-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-netflix-e10s: None
+            * browsertime-tp6-live-chromium-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1740,31 +1902,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-netflix-e10s: None
+            * browsertime-tp6-chromium-netflix-e10s: None
             * browsertime-tp6-firefox-netflix-e10s: None
             * browsertime-tp6-firefox-netflix-fis-e10s: None
+            * browsertime-tp6-live-chrome-netflix-e10s: None
+            * browsertime-tp6-live-chromium-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-netflix-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-netflix-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-netflix-e10s: None
-            * browsertime-tp6-live-firefox-netflix-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-netflix-e10s: None
             * browsertime-tp6-chromium-netflix-e10s: None
-            * browsertime-tp6-firefox-netflix-e10s: None
+            * browsertime-tp6-firefox-netflix-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-netflix-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-netflix-e10s: None
             * browsertime-tp6-live-chromium-netflix-e10s: None
             * browsertime-tp6-live-firefox-netflix-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-netflix-e10s: None
-            * browsertime-tp6-live-firefox-netflix-e10s: None
+            * browsertime-tp6-live-firefox-netflix-fis-e10s: None
 
 
 .. dropdown:: nytimes (BT, FF, CH, CU)
@@ -1793,6 +1953,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64-qr/opt
             * browsertime-tp6-firefox-nytimes-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-nytimes-e10s: None
+            * browsertime-tp6-chromium-nytimes-e10s: None
             * browsertime-tp6-firefox-nytimes-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-nytimes-fis-e10s: mozilla-central
       * test-linux1804-64-shippable/opt
@@ -1802,9 +1964,13 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64/opt
             * browsertime-tp6-firefox-nytimes-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-nytimes-e10s: None
+            * browsertime-tp6-chromium-nytimes-e10s: None
             * browsertime-tp6-firefox-nytimes-e10s: trunk
             * browsertime-tp6-firefox-nytimes-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-nytimes-e10s: None
+            * browsertime-tp6-chromium-nytimes-e10s: None
             * browsertime-tp6-firefox-nytimes-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-nytimes-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable/opt
@@ -1814,21 +1980,19 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-32-qr/opt
             * browsertime-tp6-firefox-nytimes-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-nytimes-e10s: None
+            * browsertime-tp6-chromium-nytimes-e10s: None
             * browsertime-tp6-firefox-nytimes-e10s: None
             * browsertime-tp6-firefox-nytimes-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-nytimes-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-nytimes-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-nytimes-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-nytimes-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-nytimes-e10s: None
             * browsertime-tp6-chromium-nytimes-e10s: None
-            * browsertime-tp6-firefox-nytimes-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-nytimes-e10s: None
+            * browsertime-tp6-firefox-nytimes-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-nytimes-fis-e10s: mozilla-central
 
 
 .. dropdown:: office (BT, FF, CH, CU)
@@ -1857,6 +2021,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64-qr/opt
             * browsertime-tp6-firefox-office-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-office-e10s: None
+            * browsertime-tp6-chromium-office-e10s: None
             * browsertime-tp6-firefox-office-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-office-fis-e10s: mozilla-central
       * test-linux1804-64-shippable/opt
@@ -1866,9 +2032,13 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64/opt
             * browsertime-tp6-firefox-office-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-office-e10s: None
+            * browsertime-tp6-chromium-office-e10s: None
             * browsertime-tp6-firefox-office-e10s: trunk
             * browsertime-tp6-firefox-office-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-office-e10s: None
+            * browsertime-tp6-chromium-office-e10s: None
             * browsertime-tp6-firefox-office-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-office-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable/opt
@@ -1878,21 +2048,19 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-32-qr/opt
             * browsertime-tp6-firefox-office-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-office-e10s: None
+            * browsertime-tp6-chromium-office-e10s: None
             * browsertime-tp6-firefox-office-e10s: None
             * browsertime-tp6-firefox-office-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-office-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-office-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-office-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-office-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-office-e10s: None
             * browsertime-tp6-chromium-office-e10s: None
-            * browsertime-tp6-firefox-office-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-office-e10s: None
+            * browsertime-tp6-firefox-office-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-office-fis-e10s: mozilla-central
 
 
 .. dropdown:: outlook (BT, FF, CH, CU)
@@ -1922,8 +2090,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-outlook-e10s: None
+            * browsertime-tp6-chromium-outlook-e10s: None
             * browsertime-tp6-firefox-outlook-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-outlook-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-outlook-e10s: None
+            * browsertime-tp6-live-chromium-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -1937,13 +2109,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-outlook-e10s: None
+            * browsertime-tp6-chromium-outlook-e10s: None
             * browsertime-tp6-firefox-outlook-e10s: trunk
             * browsertime-tp6-firefox-outlook-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-outlook-e10s: None
+            * browsertime-tp6-live-chromium-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-outlook-e10s: None
+            * browsertime-tp6-chromium-outlook-e10s: None
             * browsertime-tp6-firefox-outlook-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-outlook-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-outlook-e10s: None
+            * browsertime-tp6-live-chromium-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -1957,31 +2137,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-outlook-e10s: None
+            * browsertime-tp6-chromium-outlook-e10s: None
             * browsertime-tp6-firefox-outlook-e10s: None
             * browsertime-tp6-firefox-outlook-fis-e10s: None
+            * browsertime-tp6-live-chrome-outlook-e10s: None
+            * browsertime-tp6-live-chromium-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-outlook-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-outlook-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-outlook-e10s: None
-            * browsertime-tp6-live-firefox-outlook-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-outlook-e10s: None
             * browsertime-tp6-chromium-outlook-e10s: None
-            * browsertime-tp6-firefox-outlook-e10s: None
+            * browsertime-tp6-firefox-outlook-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-outlook-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-outlook-e10s: None
             * browsertime-tp6-live-chromium-outlook-e10s: None
             * browsertime-tp6-live-firefox-outlook-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-outlook-e10s: None
-            * browsertime-tp6-live-firefox-outlook-e10s: None
+            * browsertime-tp6-live-firefox-outlook-fis-e10s: None
 
 
 .. dropdown:: paypal (BT, FF, CH, CU)
@@ -2011,8 +2189,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-paypal-e10s: None
+            * browsertime-tp6-chromium-paypal-e10s: None
             * browsertime-tp6-firefox-paypal-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-paypal-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-paypal-e10s: None
+            * browsertime-tp6-live-chromium-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2026,13 +2208,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-paypal-e10s: None
+            * browsertime-tp6-chromium-paypal-e10s: None
             * browsertime-tp6-firefox-paypal-e10s: trunk
             * browsertime-tp6-firefox-paypal-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-paypal-e10s: None
+            * browsertime-tp6-live-chromium-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-paypal-e10s: None
+            * browsertime-tp6-chromium-paypal-e10s: None
             * browsertime-tp6-firefox-paypal-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-paypal-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-paypal-e10s: None
+            * browsertime-tp6-live-chromium-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2046,31 +2236,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-paypal-e10s: None
+            * browsertime-tp6-chromium-paypal-e10s: None
             * browsertime-tp6-firefox-paypal-e10s: None
             * browsertime-tp6-firefox-paypal-fis-e10s: None
+            * browsertime-tp6-live-chrome-paypal-e10s: None
+            * browsertime-tp6-live-chromium-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-paypal-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-paypal-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-paypal-e10s: None
-            * browsertime-tp6-live-firefox-paypal-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-paypal-e10s: None
             * browsertime-tp6-chromium-paypal-e10s: None
-            * browsertime-tp6-firefox-paypal-e10s: None
+            * browsertime-tp6-firefox-paypal-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-paypal-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-paypal-e10s: None
             * browsertime-tp6-live-chromium-paypal-e10s: None
             * browsertime-tp6-live-firefox-paypal-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-paypal-e10s: None
-            * browsertime-tp6-live-firefox-paypal-e10s: None
+            * browsertime-tp6-live-firefox-paypal-fis-e10s: None
 
 
 .. dropdown:: pinterest (BT, FF, CH, CU)
@@ -2100,8 +2288,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-pinterest-e10s: None
+            * browsertime-tp6-chromium-pinterest-e10s: None
             * browsertime-tp6-firefox-pinterest-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-pinterest-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-pinterest-e10s: None
+            * browsertime-tp6-live-chromium-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2115,13 +2307,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-pinterest-e10s: None
+            * browsertime-tp6-chromium-pinterest-e10s: None
             * browsertime-tp6-firefox-pinterest-e10s: trunk
             * browsertime-tp6-firefox-pinterest-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-pinterest-e10s: None
+            * browsertime-tp6-live-chromium-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-pinterest-e10s: None
+            * browsertime-tp6-chromium-pinterest-e10s: None
             * browsertime-tp6-firefox-pinterest-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-pinterest-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-pinterest-e10s: None
+            * browsertime-tp6-live-chromium-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2135,31 +2335,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-pinterest-e10s: None
+            * browsertime-tp6-chromium-pinterest-e10s: None
             * browsertime-tp6-firefox-pinterest-e10s: None
             * browsertime-tp6-firefox-pinterest-fis-e10s: None
+            * browsertime-tp6-live-chrome-pinterest-e10s: None
+            * browsertime-tp6-live-chromium-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-pinterest-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-pinterest-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-pinterest-e10s: None
-            * browsertime-tp6-live-firefox-pinterest-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-pinterest-e10s: None
             * browsertime-tp6-chromium-pinterest-e10s: None
-            * browsertime-tp6-firefox-pinterest-e10s: None
+            * browsertime-tp6-firefox-pinterest-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-pinterest-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-pinterest-e10s: None
             * browsertime-tp6-live-chromium-pinterest-e10s: None
             * browsertime-tp6-live-firefox-pinterest-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-pinterest-e10s: None
-            * browsertime-tp6-live-firefox-pinterest-e10s: None
+            * browsertime-tp6-live-firefox-pinterest-fis-e10s: None
 
 
 .. dropdown:: reddit (BT, FF, CH, CU)
@@ -2189,8 +2387,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-reddit-e10s: None
+            * browsertime-tp6-chromium-reddit-e10s: None
             * browsertime-tp6-firefox-reddit-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-reddit-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-reddit-e10s: None
+            * browsertime-tp6-live-chromium-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2204,13 +2406,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-reddit-e10s: None
+            * browsertime-tp6-chromium-reddit-e10s: None
             * browsertime-tp6-firefox-reddit-e10s: trunk
             * browsertime-tp6-firefox-reddit-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-reddit-e10s: None
+            * browsertime-tp6-live-chromium-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-reddit-e10s: None
+            * browsertime-tp6-chromium-reddit-e10s: None
             * browsertime-tp6-firefox-reddit-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-reddit-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-reddit-e10s: None
+            * browsertime-tp6-live-chromium-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2224,31 +2434,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-reddit-e10s: None
+            * browsertime-tp6-chromium-reddit-e10s: None
             * browsertime-tp6-firefox-reddit-e10s: None
             * browsertime-tp6-firefox-reddit-fis-e10s: None
+            * browsertime-tp6-live-chrome-reddit-e10s: None
+            * browsertime-tp6-live-chromium-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-reddit-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-reddit-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-reddit-e10s: None
-            * browsertime-tp6-live-firefox-reddit-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-reddit-e10s: None
             * browsertime-tp6-chromium-reddit-e10s: None
-            * browsertime-tp6-firefox-reddit-e10s: None
+            * browsertime-tp6-firefox-reddit-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-reddit-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-reddit-e10s: None
             * browsertime-tp6-live-chromium-reddit-e10s: None
             * browsertime-tp6-live-firefox-reddit-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-reddit-e10s: None
-            * browsertime-tp6-live-firefox-reddit-e10s: None
+            * browsertime-tp6-live-firefox-reddit-fis-e10s: None
 
 
 .. dropdown:: tumblr (BT, FF, CH, CU)
@@ -2278,8 +2486,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-tumblr-e10s: None
+            * browsertime-tp6-chromium-tumblr-e10s: None
             * browsertime-tp6-firefox-tumblr-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-tumblr-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-tumblr-e10s: None
+            * browsertime-tp6-live-chromium-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2293,13 +2505,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-tumblr-e10s: None
+            * browsertime-tp6-chromium-tumblr-e10s: None
             * browsertime-tp6-firefox-tumblr-e10s: trunk
             * browsertime-tp6-firefox-tumblr-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-tumblr-e10s: None
+            * browsertime-tp6-live-chromium-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-tumblr-e10s: None
+            * browsertime-tp6-chromium-tumblr-e10s: None
             * browsertime-tp6-firefox-tumblr-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-tumblr-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-tumblr-e10s: None
+            * browsertime-tp6-live-chromium-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2313,31 +2533,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-tumblr-e10s: None
+            * browsertime-tp6-chromium-tumblr-e10s: None
             * browsertime-tp6-firefox-tumblr-e10s: None
             * browsertime-tp6-firefox-tumblr-fis-e10s: None
+            * browsertime-tp6-live-chrome-tumblr-e10s: None
+            * browsertime-tp6-live-chromium-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-tumblr-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-tumblr-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-tumblr-e10s: None
-            * browsertime-tp6-live-firefox-tumblr-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-tumblr-e10s: None
             * browsertime-tp6-chromium-tumblr-e10s: None
-            * browsertime-tp6-firefox-tumblr-e10s: None
+            * browsertime-tp6-firefox-tumblr-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-tumblr-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-tumblr-e10s: None
             * browsertime-tp6-live-chromium-tumblr-e10s: None
             * browsertime-tp6-live-firefox-tumblr-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-tumblr-e10s: None
-            * browsertime-tp6-live-firefox-tumblr-e10s: None
+            * browsertime-tp6-live-firefox-tumblr-fis-e10s: None
 
 
 .. dropdown:: twitch (BT, FF, CH, CU)
@@ -2367,8 +2585,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-twitch-e10s: None
+            * browsertime-tp6-chromium-twitch-e10s: None
             * browsertime-tp6-firefox-twitch-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-twitch-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-twitch-e10s: None
+            * browsertime-tp6-live-chromium-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2382,13 +2604,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-twitch-e10s: None
+            * browsertime-tp6-chromium-twitch-e10s: None
             * browsertime-tp6-firefox-twitch-e10s: trunk
             * browsertime-tp6-firefox-twitch-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-twitch-e10s: None
+            * browsertime-tp6-live-chromium-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-twitch-e10s: None
+            * browsertime-tp6-chromium-twitch-e10s: None
             * browsertime-tp6-firefox-twitch-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-twitch-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-twitch-e10s: None
+            * browsertime-tp6-live-chromium-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2402,31 +2632,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-twitch-e10s: None
+            * browsertime-tp6-chromium-twitch-e10s: None
             * browsertime-tp6-firefox-twitch-e10s: None
             * browsertime-tp6-firefox-twitch-fis-e10s: None
+            * browsertime-tp6-live-chrome-twitch-e10s: None
+            * browsertime-tp6-live-chromium-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-twitch-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-twitch-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-twitch-e10s: None
-            * browsertime-tp6-live-firefox-twitch-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-twitch-e10s: None
             * browsertime-tp6-chromium-twitch-e10s: None
-            * browsertime-tp6-firefox-twitch-e10s: None
+            * browsertime-tp6-firefox-twitch-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-twitch-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-twitch-e10s: None
             * browsertime-tp6-live-chromium-twitch-e10s: None
             * browsertime-tp6-live-firefox-twitch-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-twitch-e10s: None
-            * browsertime-tp6-live-firefox-twitch-e10s: None
+            * browsertime-tp6-live-firefox-twitch-fis-e10s: None
 
 
 .. dropdown:: twitter (BT, FF, CH, CU)
@@ -2456,8 +2684,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-twitter-e10s: None
+            * browsertime-tp6-essential-chromium-twitter-e10s: None
             * browsertime-tp6-essential-firefox-twitter-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-twitter-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-twitter-e10s: None
+            * browsertime-tp6-live-chromium-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2471,13 +2703,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-twitter-e10s: None
+            * browsertime-tp6-essential-chromium-twitter-e10s: None
             * browsertime-tp6-essential-firefox-twitter-e10s: trunk
             * browsertime-tp6-essential-firefox-twitter-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-twitter-e10s: None
+            * browsertime-tp6-live-chromium-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-twitter-e10s: None
+            * browsertime-tp6-essential-chromium-twitter-e10s: None
             * browsertime-tp6-essential-firefox-twitter-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-twitter-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-twitter-e10s: None
+            * browsertime-tp6-live-chromium-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2491,31 +2731,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-twitter-e10s: None
+            * browsertime-tp6-essential-chromium-twitter-e10s: None
             * browsertime-tp6-essential-firefox-twitter-e10s: None
             * browsertime-tp6-essential-firefox-twitter-fis-e10s: None
+            * browsertime-tp6-live-chrome-twitter-e10s: None
+            * browsertime-tp6-live-chromium-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-twitter-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-twitter-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-twitter-e10s: None
-            * browsertime-tp6-live-firefox-twitter-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-twitter-e10s: None
             * browsertime-tp6-essential-chromium-twitter-e10s: None
             * browsertime-tp6-essential-firefox-twitter-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-twitter-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-twitter-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-twitter-e10s: None
             * browsertime-tp6-live-chromium-twitter-e10s: None
             * browsertime-tp6-live-firefox-twitter-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-twitter-e10s: None
-            * browsertime-tp6-live-firefox-twitter-e10s: None
+            * browsertime-tp6-live-firefox-twitter-fis-e10s: None
 
 
 .. dropdown:: wikia (BT, FF, CH, CU)
@@ -2544,6 +2783,8 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64-qr/opt
             * browsertime-tp6-firefox-wikia-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-wikia-e10s: None
+            * browsertime-tp6-chromium-wikia-e10s: None
             * browsertime-tp6-firefox-wikia-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-wikia-fis-e10s: mozilla-central
       * test-linux1804-64-shippable/opt
@@ -2553,9 +2794,13 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-linux1804-64/opt
             * browsertime-tp6-firefox-wikia-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-wikia-e10s: None
+            * browsertime-tp6-chromium-wikia-e10s: None
             * browsertime-tp6-firefox-wikia-e10s: trunk
             * browsertime-tp6-firefox-wikia-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-wikia-e10s: None
+            * browsertime-tp6-chromium-wikia-e10s: None
             * browsertime-tp6-firefox-wikia-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-wikia-fis-e10s: mozilla-central
       * test-macosx1015-64-shippable/opt
@@ -2565,21 +2810,19 @@ Tests for page-load performance. The links direct to the actual websites that ar
       * test-windows10-32-qr/opt
             * browsertime-tp6-firefox-wikia-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-wikia-e10s: None
+            * browsertime-tp6-chromium-wikia-e10s: None
             * browsertime-tp6-firefox-wikia-e10s: None
             * browsertime-tp6-firefox-wikia-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-wikia-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-wikia-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-wikia-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-wikia-fis-e10s: mozilla-central
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-wikia-e10s: None
             * browsertime-tp6-chromium-wikia-e10s: None
-            * browsertime-tp6-firefox-wikia-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-wikia-e10s: None
+            * browsertime-tp6-firefox-wikia-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-wikia-fis-e10s: mozilla-central
 
 
 .. dropdown:: wikipedia (BT, FF, CH, CU)
@@ -2609,8 +2852,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-wikipedia-e10s: None
+            * browsertime-tp6-essential-chromium-wikipedia-e10s: None
             * browsertime-tp6-essential-firefox-wikipedia-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-wikipedia-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-wikipedia-e10s: None
+            * browsertime-tp6-live-chromium-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2624,13 +2871,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-wikipedia-e10s: None
+            * browsertime-tp6-essential-chromium-wikipedia-e10s: None
             * browsertime-tp6-essential-firefox-wikipedia-e10s: trunk
             * browsertime-tp6-essential-firefox-wikipedia-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-wikipedia-e10s: None
+            * browsertime-tp6-live-chromium-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-wikipedia-e10s: None
+            * browsertime-tp6-essential-chromium-wikipedia-e10s: None
             * browsertime-tp6-essential-firefox-wikipedia-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-wikipedia-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-wikipedia-e10s: None
+            * browsertime-tp6-live-chromium-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2644,31 +2899,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-wikipedia-e10s: None
+            * browsertime-tp6-essential-chromium-wikipedia-e10s: None
             * browsertime-tp6-essential-firefox-wikipedia-e10s: None
             * browsertime-tp6-essential-firefox-wikipedia-fis-e10s: None
+            * browsertime-tp6-live-chrome-wikipedia-e10s: None
+            * browsertime-tp6-live-chromium-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-wikipedia-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-wikipedia-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-wikipedia-e10s: None
-            * browsertime-tp6-live-firefox-wikipedia-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-wikipedia-e10s: None
             * browsertime-tp6-essential-chromium-wikipedia-e10s: None
             * browsertime-tp6-essential-firefox-wikipedia-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-wikipedia-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-wikipedia-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-wikipedia-e10s: None
             * browsertime-tp6-live-chromium-wikipedia-e10s: None
             * browsertime-tp6-live-firefox-wikipedia-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-wikipedia-e10s: None
-            * browsertime-tp6-live-firefox-wikipedia-e10s: None
+            * browsertime-tp6-live-firefox-wikipedia-fis-e10s: None
 
 
 .. dropdown:: yahoo-mail (BT, FF, CH, CU)
@@ -2698,8 +2952,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-essential-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-yahoo-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-live-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2713,13 +2971,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-essential-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: trunk
             * browsertime-tp6-essential-firefox-yahoo-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-live-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-essential-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: mozilla-beta, trunk
             * browsertime-tp6-essential-firefox-yahoo-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-live-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2733,31 +2999,30 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-essential-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-essential-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-essential-firefox-yahoo-mail-fis-e10s: None
+            * browsertime-tp6-live-chrome-yahoo-mail-e10s: None
+            * browsertime-tp6-live-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-essential-firefox-yahoo-mail-e10s: mozilla-beta, trunk
-            * browsertime-tp6-essential-firefox-yahoo-mail-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
-            * browsertime-tp6-live-firefox-yahoo-mail-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-essential-chrome-yahoo-mail-e10s: None
             * browsertime-tp6-essential-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-essential-firefox-yahoo-mail-e10s: mozilla-beta, trunk
+            * browsertime-tp6-essential-firefox-yahoo-mail-fis-e10s: mozilla-central
+            * browsertime-tp6-essential-firefox-yahoo-mail-noqr-e10s: mozilla-beta, trunk
             * browsertime-tp6-live-chrome-yahoo-mail-e10s: None
             * browsertime-tp6-live-chromium-yahoo-mail-e10s: None
             * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-essential-firefox-yahoo-mail-e10s: None
-            * browsertime-tp6-live-firefox-yahoo-mail-e10s: None
+            * browsertime-tp6-live-firefox-yahoo-mail-fis-e10s: None
 
 
 .. dropdown:: youtube (BT, FF, CH, CU)
@@ -2787,8 +3052,12 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
       * test-linux1804-64-shippable-qr/opt
+            * browsertime-tp6-chrome-youtube-e10s: None
+            * browsertime-tp6-chromium-youtube-e10s: None
             * browsertime-tp6-firefox-youtube-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-youtube-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-youtube-e10s: None
+            * browsertime-tp6-live-chromium-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-fis-e10s: None
       * test-linux1804-64-shippable/opt
@@ -2802,13 +3071,21 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
       * test-macosx1014-64-shippable-qr/opt
+            * browsertime-tp6-chrome-youtube-e10s: None
+            * browsertime-tp6-chromium-youtube-e10s: None
             * browsertime-tp6-firefox-youtube-e10s: trunk
             * browsertime-tp6-firefox-youtube-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-youtube-e10s: None
+            * browsertime-tp6-live-chromium-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-fis-e10s: None
       * test-macosx1015-64-shippable-qr/opt
+            * browsertime-tp6-chrome-youtube-e10s: None
+            * browsertime-tp6-chromium-youtube-e10s: None
             * browsertime-tp6-firefox-youtube-e10s: mozilla-beta, trunk
             * browsertime-tp6-firefox-youtube-fis-e10s: mozilla-central
+            * browsertime-tp6-live-chrome-youtube-e10s: None
+            * browsertime-tp6-live-chromium-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-fis-e10s: None
       * test-macosx1015-64-shippable/opt
@@ -2822,31 +3099,29 @@ Tests for page-load performance. The links direct to the actual websites that ar
             * browsertime-tp6-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
       * test-windows10-32-shippable-qr/opt
+            * browsertime-tp6-chrome-youtube-e10s: None
+            * browsertime-tp6-chromium-youtube-e10s: None
             * browsertime-tp6-firefox-youtube-e10s: None
             * browsertime-tp6-firefox-youtube-fis-e10s: None
+            * browsertime-tp6-live-chrome-youtube-e10s: None
+            * browsertime-tp6-live-chromium-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-fis-e10s: None
       * test-windows10-64-qr/opt
             * browsertime-tp6-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
-      * test-windows10-64-ref-hw-2017/opt
+      * test-windows10-64-ref-hw-2017-qr/opt
             * browsertime-tp6-firefox-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
       * test-windows10-64-shippable-qr/opt
-            * browsertime-tp6-firefox-youtube-e10s: mozilla-beta, trunk
-            * browsertime-tp6-firefox-youtube-fis-e10s: mozilla-central
-            * browsertime-tp6-live-firefox-youtube-e10s: None
-            * browsertime-tp6-live-firefox-youtube-fis-e10s: None
-      * test-windows10-64-shippable/opt
             * browsertime-tp6-chrome-youtube-e10s: None
             * browsertime-tp6-chromium-youtube-e10s: None
-            * browsertime-tp6-firefox-youtube-e10s: None
+            * browsertime-tp6-firefox-youtube-e10s: mozilla-beta, trunk
+            * browsertime-tp6-firefox-youtube-fis-e10s: mozilla-central
             * browsertime-tp6-live-chrome-youtube-e10s: None
             * browsertime-tp6-live-chromium-youtube-e10s: None
             * browsertime-tp6-live-firefox-youtube-e10s: None
-      * test-windows10-64/opt
-            * browsertime-tp6-firefox-youtube-e10s: None
-            * browsertime-tp6-live-firefox-youtube-e10s: None
+            * browsertime-tp6-live-firefox-youtube-fis-e10s: None
 
 
 
