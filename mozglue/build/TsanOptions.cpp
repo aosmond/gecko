@@ -289,6 +289,9 @@ extern "C" const char* __tsan_default_suppressions() {
          // No bug, this is a benign race creating worker/SW compositor threads.
          "race:webrender::profiler::register_thread\n"
 
+	 // Bug XXX
+	 "race:scale_blit"
+
       // End of suppressions.
       ;  // Please keep this semicolon.
 }
