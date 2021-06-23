@@ -139,6 +139,11 @@ WINDOWS_WORKER_TYPES = {
         "virtual-with-gpu": "t-win10-64-gpu-s",
         "hardware": "t-win10-64-1803-hw",
     },
+    "windows10-64-devedition-qr": {
+        "virtual": "t-win10-64",
+        "virtual-with-gpu": "t-win10-64-gpu-s",
+        "hardware": "t-win10-64-1803-hw",
+    },
     "windows10-64-asan-qr": {
         "virtual": "t-win10-64",
         "virtual-with-gpu": "t-win10-64-gpu-s",
@@ -149,7 +154,7 @@ WINDOWS_WORKER_TYPES = {
         "virtual-with-gpu": "t-win10-64-gpu-s",
         "hardware": "t-win10-64-1803-hw",
     },
-    "windows10-64-ref-hw-2017": {
+    "windows10-64-ref-hw-2017-qr": {
         "virtual": "t-win10-64",
         "virtual-with-gpu": "t-win10-64-gpu-s",
         "hardware": "t-win10-64-ref-hw",
@@ -1420,6 +1425,7 @@ def handle_tier(config, tasks):
                 "windows10-64-qr/opt",
                 "windows10-64-qr/debug",
                 "windows10-64-shippable-qr/opt",
+                "windows10-64-devedition-qr/opt",
                 "windows10-64-asan-qr/opt",
                 "macosx1014-64/opt",
                 "macosx1014-64/debug",
@@ -1852,9 +1858,9 @@ def set_worker_type(config, tasks):
             # figure out what platform the job needs to run on
             if task["virtualization"] == "hardware":
                 # some jobs like talos and reftest run on real h/w - those are all win10
-                if test_platform.startswith("windows10-64-ref-hw-2017"):
+                if test_platform.startswith("windows10-64-ref-hw-2017-qr"):
                     win_worker_type_platform = WINDOWS_WORKER_TYPES[
-                        "windows10-64-ref-hw-2017"
+                        "windows10-64-ref-hw-2017-qr"
                     ]
                 elif test_platform.startswith("windows10-aarch64-qr"):
                     win_worker_type_platform = WINDOWS_WORKER_TYPES[
