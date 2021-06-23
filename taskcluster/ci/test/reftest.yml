@@ -210,6 +210,7 @@ reftest:
             windows10-64-ccov.*/.*: 5400
             windows10-64-asan/opt: 5400
             macosx.*64-ccov.*/.*: 5400
+            linux1804-64-tsan-qr/opt: 5400
             default: 3600
     mozharness:
         chunked:
