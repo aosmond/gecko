@@ -285,6 +285,7 @@ extern "C" const char* __tsan_default_suppressions() {
          // Bug 1683357
          "race:image::ImageSurfaceCache::SuggestedSizeInternal\n"
          "race:image::RasterImage::SetMetadata\n"
+         "race:image::RasterImage::GetWidth\n"
 
          // No bug, this is a benign race creating worker/SW compositor threads.
          "race:webrender::profiler::register_thread\n"
