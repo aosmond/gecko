@@ -252,6 +252,7 @@ windows-qr-tests:
     - marionette
     - mochitest-chrome-gpu
     - mochitest-browser-chrome
+    - mochitest-devtools-chrome
     - mochitest-plain
     - mochitest-plain-gpu
     - mochitest-media
