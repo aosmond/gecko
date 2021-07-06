@@ -45,9 +45,6 @@ linux1804-64/opt:
         - linux1804-tests
         - marionette-headless
         - mochitest-headless
-        - mochitest-webgpu
-        - web-platform-tests
-        - web-platform-tests-wdspec-headless
         - talos
         - linux-talos-flex
         - raptor-firefox
@@ -57,8 +54,6 @@ linux1804-64/debug:
     build-platform: linux64/debug
     test-sets:
         - linux1804-tests
-        - mochitest-webgpu
-        - web-platform-tests
 
 linux1804-64-shippable/opt:
     build-platform: linux64-shippable/opt
@@ -68,9 +63,6 @@ linux1804-64-shippable/opt:
         - linux1804-tests
         - marionette-headless
         - mochitest-headless
-        - mochitest-webgpu
-        - web-platform-tests
-        - web-platform-tests-wdspec-headless
         - talos
         - linux-talos-flex
         - raptor-chrome
@@ -82,15 +74,11 @@ linux1804-64-devedition/opt:
     test-sets:
         - desktop-screenshot-capture
         - linux1804-tests
-        - web-platform-tests
 
 linux1804-64-asan/opt:
     build-platform: linux64-asan/opt
     test-sets:
         - linux1804-tests
-        - mochitest-webgpu
-        - web-platform-tests
-        - web-platform-tests-wdspec-headless
 
 linux1804-64-tsan/opt:
     build-platform: linux64-tsan/opt
@@ -136,6 +124,7 @@ linux1804-64-asan-qr/opt:
     build-platform: linux64-asan/opt
     test-sets:
         - linux-qr-smoketests
+        - mochitest-webgpu
         - web-platform-tests
         - web-platform-tests-wdspec-headless
 
@@ -144,19 +133,20 @@ linux1804-64-ccov/opt:
     test-sets:
         - linux1804-tests
         - linux1804-ccov-tests
-        - web-platform-tests
         - ccov-code-coverage-tests
-        - mochitest-webgpu
 
 linux1804-64-ccov-qr/opt:
     build-platform: linux64-ccov/opt
     test-sets:
         - linux1804-ccov-qr-tests
+        - web-platform-tests
+        - mochitest-webgpu
 
 linux1804-64-devedition-qr/opt:
     build-platform: linux64-devedition/opt
     test-sets:
-        - linux1804-devedition-qr-tests
+        - linux1804-qr-tests
+        - web-platform-tests
 
 linux1804-64-clang-trunk/opt:
     build-platform: linux64-plain-clang-trunk/opt
