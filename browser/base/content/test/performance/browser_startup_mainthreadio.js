@@ -281,6 +281,12 @@ const startupPhases = {
       condition: WIN,
       stat: 1,
     },
+    {
+      // bug 1086936
+      path: "UAppData:ignore-dev-edition-profile",
+      condition: AppConstants.MOZ_DEV_EDITION,
+      stat: 1,
+    },
   ],
 
   // We reach this phase right after showing the first browser window.
