@@ -59,7 +59,7 @@ crashtest:
     chunks:
         by-test-platform:
             android-em-7.*: 1
-            linux.*64-tsan/opt: 12
+            linux.*64-tsan-qr/opt: 12
             default: 1
     e10s: true
     run-on-projects:
@@ -195,14 +195,13 @@ reftest:
             fission:
                 by-test-platform:
                     (linux.*64|windows10-64)(-shippable)?-qr/(debug|opt): ['trunk']
-                    linux.*64-asan/opt: ['trunk']
+                    linux.*64-asan-qr/opt: ['trunk']
                     default: []
             noqr: built-projects
             default:
                 by-test-platform:
                     windows10-aarch64-qr/.*: ['mozilla-central', 'mozilla-beta', 'mozilla-release']
                     android-em-7.0-x86_64/debug-isolated-process: []
-                    linux.*asan/opt: []
                     .*(mingwclang|-asan|-tsan|10-32|7-32).*: built-projects
                     windows10-aarch64-qr/opt: built-projects
                     android.*: built-projects
