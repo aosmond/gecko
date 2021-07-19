@@ -154,7 +154,7 @@ test-verify-gpu:
                 by-test-platform:
                     # do not run on ccov or asan
                     .*-ccov.*/.*: []
-                    .*-asan/.*: []
+                    .*-asan-qr/.*: []
                     .*shippable.*: []
                     # do not run on mozilla-central, beta or release: usually just confirms earlier results
                     default: ['integration']
