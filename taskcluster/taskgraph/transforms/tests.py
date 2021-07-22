@@ -198,7 +198,7 @@ TEST_VARIANTS = {
         "replace": {
             "run-on-projects": {
                 "by-test-platform": {
-                    "linux.*64(-shippable)?/opt": ["trunk"],
+                    "linux.*64(-shippable)?-qr/opt": ["trunk"],
                     "default": [],
                 },
             },
