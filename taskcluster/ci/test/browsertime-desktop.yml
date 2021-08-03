@@ -452,7 +452,9 @@ browsertime-tp6-profiling:
         extra-options:
             - --chimera
             - --gecko-profile
-    raptor-subtests: [amazon]
+    raptor-subtests:
+        - amazon
+        - [google-slides, gslides]
     run-on-projects:
         by-variant:
             fission: []
@@ -466,6 +468,32 @@ browsertime-tp6-profiling:
             fission: 2
             default: 3
     treeherder-symbol: Btime-Prof(tp6)
+
+browsertime-tp6-profiling-orig:
+    <<: *tp6-defaults
+    apps: [firefox]
+    description: Raptor (browsertime) tp6 page-load tests with Gecko Profiling
+    mozharness:
+        extra-options:
+            - --chimera
+            - --gecko-profile
+            - --setpref=image.svg.blob-image=false
+    raptor-subtests:
+        - amazon
+        - [google-slides, gslides]
+    run-on-projects:
+        by-variant:
+            fission: []
+            default:
+                by-test-platform:
+                    (linux|windows|macosx1015)(?!.*-qr).*: []
+                    (linux|windows|macosx1015).*shippable-qr.*: [mozilla-central]
+                    default: []
+    tier:
+        by-variant:
+            fission: 2
+            default: 3
+    treeherder-symbol: Btime-Prof-orig(tp6)
 
 browsertime-custom:
     apps: [firefox]

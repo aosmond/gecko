@@ -112,6 +112,7 @@ browsertime:
 
 browsertime-profiling:
     - browsertime-tp6-profiling
+    - browsertime-tp6-profiling-orig
 
 browsertime-high-priority:
     - browsertime-benchmark
