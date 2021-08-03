@@ -397,6 +397,14 @@ static bool Moz2DRenderCallback(const Range<const uint8_t> aBlob,
                                  aDirtyRect->width(), aDirtyRect->height()));
   }
 
+  auto dirty = aDirtyRect ? gfx::IntRect(aDirtyRect->min.x, aDirtyRect->min.y, aDirtyRect->width(), aDirtyRect->height()) : gfx::IntRect();
+
+  AUTO_PROFILER_LABEL_DYNAMIC_NSCSTRING(
+      "Blob rasterization", GRAPHICS,
+      nsPrintfCString("(%d,%d) %dx%d dirty (%d,%d) %dx%d",
+                      bounds.x, bounds.y, bounds.width, bounds.height,
+                      dirty.x, dirty.y, dirty.width, dirty.height));
+
   bool ret = true;
   size_t offset = 0;
   auto absBounds = IntRectAbsolute::FromRect(bounds);

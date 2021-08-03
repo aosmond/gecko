@@ -258,7 +258,8 @@ bool SVGDrawingCallback::operator()(gfxContext* aContext,
   [[maybe_unused]] nsIURI* uri = doc ? doc->GetDocumentURI() : nullptr;
   AUTO_PROFILER_LABEL_DYNAMIC_NSCSTRING(
       "SVG Image drawing", GRAPHICS,
-      nsPrintfCString("%dx%d %s", mSize.width, mSize.height,
+      nsPrintfCString("%dx%d fill (%f,%f) %fx%f %s", mSize.width, mSize.height,
+                      aFillRect.x, aFillRect.y, aFillRect.width, aFillRect.height,
                       uri ? uri->GetSpecOrDefault().get() : "N/A"));
 
   gfxContextAutoSaveRestore contextRestorer(aContext);

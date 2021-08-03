@@ -319,7 +319,7 @@ class Browsertime(Perftest):
                 (
                     "gecko_profile_threads",
                     "--firefox.geckoProfilerParams.threads",
-                    "GeckoMain,Compositor",
+                    "GeckoMain,Compositor,WR,Renderer,SwComposite",
                 ),
                 (
                     "gecko_profile_interval",
