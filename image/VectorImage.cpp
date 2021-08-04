@@ -1149,12 +1149,19 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
 }
 
 bool VectorImage::MayCache(const SVGDrawingParameters& aParams) const {
-  return !(aParams.flags & FLAG_BYPASS_SURFACE_CACHE) &&
-         // Refuse to cache animated images:
-         // XXX(seth): We may remove this restriction in bug 922893.
-         (!mHaveAnimations || (aParams.flags & FLAG_RECORD_BLOB)) &&
-         // The image is too big to fit in the cache:
-         SurfaceCache::CanHold(aParams.size);
+  // Either we want to bypass the cache, or it is too big to fit in the cache.
+  if (aParams.flags & FLAG_BYPASS_SURFACE_CACHE ||
+      !SurfaceCache::CanHold(aParams.size)) {
+    return false;
+  }
+
+  // Blob recordings can always be stored in the cache, if allowed by pref.
+  if (aParams.flags & FLAG_RECORD_BLOB) {
+    return StaticPrefs::image_svg_blob_image_cache();
+  }
+
+  // Refuse to cache non-recorded animated images.
+  return !mHaveAnimations;
 }
 
 bool VectorImage::CacheSurface(const SVGDrawingParameters& aParams,
