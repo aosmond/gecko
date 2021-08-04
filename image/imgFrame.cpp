@@ -484,6 +484,21 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
   return NS_OK;
 }
 
+void imgFrame::InitWithSurface(gfx::SourceSurface* aSurface) {
+  MOZ_ASSERT(aSurface);
+
+  mImageSize = aSurface->GetSize();
+  mFormat = aSurface->GetFormat();
+  mOptSurface = aSurface;
+  mDecoded = GetRect();
+  mFinished = true;
+
+#ifdef DEBUG
+  MonitorAutoLock lock(mMonitor);
+  MOZ_ASSERT(AreAllPixelsWritten());
+#endif
+}
+
 nsresult imgFrame::Optimize(DrawTarget* aTarget) {
   MOZ_ASSERT(NS_IsMainThread());
   mMonitor.AssertCurrentThreadOwns();
