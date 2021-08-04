@@ -20,6 +20,8 @@ treeherder:
         'Btime-noqr': 'Browsertime performance tests with no webrender or software webrender'
         'Btime-Prof': 'Browsertime performance tests on Firefox with Gecko Profiling'
         'Btime-Prof-fis': 'Browsertime performance tests on Firefox with Gecko Profiling, fission enabled'
+        'Btime-Prof-nocache': 'Browsertime performance tests on Firefox with Gecko Profiling, original pref'
+        'Btime-Prof-nocache-fis': 'Browsertime performance tests on Firefox with Gecko Profiling, original pref'
         'Btime-Prof-orig': 'Browsertime performance tests on Firefox with Gecko Profiling, original pref'
         'Btime-Prof-orig-fis': 'Browsertime performance tests on Firefox with Gecko Profiling, original pref'
         'Btime-Prof-1proc': 'Browsertime performance tests on Firefox with Gecko Profiling and without e10s'
