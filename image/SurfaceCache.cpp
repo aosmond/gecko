@@ -135,6 +135,8 @@ class CachedSurface {
     return mProvider->Surface();
   }
 
+  bool InvalidateBlobImage() { return mProvider->InvalidateBlobImage(); }
+
   void SetLocked(bool aLocked) {
     if (IsPlaceholder()) {
       return;  // Can't lock a placeholder.
@@ -1094,6 +1096,21 @@ class SurfaceCacheImpl final : public nsIMemoryReporter {
                      aAutoLock);
   }
 
+  void InvalidateEntries(const ImageKey aImageKey,
+                         const StaticMutexAutoLock& aAutoLock) {
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    if (!cache || !cache->IsLocked()) {
+      return;  // Already unlocked.
+    }
+
+    // (Note that we *don't* unlock the per-image cache here; that's the
+    // difference between this and UnlockImage.)
+    DoInvalidateSurfaces(
+        WrapNotNull(cache),
+        /* aStaticOnly = */
+        !StaticPrefs::image_mem_animated_discardable_AtStartup(), aAutoLock);
+  }
+
   already_AddRefed<ImageSurfaceCache> RemoveImage(
       const ImageKey aImageKey, const StaticMutexAutoLock& aAutoLock) {
     RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
@@ -1423,6 +1440,26 @@ class SurfaceCacheImpl final : public nsIMemoryReporter {
     }
   }
 
+  void DoInvalidateSurfaces(NotNull<ImageSurfaceCache*> aCache,
+                            bool aStaticOnly,
+                            const StaticMutexAutoLock& aAutoLock) {
+    AutoTArray<NotNull<CachedSurface*>, 8> discard;
+
+    // Invalidate or discard all the surfaces the per-image cache is holding.
+    for (const auto& value : aCache->Values()) {
+      NotNull<CachedSurface*> surface = WrapNotNull(value);
+      if (!surface->InvalidateBlobImage()) {
+        discard.AppendElement(surface);
+        continue;
+      }
+    }
+
+    // Discard any that we cannot invalidate.
+    for (auto iter = discard.begin(); iter != discard.end(); ++iter) {
+      Remove(*iter, /* aStopTracking */ true, aAutoLock);
+    }
+  }
+
   void RemoveEntry(const ImageKey aImageKey, const SurfaceKey& aSurfaceKey,
                    const StaticMutexAutoLock& aAutoLock) {
     RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
@@ -1692,9 +1729,25 @@ void SurfaceCache::UnlockImage(const ImageKey aImageKey) {
 
 /* static */
 void SurfaceCache::UnlockEntries(const ImageKey aImageKey) {
-  StaticMutexAutoLock lock(sInstanceMutex);
-  if (sInstance) {
-    return sInstance->UnlockEntries(aImageKey, lock);
+  nsTArray<RefPtr<CachedSurface>> discard;
+  {
+    StaticMutexAutoLock lock(sInstanceMutex);
+    if (sInstance) {
+      sInstance->UnlockEntries(aImageKey, lock);
+      sInstance->TakeDiscard(discard, lock);
+    }
+  }
+}
+
+/* static */
+void SurfaceCache::InvalidateEntries(const ImageKey aImageKey) {
+  nsTArray<RefPtr<CachedSurface>> discard;
+  {
+    StaticMutexAutoLock lock(sInstanceMutex);
+    if (sInstance) {
+      sInstance->InvalidateEntries(aImageKey, lock);
+      sInstance->TakeDiscard(discard, lock);
+    }
   }
 }
 

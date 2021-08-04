@@ -523,12 +523,20 @@ void VectorImage::SendInvalidationNotifications() {
   // notifications indirectly in |InvalidateObservers...|.
 
   mHasPendingInvalidation = false;
-  SurfaceCache::RemoveImage(ImageKey(this));
+
+  // Make sure that any blob recordings not in an image container get marked as
+  // dirty so that if they are accessed, we regenerate the recording.
+  SurfaceCache::InvalidateEntries(ImageKey(this));
 
   if (UpdateImageContainer(Nothing())) {
     // If we have image containers, that means we probably won't get a Draw call
     // from the owner since they are using the container. We must assume all
     // invalidations need to be handled.
+    //
+    // TODO(aosmond): We should really only resume honoring invalidations once
+    // any surface which was marked as dirty has been regenerated if using blob
+    // recordings. This would be much closer to the original intention of
+    // resuming after a Draw call.
     MOZ_ASSERT(mRenderingObserver, "Should have a rendering observer by now");
     mRenderingObserver->ResumeHonoringInvalidations();
   }

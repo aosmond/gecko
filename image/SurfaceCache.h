@@ -384,6 +384,18 @@ struct SurfaceCache {
   static void UnlockEntries(const ImageKey aImageKey);
 
   /**
+   * Invalidates or removes all cache entries (including placeholders)
+   * associated with the given image from the cache.  If the image is locked,
+   * it is automatically unlocked. Blob recordings can be invalidated, and
+   * regenerated when the caller next requests them, and rasterized surfaces
+   * will be removed.
+   *
+   * @param aImageKey  The image which should have its existing cache entries
+   *                   invalidated.
+   */
+  static void InvalidateEntries(const ImageKey aImageKey);
+
+  /**
    * Removes all cache entries (including placeholders) associated with the
    * given image from the cache.  If the image is locked, it is automatically
    * unlocked.
