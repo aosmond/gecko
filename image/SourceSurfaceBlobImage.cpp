@@ -184,11 +184,6 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
                        ? 0.0f
                        : mSVGDocumentWrapper->GetCurrentTimeAsFloat();
 
-  auto region =
-      mRegion ? mRegion->ToImageRegion()
-              : ImageRegion::Create(gfxRect(imageRect.x, imageRect.y,
-                                            imageRect.width, imageRect.height));
-
   IntSize viewportSize = mSize;
   if (mSVGContext) {
     auto cssViewportSize = mSVGContext->GetViewportSize();
@@ -226,16 +221,16 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
 
     IntRect visibleRect(imageRect);
     if (mSize != viewportSize) {
-      auto scaleX = double(mSize.width) / viewportSize.width;
-      auto scaleY = double(mSize.height) / viewportSize.height;
+      auto scaleX = float(mSize.width) / viewportSize.width;
+      auto scaleY = float(mSize.height) / viewportSize.height;
+      ctx->SetMatrix(Matrix::Scaling(scaleX, scaleY));
 
-      ctx->SetMatrixDouble(gfxMatrix::Scaling(scaleX, scaleY));
+      auto scaledVisibleRect = IntRectToRect(visibleRect);
+      scaledVisibleRect.Scale(1.0f / scaleX, 1.0f / scaleY);
+      visibleRect = RoundedToInt(scaledVisibleRect);
 
-      auto devFillRect = region.Rect();
-      devFillRect.ScaleInverseRoundOut(scaleX, scaleY);
-      visibleRect.SetRect(int32_t(devFillRect.x), int32_t(devFillRect.y),
-                          int32_t(devFillRect.width),
-                          int32_t(devFillRect.height));
+      IntRect viewportRect(IntPoint(0, 0), viewportSize);
+      visibleRect = visibleRect.Intersect(viewportRect);
     }
 
     nsRect svgRect(presContext->DevPixelsToAppUnits(visibleRect.x),
