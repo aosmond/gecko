@@ -213,9 +213,6 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     AutoRestoreSVGState autoRestore(mSVGContext, animTime, mSVGDocumentWrapper,
                                     contextPaint);
 
-    mSVGDocumentWrapper->UpdateViewportBounds(viewportSize);
-    mSVGDocumentWrapper->FlushImageTransformInvalidation();
-
     RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     MOZ_ASSERT(ctx);  // Already checked the draw target above.
 
@@ -223,15 +220,22 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     if (mSize != viewportSize) {
       auto scaleX = float(mSize.width) / viewportSize.width;
       auto scaleY = float(mSize.height) / viewportSize.height;
-      ctx->SetMatrix(Matrix::Scaling(scaleX, scaleY));
+      if (std::fabs(scaleX - scaleY) > 1e-6f) {
+        ctx->SetMatrix(Matrix::Scaling(scaleX, scaleY));
 
-      auto scaledVisibleRect = IntRectToRect(visibleRect);
-      scaledVisibleRect.Scale(1.0f / scaleX, 1.0f / scaleY);
-      visibleRect = RoundedToInt(scaledVisibleRect);
+        auto scaledVisibleRect = IntRectToRect(visibleRect);
+        scaledVisibleRect.Scale(1.0f / scaleX, 1.0f / scaleY);
+        visibleRect = RoundedToInt(scaledVisibleRect);
 
-      IntRect viewportRect(IntPoint(0, 0), viewportSize);
-      visibleRect = visibleRect.Intersect(viewportRect);
+        IntRect viewportRect(IntPoint(0, 0), viewportSize);
+        visibleRect = visibleRect.Intersect(viewportRect);
+      } else {
+        viewportSize = mSize;
+      }
     }
+
+    mSVGDocumentWrapper->UpdateViewportBounds(viewportSize);
+    mSVGDocumentWrapper->FlushImageTransformInvalidation();
 
     nsRect svgRect(presContext->DevPixelsToAppUnits(visibleRect.x),
                    presContext->DevPixelsToAppUnits(visibleRect.y),
