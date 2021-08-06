@@ -4555,20 +4555,24 @@ nsresult PresShell::RenderDocument(const nsRect& aRect,
 
   nsDeviceContext* devCtx = mPresContext->DeviceContext();
 
-  gfxPoint offset(-nsPresContext::AppUnitsToFloatCSSPixels(aRect.x),
-                  -nsPresContext::AppUnitsToFloatCSSPixels(aRect.y));
-  gfxFloat scale =
-      gfxFloat(devCtx->AppUnitsPerDevPixel()) / AppUnitsPerCSSPixel();
+  // FIXME(aosmond): Does canvas still need the NudgeToIntegers call?
+  auto auPerDevPixel = devCtx->AppUnitsPerDevPixel();
+  auto auPerCSSPixel = AppUnitsPerCSSPixel();
+  if (aRect.x != 0 || aRect.y != 0 || auPerDevPixel != auPerCSSPixel) {
+    gfxPoint offset(-nsPresContext::AppUnitsToFloatCSSPixels(aRect.x),
+                    -nsPresContext::AppUnitsToFloatCSSPixels(aRect.y));
+    gfxFloat scale = gfxFloat(auPerDevPixel) / auPerCSSPixel;
 
-  // Since canvas APIs use floats to set up their matrices, we may have some
-  // slight rounding errors here.  We use NudgeToIntegers() here to adjust
-  // matrix components that are integers up to the accuracy of floats to be
-  // those integers.
-  gfxMatrix newTM = aThebesContext->CurrentMatrixDouble()
-                        .PreTranslate(offset)
-                        .PreScale(scale, scale)
-                        .NudgeToIntegers();
-  aThebesContext->SetMatrixDouble(newTM);
+    // Since canvas APIs use floats to set up their matrices, we may have some
+    // slight rounding errors here.  We use NudgeToIntegers() here to adjust
+    // matrix components that are integers up to the accuracy of floats to be
+    // those integers.
+    gfxMatrix newTM = aThebesContext->CurrentMatrixDouble()
+                          .PreTranslate(offset)
+                          .PreScale(scale, scale)
+                          .NudgeToIntegers();
+    aThebesContext->SetMatrixDouble(newTM);
+  }
 
   AutoSaveRestoreRenderingState _(this);
 
