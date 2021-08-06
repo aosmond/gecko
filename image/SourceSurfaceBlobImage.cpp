@@ -225,6 +225,7 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     return Nothing();
   }
 
+  printf_stderr("[AO] blob recording %dx%d [(%d,%d) %dx%d] -- %zu bytes\n", mSize.width, mSize.height, imageRect.x, imageRect.y, imageRect.width, imageRect.height, recorder->mOutputStream.mLength);
   Range<uint8_t> bytes((uint8_t*)recorder->mOutputStream.mData,
                        recorder->mOutputStream.mLength);
   wr::BlobImageKey key = aBlobKey
