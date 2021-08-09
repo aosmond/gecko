@@ -219,24 +219,26 @@ Maybe<BlobImageKeyData> SourceSurfaceBlobImage::RecordDrawing(
     RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     MOZ_ASSERT(ctx);  // Already checked the draw target above.
 
-    IntRect visibleRect(imageRect);
+    nsRect svgRect;
+    auto auPerDevPixel = presContext->AppUnitsPerDevPixel();
     if (mSize != viewportSize) {
       auto scaleX = float(mSize.width) / viewportSize.width;
       auto scaleY = float(mSize.height) / viewportSize.height;
       ctx->SetMatrix(Matrix::Scaling(scaleX, scaleY));
 
-      auto scaledVisibleRect = IntRectToRect(visibleRect);
-      scaledVisibleRect.Scale(1.0f / scaleX, 1.0f / scaleY);
-      visibleRect = RoundedToInt(scaledVisibleRect);
-
-      IntRect viewportRect(IntPoint(0, 0), viewportSize);
-      visibleRect = visibleRect.Intersect(viewportRect);
+      auto scaledVisibleRect = IntRectToRect(imageRect);
+      scaledVisibleRect.Scale(float(auPerDevPixel) / scaleX,
+                              float(auPerDevPixel) / scaleY);
+      scaledVisibleRect.Round();
+      svgRect.SetRect(
+          int32_t(scaledVisibleRect.x), int32_t(scaledVisibleRect.y),
+          int32_t(scaledVisibleRect.width), int32_t(scaledVisibleRect.height));
+    } else {
+      auto scaledVisibleRect(imageRect);
+      scaledVisibleRect.Scale(auPerDevPixel);
+      svgRect.SetRect(scaledVisibleRect.x, scaledVisibleRect.y,
+                      scaledVisibleRect.width, scaledVisibleRect.height);
     }
-
-    nsRect svgRect(presContext->DevPixelsToAppUnits(visibleRect.x),
-                   presContext->DevPixelsToAppUnits(visibleRect.y),
-                   presContext->DevPixelsToAppUnits(visibleRect.width),
-                   presContext->DevPixelsToAppUnits(visibleRect.height));
 
     RenderDocumentFlags renderDocFlags =
         RenderDocumentFlags::IgnoreViewportScrolling;
