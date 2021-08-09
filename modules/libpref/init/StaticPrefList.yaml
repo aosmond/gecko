@@ -4898,7 +4898,7 @@
 # Whether to force using EGL over GLX.
 - name: gfx.x11-egl.force-enabled
   type: bool
-  value: false
+  value: true
   mirror: once
 #endif
 
