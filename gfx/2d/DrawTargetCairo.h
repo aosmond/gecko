@@ -123,9 +123,6 @@ class DrawTargetCairo final : public DrawTarget {
       const Pattern& aSource, SourceSurface* aMask, Point aOffset,
       const DrawOptions& aOptions = DrawOptions()) override;
 
-  virtual bool Draw3DTransformedSurface(SourceSurface* aSurface,
-                                        const Matrix4x4& aMatrix) override;
-
   virtual void PushClip(const Path* aPath) override;
   virtual void PushClipRect(const Rect& aRect) override;
   virtual void PopClip() override;
