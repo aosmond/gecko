@@ -8,4 +8,6 @@ SOURCES += [
     "nsIconChannelCocoa.mm",
 ]
 
+include("/ipc/chromium/chromium-config.mozbuild")
+
 FINAL_LIBRARY = "xul"
