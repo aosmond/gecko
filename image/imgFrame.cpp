@@ -56,86 +56,21 @@ class RecyclingSourceSurfaceSharedData final : public SourceSurfaceSharedData {
   }
 };
 
-static int32_t VolatileSurfaceStride(const IntSize& size,
-                                     SurfaceFormat format) {
-  // Stride must be a multiple of four or cairo will complain.
-  return (size.width * BytesPerPixel(format) + 0x3) & ~0x3;
-}
-
-static already_AddRefed<DataSourceSurface> CreateLockedSurface(
-    DataSourceSurface* aSurface, const IntSize& size, SurfaceFormat format) {
-  switch (aSurface->GetType()) {
-    case SurfaceType::DATA_SHARED:
-    case SurfaceType::DATA_RECYCLING_SHARED:
-    case SurfaceType::DATA_ALIGNED: {
-      // Shared memory is never released until the surface itself is released.
-      // Similar for aligned/heap surfaces.
-      RefPtr<DataSourceSurface> surf(aSurface);
-      return surf.forget();
-    }
-    default: {
-      // Volatile memory requires us to map it first, and it is fallible.
-      DataSourceSurface::ScopedMap smap(aSurface,
-                                        DataSourceSurface::READ_WRITE);
-      if (smap.IsMapped()) {
-        return MakeAndAddRef<SourceSurfaceMappedData>(std::move(smap), size,
-                                                      format);
-      }
-      break;
-    }
-  }
-
-  return nullptr;
-}
-
-static bool ShouldUseHeap(const IntSize& aSize, int32_t aStride,
-                          bool aIsAnimated) {
-  // On some platforms (i.e. Android), a volatile buffer actually keeps a file
-  // handle active. We would like to avoid too many since we could easily
-  // exhaust the pool. However, other platforms we do not have the file handle
-  // problem, and additionally we may avoid a superfluous memset since the
-  // volatile memory starts out as zero-filled. Hence the knobs below.
-
-  // For as long as an animated image is retained, its frames will never be
-  // released to let the OS purge volatile buffers.
-  if (aIsAnimated && StaticPrefs::image_mem_animated_use_heap()) {
-    return true;
-  }
-
-  // Lets us avoid too many small images consuming all of the handles. The
-  // actual allocation checks for overflow.
-  int32_t bufferSize = (aStride * aSize.height) / 1024;
-  return bufferSize < StaticPrefs::image_mem_volatile_min_threshold_kb();
-}
-
 static already_AddRefed<DataSourceSurface> AllocateBufferForImage(
-    const IntSize& size, SurfaceFormat format, bool aShouldRecycle = false,
-    bool aIsAnimated = false) {
-  int32_t stride = VolatileSurfaceStride(size, format);
+    const IntSize& size, SurfaceFormat format, bool aShouldRecycle = false) {
+  // Stride must be a multiple of four or cairo will complain.
+  int32_t stride = (size.width * BytesPerPixel(format) + 0x3) & ~0x3;
 
-  if (gfxVars::GetUseWebRenderOrDefault() && StaticPrefs::image_mem_shared()) {
-    RefPtr<SourceSurfaceSharedData> newSurf;
-    if (aShouldRecycle) {
-      newSurf = new RecyclingSourceSurfaceSharedData();
-    } else {
-      newSurf = new SourceSurfaceSharedData();
-    }
-    if (newSurf->Init(size, stride, format)) {
-      return newSurf.forget();
-    }
-  } else if (ShouldUseHeap(size, stride, aIsAnimated)) {
-    RefPtr<SourceSurfaceAlignedRawData> newSurf =
-        new SourceSurfaceAlignedRawData();
-    if (newSurf->Init(size, format, false, 0, stride)) {
-      return newSurf.forget();
-    }
+  RefPtr<SourceSurfaceSharedData> newSurf;
+  if (aShouldRecycle) {
+    newSurf = new RecyclingSourceSurfaceSharedData();
   } else {
-    RefPtr<SourceSurfaceVolatileData> newSurf = new SourceSurfaceVolatileData();
-    if (newSurf->Init(size, stride, format)) {
-      return newSurf.forget();
-    }
+    newSurf = new SourceSurfaceSharedData();
   }
-  return nullptr;
+  if (!newSurf->Init(size, stride, format)) {
+    return nullptr;
+  }
+  return newSurf.forget();
 }
 
 static bool GreenSurface(DataSourceSurface* aSurface, const IntSize& aSize,
@@ -255,11 +190,9 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
   mNonPremult = aNonPremult;
   mShouldRecycle = aShouldRecycle;
 
-  MOZ_ASSERT(!mLockedSurface, "Called imgFrame::InitForDecoder() twice?");
+  MOZ_ASSERT(!mRawSurface, "Called imgFrame::InitForDecoder() twice?");
 
-  bool postFirstFrame = aAnimParams && aAnimParams->mFrameNum > 0;
-  mRawSurface = AllocateBufferForImage(mImageSize, mFormat, mShouldRecycle,
-                                       postFirstFrame);
+  mRawSurface = AllocateBufferForImage(mImageSize, mFormat, mShouldRecycle);
   if (!mRawSurface) {
     mAborted = true;
     return NS_ERROR_OUT_OF_MEMORY;
@@ -269,23 +202,6 @@ nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,
       aAnimParams) {
     mBlankRawSurface = AllocateBufferForImage(mImageSize, mFormat);
     if (!mBlankRawSurface) {
-      mAborted = true;
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
-  }
-
-  mLockedSurface = CreateLockedSurface(mRawSurface, mImageSize, mFormat);
-  if (!mLockedSurface) {
-    NS_WARNING("Failed to create LockedSurface");
-    mAborted = true;
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
-  if (mBlankRawSurface) {
-    mBlankLockedSurface =
-        CreateLockedSurface(mBlankRawSurface, mImageSize, mFormat);
-    if (!mBlankLockedSurface) {
-      NS_WARNING("Failed to create BlankLockedSurface");
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -314,7 +230,7 @@ nsresult imgFrame::InitForDecoderRecycle(const AnimationParams& aAnimParams) {
   MonitorAutoLock lock(mMonitor);
 
   MOZ_ASSERT(mLockCount > 0);
-  MOZ_ASSERT(mLockedSurface);
+  MOZ_ASSERT(mRawSurface);
 
   if (!mShouldRecycle) {
     // This frame either was never marked as recyclable, or the flag was cleared
@@ -324,14 +240,11 @@ nsresult imgFrame::InitForDecoderRecycle(const AnimationParams& aAnimParams) {
 
   // Ensure we account for all internal references to the surface.
   MozRefCountType internalRefs = 1;
-  if (mRawSurface == mLockedSurface) {
-    ++internalRefs;
-  }
-  if (mOptSurface == mLockedSurface) {
+  if (mOptSurface == mRawSurface) {
     ++internalRefs;
   }
 
-  if (mLockedSurface->refCount() > internalRefs) {
+  if (mRawSurface->refCount() > internalRefs) {
     if (NS_IsMainThread()) {
       // We should never be both decoding and recycling on the main thread. Sync
       // decoding can only be used to produce the first set of frames. Those
@@ -361,7 +274,7 @@ nsresult imgFrame::InitForDecoderRecycle(const AnimationParams& aAnimParams) {
         TimeStamp::Now() + TimeDuration::FromMilliseconds(refreshInterval);
     while (true) {
       mMonitor.Wait(waitInterval);
-      if (mLockedSurface->refCount() <= internalRefs) {
+      if (mRawSurface->refCount() <= internalRefs) {
         break;
       }
 
@@ -405,17 +318,10 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
   if (canUseDataSurface) {
     // It's safe to use data surfaces for content on this platform, so we can
     // get away with using volatile buffers.
-    MOZ_ASSERT(!mLockedSurface, "Called imgFrame::InitWithDrawable() twice?");
+    MOZ_ASSERT(!mRawSurface, "Called imgFrame::InitWithDrawable() twice?");
 
     mRawSurface = AllocateBufferForImage(mImageSize, mFormat);
     if (!mRawSurface) {
-      mAborted = true;
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
-
-    mLockedSurface = CreateLockedSurface(mRawSurface, mImageSize, mFormat);
-    if (!mLockedSurface) {
-      NS_WARNING("Failed to create LockedSurface");
       mAborted = true;
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -427,7 +333,7 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
     }
 
     target = gfxPlatform::CreateDrawTargetForData(
-        mLockedSurface->GetData(), mImageSize, mLockedSurface->Stride(),
+        mRawSurface->GetData(), mImageSize, mRawSurface->Stride(),
         mFormat);
   } else {
     // We can't use data surfaces for content, so we'll create an offscreen
@@ -457,8 +363,8 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
                              ImageRegion::Create(ThebesRect(GetRect())),
                              mFormat, aSamplingFilter, aImageFlags);
 
-  if (canUseDataSurface && !mLockedSurface) {
-    NS_WARNING("Failed to create VolatileDataSourceSurface");
+  if (canUseDataSurface && !mRawSurface) {
+    NS_WARNING("Failed to create SourceSurfaceSharedData");
     mAborted = true;
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -621,9 +527,6 @@ nsresult imgFrame::ImageUpdatedInternal(const nsIntRect& aUpdateRect) {
   if (mRawSurface) {
     mRawSurface->Invalidate(updateRect);
   }
-  if (mLockedSurface && mRawSurface != mLockedSurface) {
-    mLockedSurface->Invalidate(updateRect);
-  }
   return NS_OK;
 }
 
@@ -685,16 +588,16 @@ void imgFrame::GetImageData(uint8_t** aData, uint32_t* aLength) const {
 void imgFrame::GetImageDataInternal(uint8_t** aData, uint32_t* aLength) const {
   mMonitor.AssertCurrentThreadOwns();
   MOZ_ASSERT(mLockCount > 0, "Image data should be locked");
-  MOZ_ASSERT(mLockedSurface);
+  MOZ_ASSERT(mRawSurface);
 
-  if (mLockedSurface) {
+  if (mRawSurface) {
     // TODO: This is okay for now because we only realloc shared surfaces on
     // the main thread after decoding has finished, but if animations want to
     // read frame data off the main thread, we will need to reconsider this.
-    *aData = mLockedSurface->GetData();
+    *aData = mRawSurface->GetData();
     MOZ_ASSERT(
         *aData,
-        "mLockedSurface is non-null, but GetData is null in GetImageData");
+        "mRawSurface is non-null, but GetData is null in GetImageData");
   } else {
     *aData = nullptr;
   }
@@ -718,8 +621,8 @@ uint8_t* imgFrame::LockImageData(bool aOnlyFinished) {
   }
 
   uint8_t* data;
-  if (mLockedSurface) {
-    data = mLockedSurface->GetData();
+  if (mRawSurface) {
+    data = mRawSurface->GetData();
   } else {
     data = nullptr;
   }
@@ -791,26 +694,16 @@ already_AddRefed<SourceSurface> imgFrame::GetSourceSurfaceInternal() {
     mOptSurface = nullptr;
   }
 
-  if (mBlankLockedSurface) {
+  if (mBlankRawSurface) {
     // We are going to return the blank surface because of the flags.
     // We are including comments here that are copied from below
     // just so that we are on the same page!
-    RefPtr<SourceSurface> surf(mBlankLockedSurface);
+    RefPtr<SourceSurface> surf(mBlankRawSurface);
     return surf.forget();
   }
 
-  if (mLockedSurface) {
-    RefPtr<SourceSurface> surf(mLockedSurface);
-    return surf.forget();
-  }
-
-  MOZ_ASSERT(!mShouldRecycle, "Should recycle but no locked surface!");
-
-  if (!mRawSurface) {
-    return nullptr;
-  }
-
-  return CreateLockedSurface(mRawSurface, mImageSize, mFormat);
+  RefPtr<SourceSurface> surf(mRawSurface);
+  return surf.forget();
 }
 
 void imgFrame::Abort() {
@@ -859,12 +752,6 @@ void imgFrame::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
   metadata.mSurface = mOptSurface ? mOptSurface.get() : mRawSurface.get();
   metadata.mFinished = mFinished;
 
-  if (mLockedSurface) {
-    // The locked surface should only be present if we have mRawSurface. Hence
-    // we only need to get its allocation size to avoid double counting.
-    metadata.mHeapBytes += aMallocSizeOf(mLockedSurface);
-    metadata.AddType(mLockedSurface->GetType());
-  }
   if (mOptSurface) {
     metadata.mHeapBytes += aMallocSizeOf(mOptSurface);
 

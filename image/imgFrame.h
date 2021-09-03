@@ -250,19 +250,10 @@ class imgFrame {
   mutable Monitor mMonitor;
 
   /**
-   * Surface which contains either a weak or a strong reference to its
-   * underlying data buffer. If it is a weak reference, and there are no strong
-   * references, the buffer may be released due to events such as low memory.
+   * Surface which contains a strong reference to its underlying data buffer.
    */
   RefPtr<DataSourceSurface> mRawSurface;
   RefPtr<DataSourceSurface> mBlankRawSurface;
-
-  /**
-   * Refers to the same data as mRawSurface, but when set, it guarantees that
-   * we hold a strong reference to the underlying data buffer.
-   */
-  RefPtr<DataSourceSurface> mLockedSurface;
-  RefPtr<DataSourceSurface> mBlankLockedSurface;
 
   /**
    * Optimized copy of mRawSurface for the DrawTarget that will render it. This
