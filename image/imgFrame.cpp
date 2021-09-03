@@ -199,7 +199,6 @@ imgFrame::imgFrame()
       mLockCount(0),
       mAborted(false),
       mFinished(false),
-      mOptimizable(false),
       mShouldRecycle(false),
       mTimeout(FrameTimeout::FromRawMilliseconds(100)),
       mDisposalMethod(DisposalMethod::NOT_SPECIFIED),
@@ -484,71 +483,6 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
   return NS_OK;
 }
 
-nsresult imgFrame::Optimize(DrawTarget* aTarget) {
-  MOZ_ASSERT(NS_IsMainThread());
-  mMonitor.AssertCurrentThreadOwns();
-
-  if (mLockCount > 0 || !mOptimizable) {
-    // Don't optimize right now.
-    return NS_OK;
-  }
-
-  // Check whether image optimization is disabled -- not thread safe!
-  static bool gDisableOptimize = false;
-  static bool hasCheckedOptimize = false;
-  if (!hasCheckedOptimize) {
-    if (PR_GetEnv("MOZ_DISABLE_IMAGE_OPTIMIZE")) {
-      gDisableOptimize = true;
-    }
-    hasCheckedOptimize = true;
-  }
-
-  // Don't optimize during shutdown because gfxPlatform may not be available.
-  if (ShutdownTracker::ShutdownHasStarted()) {
-    return NS_OK;
-  }
-
-  if (gDisableOptimize) {
-    return NS_OK;
-  }
-
-  if (mOptSurface) {
-    return NS_OK;
-  }
-
-  // XXX(seth): It's currently unclear if there's any reason why we can't
-  // optimize non-premult surfaces. We should look into removing this.
-  if (mNonPremult) {
-    return NS_OK;
-  }
-  if (!gfxVars::UseWebRender()) {
-    mOptSurface = aTarget->OptimizeSourceSurface(mLockedSurface);
-  } else {
-    mOptSurface = gfxPlatform::GetPlatform()
-                      ->ScreenReferenceDrawTarget()
-                      ->OptimizeSourceSurface(mLockedSurface);
-  }
-  if (mOptSurface == mLockedSurface) {
-    mOptSurface = nullptr;
-  }
-
-  if (mOptSurface) {
-    // There's no reason to keep our original surface around if we have an
-    // optimized surface. Release our reference to it. This will leave
-    // |mLockedSurface| as the only thing keeping it alive, so it'll get freed
-    // below.
-    mRawSurface = nullptr;
-  }
-
-  // Release all strong references to the surface's memory. If the underlying
-  // surface is volatile, this will allow the operating system to free the
-  // memory if it needs to.
-  mLockedSurface = nullptr;
-  mOptimizable = false;
-
-  return NS_OK;
-}
-
 DrawableFrameRef imgFrame::DrawableRef() { return DrawableFrameRef(this); }
 
 RawAccessFrameRef imgFrame::RawAccessRef(bool aOnlyFinished /*= false*/) {
@@ -626,11 +560,6 @@ bool imgFrame::Draw(gfxContext* aContext, const ImageRegion& aRegion,
 
   {
     MonitorAutoLock lock(mMonitor);
-
-    // Possibly convert this image into a GPU texture, this may also cause our
-    // mLockedSurface to be released and the OS to release the underlying
-    // memory.
-    Optimize(aContext->GetDrawTarget());
 
     bool doPartialDecode = !AreAllPixelsWritten();
 
@@ -826,12 +755,6 @@ nsresult imgFrame::UnlockImageData() {
   mLockCount--;
 
   return NS_OK;
-}
-
-void imgFrame::SetOptimizable() {
-  AssertImageDataLocked();
-  MonitorAutoLock lock(mMonitor);
-  mOptimizable = true;
 }
 
 void imgFrame::FinalizeSurface() {

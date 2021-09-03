@@ -155,10 +155,7 @@ class imgFrame {
   void WaitUntilFinished() const;
 
   /**
-   * Returns the number of bytes per pixel this imgFrame requires.  This is a
-   * worst-case value that does not take into account the effects of format
-   * changes caused by Optimize(), since an imgFrame is not optimized throughout
-   * its lifetime.
+   * Returns the number of bytes per pixel this imgFrame requires.
    */
   uint32_t GetBytesPerPixel() const { return 4; }
 
@@ -177,8 +174,6 @@ class imgFrame {
 
   const IntRect& GetDirtyRect() const { return mDirtyRect; }
   void SetDirtyRect(const IntRect& aDirtyRect) { mDirtyRect = aDirtyRect; }
-
-  void SetOptimizable();
 
   void FinalizeSurface();
   already_AddRefed<SourceSurface> GetSourceSurface();
@@ -210,7 +205,6 @@ class imgFrame {
    */
   uint8_t* LockImageData(bool aOnlyFinished);
   nsresult UnlockImageData();
-  nsresult Optimize(gfx::DrawTarget* aTarget);
 
   void AssertImageDataLocked() const;
 
@@ -284,7 +278,6 @@ class imgFrame {
 
   bool mAborted;
   bool mFinished;
-  bool mOptimizable;
   bool mShouldRecycle;
 
   //////////////////////////////////////////////////////////////////////////////
