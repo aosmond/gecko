@@ -13,6 +13,7 @@
 #include "AnimationParams.h"
 #include "MainThreadUtils.h"
 #include "gfxDrawable.h"
+#include "mozilla/layers/SourceSurfaceSharedData.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Monitor.h"
@@ -28,7 +29,7 @@ class RawAccessFrameRef;
 enum class Opacity : uint8_t { FULLY_OPAQUE, SOME_TRANSPARENCY };
 
 class imgFrame {
-  typedef gfx::DataSourceSurface DataSourceSurface;
+  typedef gfx::SourceSurfaceSharedData SourceSurfaceSharedData;
   typedef gfx::DrawTarget DrawTarget;
   typedef gfx::SamplingFilter SamplingFilter;
   typedef gfx::IntPoint IntPoint;
@@ -222,15 +223,14 @@ class imgFrame {
   mutable Monitor mMonitor;
 
   /**
-   * Surface which contains a strong reference to its underlying data buffer.
+   * Used for rasterized images, this contains the raw pixel data.
    */
-  RefPtr<DataSourceSurface> mRawSurface;
-  RefPtr<DataSourceSurface> mBlankRawSurface;
+  RefPtr<SourceSurfaceSharedData> mRawSurface;
+  RefPtr<SourceSurfaceSharedData> mBlankRawSurface;
 
   /**
-   * Optimized copy of mRawSurface for the DrawTarget that will render it. This
-   * is unused if the DrawTarget is able to render DataSourceSurface buffers
-   * directly.
+   * Used for vector images that were not rasterized directly. This might be a
+   * blob recording or native surface.
    */
   RefPtr<SourceSurface> mOptSurface;
 

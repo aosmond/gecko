@@ -6,7 +6,6 @@
 
 #include "imgFrame.h"
 #include "ImageRegion.h"
-#include "ShutdownTracker.h"
 #include "SurfaceCache.h"
 
 #include "prenv.h"
@@ -19,16 +18,11 @@
 
 #include "MainThreadUtils.h"
 #include "mozilla/CheckedInt.h"
-#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/Tools.h"
-#include "mozilla/gfx/SourceSurfaceRawData.h"
-#include "mozilla/layers/SourceSurfaceSharedData.h"
-#include "mozilla/layers/SourceSurfaceVolatileData.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/ProfilerLabels.h"
 #include "mozilla/StaticPrefs_browser.h"
-#include "mozilla/StaticPrefs_image.h"
 #include "nsMargin.h"
 #include "nsRefreshDriver.h"
 #include "nsThreadUtils.h"
@@ -56,7 +50,7 @@ class RecyclingSourceSurfaceSharedData final : public SourceSurfaceSharedData {
   }
 };
 
-static already_AddRefed<DataSourceSurface> AllocateBufferForImage(
+static already_AddRefed<SourceSurfaceSharedData> AllocateBufferForImage(
     const IntSize& size, SurfaceFormat format, bool aShouldRecycle = false) {
   // Stride must be a multiple of four or cairo will complain.
   int32_t stride = (size.width * BytesPerPixel(format) + 0x3) & ~0x3;
@@ -73,8 +67,8 @@ static already_AddRefed<DataSourceSurface> AllocateBufferForImage(
   return newSurf.forget();
 }
 
-static bool GreenSurface(DataSourceSurface* aSurface, const IntSize& aSize,
-                         SurfaceFormat aFormat) {
+static bool GreenSurface(SourceSurfaceSharedData* aSurface,
+                         const IntSize& aSize, SurfaceFormat aFormat) {
   int32_t stride = aSurface->Stride();
   uint32_t* surfaceData = reinterpret_cast<uint32_t*>(aSurface->GetData());
   uint32_t surfaceDataLength = (stride * aSize.height) / sizeof(uint32_t);
@@ -106,8 +100,8 @@ static bool GreenSurface(DataSourceSurface* aSurface, const IntSize& aSize,
   return true;
 }
 
-static bool ClearSurface(DataSourceSurface* aSurface, const IntSize& aSize,
-                         SurfaceFormat aFormat) {
+static bool ClearSurface(SourceSurfaceSharedData* aSurface,
+                         const IntSize& aSize, SurfaceFormat aFormat) {
   int32_t stride = aSurface->Stride();
   uint8_t* data = aSurface->GetData();
   MOZ_ASSERT(data);
