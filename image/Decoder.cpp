@@ -340,11 +340,6 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
     return RawAccessFrameRef();
   }
 
-  if (frameNum == 1) {
-    MOZ_ASSERT(aPreviousFrame, "Must provide a previous frame when animated");
-    aPreviousFrame->SetRawAccessOnly();
-  }
-
   if (frameNum > 0) {
     if (aPreviousFrame->GetDisposalMethod() !=
         DisposalMethod::RESTORE_PREVIOUS) {
@@ -409,10 +404,6 @@ RawAccessFrameRef Decoder::AllocateFrameInternal(
     if (!ref) {
       frame->Abort();
       return RawAccessFrameRef();
-    }
-
-    if (frameNum > 0) {
-      frame->SetRawAccessOnly();
     }
   }
 

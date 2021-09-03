@@ -88,23 +88,8 @@ class imgFrame {
 
   /**
    * Create a RawAccessFrameRef for the frame.
-   *
-   * @param aOnlyFinished If true, only return a valid RawAccessFrameRef if
-   *                      imgFrame::Finish has been called.
    */
-  RawAccessFrameRef RawAccessRef(bool aOnlyFinished = false);
-
-  /**
-   * Make this imgFrame permanently available for raw access.
-   *
-   * This is irrevocable, and should be avoided whenever possible, since it
-   * prevents this imgFrame from being optimized and makes it impossible for its
-   * volatile buffer to be freed.
-   *
-   * It is an error to call this without already holding a RawAccessFrameRef to
-   * this imgFrame.
-   */
-  void SetRawAccessOnly();
+  RawAccessFrameRef RawAccessRef();
 
   bool Draw(gfxContext* aContext, const ImageRegion& aRegion,
             SamplingFilter aSamplingFilter, uint32_t aImageFlags,
@@ -195,19 +180,6 @@ class imgFrame {
  private:  // methods
   ~imgFrame();
 
-  /**
-   * Used when the caller desires raw access to the underlying frame buffer.
-   * If the locking succeeds, the data pointer to the start of the buffer is
-   * returned, else it returns nullptr.
-   *
-   * @param aOnlyFinished If true, only attempt to lock if imgFrame::Finish has
-   *                      been called.
-   */
-  uint8_t* LockImageData(bool aOnlyFinished);
-  nsresult UnlockImageData();
-
-  void AssertImageDataLocked() const;
-
   bool AreAllPixelsWritten() const;
   nsresult ImageUpdatedInternal(const nsIntRect& aUpdateRect);
   void GetImageDataInternal(uint8_t** aData, uint32_t* length) const;
@@ -263,9 +235,6 @@ class imgFrame {
   RefPtr<SourceSurface> mOptSurface;
 
   nsIntRect mDecoded;
-
-  //! Number of RawAccessFrameRefs currently alive for this imgFrame.
-  int16_t mLockCount;
 
   bool mAborted;
   bool mFinished;
@@ -386,11 +355,11 @@ class RawAccessFrameRef final {
  public:
   RawAccessFrameRef() : mData(nullptr) {}
 
-  explicit RawAccessFrameRef(imgFrame* aFrame, bool aOnlyFinished)
+  explicit RawAccessFrameRef(imgFrame* aFrame)
       : mFrame(aFrame), mData(nullptr) {
     MOZ_ASSERT(mFrame, "Need a frame");
 
-    mData = mFrame->LockImageData(aOnlyFinished);
+    mData = mFrame->GetImageData();
     if (!mData) {
       mFrame = nullptr;
     }
@@ -401,18 +370,10 @@ class RawAccessFrameRef final {
     aOther.mData = nullptr;
   }
 
-  ~RawAccessFrameRef() {
-    if (mFrame) {
-      mFrame->UnlockImageData();
-    }
-  }
+  ~RawAccessFrameRef() {}
 
   RawAccessFrameRef& operator=(RawAccessFrameRef&& aOther) {
     MOZ_ASSERT(this != &aOther, "Self-moves are prohibited");
-
-    if (mFrame) {
-      mFrame->UnlockImageData();
-    }
 
     mFrame = std::move(aOther.mFrame);
     mData = aOther.mData;
@@ -437,9 +398,6 @@ class RawAccessFrameRef final {
   const imgFrame* get() const { return mFrame; }
 
   void reset() {
-    if (mFrame) {
-      mFrame->UnlockImageData();
-    }
     mFrame = nullptr;
     mData = nullptr;
   }

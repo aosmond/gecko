@@ -131,7 +131,6 @@ static bool ClearSurface(DataSourceSurface* aSurface, const IntSize& aSize,
 imgFrame::imgFrame()
     : mMonitor("imgFrame"),
       mDecoded(0, 0, 0, 0),
-      mLockCount(0),
       mAborted(false),
       mFinished(false),
       mShouldRecycle(false),
@@ -229,7 +228,6 @@ nsresult imgFrame::InitForDecoderRecycle(const AnimationParams& aAnimParams) {
   // done with it in a timely manner. Let's ensure they are done with it first.
   MonitorAutoLock lock(mMonitor);
 
-  MOZ_ASSERT(mLockCount > 0);
   MOZ_ASSERT(mRawSurface);
 
   if (!mShouldRecycle) {
@@ -391,16 +389,7 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
 
 DrawableFrameRef imgFrame::DrawableRef() { return DrawableFrameRef(this); }
 
-RawAccessFrameRef imgFrame::RawAccessRef(bool aOnlyFinished /*= false*/) {
-  return RawAccessFrameRef(this, aOnlyFinished);
-}
-
-void imgFrame::SetRawAccessOnly() {
-  AssertImageDataLocked();
-
-  // Lock our data and throw away the key.
-  LockImageData(false);
-}
+RawAccessFrameRef imgFrame::RawAccessRef() { return RawAccessFrameRef(this); }
 
 imgFrame::SurfaceWithFormat imgFrame::SurfaceForDrawing(
     bool aDoPartialDecode, bool aDoTile, ImageRegion& aRegion,
@@ -533,7 +522,6 @@ nsresult imgFrame::ImageUpdatedInternal(const nsIntRect& aUpdateRect) {
 void imgFrame::Finish(Opacity aFrameOpacity /* = Opacity::SOME_TRANSPARENCY */,
                       bool aFinalize /* = true */) {
   MonitorAutoLock lock(mMonitor);
-  MOZ_ASSERT(mLockCount > 0, "Image data should be locked");
 
   IntRect frameRect(GetRect());
   if (!mDecoded.IsEqualEdges(frameRect)) {
@@ -587,7 +575,6 @@ void imgFrame::GetImageData(uint8_t** aData, uint32_t* aLength) const {
 
 void imgFrame::GetImageDataInternal(uint8_t** aData, uint32_t* aLength) const {
   mMonitor.AssertCurrentThreadOwns();
-  MOZ_ASSERT(mLockCount > 0, "Image data should be locked");
   MOZ_ASSERT(mRawSurface);
 
   if (mRawSurface) {
@@ -610,54 +597,6 @@ uint8_t* imgFrame::GetImageData() const {
   uint32_t length;
   GetImageData(&data, &length);
   return data;
-}
-
-uint8_t* imgFrame::LockImageData(bool aOnlyFinished) {
-  MonitorAutoLock lock(mMonitor);
-
-  MOZ_ASSERT(mLockCount >= 0, "Unbalanced locks and unlocks");
-  if (mLockCount < 0 || (aOnlyFinished && !mFinished)) {
-    return nullptr;
-  }
-
-  uint8_t* data;
-  if (mRawSurface) {
-    data = mRawSurface->GetData();
-  } else {
-    data = nullptr;
-  }
-
-  // If the raw data is still available, we should get a valid pointer for it.
-  if (!data) {
-    MOZ_ASSERT_UNREACHABLE("It's illegal to re-lock an optimized imgFrame");
-    return nullptr;
-  }
-
-  ++mLockCount;
-  return data;
-}
-
-void imgFrame::AssertImageDataLocked() const {
-#ifdef DEBUG
-  MonitorAutoLock lock(mMonitor);
-  MOZ_ASSERT(mLockCount > 0, "Image data should be locked");
-#endif
-}
-
-nsresult imgFrame::UnlockImageData() {
-  MonitorAutoLock lock(mMonitor);
-
-  MOZ_ASSERT(mLockCount > 0, "Unlocking an unlocked image!");
-  if (mLockCount <= 0) {
-    return NS_ERROR_FAILURE;
-  }
-
-  MOZ_ASSERT(mLockCount > 1 || mFinished || mAborted,
-             "Should have Finish()'d or aborted before unlocking");
-
-  mLockCount--;
-
-  return NS_OK;
 }
 
 void imgFrame::FinalizeSurface() {
