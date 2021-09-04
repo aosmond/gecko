@@ -7,12 +7,15 @@
 
 #include "mozilla/StaticPrefs_image.h"
 #include "mozilla/gfx/gfxVars.h"
+#include "mozilla/layers/SharedSurfacesChild.h"
+#include "mozilla/layers/SourceSurfaceSharedData.h"
 #include "nsProxyRelease.h"
 
 #include "DecodePool.h"
 #include "Decoder.h"
 
 using namespace mozilla::gfx;
+using namespace mozilla::layers;
 
 namespace mozilla {
 namespace image {
@@ -25,7 +28,8 @@ AnimationSurfaceProvider::AnimationSurfaceProvider(
       mImage(aImage.get()),
       mDecodingMutex("AnimationSurfaceProvider::mDecoder"),
       mDecoder(aDecoder.get()),
-      mFramesMutex("AnimationSurfaceProvider::mFrames") {
+      mFramesMutex("AnimationSurfaceProvider::mFrames"),
+      mSharedAnimation(MakeRefPtr<SharedSurfacesAnimation>()) {
   MOZ_ASSERT(!mDecoder->IsMetadataDecode(),
              "Use MetadataDecodingTask for metadata decodes");
   MOZ_ASSERT(!mDecoder->IsFirstFrameDecode(),
@@ -483,6 +487,29 @@ RawAccessFrameRef AnimationSurfaceProvider::RecycleFrame(
   MutexAutoLock lock(mFramesMutex);
   MOZ_ASSERT(mFrames->IsRecycling());
   return mFrames->RecycleFrame(aRecycleRect);
+}
+
+nsresult AnimationSurfaceProvider::UpdateKey(
+    layers::RenderRootStateManager* aManager,
+    wr::IpcResourceUpdateQueue& aResources, wr::ImageKey& aKey) {
+  imgFrame* frame = mFrames->Get(mFrames->Displayed(), /* aForDisplay */ true);
+  if (!frame) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  RefPtr<SourceSurface> surface = frame->GetSourceSurface();
+  auto sharedSurface = static_cast<SourceSurfaceSharedData*>(surface.get());
+  return mSharedAnimation->UpdateKey(sharedSurface, aManager, aResources, aKey);
+}
+
+void AnimationSurfaceProvider::ReleasePreviousFrame(
+    layers::RenderRootStateManager* aManager, const wr::ExternalImageId& aId) {
+  mSharedAnimation->ReleasePreviousFrame(aManager, aId);
+}
+
+void AnimationSurfaceProvider::Invalidate(
+    layers::RenderRootStateManager* aManager) {
+  mSharedAnimation->Invalidate(aManager);
 }
 
 }  // namespace image

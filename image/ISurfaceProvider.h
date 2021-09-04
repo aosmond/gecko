@@ -17,6 +17,7 @@
 #include "mozilla/NotNull.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/image/WebRenderImageProvider.h"
 
 #include "imgFrame.h"
 #include "SurfaceCache.h"
@@ -31,7 +32,7 @@ class DrawableSurface;
  * An interface for objects which can either store a surface or dynamically
  * generate one.
  */
-class ISurfaceProvider {
+class ISurfaceProvider : public WebRenderImageProvider {
  public:
   // Subclasses may or may not be XPCOM classes, so we just require that they
   // implement AddRef and Release.
@@ -288,6 +289,10 @@ class SimpleSurfaceProvider final : public ISurfaceProvider {
     gfx::IntSize size = mSurface->GetSize();
     return size.width * size.height * mSurface->GetBytesPerPixel();
   }
+
+  nsresult UpdateKey(layers::RenderRootStateManager* aManager,
+                     wr::IpcResourceUpdateQueue& aResources,
+                     wr::ImageKey& aKey) override;
 
  protected:
   DrawableFrameRef DrawableRef(size_t aFrame) override {
