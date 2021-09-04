@@ -19,6 +19,10 @@
 #include "AnimationFrameBuffer.h"
 
 namespace mozilla {
+namespace layers {
+class SharedSurfacesAnimation;
+}
+
 namespace image {
 
 /**
@@ -41,12 +45,6 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
   //////////////////////////////////////////////////////////////////////////////
 
  public:
-  // We use the ISurfaceProvider constructor of DrawableSurface to indicate that
-  // our surfaces are computed lazily.
-  DrawableSurface Surface() override {
-    return DrawableSurface(WrapNotNull(this));
-  }
-
   bool IsFinished() const override;
   bool IsFullyDecoded() const override;
   size_t LogicalSizeInBytes() const override;
@@ -86,6 +84,15 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
  public:
   RawAccessFrameRef RecycleFrame(gfx::IntRect& aRecycleRect) override;
 
+  //////////////////////////////////////////////////////////////////////////////
+  // IDecoderFrameRecycler implementation.
+  //////////////////////////////////////////////////////////////////////////////
+
+ public:
+  nsresult UpdateKey(layers::RenderRootStateManager* aManager,
+                     wr::IpcResourceUpdateQueue& aResources,
+                     wr::ImageKey& aKey) override;
+
  private:
   virtual ~AnimationSurfaceProvider();
 
@@ -114,6 +121,9 @@ class AnimationSurfaceProvider final : public ISurfaceProvider,
 
   /// The frames of this animation, in order.
   UniquePtr<AnimationFrameBuffer> mFrames;
+
+  ///
+  RefPtr<layers::SharedSurfacesAnimation> mSharedAnimation;
 };
 
 }  // namespace image
