@@ -34,16 +34,17 @@ static void InitializeRowBuffer(uint32_t* aBuffer, size_t aSize,
   }
 }
 
-template <Orient Orientation, typename Func>
+template <Orient Orienta, typename Func>
 void WithSurfaceSink(Func aFunc) {
   RefPtr<image::Decoder> decoder = CreateTrivialDecoder();
   ASSERT_TRUE(decoder != nullptr);
 
-  const bool flipVertically = Orientation == Orient::FLIP_VERTICALLY;
+  const bool flipVertically = Orienta == Orient::FLIP_VERTICALLY;
 
-  WithFilterPipeline(decoder, std::forward<Func>(aFunc),
-                     SurfaceConfig{decoder, IntSize(100, 100),
-                                   SurfaceFormat::OS_RGBA, flipVertically});
+  WithFilterPipeline(
+      decoder, std::forward<Func>(aFunc),
+      SurfaceConfig{decoder, IntSize(100, 100), SurfaceFormat::OS_RGBA,
+                    flipVertically, Orientation()});
 }
 
 void ResetForNextPass(SurfaceFilter* aSink) {

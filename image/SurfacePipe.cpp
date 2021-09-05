@@ -17,7 +17,7 @@ using namespace gfx;
 
 using std::min;
 
-Maybe<SurfaceInvalidRect> AbstractSurfaceSink::TakeInvalidRect() {
+Maybe<SurfaceInvalidRect> SurfaceSink::TakeInvalidRect() {
   if (mInvalidRect.IsEmpty()) {
     return Nothing();
   }
@@ -31,17 +31,17 @@ Maybe<SurfaceInvalidRect> AbstractSurfaceSink::TakeInvalidRect() {
   return Some(invalidRect);
 }
 
-uint8_t* AbstractSurfaceSink::DoResetToFirstRow() {
+uint8_t* SurfaceSink::DoResetToFirstRow() {
   mRow = 0;
   return GetRowPointer();
 }
 
-uint8_t* AbstractSurfaceSink::DoAdvanceRowFromBuffer(const uint8_t* aInputRow) {
+uint8_t* SurfaceSink::DoAdvanceRowFromBuffer(const uint8_t* aInputRow) {
   CopyInputRow(aInputRow);
   return DoAdvanceRow();
 }
 
-uint8_t* AbstractSurfaceSink::DoAdvanceRow() {
+uint8_t* SurfaceSink::DoAdvanceRow() {
   if (mRow >= uint32_t(InputSize().height)) {
     return nullptr;
   }
@@ -74,6 +74,7 @@ nsresult SurfaceSink::Configure(const SurfaceConfig& aConfig) {
   mImageData = aConfig.mDecoder->mImageData;
   mImageDataLength = aConfig.mDecoder->mImageDataLength;
   mFlipVertically = aConfig.mFlipVertically;
+  mOrientation = aConfig.mOrientation;
 
   MOZ_ASSERT(mImageData);
   MOZ_ASSERT(uint64_t(mImageDataLength) == uint64_t(surfaceSize.width) *

@@ -27,6 +27,7 @@
 #include <utility>
 
 #include "AnimationParams.h"
+#include "Orientation.h"
 #include "mozilla/Likely.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/Tuple.h"
@@ -754,44 +755,16 @@ class SurfacePipe {
   UniquePtr<SurfaceFilter> mHead;  /// The first filter in the chain.
 };
 
-/**
- * AbstractSurfaceSink contains shared implementation for both SurfaceSink and
- * PalettedSurfaceSink.
- */
-class AbstractSurfaceSink : public SurfaceFilter {
- public:
-  AbstractSurfaceSink()
-      : mImageData(nullptr),
-        mImageDataLength(0),
-        mRow(0),
-        mFlipVertically(false) {}
-
-  Maybe<SurfaceInvalidRect> TakeInvalidRect() final;
-
- protected:
-  uint8_t* DoResetToFirstRow() final;
-  uint8_t* DoAdvanceRowFromBuffer(const uint8_t* aInputRow) final;
-  uint8_t* DoAdvanceRow() final;
-  virtual uint8_t* GetRowPointer() const = 0;
-
-  gfx::IntRect
-      mInvalidRect;     /// The region of the surface that has been written
-                        /// to since the last call to TakeInvalidRect().
-  uint8_t* mImageData;  /// A pointer to the beginning of the surface data.
-  uint32_t mImageDataLength;  /// The length of the surface data.
-  uint32_t mRow;              /// The row to which we're writing. (0-indexed)
-  bool mFlipVertically;       /// If true, write the rows from top to bottom.
-};
-
 class SurfaceSink;
 
 /// A configuration struct for SurfaceSink.
 struct SurfaceConfig {
   using Filter = SurfaceSink;
   Decoder* mDecoder;           /// Which Decoder to use to allocate the surface.
-  gfx::IntSize mOutputSize;    /// The size of the surface.
+  gfx::IntSize mOutputSize;    /// The unoriented size of the surface.
   gfx::SurfaceFormat mFormat;  /// The surface format (BGRA or BGRX).
   bool mFlipVertically;        /// If true, write the rows from bottom to top.
+  Orientation mOrientation;    /// The orientation of the image data.
   Maybe<AnimationParams> mAnimParams;  /// Given for animated images.
 };
 
@@ -801,12 +774,31 @@ struct SurfaceConfig {
  *
  * Sinks must always be at the end of the SurfaceFilter chain.
  */
-class SurfaceSink final : public AbstractSurfaceSink {
+class SurfaceSink final : public SurfaceFilter {
  public:
+  SurfaceSink()
+      : mImageData(nullptr),
+        mImageDataLength(0),
+        mRow(0),
+        mFlipVertically(false) {}
+
   nsresult Configure(const SurfaceConfig& aConfig);
+  Maybe<SurfaceInvalidRect> TakeInvalidRect() final;
 
  protected:
-  uint8_t* GetRowPointer() const override;
+  uint8_t* DoResetToFirstRow() final;
+  uint8_t* DoAdvanceRowFromBuffer(const uint8_t* aInputRow) final;
+  uint8_t* DoAdvanceRow() final;
+  uint8_t* GetRowPointer() const;
+
+  gfx::IntRect
+      mInvalidRect;     /// The region of the surface that has been written
+                        /// to since the last call to TakeInvalidRect().
+  uint8_t* mImageData;  /// A pointer to the beginning of the surface data.
+  uint32_t mImageDataLength;  /// The length of the surface data.
+  uint32_t mRow;              /// The row to which we're writing. (0-indexed)
+  bool mFlipVertically;       /// If true, write the rows from top to bottom.
+  Orientation mOrientation;   /// The orientation of the image data.
 };
 
 }  // namespace image

@@ -30,9 +30,10 @@ void WithADAM7InterpolatingFilter(const IntSize& aSize, Func aFunc) {
   RefPtr<image::Decoder> decoder = CreateTrivialDecoder();
   ASSERT_TRUE(bool(decoder));
 
-  WithFilterPipeline(
-      decoder, std::forward<Func>(aFunc), ADAM7InterpolatingConfig{},
-      SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA, false});
+  WithFilterPipeline(decoder, std::forward<Func>(aFunc),
+                     ADAM7InterpolatingConfig{},
+                     SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA,
+                                   false, Orientation()});
 }
 
 void AssertConfiguringADAM7InterpolatingFilterFails(const IntSize& aSize) {
@@ -41,7 +42,8 @@ void AssertConfiguringADAM7InterpolatingFilterFails(const IntSize& aSize) {
 
   AssertConfiguringPipelineFails(
       decoder, ADAM7InterpolatingConfig{},
-      SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 uint8_t InterpolateByte(uint8_t aByteA, uint8_t aByteB, float aWeight) {
