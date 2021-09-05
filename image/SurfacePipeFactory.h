@@ -107,6 +107,11 @@ class SurfacePipeFactory {
     const bool premultiplyAlpha =
         bool(aFlags & SurfacePipeFlags::PREMULTIPLY_ALPHA);
 
+    Orientation orientation;
+    if (aDecoder->GetImageMetadata().HasOrientation()) {
+      orientation = aDecoder->GetImageMetadata().GetOrientation();
+    }
+
     MOZ_ASSERT(aInFormat == gfx::SurfaceFormat::R8G8B8 ||
                aInFormat == gfx::SurfaceFormat::R8G8B8A8 ||
                aInFormat == gfx::SurfaceFormat::R8G8B8X8 ||
@@ -179,8 +184,8 @@ class SurfacePipeFactory {
     DownscalingConfig downscalingConfig{aInputSize, aOutFormat};
     ColorManagementConfig colorManagementConfig{aTransform};
     SwizzleConfig swizzleConfig{aInFormat, aOutFormat, premultiplyAlpha};
-    SurfaceConfig surfaceConfig{aDecoder, aOutputSize, aOutFormat,
-                                flipVertically, aAnimParams};
+    SurfaceConfig surfaceConfig{aDecoder,       aOutputSize, aOutFormat,
+                                flipVertically, orientation, aAnimParams};
 
     Maybe<SurfacePipe> pipe;
 

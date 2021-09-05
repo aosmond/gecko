@@ -27,7 +27,7 @@ void WithSwizzleFilter(const IntSize& aSize, SurfaceFormat aInputFormat,
   WithFilterPipeline(
       decoder, std::forward<Func>(aFunc),
       SwizzleConfig{aInputFormat, aOutputFormat, aPremultiplyAlpha},
-      SurfaceConfig{decoder, aSize, aOutputFormat, false});
+      SurfaceConfig{decoder, aSize, aOutputFormat, false, Orientation()});
 }
 
 TEST(ImageSwizzleFilter, WritePixels_RGBA_to_BGRA)

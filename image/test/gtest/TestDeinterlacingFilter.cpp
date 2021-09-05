@@ -24,10 +24,10 @@ void WithDeinterlacingFilter(const IntSize& aSize, bool aProgressiveDisplay,
   RefPtr<image::Decoder> decoder = CreateTrivialDecoder();
   ASSERT_TRUE(bool(decoder));
 
-  WithFilterPipeline(
-      decoder, std::forward<Func>(aFunc),
-      DeinterlacingConfig<uint32_t>{aProgressiveDisplay},
-      SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA, false});
+  WithFilterPipeline(decoder, std::forward<Func>(aFunc),
+                     DeinterlacingConfig<uint32_t>{aProgressiveDisplay},
+                     SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA,
+                                   false, Orientation()});
 }
 
 void AssertConfiguringDeinterlacingFilterFails(const IntSize& aSize) {
@@ -36,7 +36,8 @@ void AssertConfiguringDeinterlacingFilterFails(const IntSize& aSize) {
 
   AssertConfiguringPipelineFails(
       decoder, DeinterlacingConfig<uint32_t>{/* mProgressiveDisplay = */ true},
-      SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, aSize, SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 class ImageDeinterlacingFilter : public ::testing::Test {

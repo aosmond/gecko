@@ -25,8 +25,8 @@ enum class Flip : uint8_t { Unflipped, Horizontal };
  * underlying image's Orientation.)
  */
 struct Orientation {
-  explicit Orientation(Angle aRotation = Angle::D0,
-                       Flip aFlip = Flip::Unflipped, bool aFlipFirst = false)
+  Orientation(Angle aRotation = Angle::D0, Flip aFlip = Flip::Unflipped,
+              bool aFlipFirst = false)
       : rotation(aRotation), flip(aFlip), flipFirst(aFlipFirst) {}
 
   Orientation Reversed() const {

@@ -24,10 +24,10 @@ void WithDownscalingFilter(const IntSize& aInputSize,
   RefPtr<image::Decoder> decoder = CreateTrivialDecoder();
   ASSERT_TRUE(decoder != nullptr);
 
-  WithFilterPipeline(
-      decoder, std::forward<Func>(aFunc),
-      DownscalingConfig{aInputSize, SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, aOutputSize, SurfaceFormat::OS_RGBA, false});
+  WithFilterPipeline(decoder, std::forward<Func>(aFunc),
+                     DownscalingConfig{aInputSize, SurfaceFormat::OS_RGBA},
+                     SurfaceConfig{decoder, aOutputSize, SurfaceFormat::OS_RGBA,
+                                   false, Orientation()});
 }
 
 void AssertConfiguringDownscalingFilterFails(const IntSize& aInputSize,
@@ -37,7 +37,8 @@ void AssertConfiguringDownscalingFilterFails(const IntSize& aInputSize,
 
   AssertConfiguringPipelineFails(
       decoder, DownscalingConfig{aInputSize, SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, aOutputSize, SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, aOutputSize, SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 TEST(ImageDownscalingFilter, WritePixels100_100to99_99)

@@ -97,8 +97,9 @@ TEST_F(ImageSurfacePipeIntegration, SurfacePipe) {
   ASSERT_TRUE(decoder != nullptr);
 
   auto sink = MakeUnique<SurfaceSink>();
-  nsresult rv = sink->Configure(
-      SurfaceConfig{decoder, IntSize(100, 100), SurfaceFormat::OS_RGBA, false});
+  nsresult rv = sink->Configure(SurfaceConfig{decoder, IntSize(100, 100),
+                                              SurfaceFormat::OS_RGBA, false,
+                                              Orientation()});
   ASSERT_TRUE(NS_SUCCEEDED(rv));
 
   pipe = TestSurfacePipeFactory::SurfacePipeFromPipeline(sink);
@@ -197,7 +198,8 @@ TEST_F(ImageSurfacePipeIntegration, DeinterlaceDownscaleWritePixels) {
       decoder, test,
       DeinterlacingConfig<uint32_t>{/* mProgressiveDisplay = */ true},
       DownscalingConfig{IntSize(100, 100), SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, IntSize(25, 25), SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, IntSize(25, 25), SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 TEST_F(ImageSurfacePipeIntegration,
@@ -252,7 +254,8 @@ TEST_F(ImageSurfacePipeIntegration,
   WithFilterPipeline(
       decoder, test, RemoveFrameRectConfig{IntRect(50, 50, 100, 100)},
       DownscalingConfig{IntSize(100, 100), SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, IntSize(20, 20), SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, IntSize(20, 20), SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 TEST_F(ImageSurfacePipeIntegration,
@@ -284,7 +287,8 @@ TEST_F(ImageSurfacePipeIntegration,
   WithFilterPipeline(
       decoder, test, RemoveFrameRectConfig{IntRect(-50, -50, 100, 100)},
       DownscalingConfig{IntSize(100, 100), SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, IntSize(20, 20), SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, IntSize(20, 20), SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 TEST_F(ImageSurfacePipeIntegration, DeinterlaceRemoveFrameRectWritePixels) {
@@ -307,7 +311,8 @@ TEST_F(ImageSurfacePipeIntegration, DeinterlaceRemoveFrameRectWritePixels) {
       decoder, test,
       DeinterlacingConfig<uint32_t>{/* mProgressiveDisplay = */ true},
       RemoveFrameRectConfig{IntRect(50, 50, 100, 100)},
-      SurfaceConfig{decoder, IntSize(100, 100), SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, IntSize(100, 100), SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 TEST_F(ImageSurfacePipeIntegration,
@@ -329,7 +334,8 @@ TEST_F(ImageSurfacePipeIntegration,
       DeinterlacingConfig<uint32_t>{/* mProgressiveDisplay = */ true},
       RemoveFrameRectConfig{IntRect(50, 50, 100, 100)},
       DownscalingConfig{IntSize(100, 100), SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, IntSize(20, 20), SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, IntSize(20, 20), SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
 
 TEST_F(ImageSurfacePipeIntegration, ConfiguringHugeDeinterlacingBufferFails) {
@@ -345,5 +351,6 @@ TEST_F(ImageSurfacePipeIntegration, ConfiguringHugeDeinterlacingBufferFails) {
   AssertConfiguringPipelineFails(
       decoder, DeinterlacingConfig<uint32_t>{/* mProgressiveDisplay = */ true},
       DownscalingConfig{IntSize(60000, 60000), SurfaceFormat::OS_RGBA},
-      SurfaceConfig{decoder, IntSize(600, 600), SurfaceFormat::OS_RGBA, false});
+      SurfaceConfig{decoder, IntSize(600, 600), SurfaceFormat::OS_RGBA, false,
+                    Orientation()});
 }
