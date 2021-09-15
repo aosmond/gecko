@@ -34,6 +34,7 @@
 #include "mozilla/Unused.h"
 #include "mozilla/Variant.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/Swizzle.h"
 #include "nsDebug.h"
 
 namespace mozilla {
@@ -757,7 +758,7 @@ class SurfacePipe {
 
 /**
  * AbstractSurfaceSink contains shared implementation for both SurfaceSink and
- * PalettedSurfaceSink.
+ * ReorientSurfaceSink.
  */
 class AbstractSurfaceSink : public SurfaceFilter {
  public:
@@ -771,8 +772,6 @@ class AbstractSurfaceSink : public SurfaceFilter {
 
  protected:
   uint8_t* DoResetToFirstRow() final;
-  uint8_t* DoAdvanceRowFromBuffer(const uint8_t* aInputRow) final;
-  uint8_t* DoAdvanceRow() final;
   virtual uint8_t* GetRowPointer() const = 0;
 
   OrientedIntRect
@@ -798,7 +797,7 @@ struct SurfaceConfig {
 
 /**
  * A sink for surfaces. It handles the allocation of the surface and protects
- * against buffer overflow. This sink should be used for images.
+ * against buffer overflow. This sink should be used for most images.
  *
  * Sinks must always be at the end of the SurfaceFilter chain.
  */
@@ -807,7 +806,41 @@ class SurfaceSink final : public AbstractSurfaceSink {
   nsresult Configure(const SurfaceConfig& aConfig);
 
  protected:
-  uint8_t* GetRowPointer() const override;
+  uint8_t* DoAdvanceRowFromBuffer(const uint8_t* aInputRow) final;
+  uint8_t* DoAdvanceRow() final;
+  uint8_t* GetRowPointer() const final;
+};
+
+class ReorientSurfaceSink;
+
+/// A configuration struct for ReorientSurfaceSink.
+struct ReorientSurfaceConfig {
+  using Filter = ReorientSurfaceSink;
+  Decoder* mDecoder;  /// Which Decoder to use to allocate the surface.
+  OrientedIntSize mOutputSize;  /// The size of the surface.
+  gfx::SurfaceFormat mFormat;   /// The surface format (BGRA or BGRX).
+  Orientation mOrientation;     /// The desired orientation of the surface data.
+};
+
+/**
+ * A sink for surfaces. It handles the allocation of the surface and protects
+ * against buffer overflow. This sink should be used for images which have a
+ * non-identity orientation which we want to apply during decoding.
+ *
+ * Sinks must always be at the end of the SurfaceFilter chain.
+ */
+class ReorientSurfaceSink final : public AbstractSurfaceSink {
+ public:
+  nsresult Configure(const ReorientSurfaceConfig& aConfig);
+
+ protected:
+  uint8_t* DoAdvanceRowFromBuffer(const uint8_t* aInputRow) final;
+  uint8_t* DoAdvanceRow() final;
+  uint8_t* GetRowPointer() const final;
+
+  UniquePtr<uint8_t[]> mBuffer;
+  gfx::ReorientRowFn mReorientFn;
+  gfx::IntSize mSurfaceSize;
 };
 
 }  // namespace image
