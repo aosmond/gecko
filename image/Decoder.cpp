@@ -448,14 +448,20 @@ nsresult Decoder::FinishWithErrorInternal() {
  * Progress Notifications
  */
 
-void Decoder::PostSize(int32_t aWidth, int32_t aHeight,
-                       Orientation aOrientation, Resolution aResolution) {
+void Decoder::PostSize(const UnorientedIntSize& aSize, Orientation aOrientation,
+                       Resolution aResolution) {
+  return PostSize(OrientedPixel::From(size, aOrientation), aOrientation,
+                  aResolution);
+}
+
+void Decoder::PostSize(const OrientedIntSize& aSize, Orientation aOrientation,
+                       Resolution aResolution) {
   // Validate.
-  MOZ_ASSERT(aWidth >= 0, "Width can't be negative!");
-  MOZ_ASSERT(aHeight >= 0, "Height can't be negative!");
+  MOZ_ASSERT(aSize.width >= 0, "Width can't be negative!");
+  MOZ_ASSERT(aSize.height >= 0, "Height can't be negative!");
 
   // Set our intrinsic size.
-  mImageMetadata.SetSize(aWidth, aHeight, aOrientation, aResolution);
+  mImageMetadata.SetSize(aSize, aOrientation, aResolution);
 
   // Verify it is the expected size, if given. Note that this is only used by
   // the ICO decoder for embedded image types, so only its subdecoders are
@@ -467,11 +473,12 @@ void Decoder::PostSize(int32_t aWidth, int32_t aHeight,
 
   // Set our output size if it's not already set.
   if (!mOutputSize) {
-    mOutputSize = Some(IntSize(aWidth, aHeight));
+    mOutputSize = Some(aSize);
   }
 
-  MOZ_ASSERT(mOutputSize->width <= aWidth && mOutputSize->height <= aHeight,
-             "Output size will result in upscaling");
+  MOZ_ASSERT(
+      mOutputSize->width <= aSize.width && mOutputSize->height <= aSize.height,
+      "Output size will result in upscaling");
 
   // Record this notification.
   mProgress |= FLAG_SIZE_AVAILABLE;

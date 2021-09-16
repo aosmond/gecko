@@ -289,7 +289,7 @@ LexerTransition<ICOState> nsICODecoder::FinishDirEntry() {
   // We always report the biggest resource's size as the intrinsic size; this
   // is necessary for downscale-during-decode to work since we won't even
   // attempt to *upscale* while decoding.
-  PostSize(biggestEntry->mSize.width, biggestEntry->mSize.height);
+  PostSize(biggestEntry->mSize);
   if (HasError()) {
     return Transition::TerminateFailure();
   }

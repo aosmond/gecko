@@ -53,24 +53,34 @@ class ImageMetadata {
     return mFirstFrameRefreshArea.isSome();
   }
 
-  void SetSize(int32_t aWidth, int32_t aHeight, Orientation aOrientation,
+  void SetSize(const OrientedIntSize& aSize, Orientation aOrientation,
                Resolution aResolution) {
     if (!HasSize()) {
-      mSize.emplace(nsIntSize(aWidth, aHeight));
+      // We cannot have multiple native sizes with a non-identity orientation.
+      // If that were possible, then each native size could have its own
+      // orientation.
+      MOZ_ASSERT_IF(!aOrientation.IsIdentity(), mNativeSizes.IsEmpty());
+      mSize.emplace(aSize);
       mOrientation.emplace(aOrientation);
       mResolution = aResolution;
     }
   }
-  nsIntSize GetSize() const { return *mSize; }
+  OrientedIntSize GetSize() const { return *mSize; }
   bool HasSize() const { return mSize.isSome(); }
 
-  void AddNativeSize(const nsIntSize& aSize) {
+  void AddNativeSize(const UnorientedIntSize& aSize) {
+    MOZ_ASSERT(!mOrientation || mOrientation->IsIdentity());
+    mNativeSizes.AppendElement(OrientedIntSize(aSize.width, aSize.height));
+  }
+  void AddNativeSize(const OrientedIntSize& aSize) {
     mNativeSizes.AppendElement(aSize);
   }
 
   Resolution GetResolution() const { return mResolution; }
 
-  const nsTArray<nsIntSize>& GetNativeSizes() const { return mNativeSizes; }
+  const nsTArray<OrientedIntSize>& GetNativeSizes() const {
+    return mNativeSizes;
+  }
 
   Orientation GetOrientation() const { return *mOrientation; }
   bool HasOrientation() const { return mOrientation.isSome(); }
@@ -98,11 +108,11 @@ class ImageMetadata {
   // loops.
   Maybe<gfx::IntRect> mFirstFrameRefreshArea;
 
-  Maybe<nsIntSize> mSize;
+  Maybe<OrientedIntSize> mSize;
   Maybe<Orientation> mOrientation;
 
   // Sizes the image can natively decode to.
-  CopyableTArray<nsIntSize> mNativeSizes;
+  CopyableTArray<OrientedIntSize> mNativeSizes;
 
   bool mHasAnimation = false;
 };

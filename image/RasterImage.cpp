@@ -279,7 +279,7 @@ RasterImage::GetProducerId(uint32_t* aId) {
   return NS_OK;
 }
 
-LookupResult RasterImage::LookupFrameInternal(const UnorientedIntSize& aSize,
+LookupResult RasterImage::LookupFrameInternal(const OrientedIntSize& aSize,
                                               uint32_t aFlags,
                                               PlaybackType aPlaybackType,
                                               bool aMarkUsed) {
@@ -311,7 +311,7 @@ LookupResult RasterImage::LookupFrameInternal(const UnorientedIntSize& aSize,
       aMarkUsed);
 }
 
-LookupResult RasterImage::LookupFrame(const UnorientedIntSize& aSize,
+LookupResult RasterImage::LookupFrame(const OrientedIntSize& aSize,
                                       uint32_t aFlags,
                                       PlaybackType aPlaybackType,
                                       bool aMarkUsed) {
@@ -323,7 +323,7 @@ LookupResult RasterImage::LookupFrame(const UnorientedIntSize& aSize,
     aFlags &= ~FLAG_DECODE_NO_PREMULTIPLY_ALPHA;
   }
 
-  UnorientedIntSize requestedSize =
+  OrientedIntSize requestedSize =
       CanDownscaleDuringDecode(aSize, aFlags) ? aSize : ToUnoriented(mSize);
   if (requestedSize.IsEmpty()) {
     // Can't decode to a surface of zero size.
@@ -357,7 +357,7 @@ LookupResult RasterImage::LookupFrame(const UnorientedIntSize& aSize,
     if (!result.SuggestedSize().IsEmpty()) {
       MOZ_ASSERT(!syncDecode && (aFlags & FLAG_HIGH_QUALITY_SCALING));
       requestedSize =
-          UnorientedIntSize::FromUnknownSize(result.SuggestedSize());
+          OrientedIntSize::FromUnknownSize(result.SuggestedSize());
     }
 
     bool ranSync = false, failed = false;
@@ -617,7 +617,7 @@ RasterImage::GetFrameInternal(const IntSize& aSize,
 }
 
 Tuple<ImgDrawResult, IntSize> RasterImage::GetImageContainerSize(
-    WindowRenderer* aRenderer, const IntSize& aRequestedSize, uint32_t aFlags) {
+    WindowRenderer* aRenderer, const OrientedIntSize& aRequestedSize, uint32_t aFlags) {
   if (!LoadHasSize()) {
     return MakeTuple(ImgDrawResult::NOT_READY, IntSize(0, 0));
   }
@@ -637,7 +637,7 @@ Tuple<ImgDrawResult, IntSize> RasterImage::GetImageContainerSize(
   }
 
   auto requestedSize = OrientedIntSize::FromUnknownSize(aRequestedSize);
-  if (!CanDownscaleDuringDecode(ToUnoriented(requestedSize), aFlags)) {
+  if (!CanDownscaleDuringDecode(requestedSize, aFlags)) {
     return MakeTuple(ImgDrawResult::SUCCESS, mSize.ToUnknownSize());
   }
 
@@ -660,7 +660,8 @@ RasterImage::GetImageContainerAtSize(WindowRenderer* aRenderer,
   // We do not pass in the given SVG context because in theory it could differ
   // between calls, but actually have no impact on the actual contents of the
   // image container.
-  return GetImageContainerImpl(aRenderer, aSize, Nothing(), Nothing(), aFlags,
+  auto size = OrientedIntSize::FromUnknownSize(aSize);
+  return GetImageContainerImpl(aRenderer, size, Nothing(), Nothing(), aFlags,
                                aOutContainer);
 }
 
@@ -1155,7 +1156,7 @@ static bool LaunchDecodingTask(IDecodingTask* aTask, RasterImage* aImage,
   return false;
 }
 
-void RasterImage::Decode(const UnorientedIntSize& aSize, uint32_t aFlags,
+void RasterImage::Decode(const OrientedIntSize& aSize, uint32_t aFlags,
                          PlaybackType aPlaybackType, bool& aOutRanSync,
                          bool& aOutFailed) {
   MOZ_ASSERT(NS_IsMainThread());
@@ -1213,12 +1214,12 @@ void RasterImage::Decode(const UnorientedIntSize& aSize, uint32_t aFlags,
     size_t currentFrame = mAnimationState->GetCurrentAnimationFrameIndex();
     rv = DecoderFactory::CreateAnimationDecoder(
         mDecoderType, WrapNotNull(this), mSourceBuffer,
-        ToUnoriented(mSize).ToUnknownSize(), decoderFlags, surfaceFlags,
+        mSize, decoderFlags, surfaceFlags,
         currentFrame, getter_AddRefs(task));
   } else {
     rv = DecoderFactory::CreateDecoder(
         mDecoderType, WrapNotNull(this), mSourceBuffer,
-        ToUnoriented(mSize).ToUnknownSize(), aSize.ToUnknownSize(),
+        mSize, aSize,
         decoderFlags, surfaceFlags, getter_AddRefs(task));
   }
 
@@ -1238,8 +1239,7 @@ void RasterImage::Decode(const UnorientedIntSize& aSize, uint32_t aFlags,
 #ifdef DEBUG
     IntRect rect =
 #endif
-        mAnimationState->UpdateState(this, ToUnoriented(mSize).ToUnknownSize(),
-                                     false);
+        mAnimationState->UpdateState(this, mSize, false);
     MOZ_ASSERT(rect.IsEmpty());
   }
 
@@ -1279,7 +1279,7 @@ RasterImage::DecodeMetadata(uint32_t aFlags) {
   return NS_OK;
 }
 
-void RasterImage::RecoverFromInvalidFrames(const UnorientedIntSize& aSize,
+void RasterImage::RecoverFromInvalidFrames(const OrientedIntSize& aSize,
                                            uint32_t aFlags) {
   if (!LoadHasSize()) {
     return;
@@ -1300,7 +1300,7 @@ void RasterImage::RecoverFromInvalidFrames(const UnorientedIntSize& aSize,
   // Animated images require some special handling, because we normally require
   // that they never be discarded.
   if (mAnimationState) {
-    Decode(ToUnoriented(mSize), aFlags | FLAG_SYNC_DECODE,
+    Decode(mSize, aFlags | FLAG_SYNC_DECODE,
            PlaybackType::eAnimated, unused1, unused2);
     ResetAnimation();
     return;

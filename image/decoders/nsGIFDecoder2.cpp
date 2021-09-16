@@ -138,7 +138,8 @@ void nsGIFDecoder2::BeginGIF() {
 
   mGIFOpen = true;
 
-  PostSize(mGIFStruct.screen_width, mGIFStruct.screen_height);
+  PostSize(
+      UnorientedIntSize(mGIFStruct.screen_width, mGIFStruct.screen_height));
 }
 
 bool nsGIFDecoder2::CheckForTransparency(const IntRect& aFrameRect) {

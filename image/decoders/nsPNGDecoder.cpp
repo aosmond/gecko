@@ -530,7 +530,7 @@ void nsPNGDecoder::info_callback(png_structp png_ptr, png_infop info_ptr) {
   const IntRect frameRect(0, 0, width, height);
 
   // Post our size to the superclass
-  decoder->PostSize(frameRect.Width(), frameRect.Height());
+  decoder->PostSize(UnorientedIntSize(frameRect.Width(), frameRect.Height()));
 
   if (width > SurfaceCache::MaximumCapacity() / (bit_depth > 8 ? 16 : 8)) {
     // libpng needs space to allocate two row buffers

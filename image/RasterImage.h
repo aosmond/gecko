@@ -322,7 +322,7 @@ class RasterImage final : public ImageResource,
    * aOutRanSync is set to true if the decode was run synchronously.
    * aOutFailed is set to true if failed to start a decode.
    */
-  void Decode(const UnorientedIntSize& aSize, uint32_t aFlags,
+  void Decode(const OrientedIntSize& aSize, uint32_t aFlags,
               PlaybackType aPlaybackType, bool& aOutRanSync, bool& aOutFailed);
 
   /**

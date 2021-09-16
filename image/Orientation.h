@@ -10,26 +10,6 @@
 #include "mozilla/gfx/Rect.h"
 
 namespace mozilla {
-
-// Pixel values in an image considering orientation metadata, such as the size
-// of an image as seen by consumers of the image.
-//
-// Any public methods on RasterImage that use untyped units are interpreted as
-// oriented pixels.
-struct OrientedPixel {};
-template <>
-struct IsPixel<OrientedPixel> : std::true_type {};
-typedef gfx::IntSizeTyped<OrientedPixel> OrientedIntSize;
-typedef gfx::IntRectTyped<OrientedPixel> OrientedIntRect;
-
-// Pixel values in an image ignoring orientation metadata, such as are stored
-// in surfaces and the raw pixel data in the image.
-struct UnorientedPixel {};
-template <>
-struct IsPixel<UnorientedPixel> : std::true_type {};
-typedef gfx::IntSizeTyped<UnorientedPixel> UnorientedIntSize;
-typedef gfx::IntRectTyped<UnorientedPixel> UnorientedIntRect;
-
 namespace image {
 
 enum class Angle : uint8_t { D0, D90, D180, D270 };
@@ -88,6 +68,48 @@ struct Orientation {
 };
 
 }  // namespace image
+
+// Pixel values in an image considering orientation metadata, such as the size
+// of an image as seen by consumers of the image.
+//
+// Any public methods on RasterImage that use untyped units are interpreted as
+// oriented pixels.
+struct OrientedPixel;
+template <>
+struct IsPixel<OrientedPixel> : std::true_type {};
+typedef gfx::IntSizeTyped<OrientedPixel> OrientedIntSize;
+typedef gfx::IntRectTyped<OrientedPixel> OrientedIntRect;
+
+// Pixel values in an image ignoring orientation metadata, such as are stored
+// in surfaces and the raw pixel data in the image.
+struct UnorientedPixel;
+template <>
+struct IsPixel<UnorientedPixel> : std::true_type {};
+typedef gfx::IntSizeTyped<UnorientedPixel> UnorientedIntSize;
+typedef gfx::IntRectTyped<UnorientedPixel> UnorientedIntRect;
+
+struct OrientedPixel {
+  static OrientedIntSize From(const UnorientedIntSize& aSize,
+                              const Orientation& aOrientation) {
+    if (aOrientation.SwapsWidthAndHeight()) {
+      return OrientedIntSize(aSize.height, aSize.width);
+    } else {
+      return OrientedIntSize(aSize.width, aSize.height);
+    }
+  }
+};
+
+struct UnorientedPixel {
+  static UnorientedIntSize From(const OrientedIntSize& aSize,
+                                const Orientation& aOrientation) {
+    if (aOrientation.SwapsWidthAndHeight()) {
+      return UnorientedIntSize(aSize.height, aSize.width);
+    } else {
+      return UnorientedIntSize(aSize.width, aSize.height);
+    }
+  }
+}
+
 }  // namespace mozilla
 
 #endif  // mozilla_image_Orientation_h

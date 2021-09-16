@@ -395,7 +395,7 @@ LexerResult nsWebPDecoder::ReadHeader(WebPDemuxer* aDemuxer, bool aIsComplete) {
     return LexerResult(TerminalState::FAILURE);
   }
 
-  PostSize(width, height);
+  PostSize(UnorientedIntSize(width, height));
 
   bool alpha = flags & WebPFeatureFlags::ALPHA_FLAG;
   if (alpha) {

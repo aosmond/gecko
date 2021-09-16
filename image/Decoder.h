@@ -220,7 +220,7 @@ class Decoder {
    *
    * Illegal to call if HasSize() returns false.
    */
-  gfx::IntSize OutputSize() const {
+  OrientedIntSize OutputSize() const {
     MOZ_ASSERT(HasSize());
     return *mOutputSize;
   }
@@ -235,7 +235,7 @@ class Decoder {
    * Sets the expected image size of this decoder. Decoding will fail if this
    * does not match.
    */
-  void SetExpectedSize(const gfx::IntSize& aSize) {
+  void SetExpectedSize(const OrientedIntSize& aSize) {
     mExpectedSize.emplace(aSize);
   }
 
@@ -342,7 +342,7 @@ class Decoder {
    *
    * Illegal to call if HasSize() returns false.
    */
-  gfx::IntSize Size() const {
+  OrientedIntSize Size() const {
     MOZ_ASSERT(HasSize());
     return mImageMetadata.GetSize();
   }
@@ -474,7 +474,14 @@ class Decoder {
 
   // Called by decoders when they determine the size of the image. Informs
   // the image of its size and sends notifications.
-  void PostSize(int32_t aWidth, int32_t aHeight, Orientation = Orientation(),
+  void PostSize(const UnorientedIntSize& aSize,
+                Orientation aOrientation = Orientation(),
+                Resolution aResolution = Resolution()) {
+    return PostSize(OrientedPixel::From(aSize, aOrientation), aOrientation,
+                    aResolution);
+  }
+
+  void PostSize(const OrientedIntSize& aSize, Orientation = Orientation(),
                 Resolution = Resolution());
 
   // Called by decoders if they determine that the image has transparency.
@@ -592,8 +599,8 @@ class Decoder {
                                     // restore frame and the previous frame.
   gfx::IntRect mRecycleRect;        // Tracks an invalidation region between the
                                     // recycled frame and the current frame.
-  Maybe<gfx::IntSize> mOutputSize;  // The size of our output surface.
-  Maybe<gfx::IntSize> mExpectedSize;  // The expected size of the image.
+  Maybe<OrientedIntSize> mOutputSize;    // The size of our output surface.
+  Maybe<OrientedIntSize> mExpectedSize;  // The expected size of the image.
   Progress mProgress;
 
   uint32_t mFrameCount;      // Number of frames, including anything in-progress

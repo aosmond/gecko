@@ -71,7 +71,7 @@ LexerTransition<nsIconDecoder::State> nsIconDecoder::ReadHeader(
   mBytesPerRow = width * 4;
 
   // Post our size to the superclass.
-  PostSize(width, height);
+  PostSize(UnorientedIntSize(width, height));
 
   // Icons have alpha.
   PostHasTransparency();
