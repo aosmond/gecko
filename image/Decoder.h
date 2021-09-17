@@ -373,6 +373,16 @@ class Decoder {
     return OrientedIntRect(OrientedIntPoint(), OutputSize());
   }
 
+  /**
+   * @return the orientation of the image.
+   *
+   * Illegal to call if HasSize() returns false.
+   */
+  Orientation GetOrientation() const {
+    MOZ_ASSERT(HasSize());
+    return mImageMetadata.GetOrientation();
+  }
+
   /// @return final status information about this decoder. Should be called
   /// after we decide we're not going to run the decoder anymore.
   DecoderFinalStatus FinalStatus() const;
