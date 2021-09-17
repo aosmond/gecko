@@ -19,6 +19,7 @@ namespace mozilla {
 struct OrientedPixel {};
 template <>
 struct IsPixel<OrientedPixel> : std::true_type {};
+typedef gfx::IntPointTyped<OrientedPixel> OrientedIntPoint;
 typedef gfx::IntSizeTyped<OrientedPixel> OrientedIntSize;
 typedef gfx::IntRectTyped<OrientedPixel> OrientedIntRect;
 
@@ -27,6 +28,7 @@ typedef gfx::IntRectTyped<OrientedPixel> OrientedIntRect;
 struct UnorientedPixel {};
 template <>
 struct IsPixel<UnorientedPixel> : std::true_type {};
+typedef gfx::IntPointTyped<UnorientedPixel> UnorientedIntPoint;
 typedef gfx::IntSizeTyped<UnorientedPixel> UnorientedIntSize;
 typedef gfx::IntRectTyped<UnorientedPixel> UnorientedIntRect;
 
@@ -69,6 +71,38 @@ struct Orientation {
 
   bool operator!=(const Orientation& aOther) const {
     return !(*this == aOther);
+  }
+
+  OrientedIntSize ToOriented(const UnorientedIntSize& aSize) const {
+    if (SwapsWidthAndHeight()) {
+      return OrientedIntSize(aSize.height, aSize.width);
+    } else {
+      return OrientedIntSize(aSize.width, aSize.height);
+    }
+  }
+
+  UnorientedIntSize ToUnoriented(const OrientedIntSize& aSize) const {
+    if (SwapsWidthAndHeight()) {
+      return UnorientedIntSize(aSize.height, aSize.width);
+    } else {
+      return UnorientedIntSize(aSize.width, aSize.height);
+    }
+  }
+
+  OrientedIntRect ToOriented(const UnorientedIntRect& aRect) const {
+    if (SwapsWidthAndHeight()) {
+      return OrientedIntRect(aRect.y, aRect.x, aRect.height, aRect.width);
+    } else {
+      return OrientedIntRect(aRect.x, aRect.y, aRect.height, aRect.width);
+    }
+  }
+
+  UnorientedIntRect ToUnoriented(const OrientedIntRect& aRect) const {
+    if (SwapsWidthAndHeight()) {
+      return UnorientedIntRect(aRect.y, aRect.x, aRect.height, aRect.width);
+    } else {
+      return UnorientedIntRect(aRect.x, aRect.y, aRect.height, aRect.width);
+    }
   }
 
   static Angle InvertAngle(Angle aAngle) {
