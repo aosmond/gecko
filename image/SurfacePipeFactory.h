@@ -89,8 +89,8 @@ class SurfacePipeFactory {
    *         initialized.
    */
   static Maybe<SurfacePipe> CreateSurfacePipe(
-      Decoder* aDecoder, const nsIntSize& aInputSize,
-      const nsIntSize& aOutputSize, const nsIntRect& aFrameRect,
+      Decoder* aDecoder, const OrientedIntSize& aInputSize,
+      const OrientedIntSize& aOutputSize, const OrientedIntRect& aFrameRect,
       gfx::SurfaceFormat aInFormat, gfx::SurfaceFormat aOutFormat,
       const Maybe<AnimationParams>& aAnimParams, qcms_transform* aTransform,
       SurfacePipeFlags aFlags) {
@@ -101,11 +101,15 @@ class SurfacePipeFactory {
         bool(aFlags & SurfacePipeFlags::PROGRESSIVE_DISPLAY);
     const bool downscale = aInputSize != aOutputSize;
     const bool removeFrameRect = !aFrameRect.IsEqualEdges(
-        nsIntRect(0, 0, aInputSize.width, aInputSize.height));
+        OrientedIntRect(0, 0, aInputSize.width, aInputSize.height));
     const bool blendAnimation = aAnimParams.isSome();
     const bool colorManagement = aTransform != nullptr;
     const bool premultiplyAlpha =
         bool(aFlags & SurfacePipeFlags::PREMULTIPLY_ALPHA);
+
+    const auto& metadata = aDecoder->GetImageMetadata();
+    const auto orientation = metadata.GetOrientation();
+    const bool reorient = !orientation.IsIdentity();
 
     MOZ_ASSERT(aInFormat == gfx::SurfaceFormat::R8G8B8 ||
                aInFormat == gfx::SurfaceFormat::R8G8B8A8 ||
@@ -166,6 +170,14 @@ class SurfacePipeFactory {
       return Nothing();
     }
 
+    if (reorient && (deinterlace || adam7Interpolate || blendAnimation ||
+                     removeFrameRect)) {
+      MOZ_ASSERT_UNREACHABLE(
+          "Reorient with interpolation/animation/partial frames is not "
+          "supported");
+      return Nothing();
+    }
+
     // Construct configurations for the SurfaceFilters. Note that the order of
     // these filters is significant. We want to deinterlace or interpolate raw
     // input rows, before any other transformations, and we want to remove the
@@ -174,13 +186,18 @@ class SurfacePipeFactory {
     // account.
     DeinterlacingConfig<uint32_t> deinterlacingConfig{progressiveDisplay};
     ADAM7InterpolatingConfig interpolatingConfig;
-    RemoveFrameRectConfig removeFrameRectConfig{aFrameRect};
+    RemoveFrameRectConfig removeFrameRectConfig{
+        orientation.FromOriented(aFrameRect).ToUnknownRect()};
     BlendAnimationConfig blendAnimationConfig{aDecoder};
-    DownscalingConfig downscalingConfig{aInputSize, aOutFormat};
+    DownscalingConfig downscalingConfig{
+        orientation.FromOriented(aInputSize).ToUnknownSize(), aOutFormat};
     ColorManagementConfig colorManagementConfig{aTransform};
     SwizzleConfig swizzleConfig{aInFormat, aOutFormat, premultiplyAlpha};
-    SurfaceConfig surfaceConfig{aDecoder, aOutputSize, aOutFormat,
-                                flipVertically, aAnimParams};
+    SurfaceConfig surfaceConfig{
+        aDecoder, orientation.FromOriented(aOutputSize).ToUnknownSize(),
+        aOutFormat, flipVertically, aAnimParams};
+    ReorientSurfaceConfig reorientSurfaceConfig{aDecoder, aOutputSize,
+                                                aOutFormat, orientation};
 
     Maybe<SurfacePipe> pipe;
 
@@ -197,7 +214,11 @@ class SurfacePipeFactory {
               pipe = MakePipe(swizzleConfig, interpolatingConfig,
                               removeFrameRectConfig, downscalingConfig,
                               colorManagementConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(swizzleConfig, removeFrameRectConfig,
+                              downscalingConfig, colorManagementConfig,
+                              reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(swizzleConfig, removeFrameRectConfig,
                               downscalingConfig, colorManagementConfig,
                               surfaceConfig);
@@ -211,7 +232,10 @@ class SurfacePipeFactory {
               pipe = MakePipe(swizzleConfig, interpolatingConfig,
                               downscalingConfig, colorManagementConfig,
                               surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(swizzleConfig, downscalingConfig,
+                              colorManagementConfig, reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(swizzleConfig, downscalingConfig,
                               colorManagementConfig, surfaceConfig);
             }
@@ -250,7 +274,10 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(swizzleConfig, interpolatingConfig,
                               colorManagementConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(swizzleConfig, colorManagementConfig,
+                              reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe =
                   MakePipe(swizzleConfig, colorManagementConfig, surfaceConfig);
             }
@@ -279,7 +306,10 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(swizzleConfig, interpolatingConfig,
                               downscalingConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(swizzleConfig, downscalingConfig,
+                              reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(swizzleConfig, downscalingConfig, surfaceConfig);
             }
           }
@@ -313,7 +343,9 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe =
                   MakePipe(swizzleConfig, interpolatingConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(swizzleConfig, reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(swizzleConfig, surfaceConfig);
             }
           }
@@ -346,7 +378,10 @@ class SurfacePipeFactory {
               pipe = MakePipe(colorManagementConfig, swizzleConfig,
                               interpolatingConfig, downscalingConfig,
                               surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(colorManagementConfig, swizzleConfig,
+                              downscalingConfig, reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(colorManagementConfig, swizzleConfig,
                               downscalingConfig, surfaceConfig);
             }
@@ -385,7 +420,10 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(colorManagementConfig, swizzleConfig,
                               interpolatingConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(colorManagementConfig, swizzleConfig,
+                              reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe =
                   MakePipe(colorManagementConfig, swizzleConfig, surfaceConfig);
             }
@@ -414,7 +452,11 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(swizzleConfig, interpolatingConfig,
                               downscalingConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {  // (reorient, deinterlace and
+                                    // adam7Interpolate are false)
+              pipe = MakePipe(swizzleConfig, downscalingConfig,
+                              reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(swizzleConfig, downscalingConfig, surfaceConfig);
             }
           }
@@ -448,7 +490,9 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe =
                   MakePipe(swizzleConfig, interpolatingConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(swizzleConfig, reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(swizzleConfig, surfaceConfig);
             }
           }
@@ -478,7 +522,10 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, downscalingConfig,
                               colorManagementConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(downscalingConfig, colorManagementConfig,
+                              reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(downscalingConfig, colorManagementConfig,
                               surfaceConfig);
             }
@@ -513,7 +560,9 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, colorManagementConfig,
                               surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(colorManagementConfig, reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(colorManagementConfig, surfaceConfig);
             }
           }
@@ -539,7 +588,9 @@ class SurfacePipeFactory {
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, downscalingConfig,
                               surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(downscalingConfig, reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(downscalingConfig, surfaceConfig);
             }
           }
@@ -569,7 +620,9 @@ class SurfacePipeFactory {
               pipe = MakePipe(deinterlacingConfig, surfaceConfig);
             } else if (adam7Interpolate) {
               pipe = MakePipe(interpolatingConfig, surfaceConfig);
-            } else {  // (deinterlace and adam7Interpolate are false)
+            } else if (reorient) {
+              pipe = MakePipe(reorientSurfaceConfig);
+            } else {  // (reorient, deinterlace and adam7Interpolate are false)
               pipe = MakePipe(surfaceConfig);
             }
           }

@@ -13,6 +13,7 @@
 #include "mozilla/NotNull.h"
 #include "mozilla/gfx/2D.h"
 #include "nsCOMPtr.h"
+#include "Orientation.h"
 #include "SurfaceFlags.h"
 
 namespace mozilla::image {
@@ -73,8 +74,8 @@ class DecoderFactory {
    */
   static nsresult CreateDecoder(DecoderType aType, NotNull<RasterImage*> aImage,
                                 NotNull<SourceBuffer*> aSourceBuffer,
-                                const gfx::IntSize& aIntrinsicSize,
-                                const gfx::IntSize& aOutputSize,
+                                const OrientedIntSize& aIntrinsicSize,
+                                const OrientedIntSize& aOutputSize,
                                 DecoderFlags aDecoderFlags,
                                 SurfaceFlags aSurfaceFlags,
                                 IDecodingTask** aOutTask);
@@ -100,11 +101,14 @@ class DecoderFactory {
    *           for this image;
    *         Else some other unrecoverable error occurred.
    */
-  static nsresult CreateAnimationDecoder(
-      DecoderType aType, NotNull<RasterImage*> aImage,
-      NotNull<SourceBuffer*> aSourceBuffer, const gfx::IntSize& aIntrinsicSize,
-      DecoderFlags aDecoderFlags, SurfaceFlags aSurfaceFlags,
-      size_t aCurrentFrame, IDecodingTask** aOutTask);
+  static nsresult CreateAnimationDecoder(DecoderType aType,
+                                         NotNull<RasterImage*> aImage,
+                                         NotNull<SourceBuffer*> aSourceBuffer,
+                                         const OrientedIntSize& aIntrinsicSize,
+                                         DecoderFlags aDecoderFlags,
+                                         SurfaceFlags aSurfaceFlags,
+                                         size_t aCurrentFrame,
+                                         IDecodingTask** aOutTask);
 
   /**
    * Creates and initializes a decoder for animated images, cloned from the
@@ -154,7 +158,7 @@ class DecoderFactory {
   static already_AddRefed<Decoder> CreateDecoderForICOResource(
       DecoderType aType, SourceBufferIterator&& aIterator,
       NotNull<nsICODecoder*> aICODecoder, bool aIsMetadataDecode,
-      const Maybe<gfx::IntSize>& aExpectedSize,
+      const Maybe<OrientedIntSize>& aExpectedSize,
       const Maybe<uint32_t>& aDataOffset = Nothing());
 
   /**
@@ -174,7 +178,7 @@ class DecoderFactory {
    */
   static already_AddRefed<Decoder> CreateAnonymousDecoder(
       DecoderType aType, NotNull<SourceBuffer*> aSourceBuffer,
-      const Maybe<gfx::IntSize>& aOutputSize, DecoderFlags aDecoderFlags,
+      const Maybe<OrientedIntSize>& aOutputSize, DecoderFlags aDecoderFlags,
       SurfaceFlags aSurfaceFlags);
 
   /**

@@ -1247,7 +1247,8 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
             ("[this=%p] Parser returned image size %d x %d (%d/%d bit)", this,
              parsedImageSize->width, parsedImageSize->height,
              primaryBitDepth.valueOr(0), alphaBitDepth.valueOr(0)));
-    PostSize(parsedImageSize->width, parsedImageSize->height, orientation);
+    PostSize(UnorientedIntSize(parsedImageSize->width, parsedImageSize->height),
+             orientation);
     if (IsMetadataDecode()) {
       MOZ_LOG(
           sAVIFLog, LogLevel::Debug,
@@ -1319,7 +1320,8 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
     MOZ_LOG(sAVIFLog, LogLevel::Error,
             ("[this=%p] Using decoded image size: %d x %d", this,
              decodedData.mPicSize.width, decodedData.mPicSize.height));
-    PostSize(decodedData.mPicSize.width, decodedData.mPicSize.height,
+    PostSize(UnorientedIntSize(decodedData.mPicSize.width,
+                               decodedData.mPicSize.height),
              orientation);
     AccumulateCategorical(LABELS_AVIF_ISPE::absent);
   } else if (decodedData.mPicSize.width != parsedImageSize->width ||
@@ -1364,8 +1366,7 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
     AccumulateCategorical(LABELS_AVIF_ALPHA::absent);
   }
 
-  IntSize rgbSize = Size();
-  MOZ_ASSERT(rgbSize == decodedData.mPicSize);
+  IntSize rgbSize = decodedData.mPicSize;
 
   if (parsedImg.nclx_colour_information) {
     AccumulateCategorical(LABELS_AVIF_COLR::nclx);
@@ -1535,10 +1536,14 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
                            rgbStride.value());
   }
 
+  OrientedIntSize orientRgbSize =
+      GetImageMetadata().GetOrientation().FromUnoriented(
+          OrientedIntSize(rgbSize.width, rgbSize.height));
+
   MOZ_LOG(sAVIFLog, LogLevel::Debug,
           ("[this=%p] calling SurfacePipeFactory::CreateSurfacePipe", this));
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
-      this, rgbSize, OutputSize(), FullFrame(), format, format, Nothing(),
+      this, orientRgbSize, OutputSize(), FullFrame(), format, format, Nothing(),
       mTransform, SurfacePipeFlags());
 
   if (!pipe) {

@@ -138,10 +138,10 @@ void nsGIFDecoder2::BeginGIF() {
 
   mGIFOpen = true;
 
-  PostSize(mGIFStruct.screen_width, mGIFStruct.screen_height);
+  PostSize(OrientedIntSize(mGIFStruct.screen_width, mGIFStruct.screen_height));
 }
 
-bool nsGIFDecoder2::CheckForTransparency(const IntRect& aFrameRect) {
+bool nsGIFDecoder2::CheckForTransparency(const OrientedIntRect& aFrameRect) {
   // Check if the image has a transparent color in its palette.
   if (mGIFStruct.is_transparent) {
     PostHasTransparency();
@@ -154,7 +154,8 @@ bool nsGIFDecoder2::CheckForTransparency(const IntRect& aFrameRect) {
 
   // If we need padding on the first frame, that means we don't draw into part
   // of the image at all. Report that as transparency.
-  IntRect imageRect(0, 0, mGIFStruct.screen_width, mGIFStruct.screen_height);
+  OrientedIntRect imageRect(0, 0, mGIFStruct.screen_width,
+                            mGIFStruct.screen_height);
   if (!imageRect.IsEqualEdges(aFrameRect)) {
     PostHasTransparency();
     mSawTransparency = true;  // Make sure we don't optimize it away.
@@ -165,7 +166,7 @@ bool nsGIFDecoder2::CheckForTransparency(const IntRect& aFrameRect) {
 }
 
 //******************************************************************************
-nsresult nsGIFDecoder2::BeginImageFrame(const IntRect& aFrameRect,
+nsresult nsGIFDecoder2::BeginImageFrame(const OrientedIntRect& aFrameRect,
                                         uint16_t aDepth, bool aIsInterlaced) {
   MOZ_ASSERT(HasSize());
 
@@ -752,7 +753,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadImageDescriptor(
 
 LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::FinishImageDescriptor(
     const char* aData) {
-  IntRect frameRect;
+  OrientedIntRect frameRect;
 
   // Get image offsets with respect to the screen origin.
   frameRect.SetRect(

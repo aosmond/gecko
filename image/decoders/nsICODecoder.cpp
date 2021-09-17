@@ -154,7 +154,9 @@ LexerTransition<ICOState> nsICODecoder::ReadDirEntry(const char* aData) {
     e.mBitCount = LittleEndian::readUint16(aData + 6);
     e.mBytesInRes = LittleEndian::readUint32(aData + 8);
     e.mImageOffset = offset;
-    e.mSize = IntSize(e.mWidth, e.mHeight);
+
+    // ICOs don't support different orientations.
+    e.mSize = OrientedIntSize(e.mWidth, e.mHeight);
 
     // Only accept entries with sufficient resource data to actually contain
     // some image data.
@@ -234,7 +236,7 @@ LexerTransition<ICOState> nsICODecoder::FinishDirEntry() {
 
   // If an explicit output size was specified, we'll try to select the resource
   // that matches it best below.
-  const Maybe<IntSize> desiredSize = ExplicitOutputSize();
+  const Maybe<OrientedIntSize> desiredSize = ExplicitOutputSize();
 
   // Determine the biggest resource. We always use the biggest resource for the
   // intrinsic size, and if we don't have a specific desired size, we select it
@@ -289,7 +291,7 @@ LexerTransition<ICOState> nsICODecoder::FinishDirEntry() {
   // We always report the biggest resource's size as the intrinsic size; this
   // is necessary for downscale-during-decode to work since we won't even
   // attempt to *upscale* while decoding.
-  PostSize(biggestEntry->mSize.width, biggestEntry->mSize.height);
+  PostSize(biggestEntry->mSize);
   if (HasError()) {
     return Transition::TerminateFailure();
   }
@@ -309,7 +311,7 @@ LexerTransition<ICOState> nsICODecoder::FinishDirEntry() {
     //
     // TODO(aosmond): This is the last user of Downscaler. We should switch this
     // to SurfacePipe as well so we can remove the code from tree.
-    mDownscaler.emplace(OutputSize());
+    mDownscaler.emplace(OutputSize().ToUnknownSize());
   }
 
   size_t offsetToResource = mDirEntry->mImageOffset - FirstResourceOffset();
@@ -348,7 +350,7 @@ LexerTransition<ICOState> nsICODecoder::SniffResource(const char* aData) {
 
     // Create a PNG decoder which will do the rest of the work for us.
     bool metadataDecode = mReturnIterator.isSome();
-    Maybe<IntSize> expectedSize =
+    Maybe<OrientedIntSize> expectedSize =
         metadataDecode ? Nothing() : Some(mDirEntry->mSize);
     mContainedDecoder = DecoderFactory::CreateDecoderForICOResource(
         DecoderType::PNG, std::move(containedIterator.ref()), WrapNotNull(this),
@@ -491,10 +493,10 @@ LexerTransition<ICOState> nsICODecoder::PrepareForMask() {
                mDownscaler->TargetSize().width *
                    mDownscaler->TargetSize().height * sizeof(uint32_t));
     mMaskBuffer = MakeUnique<uint8_t[]>(bmpDecoder->GetImageDataLength());
-    nsresult rv =
-        mDownscaler->BeginFrame(mDirEntry->mSize, Nothing(), mMaskBuffer.get(),
-                                /* aHasAlpha = */ true,
-                                /* aFlipVertically = */ true);
+    nsresult rv = mDownscaler->BeginFrame(mDirEntry->mSize.ToUnknownSize(),
+                                          Nothing(), mMaskBuffer.get(),
+                                          /* aHasAlpha = */ true,
+                                          /* aFlipVertically = */ true);
     if (NS_FAILED(rv)) {
       return Transition::TerminateFailure();
     }

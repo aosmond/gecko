@@ -111,7 +111,7 @@ LexerTransition<nsJXLDecoder::State> nsJXLDecoder::ReadJXLData(
 
       case JXL_DEC_BASIC_INFO: {
         JXL_TRY(JxlDecoderGetBasicInfo(mDecoder.get(), &mInfo));
-        PostSize(mInfo.xsize, mInfo.ysize);
+        PostSize(UnorientedIntSize(mInfo.xsize, mInfo.ysize));
         if (mInfo.alpha_bits > 0) {
           PostHasTransparency();
         }
@@ -134,7 +134,7 @@ LexerTransition<nsJXLDecoder::State> nsJXLDecoder::ReadJXLData(
       }
 
       case JXL_DEC_FULL_IMAGE: {
-        gfx::IntSize size(mInfo.xsize, mInfo.ysize);
+        OrientedIntSize size(mInfo.xsize, mInfo.ysize);
         Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateSurfacePipe(
             this, size, OutputSize(), FullFrame(), SurfaceFormat::R8G8B8A8,
             SurfaceFormat::OS_RGBA, Nothing(), nullptr, SurfacePipeFlags());

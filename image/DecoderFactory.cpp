@@ -154,8 +154,8 @@ already_AddRefed<Decoder> DecoderFactory::GetDecoder(DecoderType aType,
 /* static */
 nsresult DecoderFactory::CreateDecoder(
     DecoderType aType, NotNull<RasterImage*> aImage,
-    NotNull<SourceBuffer*> aSourceBuffer, const IntSize& aIntrinsicSize,
-    const IntSize& aOutputSize, DecoderFlags aDecoderFlags,
+    NotNull<SourceBuffer*> aSourceBuffer, const OrientedIntSize& aIntrinsicSize,
+    const OrientedIntSize& aOutputSize, DecoderFlags aDecoderFlags,
     SurfaceFlags aSurfaceFlags, IDecodingTask** aOutTask) {
   if (aType == DecoderType::UNKNOWN) {
     return NS_ERROR_INVALID_ARG;
@@ -209,7 +209,7 @@ nsresult DecoderFactory::CreateDecoder(
 /* static */
 nsresult DecoderFactory::CreateAnimationDecoder(
     DecoderType aType, NotNull<RasterImage*> aImage,
-    NotNull<SourceBuffer*> aSourceBuffer, const IntSize& aIntrinsicSize,
+    NotNull<SourceBuffer*> aSourceBuffer, const OrientedIntSize& aIntrinsicSize,
     DecoderFlags aDecoderFlags, SurfaceFlags aSurfaceFlags,
     size_t aCurrentFrame, IDecodingTask** aOutTask) {
   if (aType == DecoderType::UNKNOWN) {
@@ -320,7 +320,8 @@ already_AddRefed<IDecodingTask> DecoderFactory::CreateMetadataDecoder(
 already_AddRefed<Decoder> DecoderFactory::CreateDecoderForICOResource(
     DecoderType aType, SourceBufferIterator&& aIterator,
     NotNull<nsICODecoder*> aICODecoder, bool aIsMetadataDecode,
-    const Maybe<IntSize>& aExpectedSize, const Maybe<uint32_t>& aDataOffset
+    const Maybe<OrientedIntSize>& aExpectedSize,
+    const Maybe<uint32_t>& aDataOffset
     /* = Nothing() */) {
   // Create the decoder.
   RefPtr<Decoder> decoder;
@@ -366,7 +367,7 @@ already_AddRefed<Decoder> DecoderFactory::CreateDecoderForICOResource(
 /* static */
 already_AddRefed<Decoder> DecoderFactory::CreateAnonymousDecoder(
     DecoderType aType, NotNull<SourceBuffer*> aSourceBuffer,
-    const Maybe<IntSize>& aOutputSize, DecoderFlags aDecoderFlags,
+    const Maybe<OrientedIntSize>& aOutputSize, DecoderFlags aDecoderFlags,
     SurfaceFlags aSurfaceFlags) {
   if (aType == DecoderType::UNKNOWN) {
     return nullptr;
