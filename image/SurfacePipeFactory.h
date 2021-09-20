@@ -612,7 +612,8 @@ class SurfacePipeFactory {
     // frame rect (which may involve adding blank rows or columns to the image)
     // before any downscaling, so that the new rows and columns are taken into
     // account.
-    DownscalingConfig downscalingConfig{aInputSize.ToUnknownSize(), aFormat};
+    DownscalingConfig downscalingConfig{
+        aOrientation.ToUnoriented(aInputSize).ToUnknownSize(), aFormat};
     ColorManagementConfig colorManagementConfig{aTransform};
     SurfaceConfig surfaceConfig{aDecoder, aOutputSize.ToUnknownSize(), aFormat,
                                 /* mFlipVertically */ false,
