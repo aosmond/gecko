@@ -149,12 +149,9 @@ nsresult ReorientSurfaceSink::Configure(const ReorientSurfaceConfig& aConfig) {
                                                uint64_t(mSurfaceSize.height) *
                                                sizeof(uint32_t));
 
-  IntSize inputSize;
-  if (aConfig.mOrientation.SwapsWidthAndHeight()) {
-    inputSize = IntSize(aConfig.mOutputSize.height, aConfig.mOutputSize.height);
-  } else {
-    inputSize = aConfig.mOutputSize.ToUnknownSize();
-  }
+  // The filters above us need the unoriented size as the input.
+  auto inputSize =
+      aConfig.mOrientation.ToUnoriented(aConfig.mOutputSize).ToUnknownSize();
   ConfigureFilter(inputSize, sizeof(uint32_t));
   return NS_OK;
 }
