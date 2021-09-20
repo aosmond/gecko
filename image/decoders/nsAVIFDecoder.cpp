@@ -1369,8 +1369,10 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
     AccumulateCategorical(LABELS_AVIF_ALPHA::absent);
   }
 
-  IntSize rgbSize = Size();
-  MOZ_ASSERT(rgbSize == decodedData.mPicSize);
+  IntSize rgbSize = decodedData.mPicSize;
+  MOZ_ASSERT(
+      rgbSize ==
+      GetImageMetadata().GetOrientation().ToUnoriented(Size()).ToUnknownSize());
 
   if (parsedImg.nclx_colour_information &&
       parsedImg.icc_colour_information.data) {
@@ -1546,7 +1548,7 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
   MOZ_LOG(sAVIFLog, LogLevel::Debug,
           ("[this=%p] calling SurfacePipeFactory::CreateSurfacePipe", this));
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateReorientSurfacePipe(
-      this, rgbSize, OutputSize(), format, mTransform, Orientation());
+      this, Size(), OutputSize(), format, mTransform, Orientation());
 
   if (!pipe) {
     MOZ_LOG(sAVIFLog, LogLevel::Debug,

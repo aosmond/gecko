@@ -818,7 +818,7 @@ class ReorientSurfaceSink;
 struct ReorientSurfaceConfig {
   using Filter = ReorientSurfaceSink;
   Decoder* mDecoder;           /// Which Decoder to use to allocate the surface.
-  gfx::IntSize mOutputSize;    /// The size of the surface.
+  OrientedIntSize mOutputSize;  /// The size of the surface.
   gfx::SurfaceFormat mFormat;  /// The surface format (BGRA or BGRX).
   Orientation mOrientation;    /// The desired orientation of the surface data.
 };

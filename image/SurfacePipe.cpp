@@ -118,12 +118,7 @@ uint8_t* ReorientSurfaceSink::DoAdvanceRow() {
 }
 
 nsresult ReorientSurfaceSink::Configure(const ReorientSurfaceConfig& aConfig) {
-  if (aConfig.mOrientation.SwapsWidthAndHeight()) {
-    mSurfaceSize =
-        IntSize(aConfig.mOutputSize.height, aConfig.mOutputSize.width);
-  } else {
-    mSurfaceSize = aConfig.mOutputSize;
-  }
+  mSurfaceSize = aConfig.mOutputSize.ToUnknownSize();
 
   // Allocate the frame.
   // XXX(seth): Once every Decoder subclass uses SurfacePipe, we probably want
@@ -153,7 +148,13 @@ nsresult ReorientSurfaceSink::Configure(const ReorientSurfaceConfig& aConfig) {
                                                uint64_t(mSurfaceSize.height) *
                                                sizeof(uint32_t));
 
-  ConfigureFilter(aConfig.mOutputSize, sizeof(uint32_t));
+  IntSize inputSize;
+  if (aConfig.mOrientation.SwapsWidthAndHeight()) {
+    inputSize = IntSize(aConfig.mOutputSize.height, aConfig.mOutputSize.height);
+  } else {
+    inputSize = aConfig.mOutputSize.ToUnknownSize();
+  }
+  ConfigureFilter(inputSize, sizeof(uint32_t));
   return NS_OK;
 }
 
