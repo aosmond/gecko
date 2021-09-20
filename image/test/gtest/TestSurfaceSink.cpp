@@ -240,8 +240,10 @@ TEST(ImageSurfaceSink, SurfaceSinkWritePixelsToRow)
 
           Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
           EXPECT_TRUE(invalidRect.isSome());
-          EXPECT_EQ(IntRect(0, row, 100, 1), invalidRect->mInputSpaceRect);
-          EXPECT_EQ(IntRect(0, row, 100, 1), invalidRect->mOutputSpaceRect);
+          EXPECT_EQ(OrientedIntRect(0, row, 100, 1),
+                    invalidRect->mInputSpaceRect);
+          EXPECT_EQ(OrientedIntRect(0, row, 100, 1),
+                    invalidRect->mOutputSpaceRect);
 
           CheckGeneratedImage(aDecoder, IntRect(0, 0, 100, row + 1));
         }
@@ -673,8 +675,8 @@ TEST(ImageSurfaceSink, SurfaceSinkWritePixelBlocksPartialRow)
 
       Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
       EXPECT_TRUE(invalidRect.isSome());
-      EXPECT_EQ(IntRect(0, row, 100, 1), invalidRect->mInputSpaceRect);
-      EXPECT_EQ(IntRect(0, row, 100, 1), invalidRect->mOutputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, row, 100, 1), invalidRect->mInputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, row, 100, 1), invalidRect->mOutputSpaceRect);
 
       CheckGeneratedImage(aDecoder, IntRect(20, 0, 60, row + 1));
     }
@@ -794,8 +796,8 @@ TEST(ImageSurfaceSink, SurfaceSinkInvalidRect)
       // Assert that we have the right invalid rect.
       Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
       EXPECT_TRUE(invalidRect.isSome());
-      EXPECT_EQ(IntRect(0, 0, 100, 1), invalidRect->mInputSpaceRect);
-      EXPECT_EQ(IntRect(0, 0, 100, 1), invalidRect->mOutputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 0, 100, 1), invalidRect->mInputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 0, 100, 1), invalidRect->mOutputSpaceRect);
     }
 
     {
@@ -815,8 +817,8 @@ TEST(ImageSurfaceSink, SurfaceSinkInvalidRect)
       // Assert that we have the right invalid rect.
       Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
       EXPECT_TRUE(invalidRect.isSome());
-      EXPECT_EQ(IntRect(0, 1, 100, 8), invalidRect->mInputSpaceRect);
-      EXPECT_EQ(IntRect(0, 1, 100, 8), invalidRect->mOutputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 1, 100, 8), invalidRect->mInputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 1, 100, 8), invalidRect->mOutputSpaceRect);
     }
 
     {
@@ -857,8 +859,8 @@ TEST(ImageSurfaceSink, SurfaceSinkInvalidRect)
       // left and right halves of this row now that we've completed it.
       Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
       EXPECT_TRUE(invalidRect.isSome());
-      EXPECT_EQ(IntRect(0, 9, 100, 1), invalidRect->mInputSpaceRect);
-      EXPECT_EQ(IntRect(0, 9, 100, 1), invalidRect->mOutputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 9, 100, 1), invalidRect->mInputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 9, 100, 1), invalidRect->mOutputSpaceRect);
     }
 
     {
@@ -887,8 +889,8 @@ TEST(ImageSurfaceSink, SurfaceSinkInvalidRect)
       // Assert that we have the right invalid rect.
       Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
       EXPECT_TRUE(invalidRect.isSome());
-      EXPECT_EQ(IntRect(0, 10, 100, 90), invalidRect->mInputSpaceRect);
-      EXPECT_EQ(IntRect(0, 10, 100, 90), invalidRect->mOutputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 10, 100, 90), invalidRect->mInputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 10, 100, 90), invalidRect->mOutputSpaceRect);
 
       // Check that the generated image is correct.
       RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
@@ -948,8 +950,8 @@ TEST(ImageSurfaceSink, SurfaceSinkFlipVertically)
       // *bottom* (since we're flipping vertically) 25 rows of the image.
       Maybe<SurfaceInvalidRect> invalidRect = aSink->TakeInvalidRect();
       EXPECT_TRUE(invalidRect.isSome());
-      EXPECT_EQ(IntRect(0, 75, 100, 25), invalidRect->mInputSpaceRect);
-      EXPECT_EQ(IntRect(0, 75, 100, 25), invalidRect->mOutputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 75, 100, 25), invalidRect->mInputSpaceRect);
+      EXPECT_EQ(OrientedIntRect(0, 75, 100, 25), invalidRect->mOutputSpaceRect);
 
       // Check that the generated image is correct.
       RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
