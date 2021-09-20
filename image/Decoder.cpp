@@ -266,12 +266,12 @@ void Decoder::CompleteDecode() {
   }
 }
 
-void Decoder::SetOutputSize(const gfx::IntSize& aSize) {
+void Decoder::SetOutputSize(const OrientedIntSize& aSize) {
   mOutputSize = Some(aSize);
   mHaveExplicitOutputSize = true;
 }
 
-Maybe<gfx::IntSize> Decoder::ExplicitOutputSize() const {
+Maybe<OrientedIntSize> Decoder::ExplicitOutputSize() const {
   MOZ_ASSERT_IF(mHaveExplicitOutputSize, mOutputSize);
   return mHaveExplicitOutputSize ? mOutputSize : Nothing();
 }
@@ -448,10 +448,11 @@ void Decoder::PostSize(int32_t aWidth, int32_t aHeight,
 
   // Set our output size if it's not already set.
   if (!mOutputSize) {
-    mOutputSize = Some(IntSize(aWidth, aHeight));
+    mOutputSize = Some(mImageMetadata.GetSize());
   }
 
-  MOZ_ASSERT(mOutputSize->width <= aWidth && mOutputSize->height <= aHeight,
+  MOZ_ASSERT(mOutputSize->width <= mImageMetadata.GetSize().width &&
+                 mOutputSize->height <= mImageMetadata.GetSize().height,
              "Output size will result in upscaling");
 
   // Record this notification.
@@ -486,7 +487,8 @@ void Decoder::PostFrameStop(Opacity aFrameOpacity) {
     // If we're not sending partial invalidations, then we send an invalidation
     // here when the first frame is complete.
     if (!ShouldSendPartialInvalidations()) {
-      mInvalidRect.UnionRect(mInvalidRect, IntRect(IntPoint(), Size()));
+      mInvalidRect.UnionRect(mInvalidRect,
+                             IntRect(IntPoint(), Size().ToUnknownSize()));
     }
 
     // If we dispose of the first frame by clearing it, then the first frame's
@@ -498,7 +500,7 @@ void Decoder::PostFrameStop(Opacity aFrameOpacity) {
       case DisposalMethod::CLEAR:
       case DisposalMethod::CLEAR_ALL:
       case DisposalMethod::RESTORE_PREVIOUS:
-        mFirstFrameRefreshArea = IntRect(IntPoint(), Size());
+        mFirstFrameRefreshArea = IntRect(IntPoint(), Size().ToUnknownSize());
         break;
       case DisposalMethod::KEEP:
       case DisposalMethod::NOT_SPECIFIED:
