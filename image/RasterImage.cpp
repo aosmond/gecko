@@ -596,12 +596,6 @@ RasterImage::GetFrameInternal(const IntSize& aSize,
   }
 
   RefPtr<SourceSurface> surface = result.Surface()->GetSourceSurface();
-
-  // If this RasterImage requires orientation, we must return a newly created
-  // surface with the oriented image instead of returning the frame's surface
-  // directly.
-  surface = OrientedImage::OrientSurface(mOrientation, surface);
-
   if (!result.Surface()->IsFinished()) {
     return MakeTuple(ImgDrawResult::INCOMPLETE, suggestedSize.ToUnknownSize(),
                      std::move(surface));
