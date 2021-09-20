@@ -488,7 +488,7 @@ void Decoder::PostFrameStop(Opacity aFrameOpacity) {
     // here when the first frame is complete.
     if (!ShouldSendPartialInvalidations()) {
       mInvalidRect.UnionRect(mInvalidRect,
-                             IntRect(IntPoint(), Size().ToUnknownSize()));
+                             OrientedIntRect(OrientedIntPoint(), Size()));
     }
 
     // If we dispose of the first frame by clearing it, then the first frame's
@@ -514,8 +514,8 @@ void Decoder::PostFrameStop(Opacity aFrameOpacity) {
   }
 }
 
-void Decoder::PostInvalidation(const gfx::IntRect& aRect,
-                               const Maybe<gfx::IntRect>& aRectAtOutputSize
+void Decoder::PostInvalidation(const OrientedIntRect& aRect,
+                               const Maybe<OrientedIntRect>& aRectAtOutputSize
                                /* = Nothing() */) {
   // We should be mid-frame
   MOZ_ASSERT(mInFrame, "Can't invalidate when not mid-frame!");
@@ -525,7 +525,8 @@ void Decoder::PostInvalidation(const gfx::IntRect& aRect,
   // or we're past the first frame.
   if (ShouldSendPartialInvalidations() && mFrameCount == 1) {
     mInvalidRect.UnionRect(mInvalidRect, aRect);
-    mCurrentFrame->ImageUpdated(aRectAtOutputSize.valueOr(aRect));
+    mCurrentFrame->ImageUpdated(
+        aRectAtOutputSize.valueOr(aRect).ToUnknownRect());
   }
 }
 

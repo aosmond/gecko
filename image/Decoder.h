@@ -157,8 +157,8 @@ class Decoder {
    * TakeInvalidRect() returns only the invalidation region accumulated since
    * the last call to TakeInvalidRect().
    */
-  nsIntRect TakeInvalidRect() {
-    nsIntRect invalidRect = mInvalidRect;
+  OrientedIntRect TakeInvalidRect() {
+    OrientedIntRect invalidRect = mInvalidRect;
     mInvalidRect.SetEmpty();
     return invalidRect;
   }
@@ -514,8 +514,8 @@ class Decoder {
    *                          be supplied if we're downscaling during decode.
    */
   void PostInvalidation(
-      const gfx::IntRect& aRect,
-      const Maybe<gfx::IntRect>& aRectAtOutputSize = Nothing());
+      const OrientedIntRect& aRect,
+      const Maybe<OrientedIntRect>& aRectAtOutputSize = Nothing());
 
   // Called by the decoders when they have successfully decoded the image. This
   // may occur as the result of the decoder getting to the appropriate point in
@@ -586,7 +586,7 @@ class Decoder {
 
   ImageMetadata mImageMetadata;
 
-  gfx::IntRect
+  OrientedIntRect
       mInvalidRect;  // Tracks new rows as the current frame is decoded.
   gfx::IntRect mRestoreDirtyRect;   // Tracks an invalidation region between the
                                     // restore frame and the previous frame.

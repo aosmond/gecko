@@ -26,7 +26,7 @@ Maybe<SurfaceInvalidRect> AbstractSurfaceSink::TakeInvalidRect() {
   invalidRect.mInputSpaceRect = invalidRect.mOutputSpaceRect = mInvalidRect;
 
   // Forget about the invalid rect we're returning.
-  mInvalidRect = IntRect();
+  mInvalidRect = OrientedIntRect();
 
   return Some(invalidRect);
 }
@@ -51,7 +51,7 @@ uint8_t* SurfaceSink::DoAdvanceRow() {
   // to change.
   int32_t invalidY = mFlipVertically ? InputSize().height - (mRow + 1) : mRow;
   mInvalidRect.UnionRect(mInvalidRect,
-                         IntRect(0, invalidY, InputSize().width, 1));
+                         OrientedIntRect(0, invalidY, InputSize().width, 1));
 
   mRow = min(uint32_t(InputSize().height), mRow + 1);
 
@@ -106,7 +106,8 @@ uint8_t* ReorientSurfaceSink::DoAdvanceRowFromBuffer(const uint8_t* aInputRow) {
 
   IntRect dirty = mReorientFn(aInputRow, mRow, mImageData, mSurfaceSize,
                               mSurfaceSize.width * sizeof(uint32_t));
-  mInvalidRect.UnionRect(mInvalidRect, dirty);
+  auto orientedDirty = OrientedIntRect::FromUnknownRect(dirty);
+  mInvalidRect.UnionRect(mInvalidRect, orientedDirty);
 
   mRow = min(uint32_t(InputSize().height), mRow + 1);
 
