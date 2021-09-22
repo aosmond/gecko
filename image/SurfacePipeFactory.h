@@ -594,6 +594,9 @@ class SurfacePipeFactory {
    * @param aFormat The surface format of the image; generally B8G8R8A8 or
    *                B8G8R8X8.
    * @param aOrientation The orientation of the image.
+   * @param aFlags Flags enabling or disabling various functionality for the
+   *               SurfacePipe; see the SurfacePipeFlags documentation for more
+   *               information.
    *
    * @return A SurfacePipe if the parameters allowed one to be created
    *         successfully, or Nothing() if the SurfacePipe could not be
@@ -602,9 +605,36 @@ class SurfacePipeFactory {
   static Maybe<SurfacePipe> CreateReorientSurfacePipe(
       Decoder* aDecoder, const OrientedIntSize& aInputSize,
       const OrientedIntSize& aOutputSize, gfx::SurfaceFormat aFormat,
-      qcms_transform* aTransform, const Orientation& aOrientation) {
+      qcms_transform* aTransform, const Orientation& aOrientation,
+      SurfacePipeFlags aFlags) {
+    // None of these are used by the decoders right now, so just fail if they
+    // are requested.
+    const bool deinterlace = bool(aFlags & SurfacePipeFlags::DEINTERLACE);
+    const bool flipVertically =
+        bool(aFlags & SurfacePipeFlags::FLIP_VERTICALLY);
+    const bool progressiveDisplay =
+        bool(aFlags & SurfacePipeFlags::PROGRESSIVE_DISPLAY);
+    if (deinterlace || flipVertically || progressiveDisplay) {
+      MOZ_ASSERT_UNREACHABLE("Unsupported flags with reorient pipeline!");
+      return Nothing();
+    }
+
+    // Identity orientations should be handled by the default sink.
+    if (aOrientation.IsIdentity()) {
+      return CreateSurfacePipe(
+          aDecoder, aInputSize, aOutputSize,
+          OrientedIntRect(OrientedIntPoint(0, 0), aInputSize), aFormat, aFormat,
+          /* aAnimParams */ Nothing(), aTransform, aFlags);
+    }
+
     const bool downscale = aInputSize != aOutputSize;
     const bool colorManagement = aTransform != nullptr;
+
+    // Late swizzles are for premultiplying RGBA/BGRA_U32 and/or possible
+    // converting between RGBA and BGRA_U32. It must happen after color
+    // management, and before downscaling.
+    const bool premultiplyAlpha =
+        bool(aFlags & SurfacePipeFlags::PREMULTIPLY_ALPHA);
 
     // Construct configurations for the SurfaceFilters. Note that the order of
     // these filters is significant. We want to deinterlace or interpolate raw
@@ -615,30 +645,30 @@ class SurfacePipeFactory {
     DownscalingConfig downscalingConfig{
         aOrientation.ToUnoriented(aInputSize).ToUnknownSize(), aFormat};
     ColorManagementConfig colorManagementConfig{aTransform};
-    SurfaceConfig surfaceConfig{aDecoder, aOutputSize.ToUnknownSize(), aFormat,
-                                /* mFlipVertically */ false,
-                                /* mAnimParams */ Nothing()};
+    SwizzleConfig swizzleConfig{aFormat, aFormat, premultiplyAlpha};
     ReorientSurfaceConfig reorientSurfaceConfig{aDecoder, aOutputSize, aFormat,
                                                 aOrientation};
 
     Maybe<SurfacePipe> pipe;
 
-    if (aOrientation.IsIdentity()) {
+    if (premultiplyAlpha) {
       if (colorManagement) {
         if (downscale) {
-          pipe =
-              MakePipe(downscalingConfig, colorManagementConfig, surfaceConfig);
+          pipe = MakePipe(downscalingConfig, colorManagementConfig,
+                          swizzleConfig, reorientSurfaceConfig);
         } else {  // (downscale is false)
-          pipe = MakePipe(colorManagementConfig, surfaceConfig);
+          pipe = MakePipe(colorManagementConfig, swizzleConfig,
+                          reorientSurfaceConfig);
         }
       } else {  // (colorManagement is false)
         if (downscale) {
-          pipe = MakePipe(downscalingConfig, surfaceConfig);
+          pipe =
+              MakePipe(downscalingConfig, swizzleConfig, reorientSurfaceConfig);
         } else {  // (downscale is false)
-          pipe = MakePipe(surfaceConfig);
+          pipe = MakePipe(swizzleConfig, reorientSurfaceConfig);
         }
       }
-    } else {  // (orientation is not identity)
+    } else {  // (premultiplyAlpha is false)
       if (colorManagement) {
         if (downscale) {
           pipe = MakePipe(downscalingConfig, colorManagementConfig,

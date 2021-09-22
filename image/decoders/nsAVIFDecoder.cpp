@@ -1555,7 +1555,8 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::Decode(
   MOZ_LOG(sAVIFLog, LogLevel::Debug,
           ("[this=%p] calling SurfacePipeFactory::CreateSurfacePipe", this));
   Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateReorientSurfacePipe(
-      this, Size(), OutputSize(), format, mTransform, GetOrientation());
+      this, Size(), OutputSize(), format, mTransform, GetOrientation(),
+      SurfacePipeFlags());
 
   if (!pipe) {
     MOZ_LOG(sAVIFLog, LogLevel::Debug,
