@@ -131,7 +131,10 @@ nsresult ReorientSurfaceSink::Configure(const ReorientSurfaceConfig& aConfig) {
     return rv;
   }
 
-  mBuffer.reset(new (fallible) uint8_t[mSurfaceSize.width * sizeof(uint32_t)]);
+  // The filters above us need the unoriented size as the input.
+  auto inputSize =
+      aConfig.mOrientation.ToUnoriented(aConfig.mOutputSize).ToUnknownSize();
+  mBuffer.reset(new (fallible) uint8_t[inputSize.width * sizeof(uint32_t)]);
   if (MOZ_UNLIKELY(!mBuffer)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -149,9 +152,6 @@ nsresult ReorientSurfaceSink::Configure(const ReorientSurfaceConfig& aConfig) {
                                                uint64_t(mSurfaceSize.height) *
                                                sizeof(uint32_t));
 
-  // The filters above us need the unoriented size as the input.
-  auto inputSize =
-      aConfig.mOrientation.ToUnoriented(aConfig.mOutputSize).ToUnknownSize();
   ConfigureFilter(inputSize, sizeof(uint32_t));
   return NS_OK;
 }
