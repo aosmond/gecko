@@ -161,6 +161,10 @@ nsresult DecoderFactory::CreateDecoder(
     return NS_ERROR_INVALID_ARG;
   }
 
+  if (!aImage->GetOrientation().IsIdentity()) {
+    printf_stderr("[AO] DecoderFactory::CreateDecoder -- intrinsic size %dx%d output size %dx%d\n", aIntrinsicSize.width, aIntrinsicSize.height, aOutputSize.width, aOutputSize.height);
+  }
+
   // Create an anonymous decoder. Interaction with the SurfaceCache and the
   // owning RasterImage will be mediated by DecodedSurfaceProvider.
   RefPtr<Decoder> decoder = GetDecoder(

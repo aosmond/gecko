@@ -1310,6 +1310,9 @@ static IntRect ReorientRowRotate0FlipFallback(const uint8_t* aSrc,
                                               int32_t aSrcRow, uint8_t* aDst,
                                               const IntSize& aDstSize,
                                               int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.height);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Reverse order of pixels in the row.
   const uint32_t* src = reinterpret_cast<const uint32_t*>(aSrc);
   const uint32_t* end = src + aDstSize.width;
@@ -1326,6 +1329,9 @@ static IntRect ReorientRowRotate90FlipFallback(const uint8_t* aSrc,
                                                int32_t aSrcRow, uint8_t* aDst,
                                                const IntSize& aDstSize,
                                                int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.width);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Copy row of pixels from top to bottom, into left to right columns.
   const uint32_t* src = reinterpret_cast<const uint32_t*>(aSrc);
   const uint32_t* end = src + aDstSize.height;
@@ -1343,6 +1349,9 @@ static IntRect ReorientRowRotate180FlipFallback(const uint8_t* aSrc,
                                                 int32_t aSrcRow, uint8_t* aDst,
                                                 const IntSize& aDstSize,
                                                 int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.height);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Copy row of pixels from top to bottom, into bottom to top rows.
   uint8_t* dst = aDst + (aDstSize.height - aSrcRow - 1) * aDstStride;
   memcpy(dst, aSrc, aDstSize.width * sizeof(uint32_t));
@@ -1353,6 +1362,9 @@ static IntRect ReorientRowRotate270FlipFallback(const uint8_t* aSrc,
                                                 int32_t aSrcRow, uint8_t* aDst,
                                                 const IntSize& aDstSize,
                                                 int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.width);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Copy row of pixels in reverse order from top to bottom, into right to left
   // columns.
   const uint32_t* src = reinterpret_cast<const uint32_t*>(aSrc);
@@ -1373,6 +1385,9 @@ static IntRect ReorientRowRotate0Fallback(const uint8_t* aSrc, int32_t aSrcRow,
                                           uint8_t* aDst,
                                           const IntSize& aDstSize,
                                           int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.height);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Copy row of pixels into the destination.
   uint8_t* dst = aDst + aSrcRow * aDstStride;
   memcpy(dst, aSrc, aDstSize.width * sizeof(uint32_t));
@@ -1383,6 +1398,11 @@ static IntRect ReorientRowRotate90Fallback(const uint8_t* aSrc, int32_t aSrcRow,
                                            uint8_t* aDst,
                                            const IntSize& aDstSize,
                                            int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.width);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
+  printf_stderr("[AO] ReorientRowRotate90Fallback -- src %p srcRow %d dst %p size %dx%d stride %d\n", aSrc, aSrcRow, aDst, aDstSize.width, aDstSize.height, aDstStride);
+
   // Copy row of pixels from top to bottom, into right to left columns.
   const uint32_t* src = reinterpret_cast<const uint32_t*>(aSrc);
   const uint32_t* end = src + aDstSize.height;
@@ -1394,13 +1414,18 @@ static IntRect ReorientRowRotate90Fallback(const uint8_t* aSrc, int32_t aSrcRow,
     dst += stride;
   } while (src < end);
 
-  return IntRect(aDstSize.width - aSrcRow - 1, 0, 1, aDstSize.height);
+  auto rv = IntRect(aDstSize.width - aSrcRow - 1, 0, 1, aDstSize.height);
+  printf_stderr("[AO] ReorientRowRotate90Fallback -- dst %p dirty (%d,%d) %dx%d\n", dst - stride, rv.x, rv.y, rv.width, rv.height);
+  return rv;
 }
 
 static IntRect ReorientRowRotate180Fallback(const uint8_t* aSrc,
                                             int32_t aSrcRow, uint8_t* aDst,
                                             const IntSize& aDstSize,
                                             int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.height);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Copy row of pixels in reverse order from top to bottom, into bottom to top
   // rows.
   const uint32_t* src = reinterpret_cast<const uint32_t*>(aSrc);
@@ -1419,6 +1444,9 @@ static IntRect ReorientRowRotate270Fallback(const uint8_t* aSrc,
                                             int32_t aSrcRow, uint8_t* aDst,
                                             const IntSize& aDstSize,
                                             int32_t aDstStride) {
+  MOZ_ASSERT(aSrcRow < aDstSize.width);
+  MOZ_ASSERT(!(aDstStride & 0x3));
+
   // Copy row of pixels in reverse order from top to bottom, into left to right
   // column.
   const uint32_t* src = reinterpret_cast<const uint32_t*>(aSrc);

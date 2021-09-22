@@ -451,6 +451,10 @@ void Decoder::PostSize(int32_t aWidth, int32_t aHeight,
     mOutputSize = Some(mImageMetadata.GetSize());
   }
 
+  if (!aOrientation.IsIdentity()) {
+    printf_stderr("[AO] Decoder::PostSize -- unoriented native size %dx%d oriented native size %dx%d output size %dx%d\n", aWidth, aHeight, mImageMetadata.GetSize().width, mImageMetadata.GetSize().height, mOutputSize->width, mOutputSize->height);
+  }
+
   MOZ_ASSERT(mOutputSize->width <= mImageMetadata.GetSize().width &&
                  mOutputSize->height <= mImageMetadata.GetSize().height,
              "Output size will result in upscaling");

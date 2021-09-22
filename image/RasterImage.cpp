@@ -333,6 +333,11 @@ LookupResult RasterImage::LookupFrame(const OrientedIntSize& aSize,
   LookupResult result =
       LookupFrameInternal(requestedSize, aFlags, aPlaybackType, aMarkUsed);
 
+  if (!mOrientation.IsIdentity()) {
+    printf_stderr("[AO] RasterImage::LookupFrame -- size %dx%d requested %dx%d suggested %dx%d result %d\n",
+		    aSize.width, aSize.height, requestedSize.width, requestedSize.height, result.SuggestedSize().width, result.SuggestedSize().height, !!result);
+  }
+
   if (!result && !LoadHasSize()) {
     // We can't request a decode without knowing our intrinsic size. Give up.
     return LookupResult(MatchType::NOT_FOUND);
@@ -1577,6 +1582,10 @@ void RasterImage::NotifyProgress(
 
   OrientedIntRect invalidRect = aInvalidRect;
 
+  if (!mOrientation.IsIdentity()) {
+    printf_stderr("[AO] RasterImage::NotifyProgress -- invalid rect (%d,%d) %dx%d\n", aInvalidRect.x, aInvalidRect.y, aInvalidRect.width, aInvalidRect.height);
+  }
+
   if (!(aDecoderFlags & DecoderFlags::FIRST_FRAME_ONLY)) {
     // We may have decoded new animation frames; update our animation state.
     MOZ_ASSERT_IF(aFrameCount && *aFrameCount > 1, mAnimationState || mError);
@@ -1630,6 +1639,10 @@ void RasterImage::NotifyDecodeComplete(
     // decoder on the floor, since they aren't valid.
     RecoverFromInvalidFrames(mSize, FromSurfaceFlags(aSurfaceFlags));
     return;
+  }
+
+  if (!mOrientation.IsIdentity()) {
+    printf_stderr("[AO] RasterImage::NotifyDecodeComplete -- size %dx%d invalid rect (%d,%d) %dx%d\n", mSize.width, mSize.height, aInvalidRect.x, aInvalidRect.y, aInvalidRect.width, aInvalidRect.height);
   }
 
   MOZ_ASSERT(mError || LoadHasSize() || !aMetadata.HasSize(),
