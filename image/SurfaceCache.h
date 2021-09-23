@@ -88,6 +88,9 @@ class SurfaceKey {
                                      PlaybackType);
   friend SurfaceKey VectorSurfaceKey(const IntSize&,
                                      const Maybe<SVGImageContext>&);
+  friend SurfaceKey VectorSurfaceKey(const IntSize&,
+                                     const Maybe<SVGImageContext>&,
+                                     SurfaceFlags, PlaybackType);
   friend SurfaceKey ContainerSurfaceKey(
       const gfx::IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
       SurfaceFlags aFlags);
@@ -102,6 +105,18 @@ inline SurfaceKey RasterSurfaceKey(const gfx::IntSize& aSize,
                                    SurfaceFlags aFlags,
                                    PlaybackType aPlayback) {
   return SurfaceKey(aSize, Nothing(), aPlayback, aFlags);
+}
+
+inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
+                                   const Maybe<SVGImageContext>& aSVGContext,
+                                   SurfaceFlags aFlags,
+                                   PlaybackType aPlayback) {
+  // We don't care about aFlags for VectorImage because none of the flags we
+  // have right now influence VectorImage's rendering. If we add a new flag that
+  // *does* affect how a VectorImage renders, we'll have to change this.
+  // Similarly, we don't accept a PlaybackType parameter because we don't
+  // currently cache frames of animated SVG images.
+  return SurfaceKey(aSize, aSVGContext, aPlayback, aFlags);
 }
 
 inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
