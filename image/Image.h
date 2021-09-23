@@ -335,10 +335,6 @@ class ImageResource : public Image {
   explicit ImageResource(nsIURI* aURI);
   ~ImageResource();
 
-  layers::ContainerProducerID GetImageProducerId() const {
-    return mImageProducerID;
-  }
-
   bool GetSpecTruncatedTo1k(nsCString& aSpec) const;
 
   // Shared functionality for implementors of imgIContainer. Every
@@ -419,33 +415,6 @@ class ImageResource : public Image {
                      RefPtr<gfx::SourceSurface>());
   }
 
-  /**
-   * Calculate the estimated size to use for an image container with the given
-   * parameters. It may not be the same as the given size, and it may not be
-   * the same as the size of the surface in the image container, but it is the
-   * best effort estimate.
-   */
-  virtual Tuple<ImgDrawResult, gfx::IntSize> GetImageContainerSize(
-      WindowRenderer* aRenderer, const gfx::IntSize& aSize, uint32_t aFlags) {
-    return MakeTuple(ImgDrawResult::NOT_SUPPORTED, gfx::IntSize(0, 0));
-  }
-
-  ImgDrawResult GetImageContainerImpl(WindowRenderer* aRenderer,
-                                      const gfx::IntSize& aSize,
-                                      const Maybe<SVGImageContext>& aSVGContext,
-                                      const Maybe<ImageIntRegion>& aRegion,
-                                      uint32_t aFlags,
-                                      layers::ImageContainer** aContainer);
-
-  /**
-   * Re-requests the appropriate frames for each image container using
-   * GetFrameInternal.
-   * @returns True if any image containers were updated, else false.
-   */
-  bool UpdateImageContainer(const Maybe<gfx::IntRect>& aDirtyRect);
-
-  void ReleaseImageContainer();
-
   class MOZ_RAII AutoProfilerImagePaintMarker {
    public:
     explicit AutoProfilerImagePaintMarker(ImageResource* self)
@@ -474,39 +443,6 @@ class ImageResource : public Image {
   };
 
  private:
-  void SetCurrentImage(layers::ImageContainer* aContainer,
-                       gfx::SourceSurface* aSurface,
-                       const Maybe<gfx::IntRect>& aDirtyRect);
-
-  struct ImageContainerEntry {
-    ImageContainerEntry(const gfx::IntSize& aSize,
-                        const Maybe<SVGImageContext>& aSVGContext,
-                        const Maybe<ImageIntRegion>& aRegion,
-                        layers::ImageContainer* aContainer, uint32_t aFlags)
-        : mSize(aSize),
-          mSVGContext(aSVGContext),
-          mRegion(aRegion),
-          mContainer(aContainer),
-          mLastDrawResult(ImgDrawResult::NOT_READY),
-          mFlags(aFlags) {}
-
-    gfx::IntSize mSize;
-    Maybe<SVGImageContext> mSVGContext;
-    Maybe<ImageIntRegion> mRegion;
-    // A weak pointer to our ImageContainer, which stays alive only as long as
-    // the layer system needs it.
-    ThreadSafeWeakPtr<layers::ImageContainer> mContainer;
-    // If mContainer is non-null, this contains the ImgDrawResult we obtained
-    // the last time we updated it.
-    ImgDrawResult mLastDrawResult;
-    // Cached flags to use for decoding. FLAG_ASYNC_NOTIFY should always be set
-    // but FLAG_HIGH_QUALITY_SCALING may vary.
-    uint32_t mFlags;
-  };
-
-  AutoTArray<ImageContainerEntry, 1> mImageContainers;
-  layers::ImageContainer::ProducerID mImageProducerID;
-  layers::ImageContainer::FrameID mLastFrameID;
   ImageProviderId mProviderId;
 };
 

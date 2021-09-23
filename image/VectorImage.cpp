@@ -371,13 +371,6 @@ size_t VectorImage::SizeOfSourceWithComputedFallback(
   return windowSizes.getTotalSize();
 }
 
-void VectorImage::CollectSizeOfSurfaces(
-    nsTArray<SurfaceMemoryCounter>& aCounters,
-    MallocSizeOf aMallocSizeOf) const {
-  SurfaceCache::CollectSizeOfSurfaces(ImageKey(this), aCounters, aMallocSizeOf);
-  ImageResource::CollectSizeOfSurfaces(aCounters, aMallocSizeOf);
-}
-
 nsresult VectorImage::OnImageDataComplete(nsIRequest* aRequest,
                                           nsISupports* aContext,
                                           nsresult aStatus, bool aLastPart) {
@@ -618,15 +611,6 @@ VectorImage::GetType(uint16_t* aType) {
 
 //******************************************************************************
 NS_IMETHODIMP
-VectorImage::GetProducerId(uint32_t* aId) {
-  NS_ENSURE_ARG_POINTER(aId);
-
-  *aId = ImageResource::GetImageProducerId();
-  return NS_OK;
-}
-
-//******************************************************************************
-NS_IMETHODIMP
 VectorImage::GetProviderId(uint32_t* aId) {
   NS_ENSURE_ARG_POINTER(aId);
 
@@ -773,36 +757,6 @@ VectorImage::GetFrameInternal(const IntSize& aSize,
   return MakeTuple(ImgDrawResult::SUCCESS, decodeSize, std::move(surface));
 }
 
-//******************************************************************************
-Tuple<ImgDrawResult, IntSize> VectorImage::GetImageContainerSize(
-    WindowRenderer* aRenderer, const IntSize& aSize, uint32_t aFlags) {
-  if (mError) {
-    return MakeTuple(ImgDrawResult::BAD_IMAGE, IntSize(0, 0));
-  }
-
-  if (!mIsFullyLoaded) {
-    return MakeTuple(ImgDrawResult::NOT_READY, IntSize(0, 0));
-  }
-
-  if (mHaveAnimations && !StaticPrefs::image_svg_blob_image()) {
-    // We don't support rasterizing animation SVGs. We can put them in a blob
-    // recording however instead of using fallback.
-    return MakeTuple(ImgDrawResult::NOT_SUPPORTED, IntSize(0, 0));
-  }
-
-  if (aRenderer->GetBackendType() != LayersBackend::LAYERS_WR) {
-    return MakeTuple(ImgDrawResult::NOT_SUPPORTED, IntSize(0, 0));
-  }
-
-  // We don't need to check if the size is too big since we only support
-  // WebRender backends.
-  if (aSize.IsEmpty()) {
-    return MakeTuple(ImgDrawResult::BAD_ARGS, IntSize(0, 0));
-  }
-
-  return MakeTuple(ImgDrawResult::SUCCESS, aSize);
-}
-
 NS_IMETHODIMP_(bool)
 VectorImage::IsImageContainerAvailable(WindowRenderer* aRenderer,
                                        uint32_t aFlags) {
@@ -818,34 +772,6 @@ VectorImage::IsImageContainerAvailable(WindowRenderer* aRenderer,
   }
 
   return true;
-}
-
-//******************************************************************************
-NS_IMETHODIMP_(ImgDrawResult)
-VectorImage::GetImageContainerAtSize(WindowRenderer* aRenderer,
-                                     const gfx::IntSize& aSize,
-                                     const Maybe<SVGImageContext>& aSVGContext,
-                                     const Maybe<ImageIntRegion>& aRegion,
-                                     uint32_t aFlags,
-                                     layers::ImageContainer** aOutContainer) {
-  Maybe<SVGImageContext> newSVGContext;
-  MaybeRestrictSVGContext(newSVGContext, aSVGContext, aFlags);
-
-  // The aspect ratio flag was already handled as part of the SVG context
-  // restriction above.
-  uint32_t flags = aFlags & ~(FLAG_FORCE_PRESERVEASPECTRATIO_NONE);
-  auto rv = GetImageContainerImpl(aRenderer, aSize,
-                                  newSVGContext ? newSVGContext : aSVGContext,
-                                  aRegion, flags, aOutContainer);
-
-  // Invalidations may still be suspended if we had a refresh tick and there
-  // were no image containers remaining. If we created a new container, we
-  // should resume invalidations to allow animations to progress.
-  if (*aOutContainer && mRenderingObserver) {
-    mRenderingObserver->ResumeHonoringInvalidations();
-  }
-
-  return rv;
 }
 
 //******************************************************************************

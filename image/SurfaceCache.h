@@ -101,9 +101,6 @@ class SurfaceKey {
                                      const Maybe<ImageIntRegion>&,
                                      const Maybe<SVGImageContext>&,
                                      SurfaceFlags, PlaybackType);
-  friend SurfaceKey ContainerSurfaceKey(
-      const gfx::IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
-      SurfaceFlags aFlags);
 
   IntSize mSize;
   Maybe<ImageIntRegion> mRegion;
@@ -135,12 +132,6 @@ inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
   // currently cache frames of animated SVG images.
   return SurfaceKey(aSize, Nothing(), aSVGContext, PlaybackType::eStatic,
                     DefaultSurfaceFlags());
-}
-
-inline SurfaceKey ContainerSurfaceKey(const gfx::IntSize& aSize,
-                                      const Maybe<SVGImageContext>& aSVGContext,
-                                      SurfaceFlags aFlags) {
-  return SurfaceKey(aSize, aSVGContext, PlaybackType::eStatic, aFlags);
 }
 
 /**
