@@ -9,6 +9,7 @@
 
 #include <vector>
 #include "mozilla/webrender/WebRenderAPI.h"
+#include "mozilla/image/WebRenderImageProvider.h"
 #include "mozilla/layers/AnimationInfo.h"
 #include "mozilla/dom/RemoteBrowser.h"
 #include "mozilla/UniquePtr.h"
@@ -32,10 +33,6 @@ class IpcResourceUpdateQueue;
 
 namespace gfx {
 class SourceSurface;
-}
-
-namespace image {
-class WebRenderImageProvider;
 }
 
 namespace layers {
@@ -74,7 +71,7 @@ class WebRenderUserData {
   static bool SupportsAsyncUpdate(nsIFrame* aFrame);
 
   static bool ProcessInvalidateForImage(nsIFrame* aFrame, DisplayItemType aType,
-                                        ContainerProducerID aProducerId);
+                                        image::ImageProviderId aProviderId);
 
   NS_INLINE_DECL_REFCOUNTING(WebRenderUserData)
 
@@ -209,7 +206,7 @@ class WebRenderImageProviderData final : public WebRenderUserData {
   Maybe<wr::ImageKey> UpdateImageKey(image::WebRenderImageProvider* aProvider,
                                      wr::IpcResourceUpdateQueue& aResources);
 
-  bool UsingSharedSurface(ContainerProducerID aProducerId) const;
+  bool Invalidate(image::ImageProviderId aProviderId) const;
 
  protected:
   RefPtr<image::WebRenderImageProvider> mProvider;

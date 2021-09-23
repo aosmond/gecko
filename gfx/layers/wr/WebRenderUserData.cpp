@@ -46,8 +46,9 @@ bool WebRenderUserData::SupportsAsyncUpdate(nsIFrame* aFrame) {
 }
 
 /* static */
-bool WebRenderUserData::ProcessInvalidateForImage(
-    nsIFrame* aFrame, DisplayItemType aType, ContainerProducerID aProducerId) {
+bool WebRenderUserData::ProcessInvalidateForImage(nsIFrame* aFrame,
+                                                  DisplayItemType aType,
+                                                  ImageProviderId aProviderId) {
   MOZ_ASSERT(aFrame);
 
   if (!aFrame->HasProperty(WebRenderUserDataProperty::Key())) {
@@ -63,9 +64,9 @@ bool WebRenderUserData::ProcessInvalidateForImage(
     return true;
   }
 
-  RefPtr<WebRenderImageData> image =
-      GetWebRenderUserData<WebRenderImageData>(aFrame, type);
-  if (image && image->UsingSharedSurface(aProducerId)) {
+  RefPtr<WebRenderImageProviderData> image =
+      GetWebRenderUserData<WebRenderImageProviderData>(aFrame, type);
+  if (image && image->Invalidate(aProviderId)) {
     return true;
   }
 
@@ -311,6 +312,21 @@ Maybe<wr::ImageKey> WebRenderImageProviderData::UpdateImageKey(
   }
 
   return Some(key);
+}
+
+bool WebRenderImageProviderData::Invalidate(ImageProviderId aProviderId) const {
+  if (!aProviderId || mProvider->GetProviderId() != aProviderId) {
+    return false;
+  }
+
+  wr::ImageKey key = {};
+  nsresult rv =
+      mProvider->UpdateKey(mManager, mManager->AsyncResourceUpdates(), key);
+  if (NS_FAILED(rv)) {
+    return false;
+  }
+
+  return true;
 }
 
 WebRenderFallbackData::WebRenderFallbackData(RenderRootStateManager* aManager,
