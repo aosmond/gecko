@@ -25,7 +25,7 @@ namespace mozilla {
 namespace image {
 
 WebRenderImageProvider::WebRenderImageProvider(const ImageResource* aImage)
-    : mProviderId(aImage->GetProviderId()) {}
+    : mProviderId(aImage->GetImageProviderId()) {}
 
 /* static */ ImageProviderId WebRenderImageProvider::AllocateProviderId() {
   // Callable on all threads.

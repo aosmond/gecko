@@ -329,7 +329,7 @@ class ImageResource : public Image {
   void CollectSizeOfSurfaces(nsTArray<SurfaceMemoryCounter>& aCounters,
                              MallocSizeOf aMallocSizeOf) const override;
 
-  ImageProviderId GetProviderId() const { return mProviderId; }
+  ImageProviderId GetImageProviderId() const { return mProviderId; }
 
  protected:
   explicit ImageResource(nsIURI* aURI);
