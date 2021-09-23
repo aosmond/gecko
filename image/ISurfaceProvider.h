@@ -234,6 +234,10 @@ class MOZ_STACK_CLASS DrawableSurface final {
     return mProvider->IsFullyDecoded();
   }
 
+  void TakeProvider(WebRenderImageProvider** aOutProvider) {
+    mProvider.forget(aOutProvider);
+  }
+
   explicit operator bool() const { return mHaveSurface; }
   imgFrame* operator->() { return DrawableRef().get(); }
 
