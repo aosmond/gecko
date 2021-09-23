@@ -371,33 +371,6 @@ nsresult SharedSurfacesChild::Share(ImageContainer* aContainer,
 }
 
 /* static */
-nsresult SharedSurfacesChild::ShareBlob(ImageContainer* aContainer,
-                                        RenderRootStateManager* aManager,
-                                        wr::IpcResourceUpdateQueue& aResources,
-                                        wr::BlobImageKey& aKey) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aContainer);
-  MOZ_ASSERT(aManager);
-
-  if (aContainer->IsAsync()) {
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
-
-  AutoTArray<ImageContainer::OwningImage, 4> images;
-  aContainer->GetCurrentImages(&images);
-  if (images.IsEmpty()) {
-    return NS_ERROR_NOT_AVAILABLE;
-  }
-
-  RefPtr<gfx::SourceSurface> surface = images[0].mImage->GetAsSourceSurface();
-  if (!surface || surface->GetType() != SurfaceType::BLOB_IMAGE) {
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
-
-  return NS_ERROR_FAILURE;
-}
-
-/* static */
 nsresult SharedSurfacesChild::Share(SourceSurface* aSurface,
                                     wr::ExternalImageId& aId) {
   MOZ_ASSERT(NS_IsMainThread());
