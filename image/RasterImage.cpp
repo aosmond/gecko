@@ -272,14 +272,6 @@ RasterImage::GetType(uint16_t* aType) {
 }
 
 NS_IMETHODIMP
-RasterImage::GetProducerId(uint32_t* aId) {
-  NS_ENSURE_ARG_POINTER(aId);
-
-  *aId = ImageResource::GetImageProducerId();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 RasterImage::GetProviderId(uint32_t* aId) {
   NS_ENSURE_ARG_POINTER(aId);
 
@@ -486,7 +478,6 @@ void RasterImage::OnSurfaceDiscardedInternal(bool aAnimatedFramesDiscarded) {
 
   if (aAnimatedFramesDiscarded && mAnimationState) {
     MOZ_ASSERT(StaticPrefs::image_mem_animated_discardable_AtStartup());
-    ReleaseImageContainer();
 
     IntRect rect = mAnimationState->UpdateState(this, mSize.ToUnknownSize());
 
@@ -612,52 +603,10 @@ RasterImage::GetFrameInternal(const IntSize& aSize,
                    std::move(surface));
 }
 
-Tuple<ImgDrawResult, IntSize> RasterImage::GetImageContainerSize(
-    WindowRenderer* aRenderer, const IntSize& aRequestedSize, uint32_t aFlags) {
-  if (!LoadHasSize()) {
-    return MakeTuple(ImgDrawResult::NOT_READY, IntSize(0, 0));
-  }
-
-  if (aRequestedSize.IsEmpty()) {
-    return MakeTuple(ImgDrawResult::BAD_ARGS, IntSize(0, 0));
-  }
-
-  // We check the minimum size because while we support downscaling, we do not
-  // support upscaling. If aRequestedSize > mSize, we will never give a larger
-  // surface than mSize. If mSize > aRequestedSize, and mSize > maxTextureSize,
-  // we still want to use image containers if aRequestedSize <= maxTextureSize.
-  int32_t maxTextureSize = aRenderer->GetMaxTextureSize();
-  if (min(mSize.width, aRequestedSize.width) > maxTextureSize ||
-      min(mSize.height, aRequestedSize.height) > maxTextureSize) {
-    return MakeTuple(ImgDrawResult::NOT_SUPPORTED, IntSize(0, 0));
-  }
-
-  auto requestedSize = OrientedIntSize::FromUnknownSize(aRequestedSize);
-  if (!CanDownscaleDuringDecode(requestedSize, aFlags)) {
-    return MakeTuple(ImgDrawResult::SUCCESS, mSize.ToUnknownSize());
-  }
-
-  return MakeTuple(ImgDrawResult::SUCCESS, aRequestedSize);
-}
-
 NS_IMETHODIMP_(bool)
 RasterImage::IsImageContainerAvailable(WindowRenderer* aRenderer,
                                        uint32_t aFlags) {
   return LoadHasSize();
-}
-
-NS_IMETHODIMP_(ImgDrawResult)
-RasterImage::GetImageContainerAtSize(WindowRenderer* aRenderer,
-                                     const gfx::IntSize& aSize,
-                                     const Maybe<SVGImageContext>& aSVGContext,
-                                     const Maybe<ImageIntRegion>& aRegion,
-                                     uint32_t aFlags,
-                                     layers::ImageContainer** aOutContainer) {
-  // We do not pass in the given SVG context because in theory it could differ
-  // between calls, but actually have no impact on the actual contents of the
-  // image container.
-  return GetImageContainerImpl(aRenderer, aSize, Nothing(), Nothing(), aFlags,
-                               aOutContainer);
 }
 
 NS_IMETHODIMP_(ImgDrawResult)
@@ -721,13 +670,6 @@ size_t RasterImage::SizeOfSourceWithComputedFallback(
     SizeOfState& aState) const {
   return mSourceBuffer->SizeOfIncludingThisWithComputedFallback(
       aState.mMallocSizeOf);
-}
-
-void RasterImage::CollectSizeOfSurfaces(
-    nsTArray<SurfaceMemoryCounter>& aCounters,
-    MallocSizeOf aMallocSizeOf) const {
-  SurfaceCache::CollectSizeOfSurfaces(ImageKey(this), aCounters, aMallocSizeOf);
-  ImageResource::CollectSizeOfSurfaces(aCounters, aMallocSizeOf);
 }
 
 bool RasterImage::SetMetadata(const ImageMetadata& aMetadata,
@@ -1057,8 +999,6 @@ void RasterImage::Discard() {
   SurfaceCache::RemoveImage(ImageKey(this));
 
   if (mAnimationState) {
-    ReleaseImageContainer();
-
     IntRect rect = mAnimationState->UpdateState(this, mSize.ToUnknownSize());
 
     auto dirtyRect = OrientedIntRect::FromUnknownRect(rect);
@@ -1660,13 +1600,6 @@ void RasterImage::NotifyProgress(
       invalidRect.UnionRect(invalidRect,
                             OrientedIntRect::FromUnknownRect(rect));
     }
-  }
-
-  const bool wasDefaultFlags = aSurfaceFlags == DefaultSurfaceFlags();
-
-  if (!invalidRect.IsEmpty() && wasDefaultFlags) {
-    // Update our image container since we're invalidating.
-    UpdateImageContainer(Some(invalidRect.ToUnknownRect()));
   }
 
   // Tell the observers what happened.
