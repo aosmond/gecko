@@ -6,6 +6,7 @@
 
 #include "WebRenderUserData.h"
 
+#include "mozilla/image/WebRenderImageProvider.h"
 #include "mozilla/layers/AnimationHelper.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/ImageClient.h"
@@ -19,6 +20,8 @@
 #include "nsDisplayListInvalidation.h"
 #include "nsIFrame.h"
 #include "WebRenderCanvasRenderer.h"
+
+using namespace mozilla::image;
 
 namespace mozilla {
 namespace layers {
@@ -282,33 +285,32 @@ void WebRenderImageData::CreateImageClientIfNeeded() {
   }
 }
 
-WebRenderBlobImageData::WebRenderBlobImageData(RenderRootStateManager* aManager,
-                                               nsDisplayItem* aItem)
+WebRenderImageProviderData::WebRenderImageProviderData(
+    RenderRootStateManager* aManager, nsDisplayItem* aItem)
     : WebRenderUserData(aManager, aItem) {}
 
-WebRenderBlobImageData::WebRenderBlobImageData(RenderRootStateManager* aManager,
-                                               uint32_t aDisplayItemKey,
-                                               nsIFrame* aFrame)
+WebRenderImageProviderData::WebRenderImageProviderData(
+    RenderRootStateManager* aManager, uint32_t aDisplayItemKey,
+    nsIFrame* aFrame)
     : WebRenderUserData(aManager, aDisplayItemKey, aFrame) {}
 
-Maybe<wr::BlobImageKey> WebRenderBlobImageData::UpdateImageKey(
-    ImageContainer* aContainer, wr::IpcResourceUpdateQueue& aResources) {
-  MOZ_ASSERT(aContainer);
+WebRenderImageProviderData::~WebRenderImageProviderData() {}
 
-  if (mContainer != aContainer) {
-    mContainer = aContainer;
+Maybe<wr::ImageKey> WebRenderImageProviderData::UpdateImageKey(
+    WebRenderImageProvider* aProvider, wr::IpcResourceUpdateQueue& aResources) {
+  MOZ_ASSERT(aProvider);
+
+  if (mProvider != aProvider) {
+    mProvider = aProvider;
   }
 
-  wr::BlobImageKey key = {};
-  nsresult rv =
-      SharedSurfacesChild::ShareBlob(aContainer, mManager, aResources, key);
-  if (NS_SUCCEEDED(rv)) {
-    mKey = Some(key);
-  } else {
-    mKey.reset();
+  wr::ImageKey key = {};
+  nsresult rv = mProvider->UpdateKey(mManager, aResources, key);
+  if (NS_FAILED(rv)) {
+    return Nothing();
   }
 
-  return mKey;
+  return Some(key);
 }
 
 WebRenderFallbackData::WebRenderFallbackData(RenderRootStateManager* aManager,
