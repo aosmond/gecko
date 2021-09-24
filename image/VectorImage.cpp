@@ -514,16 +514,13 @@ void VectorImage::SendInvalidationNotifications() {
   // notifications indirectly in |InvalidateObservers...|.
 
   mHasPendingInvalidation = false;
-  SurfaceCache::RemoveImage(ImageKey(this));
 
-  // FIXME(aosmond)
-#if 0
-    // If we have image containers, that means we probably won't get a Draw call
-    // from the owner since they are using the container. We must assume all
-    // invalidations need to be handled.
+  if (SurfaceCache::InvalidateImage(ImageKey(this))) {
+    // If we still have recordings in the cache, make sure we handle future
+    // invalidations.
     MOZ_ASSERT(mRenderingObserver, "Should have a rendering observer by now");
     mRenderingObserver->ResumeHonoringInvalidations();
-#endif
+  }
 
   if (mProgressTracker) {
     mProgressTracker->SyncNotifyProgress(FLAG_FRAME_COMPLETE,
