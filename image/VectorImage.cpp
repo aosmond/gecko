@@ -815,7 +815,7 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
       mHaveAnimations ? PlaybackType::eAnimated : PlaybackType::eStatic;
   auto surfaceFlags = ToSurfaceFlags(aFlags);
   SurfaceKey surfaceKey =
-      VectorSurfaceKey(aSize, aSVGContext, surfaceFlags, playbackType);
+      VectorSurfaceKey(aSize, aRegion, aSVGContext, surfaceFlags, playbackType);
   if ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
     result = SurfaceCache::Lookup(ImageKey(this), surfaceKey,
                                   /* aMarkUsed = */ true);
