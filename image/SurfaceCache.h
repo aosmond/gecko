@@ -21,6 +21,7 @@
 #include "gfx2DGlue.h"
 #include "gfxPoint.h"  // for gfxSize
 #include "nsCOMPtr.h"  // for already_AddRefed
+#include "ImageRegion.h"
 #include "PlaybackType.h"
 #include "SurfaceFlags.h"
 
@@ -58,27 +59,35 @@ class SurfaceKey {
 
   PLDHashNumber Hash() const {
     PLDHashNumber hash = HashGeneric(mSize.width, mSize.height);
+    hash = AddToHash(hash, mRegion.map(HashIIR).valueOr(0));
     hash = AddToHash(hash, mSVGContext.map(HashSIC).valueOr(0));
     hash = AddToHash(hash, uint8_t(mPlayback), uint32_t(mFlags));
     return hash;
   }
 
   SurfaceKey CloneWithSize(const IntSize& aSize) const {
-    return SurfaceKey(aSize, mSVGContext, mPlayback, mFlags);
+    return SurfaceKey(aSize, mRegion, mSVGContext, mPlayback, mFlags);
   }
 
   const IntSize& Size() const { return mSize; }
+  const Maybe<ImageIntRegion>& Region() const { return mRegion; }
   const Maybe<SVGImageContext>& SVGContext() const { return mSVGContext; }
   PlaybackType Playback() const { return mPlayback; }
   SurfaceFlags Flags() const { return mFlags; }
 
  private:
-  SurfaceKey(const IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
-             PlaybackType aPlayback, SurfaceFlags aFlags)
+  SurfaceKey(const IntSize& aSize, const Maybe<ImageIntRegion>& aRegion,
+             const Maybe<SVGImageContext>& aSVGContext, PlaybackType aPlayback,
+             SurfaceFlags aFlags)
       : mSize(aSize),
+        mRegion(aRegion),
         mSVGContext(aSVGContext),
         mPlayback(aPlayback),
         mFlags(aFlags) {}
+
+  static PLDHashNumber HashIIR(const ImageIntRegion& aIIR) {
+    return aIIR.Hash();
+  }
 
   static PLDHashNumber HashSIC(const SVGImageContext& aSIC) {
     return aSIC.Hash();
@@ -91,8 +100,13 @@ class SurfaceKey {
   friend SurfaceKey VectorSurfaceKey(const IntSize&,
                                      const Maybe<SVGImageContext>&,
                                      SurfaceFlags, PlaybackType);
+  friend SurfaceKey VectorSurfaceKey(const IntSize&,
+                                     const Maybe<ImageIntRegion>&,
+                                     const Maybe<SVGImageContext>&,
+                                     SurfaceFlags, PlaybackType);
 
   IntSize mSize;
+  Maybe<ImageIntRegion> mRegion;
   Maybe<SVGImageContext> mSVGContext;
   PlaybackType mPlayback;
   SurfaceFlags mFlags;
@@ -101,7 +115,15 @@ class SurfaceKey {
 inline SurfaceKey RasterSurfaceKey(const gfx::IntSize& aSize,
                                    SurfaceFlags aFlags,
                                    PlaybackType aPlayback) {
-  return SurfaceKey(aSize, Nothing(), aPlayback, aFlags);
+  return SurfaceKey(aSize, Nothing(), Nothing(), aPlayback, aFlags);
+}
+
+inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
+                                   const Maybe<ImageIntRegion>& aRegion,
+                                   const Maybe<SVGImageContext>& aSVGContext,
+                                   SurfaceFlags aFlags,
+                                   PlaybackType aPlayback) {
+  return SurfaceKey(aSize, aRegion, aSVGContext, aPlayback, aFlags);
 }
 
 inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
@@ -113,7 +135,7 @@ inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
   // *does* affect how a VectorImage renders, we'll have to change this.
   // Similarly, we don't accept a PlaybackType parameter because we don't
   // currently cache frames of animated SVG images.
-  return SurfaceKey(aSize, aSVGContext, aPlayback, aFlags);
+  return SurfaceKey(aSize, Nothing(), aSVGContext, aPlayback, aFlags);
 }
 
 inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
@@ -123,7 +145,7 @@ inline SurfaceKey VectorSurfaceKey(const gfx::IntSize& aSize,
   // *does* affect how a VectorImage renders, we'll have to change this.
   // Similarly, we don't accept a PlaybackType parameter because we don't
   // currently cache frames of animated SVG images.
-  return SurfaceKey(aSize, aSVGContext, PlaybackType::eStatic,
+  return SurfaceKey(aSize, Nothing(), aSVGContext, PlaybackType::eStatic,
                     DefaultSurfaceFlags());
 }
 

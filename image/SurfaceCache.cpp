@@ -278,8 +278,14 @@ class ImageSurfaceCache {
   [[nodiscard]] bool Insert(NotNull<CachedSurface*> aSurface) {
     MOZ_ASSERT(!mLocked || aSurface->IsPlaceholder() || aSurface->IsLocked(),
                "Inserting an unlocked surface for a locked image");
-    return mSurfaces.InsertOrUpdate(aSurface->GetSurfaceKey(),
-                                    RefPtr<CachedSurface>{aSurface}, fallible);
+    const auto& surfaceKey = aSurface->GetSurfaceKey();
+    if (surfaceKey.Region()) {
+      // We don't allow substitutes for surfaces with regions, so we don't want
+      // to allow factor of 2 mode pruning to release these surfaces.
+      aSurface->SetCannotSubstitute();
+    }
+    return mSurfaces.InsertOrUpdate(surfaceKey, RefPtr<CachedSurface>{aSurface},
+                                    fallible);
   }
 
   already_AddRefed<CachedSurface> Remove(NotNull<CachedSurface*> aSurface) {
@@ -328,6 +334,10 @@ class ImageSurfaceCache {
       if (exactMatch->IsDecoded()) {
         return MakeTuple(exactMatch.forget(), MatchType::EXACT, IntSize());
       }
+    } else if (aIdealKey.Region()) {
+      // We cannot substitute if we have a region. Allow it to create an exact
+      // match.
+      return MakeTuple(exactMatch.forget(), MatchType::NOT_FOUND, IntSize());
     } else if (!mFactor2Mode) {
       // If no exact match is found, and we are not in factor of 2 mode, then
       // we know that we will trigger a decode because at best we will provide
@@ -355,8 +365,8 @@ class ImageSurfaceCache {
       NotNull<CachedSurface*> current = WrapNotNull(value);
       const SurfaceKey& currentKey = current->GetSurfaceKey();
 
-      // We never match a placeholder.
-      if (current->IsPlaceholder()) {
+      // We never match a placeholder or a surface with a region.
+      if (current->IsPlaceholder() || currentKey.Region()) {
         continue;
       }
       // Matching the playback type and SVG context is required.
@@ -1040,7 +1050,8 @@ class SurfaceCacheImpl final : public nsIMemoryReporter {
     MOZ_ASSERT_IF(
         matchType == MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND ||
             matchType == MatchType::SUBSTITUTE_BECAUSE_PENDING,
-        surface->GetSurfaceKey().SVGContext() == aSurfaceKey.SVGContext() &&
+        surface->GetSurfaceKey().Region() == aSurfaceKey.Region() &&
+            surface->GetSurfaceKey().SVGContext() == aSurfaceKey.SVGContext() &&
             surface->GetSurfaceKey().Playback() == aSurfaceKey.Playback() &&
             surface->GetSurfaceKey().Flags() == aSurfaceKey.Flags());
 
