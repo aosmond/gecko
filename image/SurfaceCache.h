@@ -425,6 +425,17 @@ struct SurfaceCache {
   static void PruneImage(const ImageKey aImageKey);
 
   /**
+   * Removes all rasterized cache entries (including placeholders) associated
+   * with the given image from the cache. Any blob recordings are marked as
+   * dirty and must be regenerated.
+   *
+   * @param aImageKey  The image whose cache which should be regenerated.
+   *
+   * @returns true if any recordings were invalidated, else false.
+   */
+  static bool InvalidateImage(const ImageKey aImageKey);
+
+  /**
    * Evicts all evictable entries from the cache.
    *
    * All entries are evictable except for entries associated with locked images.

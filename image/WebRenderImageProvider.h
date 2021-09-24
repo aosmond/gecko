@@ -60,6 +60,11 @@ class WebRenderImageProvider {
    */
   virtual void Invalidate(layers::RenderRootStateManager* aManager) {}
 
+  /**
+   * Invalidate if a blob recording, requiring it to be regenerated.
+   */
+  virtual void InvalidateRecording() {}
+
  protected:
   WebRenderImageProvider(const ImageResource* aImage);
 

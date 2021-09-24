@@ -176,6 +176,8 @@ class CachedSurface {
     return aMallocSizeOf(this) + aMallocSizeOf(mProvider.get());
   }
 
+  void InvalidateRecording() { mProvider->InvalidateRecording(); }
+
   // A helper type used by SurfaceCacheImpl::CollectSizeOfSurfaces.
   struct MOZ_STACK_CLASS SurfaceMemoryReport {
     SurfaceMemoryReport(nsTArray<SurfaceMemoryCounter>& aCounters,
@@ -528,6 +530,28 @@ class ImageSurfaceCache {
     // if we discarded surfaces due to the volatile buffers getting released,
     // it is possible.
     AfterMaybeRemove();
+  }
+
+  template <typename Function>
+  bool Invalidate(Function&& aRemoveCallback) {
+    // Remove all non-blob recordings from the cache. Invalidate any blob
+    // recordings.
+    bool foundRecording = false;
+    for (auto iter = mSurfaces.Iter(); !iter.Done(); iter.Next()) {
+      NotNull<CachedSurface*> current = WrapNotNull(iter.UserData());
+
+      if (current->GetSurfaceKey().Flags() & SurfaceFlags::RECORD_BLOB) {
+        foundRecording = true;
+        current->InvalidateRecording();
+        continue;
+      }
+
+      aRemoveCallback(current);
+      iter.Remove();
+    }
+
+    AfterMaybeRemove();
+    return foundRecording;
   }
 
   IntSize SuggestedSize(const IntSize& aSize) const {
@@ -1132,6 +1156,24 @@ class SurfaceCacheImpl final : public nsIMemoryReporter {
     MaybeRemoveEmptyCache(aImageKey, cache);
   }
 
+  bool InvalidateImage(const ImageKey aImageKey,
+                  const StaticMutexAutoLock& aAutoLock) {
+    RefPtr<ImageSurfaceCache> cache = GetImageCache(aImageKey);
+    if (!cache) {
+      return false;  // No cached surfaces for this image, so nothing to do.
+    }
+
+    bool rv = cache->Invalidate(
+        [this, &aAutoLock](NotNull<CachedSurface*> aSurface) -> void {
+          StopTracking(aSurface, /* aIsTracked */ true, aAutoLock);
+          // Individual surfaces must be freed outside the lock.
+          mCachedSurfacesDiscard.AppendElement(aSurface);
+        });
+
+    MaybeRemoveEmptyCache(aImageKey, cache);
+    return rv;
+  }
+
   void DiscardAll(const StaticMutexAutoLock& aAutoLock) {
     // Remove in order of cost because mCosts is an array and the other data
     // structures are all hash tables. Note that locked surfaces are not
@@ -1715,6 +1757,20 @@ void SurfaceCache::PruneImage(const ImageKey aImageKey) {
       sInstance->TakeDiscard(discard, lock);
     }
   }
+}
+
+/* static */
+bool SurfaceCache::InvalidateImage(const ImageKey aImageKey) {
+  nsTArray<RefPtr<CachedSurface>> discard;
+  bool rv = false;
+  {
+    StaticMutexAutoLock lock(sInstanceMutex);
+    if (sInstance) {
+      rv = sInstance->InvalidateImage(aImageKey, lock);
+      sInstance->TakeDiscard(discard, lock);
+    }
+  }
+  return rv;
 }
 
 /* static */

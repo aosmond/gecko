@@ -97,7 +97,7 @@ class BlobSurfaceProvider final : public ISurfaceProvider {
                      wr::IpcResourceUpdateQueue& aResources,
                      wr::ImageKey& aKey) override;
 
-  void MarkDirty();
+  void InvalidateRecording() override;
 
   void AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                               const AddSizeOfCb& aCallback) override {
