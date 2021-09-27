@@ -10,9 +10,18 @@
 #include "mozilla/gfx/2D.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/ipc/SharedMemoryBasic.h"
+#include "mozilla/webrender/webrender_ffi.h"
 #include "nsExpirationTracker.h"
 
 namespace mozilla {
+namespace layers {
+class RenderRootStateManager;
+}
+
+namespace wr {
+class IpcResourceUpdateQueue;
+}
+
 namespace gfx {
 
 class SourceSurfaceSharedData;
@@ -129,24 +138,28 @@ class SourceSurfaceSharedData : public DataSourceSurface {
   SourceSurfaceSharedData()
       : mMutex("SourceSurfaceSharedData"),
         mStride(0),
-        mHandleCount(0),
-        mFormat(SurfaceFormat::UNKNOWN),
-        mClosed(false),
-        mFinalized(false),
-        mShared(false) {}
+        mFormat(SurfaceFormat::UNKNOWN) {}
 
   /**
    * Initialize the surface by creating a shared memory buffer with a size
-   * determined by aSize, aStride and aFormat. If aShare is true, it will also
-   * immediately attempt to share the surface with the GPU process via
-   * SharedSurfacesChild.
+   * determined by aSize, aStride and aFormat. It will create an external
+   * image ID which may be used to access the surface in the compositor
+   * process.
    */
-  bool Init(const IntSize& aSize, int32_t aStride, SurfaceFormat aFormat,
-            bool aShare = true);
+  bool Init(const IntSize& aSize, int32_t aStride, SurfaceFormat aFormat);
+
+  Maybe<wr::ImageKey> UpdateKey(layers::RenderRootStateManager* aManager,
+                                wr::IpcResourceUpdateQueue& aResources);
+
+  Maybe<wr::ExternalImageId> GetExternalImageId() {
+    if (!IsValid()) {
+      return Nothing();
+    }
+    return Some(mId);
+  }
 
   uint8_t* GetData() final {
-    MutexAutoLock lock(mMutex);
-    return GetDataInternal();
+    return static_cast<uint8_t*>(mBuf->memory());
   }
 
   int32_t Stride() final { return mStride; }
@@ -157,37 +170,29 @@ class SourceSurfaceSharedData : public DataSourceSurface {
 
   void SizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                            SizeOfInfo& aInfo) const final;
+  bool IsValid() const final;
 
   bool OnHeap() const final { return false; }
 
-  /**
-   * Although Map (and Moz2D in general) isn't normally threadsafe,
-   * we want to allow it for SourceSurfaceSharedData since it should
-   * always be fine (for reading at least).
-   *
-   * This is the same as the base class implementation except using
-   * mMapCount instead of mIsMapped since that breaks for multithread.
-   *
-   * Additionally if a reallocation happened while there were active
-   * mappings, then we guarantee that GetData will continue to return
-   * the same data pointer by retaining the old shared buffer until
-   * the last mapping is freed via Unmap.
-   */
-  bool Map(MapType, MappedSurface* aMappedSurface) final {
-    MutexAutoLock lock(mMutex);
-    ++mMapCount;
-    aMappedSurface->mData = GetDataInternal();
-    aMappedSurface->mStride = mStride;
-    return true;
-  }
+  bool Map(MapType, MappedSurface* aMappedSurface) final = default;
+  void Unmap() final = default;
 
-  void Unmap() final {
-    MutexAutoLock lock(mMutex);
-    MOZ_ASSERT(mMapCount > 0);
-    if (--mMapCount == 0) {
-      mOldBuf = nullptr;
-    }
-  }
+  /**
+   * Signals we have finished writing to the buffer and it may be marked as
+   * read only.
+   */
+  void Finalize();
+
+  /**
+   * Increment the invalidation counter.
+   */
+  void Invalidate(const IntRect& aDirtyRect) final;
+
+ protected:
+  ~SourceSurfaceSharedData() override;
+
+ private:
+  friend class SourceSurfaceSharedDataWrapper;
 
   /**
    * Get a handle to share to another process for this buffer. Returns:
@@ -198,115 +203,7 @@ class SourceSurfaceSharedData : public DataSourceSurface {
   nsresult ShareToProcess(base::ProcessId aPid,
                           SharedMemoryBasic::Handle& aHandle);
 
-  /**
-   * Indicates the buffer is not expected to be shared with any more processes.
-   * May release the handle if possible (see CloseHandleInternal).
-   */
-  void FinishedSharing() {
-    MutexAutoLock lock(mMutex);
-    mShared = true;
-    CloseHandleInternal();
-  }
-
-  /**
-   * Indicates whether or not the buffer can be shared with another process
-   * without reallocating. Note that this is racy and should only be used for
-   * informational/reporting purposes.
-   */
-  bool CanShare() const {
-    MutexAutoLock lock(mMutex);
-    return !mClosed;
-  }
-
-  /**
-   * Allocate a new shared memory buffer so that we can get a new handle for
-   * sharing to new processes. ShareToProcess must have failed with
-   * NS_ERROR_NOT_AVAILABLE in order for this to be safe to call. Returns true
-   * if the operation succeeds. If it fails, there is no state change.
-   */
-  bool ReallocHandle();
-
-  /**
-   * Signals we have finished writing to the buffer and it may be marked as
-   * read only.
-   */
-  void Finalize();
-
-  /**
-   * Indicates whether or not the buffer can change. If this returns true, it is
-   * guaranteed to continue to do so for the remainder of the surface's life.
-   */
-  bool IsFinalized() const {
-    MutexAutoLock lock(mMutex);
-    return mFinalized;
-  }
-
-  /**
-   * Yields a dirty rect of what has changed since it was last called.
-   */
-  Maybe<IntRect> TakeDirtyRect() final {
-    MutexAutoLock lock(mMutex);
-    if (mDirtyRect) {
-      Maybe<IntRect> ret = std::move(mDirtyRect);
-      return ret;
-    }
-    return Nothing();
-  }
-
-  /**
-   * Increment the invalidation counter.
-   */
-  void Invalidate(const IntRect& aDirtyRect) final {
-    MutexAutoLock lock(mMutex);
-    if (!aDirtyRect.IsEmpty()) {
-      if (mDirtyRect) {
-        mDirtyRect->UnionRect(mDirtyRect.ref(), aDirtyRect);
-      } else {
-        mDirtyRect = Some(aDirtyRect);
-      }
-    } else {
-      mDirtyRect = Some(IntRect(IntPoint(0, 0), mSize));
-    }
-    MOZ_ASSERT_IF(mDirtyRect, !mDirtyRect->IsEmpty());
-  }
-
-  /**
-   * While a HandleLock exists for the given surface, the shared memory handle
-   * cannot be released.
-   */
-  class MOZ_STACK_CLASS HandleLock final {
-   public:
-    explicit HandleLock(SourceSurfaceSharedData* aSurface)
-        : mSurface(aSurface) {
-      mSurface->LockHandle();
-    }
-
-    ~HandleLock() { mSurface->UnlockHandle(); }
-
-   private:
-    RefPtr<SourceSurfaceSharedData> mSurface;
-  };
-
- protected:
-  virtual ~SourceSurfaceSharedData() = default;
-
- private:
-  friend class SourceSurfaceSharedDataWrapper;
-
-  void LockHandle() {
-    MutexAutoLock lock(mMutex);
-    ++mHandleCount;
-  }
-
-  void UnlockHandle() {
-    MutexAutoLock lock(mMutex);
-    MOZ_ASSERT(mHandleCount > 0);
-    --mHandleCount;
-    mShared = true;
-    CloseHandleInternal();
-  }
-
-  uint8_t* GetDataInternal() const;
+  void CloseHandleInternal();
 
   size_t GetDataLength() const {
     return static_cast<size_t>(mStride) * mSize.height;
@@ -317,22 +214,39 @@ class SourceSurfaceSharedData : public DataSourceSurface {
   }
 
   /**
-   * Attempt to close the handle. Only if the buffer has been both finalized
-   * and we have completed sharing will it be released.
+   * Helper class that tracks the WebRender bindings for specific manager
+   * instance.
    */
-  void CloseHandleInternal();
+  class ImageKeyData final {
+   public:
+    ImageKeyData(layers::RenderRootStateManager* aManager,
+                 const wr::ImageKey& aImageKey);
+    ~ImageKeyData();
+
+    ImageKeyData(ImageKeyData&& aOther);
+    ImageKeyData& operator=(ImageKeyData&& aOther);
+    ImageKeyData(const ImageKeyData&) = delete;
+    ImageKeyData& operator=(const ImageKeyData&) = delete;
+
+    void MergeDirtyRect(const Maybe<gfx::IntRect>& aDirtyRect);
+
+    Maybe<gfx::IntRect> TakeDirtyRect() { return std::move(mDirtyRect); }
+
+    RefPtr<layers::RenderRootStateManager> mManager;
+    Maybe<gfx::IntRect> mDirtyRect;
+    wr::ImageKey mImageKey;
+  };
+
+  static void Unshare(const wr::ExternalImageId& aId,
+                      nsTArray<ImageKeyData>& aKeys);
 
   mutable Mutex mMutex;
-  int32_t mStride;
-  int32_t mHandleCount;
-  Maybe<IntRect> mDirtyRect;
-  IntSize mSize;
   RefPtr<SharedMemoryBasic> mBuf;
-  RefPtr<SharedMemoryBasic> mOldBuf;
+  AutoTArray<ImageKeyData, 1> mKeys;
+  wr::ExternalImageId mId;
+  IntSize mSize;
+  int32_t mStride;
   SurfaceFormat mFormat;
-  bool mClosed : 1;
-  bool mFinalized : 1;
-  bool mShared : 1;
 };
 
 }  // namespace gfx

@@ -9,8 +9,11 @@
 #include "mozilla/Likely.h"
 #include "mozilla/StaticPrefs_image.h"
 #include "mozilla/Types.h"  // for decltype
+#include "mozilla/layers/CompositorManagerChild.h"
+#include "mozilla/layers/RenderRootStateManager.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
 #include "mozilla/layers/SharedSurfacesParent.h"
+#include "mozilla/layers/WebRenderBridgeChild.h"
 #include "nsDebug.h"  // for NS_ABORT_OOM
 
 #include "base/process_util.h"
@@ -139,9 +142,92 @@ void SourceSurfaceSharedDataWrapper::ExpireMap() {
   }
 }
 
+SourceSurfaceSharedData::ImageKeyData::ImageKeyData(
+    RenderRootStateManager* aManager, const wr::ImageKey& aImageKey)
+    : mManager(aManager), mImageKey(aImageKey) {}
+
+SourceSurfaceSharedData::ImageKeyData::ImageKeyData(
+    SourceSurfaceSharedData::ImageKeyData&& aOther)
+    : mManager(std::move(aOther.mManager)),
+      mDirtyRect(std::move(aOther.mDirtyRect)),
+      mImageKey(aOther.mImageKey) {}
+
+SourceSurfaceSharedData::ImageKeyData&
+SourceSurfaceSharedData::ImageKeyData::operator=(
+    SourceSurfaceSharedData::ImageKeyData&& aOther) {
+  mManager = std::move(aOther.mManager);
+  mDirtyRect = std::move(aOther.mDirtyRect);
+  mImageKey = aOther.mImageKey;
+  return *this;
+}
+
+SourceSurfaceSharedData::ImageKeyData::~ImageKeyData() = default;
+
+void SourceSurfaceSharedData::ImageKeyData::MergeDirtyRect(
+    const Maybe<IntRect>& aDirtyRect) {
+  if (mDirtyRect) {
+    if (aDirtyRect) {
+      mDirtyRect->UnionRect(mDirtyRect.ref(), aDirtyRect.ref());
+    }
+  } else {
+    mDirtyRect = aDirtyRect;
+  }
+}
+
+/* static */
+void SourceSurfaceSharedData::Unshare(const wr::ExternalImageId& aId,
+                                      nsTArray<ImageKeyData>& aKeys) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  for (const auto& entry : aKeys) {
+    if (!entry.mManager->IsDestroyed()) {
+      entry.mManager->AddImageKeyForDiscard(entry.mImageKey);
+    }
+  }
+
+  CompositorManagerChild* manager = CompositorManagerChild::GetInstance();
+  if (MOZ_UNLIKELY(!manager || !manager->CanSend())) {
+    return;
+  }
+
+  if (manager->OwnsExternalImageId(aId)) {
+    // Only attempt to release current mappings in the compositor process. It is
+    // possible we had a surface that was previously shared, the compositor
+    // process crashed / was restarted, and then we freed the surface. In that
+    // case we know the mapping has already been freed.
+    manager->SendRemoveSharedSurface(aId);
+  }
+}
+
+SourceSurfaceSharedData::~SourceSurfaceSharedData() {
+  if (NS_IsMainThread()) {
+    Unshare(mId, mKeys);
+  } else {
+    class UnshareHelper final : public Runnable {
+     public:
+      UnshareHelper(const wr::ExternalImageId& aId,
+                    nsTArray<ImageKeyData>&& aKeys)
+          : Runnable("SourceSurfaceSharedData::UnshareHelper"),
+            mId(aId),
+            mKeys(std::move(aKeys)) {}
+
+      NS_IMETHOD Run() override {
+        Unshare(mId, mKeys);
+        return NS_OK;
+      }
+
+     private:
+      wr::ExternalImageId mId;
+      AutoTArray<ImageKeyData, 1> mKeys;
+    };
+
+    nsCOMPtr<nsIRunnable> runnable = new UnshareHelper(mId, std::move(mKeys));
+    NS_DispatchToMainThread(runnable.forget());
+  }
+}
+
 bool SourceSurfaceSharedData::Init(const IntSize& aSize, int32_t aStride,
-                                   SurfaceFormat aFormat,
-                                   bool aShare /* = true */) {
+                                   SurfaceFormat aFormat) {
   mSize = aSize;
   mStride = aStride;
   mFormat = aFormat;
@@ -153,118 +239,131 @@ bool SourceSurfaceSharedData::Init(const IntSize& aSize, int32_t aStride,
     return false;
   }
 
-  if (aShare) {
-    layers::SharedSurfacesChild::Share(this);
+  CompositorManagerChild* manager = CompositorManagerChild::GetInstance();
+  if (NS_WARN_IF(!manager)) {
+    // We cannot try to share the surface, most likely because the GPU process
+    // crashed. Ideally, we would retry when it is ready, but the handles may be
+    // a scarce resource, which can cause much more serious problems if we run
+    // out. We'll redecode into a fresh buffer later.
+    mBuf->CloseHandle();
+    return true;
   }
 
+  mId = manager->GetNextExternalImageId();
+
+  // If we live in the same process, then it is a simple matter of directly
+  // asking the parent instance to store a pointer to the same data, no need
+  // to map the data into our memory space twice.
+  auto pid = manager->OtherPid();
+  if (pid == base::GetCurrentProcId()) {
+    SharedSurfacesParent::AddSameProcess(mId, this);
+    mBuf->CloseHandle();
+    return true;
+  }
+
+  // Attempt to share a handle with the GPU process. The handle may or may not
+  // be available -- it will only be available if it is either not yet finalized
+  // and/or if it has been finalized but never used for drawing in process.
+  ipc::SharedMemoryBasic::Handle handle = ipc::SharedMemoryBasic::NULLHandle();
+  bool shared = mBuf->ShareToProcess(pid, &handle);
+  if (MOZ_UNLIKELY(!shared)) {
+    return false;
+  }
+
+  mBuf->CloseHandle();
+  manager->SendAddSharedSurface(
+      mId, SurfaceDescriptorShared(mSize, mStride, mFormat, handle));
+
   return true;
+}
+
+Maybe<wr::ImageKey> SourceSurfaceSharedData::UpdateKey(
+    RenderRootStateManager* aManager, wr::IpcResourceUpdateQueue& aResources) {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aManager);
+  MOZ_ASSERT(!aManager->IsDestroyed());
+
+  if (!IsValid()) {
+    return Nothing();
+  }
+
+  MutexAutoLock lock(mMutex);
+
+  // We iterate through all of the items to ensure we clean up the old
+  // RenderRootStateManager references. Most of the time there will be few
+  // entries and this should not be particularly expensive compared to the
+  // cost of duplicating image keys. In an ideal world, we would generate a
+  // single key for the surface, and it would be usable on all of the
+  // renderer instances. For now, we must allocate a key for each WR bridge.
+  wr::ImageKey key;
+  bool found = false;
+  auto i = mKeys.Length();
+  while (i > 0) {
+    --i;
+    ImageKeyData& entry = mKeys[i];
+    if (entry.mManager->IsDestroyed()) {
+      mKeys.RemoveElementAt(i);
+    } else if (entry.mManager == aManager) {
+      WebRenderBridgeChild* wrBridge = aManager->WrBridge();
+      MOZ_ASSERT(wrBridge);
+
+      // Even if the manager is the same, its underlying WebRenderBridgeChild
+      // can change state. If our namespace differs, then our old key has
+      // already been discarded.
+      bool ownsKey = wrBridge->GetNamespace() == entry.mImageKey.mNamespace;
+      if (!ownsKey) {
+        entry.mImageKey = wrBridge->GetNextImageKey();
+        entry.TakeDirtyRect();
+        aResources.AddSharedExternalImage(mId, entry.mImageKey);
+      } else {
+        Maybe<IntRect> dirtyRect = entry.TakeDirtyRect();
+        if (dirtyRect) {
+          MOZ_ASSERT(mShared);
+          aResources.UpdateSharedExternalImage(
+              mId, entry.mImageKey, ViewAs<ImagePixel>(dirtyRect.ref()));
+        }
+      }
+
+      key = entry.mImageKey;
+      found = true;
+    }
+  }
+
+  if (!found) {
+    key = aManager->WrBridge()->GetNextImageKey();
+    ImageKeyData data(aManager, key);
+    mKeys.AppendElement(std::move(data));
+    aResources.AddSharedExternalImage(mId, key);
+  }
+
+  return Some(key);
+}
+
+void SourceSurfaceSharedData::Invalidate(const IntRect& aDirtyRect) {
+  MutexAutoLock lock(mMutex);
+  for (auto& entry : mKeys) {
+    entry.MergeDirtyRect(aDirtyRect);
+  }
 }
 
 void SourceSurfaceSharedData::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf,
                                                   SizeOfInfo& aInfo) const {
-  MutexAutoLock lock(mMutex);
   aInfo.AddType(SurfaceType::DATA_SHARED);
-  if (mBuf) {
-    aInfo.mNonHeapBytes = GetAlignedDataLength();
-  }
-  if (!mClosed) {
-    aInfo.mExternalHandles = 1;
-  }
-  Maybe<wr::ExternalImageId> extId = SharedSurfacesChild::GetExternalId(this);
-  if (extId) {
-    aInfo.mExternalId = wr::AsUint64(extId.ref());
-  }
+  aInfo.mNonHeapBytes = GetAlignedDataLength();
+  aInfo.mExternalId = mId;
 }
 
-uint8_t* SourceSurfaceSharedData::GetDataInternal() const {
-  mMutex.AssertCurrentThreadOwns();
-
-  // If we have an old buffer lingering, it is because we get reallocated to
-  // get a new handle to share, but there were still active mappings.
-  if (MOZ_UNLIKELY(mOldBuf)) {
-    MOZ_ASSERT(mMapCount > 0);
-    MOZ_ASSERT(mFinalized);
-    return static_cast<uint8_t*>(mOldBuf->memory());
-  }
-  return static_cast<uint8_t*>(mBuf->memory());
-}
-
-nsresult SourceSurfaceSharedData::ShareToProcess(
-    base::ProcessId aPid, SharedMemoryBasic::Handle& aHandle) {
-  MutexAutoLock lock(mMutex);
-  MOZ_ASSERT(mHandleCount > 0);
-
-  if (mClosed) {
-    return NS_ERROR_NOT_AVAILABLE;
-  }
-
-  bool shared = mBuf->ShareToProcess(aPid, &aHandle);
-  if (MOZ_UNLIKELY(!shared)) {
-    return NS_ERROR_FAILURE;
-  }
-
-  return NS_OK;
-}
-
-void SourceSurfaceSharedData::CloseHandleInternal() {
-  mMutex.AssertCurrentThreadOwns();
-
-  if (mClosed) {
-    MOZ_ASSERT(mHandleCount == 0);
-    MOZ_ASSERT(mShared);
-    return;
-  }
-
-  if (mShared) {
-    mBuf->CloseHandle();
-    mClosed = true;
-  }
-}
-
-bool SourceSurfaceSharedData::ReallocHandle() {
-  MutexAutoLock lock(mMutex);
-  MOZ_ASSERT(mHandleCount > 0);
-  MOZ_ASSERT(mClosed);
-
-  if (NS_WARN_IF(!mFinalized)) {
-    // We haven't finished populating the surface data yet, which means we are
-    // out of luck, as we have no means of synchronizing with the producer to
-    // write new data to a new buffer. This should be fairly rare, caused by a
-    // crash in the GPU process, while we were decoding an image.
-    return false;
-  }
-
-  size_t len = GetAlignedDataLength();
-  RefPtr<SharedMemoryBasic> buf = new SharedMemoryBasic();
-  if (NS_WARN_IF(!buf->Create(len)) || NS_WARN_IF(!buf->Map(len))) {
-    return false;
-  }
-
-  size_t copyLen = GetDataLength();
-  memcpy(buf->memory(), mBuf->memory(), copyLen);
-#ifdef SHARED_SURFACE_PROTECT_FINALIZED
-  buf->Protect(static_cast<char*>(buf->memory()), len, RightsRead);
-#endif
-
-  if (mMapCount > 0 && !mOldBuf) {
-    mOldBuf = std::move(mBuf);
-  }
-  mBuf = std::move(buf);
-  mClosed = false;
-  mShared = false;
-  return true;
+bool SourceSurfaceSharedData::IsValid() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  CompositorManagerChild* manager = CompositorManagerChild::GetInstance();
+  return manager && manager->OwnsExternalImageId(mId);
 }
 
 void SourceSurfaceSharedData::Finalize() {
-  MutexAutoLock lock(mMutex);
-  MOZ_ASSERT(!mFinalized);
-
 #ifdef SHARED_SURFACE_PROTECT_FINALIZED
   size_t len = GetAlignedDataLength();
   mBuf->Protect(static_cast<char*>(mBuf->memory()), len, RightsRead);
 #endif
-
-  mFinalized = true;
 }
 
 }  // namespace gfx

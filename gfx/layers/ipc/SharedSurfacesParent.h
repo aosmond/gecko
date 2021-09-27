@@ -70,6 +70,7 @@ class SharedSurfacesParent final {
 
  private:
   friend class SharedSurfacesChild;
+  friend class gfx::SourceSurfaceSharedData;
   friend class gfx::SourceSurfaceSharedDataWrapper;
 
   SharedSurfacesParent();

@@ -287,23 +287,15 @@ nsresult SharedSurfacesChild::Share(SourceSurfaceSharedData* aSurface,
                                     RenderRootStateManager* aManager,
                                     wr::IpcResourceUpdateQueue& aResources,
                                     wr::ImageKey& aKey) {
-  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aSurface);
-  MOZ_ASSERT(aManager);
 
-  // Each time the surface changes, the producers of SourceSurfaceSharedData
-  // surfaces promise to increment the invalidation counter each time the
-  // surface has changed. We can use this counter to determine whether or not
-  // we should update our paired ImageKey.
-  Maybe<IntRect> dirtyRect = aSurface->TakeDirtyRect();
-  SharedUserData* data = nullptr;
-  nsresult rv = SharedSurfacesChild::ShareInternal(aSurface, &data);
-  if (NS_SUCCEEDED(rv)) {
-    MOZ_ASSERT(data);
-    aKey = data->UpdateKey(aManager, aResources, dirtyRect);
+  Maybe<wr::ImageKey> key = aSurface->UpdateKey(aManager, aResources);
+  if (!key) {
+    return NS_ERROR_NOT_AVAILABLE;
   }
 
-  return rv;
+  aKey = key.ref();
+  return NS_OK;
 }
 
 /* static */
@@ -311,9 +303,7 @@ nsresult SharedSurfacesChild::Share(SourceSurface* aSurface,
                                     RenderRootStateManager* aManager,
                                     wr::IpcResourceUpdateQueue& aResources,
                                     wr::ImageKey& aKey) {
-  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aSurface);
-  MOZ_ASSERT(aManager);
 
   auto sharedSurface = AsSourceSurfaceSharedData(aSurface);
   if (!sharedSurface) {
