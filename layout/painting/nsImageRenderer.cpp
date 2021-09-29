@@ -642,8 +642,9 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
           wr::ToImageRendering(aItem->Frame()->UsedImageRendering());
       wr::LayoutRect clip = wr::ToLayoutRect(clipRect);
 
-      // If we provided a region to the provider, then it already took
-      wr::LayoutRect dest = region ? wr::ToLayoutRect(destRect) : clip;
+      // If we provided a region to the provider, then it already took the
+      // dest rect into account when it did the recording.
+      wr::LayoutRect dest = region ? clip : wr::ToLayoutRect(destRect);
 
       if (extendMode == ExtendMode::CLAMP) {
         // The image is not repeating. Just push as a regular image.
