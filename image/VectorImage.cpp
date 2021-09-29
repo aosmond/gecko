@@ -808,8 +808,13 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
     return ImgDrawResult::SUCCESS;
   }
 
-  IntSize rasterSize =
-      result.SuggestedSize().IsEmpty() ? aSize : result.SuggestedSize();
+  // Ensure we store the surface with the correct key if we switched to factor
+  // of 2 sizing or we otherwise got clamped.
+  IntSize rasterSize(aSize);
+  if (!result.SuggestedSize().IsEmpty()) {
+    rasterSize = result.SuggestedSize();
+    surfaceKey = surfaceKey.CloneWithSize(rasterSize);
+  }
 
   // We're about to rerasterize, which may mean that some of the previous
   // surfaces we've rasterized aren't useful anymore. We can allow them to
@@ -828,8 +833,7 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
   RefPtr<ISurfaceProvider> provider;
   if (aFlags & FLAG_RECORD_BLOB) {
     provider = MakeRefPtr<BlobSurfaceProvider>(ImageKey(this), surfaceKey,
-                                               mSVGDocumentWrapper, aSVGContext,
-                                               aRegion, aFlags);
+                                               mSVGDocumentWrapper, aFlags);
   } else {
     if (mSVGDocumentWrapper->IsDrawing()) {
       NS_WARNING("Refusing to make re-entrant call to VectorImage::Draw");
