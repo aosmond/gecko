@@ -782,14 +782,15 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
     return ImgDrawResult::NOT_SUPPORTED;
   }
 
-  if (aRenderer->GetBackendType() != LayersBackend::LAYERS_WR) {
-    return ImgDrawResult::NOT_SUPPORTED;
-  }
+  // Only blob recordings support a region to restrict drawing.
+  const bool blobRecording = aFlags & FLAG_RECORD_BLOB != 0;
+  MOZ_ASSERT_IF(blobRecording, aRegion.isNothing());
 
   LookupResult result(MatchType::NOT_FOUND);
   auto playbackType =
       mHaveAnimations ? PlaybackType::eAnimated : PlaybackType::eStatic;
   auto surfaceFlags = ToSurfaceFlags(aFlags);
+
   SurfaceKey surfaceKey =
       VectorSurfaceKey(aSize, aRegion, aSVGContext, surfaceFlags, playbackType);
   if ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
@@ -831,7 +832,7 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
   // generating blob keys and recording bindings. The recording won't happen
   // until the caller requests the key explicitly.
   RefPtr<ISurfaceProvider> provider;
-  if (aFlags & FLAG_RECORD_BLOB) {
+  if (blobRecording) {
     provider = MakeRefPtr<BlobSurfaceProvider>(ImageKey(this), surfaceKey,
                                                mSVGDocumentWrapper, aFlags);
   } else {
@@ -844,18 +845,14 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
     float animTime =
         mHaveAnimations ? mSVGDocumentWrapper->GetCurrentTimeAsFloat() : 0.0f;
 
-    // If we aren't given a region, create one that covers the whole SVG image.
-    ImageRegion region =
-        aRegion ? aRegion->ToImageRegion() : ImageRegion::Create(rasterSize);
-
     // By using a null gfxContext, we ensure that we will always attempt to
     // create a surface, even if we aren't capable of caching it (e.g. due to
     // our flags, having an animation, etc). Otherwise CreateSurface will assume
     // that the caller is capable of drawing directly to its own draw target if
     // we cannot cache.
-    SVGDrawingParameters params(nullptr, rasterSize, aSize, region,
-                                SamplingFilter::POINT, aSVGContext, animTime,
-                                aFlags, 1.0);
+    SVGDrawingParameters params(
+        nullptr, rasterSize, aSize, ImageRegion::Create(rasterSize),
+        SamplingFilter::POINT, aSVGContext, animTime, aFlags, 1.0);
 
     RefPtr<gfxDrawable> svgDrawable = CreateSVGDrawable(params);
     bool contextPaint = aSVGContext && aSVGContext->GetContextPaint();
