@@ -800,14 +800,12 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
                                            /* aMarkUsed = */ true);
   }
 
-  if (result) {
+  // Unless we get a best match (exact or factor of 2 limited), then we want to
+  // generate a new recording, even if we have a substitute.
+  if (result && (result.Type() == MatchType::EXACT ||
+                 result.Type() == MatchType::SUBSTITUTE_BECAUSE_BEST)) {
     result.Surface().TakeProvider(aProvider);
     return ImgDrawResult::SUCCESS;
-  }
-
-  if (mSVGDocumentWrapper->IsDrawing()) {
-    NS_WARNING("Refusing to make re-entrant call to VectorImage::Draw");
-    return ImgDrawResult::TEMPORARY_ERROR;
   }
 
   IntSize rasterSize =
@@ -833,6 +831,11 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
                                                mSVGDocumentWrapper, aSVGContext,
                                                aRegion, aFlags);
   } else {
+    if (mSVGDocumentWrapper->IsDrawing()) {
+      NS_WARNING("Refusing to make re-entrant call to VectorImage::Draw");
+      return ImgDrawResult::TEMPORARY_ERROR;
+    }
+
     // We aren't using blobs, so we need to rasterize.
     float animTime =
         mHaveAnimations ? mSVGDocumentWrapper->GetCurrentTimeAsFloat() : 0.0f;
