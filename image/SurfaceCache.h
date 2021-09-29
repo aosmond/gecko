@@ -53,8 +53,9 @@ class SurfaceKey {
 
  public:
   bool operator==(const SurfaceKey& aOther) const {
-    return aOther.mSize == mSize && aOther.mSVGContext == mSVGContext &&
-           aOther.mPlayback == mPlayback && aOther.mFlags == mFlags;
+    return aOther.mSize == mSize && aOther.mRegion == mRegion &&
+           aOther.mSVGContext == mSVGContext && aOther.mPlayback == mPlayback &&
+           aOther.mFlags == mFlags;
   }
 
   PLDHashNumber Hash() const {
