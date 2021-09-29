@@ -783,8 +783,8 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
   }
 
   // Only blob recordings support a region to restrict drawing.
-  const bool blobRecording = aFlags & FLAG_RECORD_BLOB != 0;
-  MOZ_ASSERT_IF(blobRecording, aRegion.isNothing());
+  const bool blobRecording = aFlags & FLAG_RECORD_BLOB;
+  MOZ_ASSERT_IF(!blobRecording, aRegion.isNothing());
 
   LookupResult result(MatchType::NOT_FOUND);
   auto playbackType =
