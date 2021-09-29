@@ -622,10 +622,6 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
               mImageContainer, mForFrame, destRect, clipRect, aSc,
               containerFlags, svgContext, region);
 
-      if (extendMode != ExtendMode::CLAMP) {
-        region = Nothing();
-      }
-
       RefPtr<image::WebRenderImageProvider> provider;
       drawResult = mImageContainer->GetImageProvider(
           aManager->LayerManager(), decodeSize, svgContext, region,
@@ -644,8 +640,10 @@ ImgDrawResult nsImageRenderer::BuildWebRenderDisplayItems(
 
       auto rendering =
           wr::ToImageRendering(aItem->Frame()->UsedImageRendering());
-      wr::LayoutRect dest = wr::ToLayoutRect(destRect);
       wr::LayoutRect clip = wr::ToLayoutRect(clipRect);
+
+      // If we provided a region to the provider, then it already took
+      wr::LayoutRect dest = region ? wr::ToLayoutRect(destRect) : clip;
 
       if (extendMode == ExtendMode::CLAMP) {
         // The image is not repeating. Just push as a regular image.
