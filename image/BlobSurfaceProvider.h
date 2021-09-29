@@ -82,8 +82,6 @@ class BlobSurfaceProvider final : public ISurfaceProvider {
 
   BlobSurfaceProvider(ImageKey aImageKey, const SurfaceKey& aSurfaceKey,
                       SVGDocumentWrapper* aSVGDocumentWrapper,
-                      const Maybe<SVGImageContext>& aSVGContext,
-                      const Maybe<ImageIntRegion>& aRegion,
                       uint32_t aImageFlags);
 
   bool IsFinished() const override { return true; }
@@ -132,8 +130,6 @@ class BlobSurfaceProvider final : public ISurfaceProvider {
   AutoTArray<BlobImageKeyData, 1> mKeys;
 
   RefPtr<image::SVGDocumentWrapper> mSVGDocumentWrapper;
-  Maybe<SVGImageContext> mSVGContext;
-  Maybe<ImageIntRegion> mRegion;
   uint32_t mImageFlags;
 };
 

@@ -22,14 +22,10 @@ namespace mozilla::image {
 
 BlobSurfaceProvider::BlobSurfaceProvider(
     const ImageKey aImageKey, const SurfaceKey& aSurfaceKey,
-    image::SVGDocumentWrapper* aSVGDocumentWrapper,
-    const Maybe<SVGImageContext>& aSVGContext,
-    const Maybe<ImageIntRegion>& aRegion, uint32_t aImageFlags)
+    image::SVGDocumentWrapper* aSVGDocumentWrapper, uint32_t aImageFlags)
     : ISurfaceProvider(aImageKey, aSurfaceKey,
                        AvailabilityState::StartAvailable()),
       mSVGDocumentWrapper(aSVGDocumentWrapper),
-      mSVGContext(aSVGContext),
-      mRegion(aRegion),
       mImageFlags(aImageFlags) {
   MOZ_ASSERT(mSVGDocumentWrapper);
   MOZ_ASSERT(aImageFlags & imgIContainer::FLAG_RECORD_BLOB);
@@ -149,9 +145,11 @@ Maybe<BlobImageKeyData> BlobSurfaceProvider::RecordDrawing(
   auto* rootManager = aManager->GetRenderRootStateManager();
   auto* wrBridge = aManager->WrBridge();
 
-  const IntSize& size = GetSurfaceKey().Size();
+  const auto& size = GetSurfaceKey().Size();
+  const auto& region = GetSurfaceKey().Region();
+  const auto& svgContext = GetSurfaceKey().SVGContext();
 
-  IntRect imageRect = mRegion ? mRegion->Rect() : IntRect(IntPoint(0, 0), size);
+  IntRect imageRect = region ? region->Rect() : IntRect(IntPoint(0, 0), size);
   IntRect imageRectOrigin = imageRect - imageRect.TopLeft();
 
   std::vector<RefPtr<ScaledFont>> fonts;
@@ -186,15 +184,15 @@ Maybe<BlobImageKeyData> BlobSurfaceProvider::RecordDrawing(
     return Nothing();
   }
 
-  bool contextPaint = mSVGContext && mSVGContext->GetContextPaint();
+  bool contextPaint = svgContext && svgContext->GetContextPaint();
 
   float animTime = (GetSurfaceKey().Playback() == PlaybackType::eStatic)
                        ? 0.0f
                        : mSVGDocumentWrapper->GetCurrentTimeAsFloat();
 
   IntSize viewportSize = size;
-  if (mSVGContext) {
-    auto cssViewportSize = mSVGContext->GetViewportSize();
+  if (svgContext) {
+    auto cssViewportSize = svgContext->GetViewportSize();
     if (cssViewportSize) {
       // XXX losing unit
       viewportSize.SizeTo(cssViewportSize->width, cssViewportSize->height);
@@ -218,7 +216,7 @@ Maybe<BlobImageKeyData> BlobSurfaceProvider::RecordDrawing(
                         size.height,
                         uri ? uri->GetSpecOrDefault().get() : "N/A"));
 
-    AutoRestoreSVGState autoRestore(mSVGContext, animTime, mSVGDocumentWrapper,
+    AutoRestoreSVGState autoRestore(svgContext, animTime, mSVGDocumentWrapper,
                                     contextPaint);
 
     mSVGDocumentWrapper->UpdateViewportBounds(viewportSize);
