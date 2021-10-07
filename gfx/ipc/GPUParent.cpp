@@ -14,6 +14,7 @@
 #include "GPUProcessManager.h"
 #include "gfxGradientCache.h"
 #include "GfxInfoBase.h"
+#include "OffscreenCanvasManagerParent.h"
 #include "VRGPUChild.h"
 #include "VRManager.h"
 #include "VRManagerParent.h"
@@ -405,6 +406,12 @@ mozilla::ipc::IPCResult GPUParent::RecvInitVR(
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult GPUParent::RecvInitOffscreenCanvasManager(
+    Endpoint<POffscreenCanvasManagerParent>&& aEndpoint) {
+  OffscreenCanvasManagerParent::Init(std::move(aEndpoint));
+  return IPC_OK();
+}
+
 mozilla::ipc::IPCResult GPUParent::RecvInitUiCompositorController(
     const LayersId& aRootLayerTreeId,
     Endpoint<PUiCompositorControllerParent>&& aEndpoint) {
@@ -628,6 +635,7 @@ void GPUParent::ActorDestroy(ActorDestroyReason aWhy) {
           mVsyncBridge = nullptr;
         }
         RemoteDecoderManagerParent::ShutdownVideoBridge();
+        OffscreenCanvasManagerParent::Shutdown();
         CompositorThreadHolder::Shutdown();
         // There is a case that RenderThread exists when gfxVars::UseWebRender()
         // is false. This could happen when WebRender was fallbacked to
