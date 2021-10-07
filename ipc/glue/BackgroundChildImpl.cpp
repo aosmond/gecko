@@ -47,6 +47,7 @@
 #include "mozilla/dom/ServiceWorkerManagerChild.h"
 #include "mozilla/dom/BrowserChild.h"
 #include "mozilla/dom/VsyncChild.h"
+#include "mozilla/gfx/OffscreenCanvasManagerChild.h"
 #include "mozilla/ipc/IPCStreamAlloc.h"
 #include "mozilla/ipc/PBackgroundTestChild.h"
 #include "mozilla/ipc/PChildToParentStreamChild.h"

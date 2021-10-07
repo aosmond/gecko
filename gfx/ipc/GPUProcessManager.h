@@ -12,6 +12,7 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/gfx/GPUProcessHost.h"
+#include "mozilla/gfx/POffscreenCanvasManagerChild.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/ipc/TaskFactory.h"
@@ -108,6 +109,9 @@ class GPUProcessManager final : public GPUProcessHost::Listener {
       mozilla::ipc::Endpoint<PVRManagerChild>* aOutVRBridge,
       mozilla::ipc::Endpoint<PRemoteDecoderManagerChild>* aOutVideoManager,
       nsTArray<uint32_t>* aNamespaces);
+
+  void CreateOffscreenCanvasManager(
+      mozilla::ipc::Endpoint<POffscreenCanvasManagerParent>&& aEndpoint);
 
   // Initialize GPU process with consuming end of PVideoBridge.
   void InitVideoBridge(

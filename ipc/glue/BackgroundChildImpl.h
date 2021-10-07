@@ -25,6 +25,12 @@ class ThreadLocal;
 }  // namespace indexedDB
 }  // namespace dom
 
+namespace gfx {
+
+class OffscreenCanvasManagerChild;
+
+}  // namespace gfx
+
 namespace ipc {
 
 // Instances of this class should never be created directly. This class is meant
@@ -273,6 +279,7 @@ class BackgroundChildImpl::ThreadLocal final {
   mozilla::UniquePtr<mozilla::dom::indexedDB::ThreadLocal>
       mIndexedDBThreadLocal;
   mozilla::dom::IDBFileHandle* mCurrentFileHandle;
+  RefPtr<mozilla::gfx::OffscreenCanvasManagerChild> mOffscreenCanvasManager;
 
  public:
   ThreadLocal();

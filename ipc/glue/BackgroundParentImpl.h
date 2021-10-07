@@ -411,6 +411,9 @@ class BackgroundParentImpl : public PBackgroundParent,
       const nsString& aGroupName, const nsCString& aEndpointURL,
       const PrincipalInfo& aPrincipalInfo) override;
 
+  mozilla::ipc::IPCResult RecvCreateOffscreenCanvasManager(
+      Endpoint<POffscreenCanvasManagerParent>&& aEndpoint) override;
+
   dom::PMediaTransportParent* AllocPMediaTransportParent() override;
   bool DeallocPMediaTransportParent(
       dom::PMediaTransportParent* aActor) override;

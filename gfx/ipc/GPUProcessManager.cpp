@@ -23,6 +23,7 @@
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUChild.h"
+#include "mozilla/gfx/OffscreenCanvasManagerParent.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/APZCTreeManagerChild.h"
 #include "mozilla/layers/APZInputBridgeChild.h"
@@ -1019,6 +1020,15 @@ bool GPUProcessManager::CreateContentImageBridge(
 
   *aOutEndpoint = std::move(childPipe);
   return true;
+}
+
+void GPUProcessManager::CreateOffscreenCanvasManager(
+    mozilla::ipc::Endpoint<POffscreenCanvasManagerParent>&& aEndpoint) {
+  if (mGPUChild) {
+    mGPUChild->SendInitOffscreenCanvasManager(std::move(aEndpoint));
+  } else {
+    OffscreenCanvasManagerParent::Init(std::move(aEndpoint));
+  }
 }
 
 base::ProcessId GPUProcessManager::GPUProcessPid() {
