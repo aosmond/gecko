@@ -58,6 +58,8 @@ class GPUParent final : public PGPUParent {
   mozilla::ipc::IPCResult RecvInitVRManager(
       Endpoint<PVRManagerParent>&& aEndpoint);
   mozilla::ipc::IPCResult RecvInitVR(Endpoint<PVRGPUChild>&& aVRGPUChild);
+  mozilla::ipc::IPCResult RecvInitOffscreenCanvasManager(
+      Endpoint<POffscreenCanvasManagerParent>&& aEndpoint);
   mozilla::ipc::IPCResult RecvInitUiCompositorController(
       const LayersId& aRootLayerTreeId,
       Endpoint<PUiCompositorControllerParent>&& aEndpoint);

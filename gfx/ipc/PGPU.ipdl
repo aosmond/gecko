@@ -10,6 +10,7 @@ include PrefsTypes;
 include protocol PAPZInputBridge;
 include protocol PCompositorManager;
 include protocol PImageBridge;
+include protocol POffscreenCanvasManager;
 include protocol PProfiler;
 include protocol PVRGPU;
 include protocol PVRManager;
@@ -72,6 +73,7 @@ parent:
   async InitProfiler(Endpoint<PProfilerChild> endpoint);
   // Forward GPU process its endpoints to the VR process.
   async InitVR(Endpoint<PVRGPUChild> endpoint);
+  async InitOffscreenCanvasManager(Endpoint<POffscreenCanvasManagerParent> endpoint);
   // Called to update a gfx variable.
   async UpdateVar(GfxVarUpdate var);
 

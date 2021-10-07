@@ -28,6 +28,7 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
+#include "mozilla/gfx/OffscreenCanvasManagerChild.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/ipc/ProtocolTypes.h"
 #include "mozilla/net/SocketProcessChild.h"
@@ -1643,6 +1644,14 @@ void ChildImpl::ThreadLocalDestructor(void* aThreadLocal) {
 
     if (threadLocalInfo->mSendInitBackgroundRunnable) {
       threadLocalInfo->mSendInitBackgroundRunnable->ClearEventTarget();
+    }
+
+    if (threadLocalInfo->mConsumerThreadLocal) {
+      auto ocm =
+          threadLocalInfo->mConsumerThreadLocal->mOffscreenCanvasManager.get();
+      if (ocm) {
+        ocm->Close();
+      }
     }
 
     delete threadLocalInfo;
