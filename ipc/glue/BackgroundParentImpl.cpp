@@ -56,6 +56,7 @@
 #include "mozilla/dom/quota/ActorsParent.h"
 #include "mozilla/dom/simpledb/ActorsParent.h"
 #include "mozilla/dom/VsyncParent.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/ipc/BackgroundParent.h"
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/ipc/Endpoint.h"
@@ -1424,6 +1425,24 @@ mozilla::ipc::IPCResult BackgroundParentImpl::RecvRemoveEndpoint(
                                    aGroupName, aEndpointURL, aPrincipalInfo);
                              }));
 
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult BackgroundParentImpl::RecvCreateOffscreenCanvasManager(
+    nsresult* aRv, Endpoint<POffscreenCanvasManagerChild>* aEndpoint) {
+  auto pid = OtherPid();
+  NS_DispatchToMainThread(
+      NS_NewRunnableFunction(
+          "BackgroundParentImpl::RecvInitOffscreenCanvasManager",
+          [pid, aRv, aEndpoint]() {
+            auto* gpm = gfx::GPUProcessManager::Get();
+            if (!gpm) {
+              *aRv = NS_ERROR_NOT_AVAILABLE;
+              return;
+            }
+            *aRv = gpm->CreateOffscreenCanvasManager(pid, aEndpoint);
+          }),
+      NS_DISPATCH_SYNC);
   return IPC_OK();
 }
 

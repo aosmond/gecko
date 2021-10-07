@@ -1,0 +1,29 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*-
+ * vim: sw=2 ts=8 et :
+ */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+include protocol PWebGL;
+
+namespace mozilla {
+namespace gfx {
+
+/**
+ * The POffscreenCanvasManager protocol is the top-level protocol between
+ * background threads and the offscreen canvas thread in the compositor
+ * process. This protocol should be used by service worker threads to create
+ * offscreen canvas instances.
+ */
+[RefCounted] sync protocol POffscreenCanvasManager
+{
+  manages PWebGL;
+
+parent:
+  // Actor that represents one WebGL context.
+  async PWebGL();
+};
+
+} // gfx
+} // mozilla

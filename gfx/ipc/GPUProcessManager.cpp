@@ -23,6 +23,7 @@
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUChild.h"
+#include "mozilla/gfx/OffscreenCanvasManagerParent.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/APZCTreeManagerChild.h"
 #include "mozilla/layers/APZInputBridgeChild.h"
@@ -1019,6 +1020,32 @@ bool GPUProcessManager::CreateContentImageBridge(
 
   *aOutEndpoint = std::move(childPipe);
   return true;
+}
+
+nsresult GPUProcessManager::CreateOffscreenCanvasManager(
+    base::ProcessId aOtherProcess,
+    mozilla::ipc::Endpoint<POffscreenCanvasManagerChild>* aOutManager) {
+  base::ProcessId parentPid =
+      EnsureGPUReady() ? mGPUChild->OtherPid() : base::GetCurrentProcId();
+
+  ipc::Endpoint<POffscreenCanvasManagerParent> parentPipe;
+  ipc::Endpoint<POffscreenCanvasManagerChild> childPipe;
+  nsresult rv = POffscreenCanvasManager::CreateEndpoints(
+      parentPid, aOtherProcess, &parentPipe, &childPipe);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  if (mGPUChild) {
+    if (!mGPUChild->SendInitOffscreenCanvasManager(std::move(parentPipe))) {
+      return NS_ERROR_FAILURE;
+    }
+  } else {
+    OffscreenCanvasManagerParent::Init(std::move(parentPipe));
+  }
+
+  *aOutManager = std::move(childPipe);
+  return NS_OK;
 }
 
 base::ProcessId GPUProcessManager::GPUProcessPid() {

@@ -19,6 +19,7 @@
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/GraphicsMessages.h"
+#include "mozilla/gfx/OffscreenCanvasManagerParent.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/StaticPrefs_accessibility.h"
 #include "mozilla/StaticPrefs_apz.h"
@@ -1295,6 +1296,7 @@ void gfxPlatform::ShutdownLayersIPC() {
 
   } else if (XRE_IsParentProcess()) {
     gfx::VRManagerChild::ShutDown();
+    gfx::OffscreenCanvasManagerParent::Shutdown();
     layers::CompositorManagerChild::Shutdown();
     layers::ImageBridgeChild::ShutDown();
     // This has to happen after shutting down the child protocols.
