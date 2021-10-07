@@ -5,16 +5,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "OffscreenCanvasManagerParent.h"
-#include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/dom/WebGLParent.h"
 #include "mozilla/ipc/Endpoint.h"
-#include "nsThread.h"
+#include "mozilla/layers/CompositorThread.h"
 
 namespace mozilla::gfx {
 
-nsCOMPtr<nsIThread> OffscreenCanvasManagerParent::sCanvasThread;
-mozilla::BackgroundHangMonitor*
-    OffscreenCanvasManagerParent::sBackgroundHangMonitor(nullptr);
 OffscreenCanvasManagerParent::ManagerMap
     OffscreenCanvasManagerParent::sManagers;
 
@@ -22,32 +18,8 @@ OffscreenCanvasManagerParent::ManagerMap
     Endpoint<POffscreenCanvasManagerParent>&& aEndpoint) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (!sCanvasThread) {
-    nsresult rv = NS_NewNamedThread(
-        "OffscreenCanvas", getter_AddRefs(sCanvasThread),
-        NS_NewRunnableFunction(
-            "OffscreenCanvasManagerParent::InitThread", []() {
-              sBackgroundHangMonitor = new mozilla::BackgroundHangMonitor(
-                  "OffscreenCanvas",
-                  /* Timeout values are powers-of-two to enable us get better
-                     data. 128ms is chosen for transient hangs because 8Hz
-                     should be the minimally acceptable goal for Compositor
-                     responsiveness (normal goal is 60Hz). */
-                  128,
-                  /* 2048ms is chosen for permanent hangs because it's longer
-                   * than most OffscreenCanvas hangs seen in the wild, but is
-                   * short enough to not miss getting native hang stacks. */
-                  2048);
-              nsCOMPtr<nsIThread> thread = NS_GetCurrentThread();
-              static_cast<nsThread*>(thread.get())->SetUseHangMonitor(true);
-            }));
-
-    MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv),
-                       "Cannot create OffscreenCanvasThread!");
-  }
-
   auto manager = MakeRefPtr<OffscreenCanvasManagerParent>();
-  sCanvasThread->Dispatch(
+  layers::CompositorThread()->Dispatch(
       NewRunnableMethod<Endpoint<POffscreenCanvasManagerParent>&&>(
           "OffscreenCanvasManagerParent::Bind", manager,
           &OffscreenCanvasManagerParent::Bind, std::move(aEndpoint)));
@@ -56,18 +28,11 @@ OffscreenCanvasManagerParent::ManagerMap
 /* static */ void OffscreenCanvasManagerParent::Shutdown() {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (!sCanvasThread) {
-    return;
-  }
-
-  sCanvasThread->Dispatch(
+  layers::CompositorThread()->Dispatch(
       NS_NewRunnableFunction(
           "OffscreenCanvasManagerParent::Shutdown",
           []() -> void { OffscreenCanvasManagerParent::ShutdownInternal(); }),
       NS_DISPATCH_SYNC);
-
-  sCanvasThread->Shutdown();
-  sBackgroundHangMonitor = nullptr;
 }
 
 /* static */ void OffscreenCanvasManagerParent::ShutdownInternal() {
@@ -82,7 +47,9 @@ OffscreenCanvasManagerParent::ManagerMap
   }
 }
 
-OffscreenCanvasManagerParent::OffscreenCanvasManagerParent() = default;
+OffscreenCanvasManagerParent::OffscreenCanvasManagerParent()
+    : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {}
+
 OffscreenCanvasManagerParent::~OffscreenCanvasManagerParent() = default;
 
 void OffscreenCanvasManagerParent::Bind(

@@ -7,11 +7,12 @@
 #define _include_gfx_ipc_OffscreenCanvasManagerParent_h__
 
 #include "mozilla/gfx/POffscreenCanvasManagerParent.h"
-#include "nsIThread.h"
 #include <map>
 
 namespace mozilla {
-class BackgroundHangMonitor;
+namespace layers {
+class CompositorThreadHolder;
+}
 
 namespace gfx {
 
@@ -36,10 +37,9 @@ class OffscreenCanvasManagerParent final
   ~OffscreenCanvasManagerParent();
 
   using ManagerMap = std::map<base::ProcessId, OffscreenCanvasManagerParent*>;
-
-  static nsCOMPtr<nsIThread> sCanvasThread;
-  static BackgroundHangMonitor* sBackgroundHangMonitor;
   static ManagerMap sManagers;
+
+  RefPtr<layers::CompositorThreadHolder> mCompositorThreadHolder;
 };
 
 }  // namespace gfx
