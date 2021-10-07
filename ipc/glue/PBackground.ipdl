@@ -26,6 +26,7 @@ include protocol PGamepadEventChannel;
 include protocol PGamepadTestChannel;
 include protocol PHttpBackgroundChannel;
 include protocol PIdleScheduler;
+include protocol POffscreenCanvasManager;
 include protocol PRemoteLazyInputStream;
 include protocol PMediaTransport;
 include protocol PRemoteWorker;
@@ -281,6 +282,9 @@ parent:
       returns (nsresult rv, Endpoint<PRemoteDecoderManagerChild> aEndpoint);
 
   async PWebSocketConnection(uint32_t aListenerId);
+
+  sync CreateOffscreenCanvasManager()
+      returns (nsresult rv, Endpoint<POffscreenCanvasManagerChild> aEndpoint);
 
 child:
   async PCache();

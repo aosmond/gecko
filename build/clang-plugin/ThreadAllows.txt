@@ -50,6 +50,7 @@ mtransport
 NamedPipeSrv
 Netlink Monitor
 OSKeyStore
+OffscreenCanvas
 OutputDrain
 PaintThread
 Permission
