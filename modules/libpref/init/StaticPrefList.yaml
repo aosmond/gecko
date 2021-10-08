@@ -11723,6 +11723,11 @@
 #endif
   mirror: always
 
+- name: webgl.out-of-process.worker
+  type: RelaxedAtomicBool
+  value: true
+  mirror: always
+
 - name: webgl.out-of-process.force
   type: RelaxedAtomicBool
   value: false
