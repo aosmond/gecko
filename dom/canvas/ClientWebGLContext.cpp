@@ -546,6 +546,9 @@ ClientWebGLContext::SetDimensions(const int32_t signedWidth,
 
 static bool IsWebglOutOfProcessEnabled() {
   bool useOop = StaticPrefs::webgl_out_of_process();
+  if (!useOop && !NS_IsMainThread()) {
+    useOop = StaticPrefs::webgl_out_of_process_worker();
+  }
 
   if (!gfx::gfxVars::AllowWebglOop()) {
     useOop = false;
