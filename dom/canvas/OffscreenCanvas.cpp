@@ -297,6 +297,22 @@ bool OffscreenCanvas::ShouldResistFingerprinting() const {
   return nsContentUtils::ShouldResistFingerprinting();
 }
 
+uint32_t OffscreenCanvas::GetPrincipalHashValue() const {
+  if (NS_IsMainThread()) {
+    nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetGlobalObject());
+    Document* doc = window->GetExtantDoc();
+    if (doc) {
+      return doc->NodePrincipal()->GetHashValue();
+    }
+  } else {
+    dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
+    if (workerPrivate) {
+      return workerPrivate->GetPrincipalHashValue();
+    }
+  }
+  return 0;
+}
+
 /* static */
 already_AddRefed<OffscreenCanvas> OffscreenCanvas::CreateFromCloneData(
     nsIGlobalObject* aGlobal, OffscreenCanvasCloneData* aData) {
