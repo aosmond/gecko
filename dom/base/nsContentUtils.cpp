@@ -2170,19 +2170,6 @@ bool nsContentUtils::ShouldResistFingerprinting(nsIPrincipal* aPrincipal) {
   return !isChrome && ShouldResistFingerprinting();
 }
 
-/* static */
-bool nsContentUtils::ShouldResistFingerprinting(WorkerPrivate* aWorkerPrivate) {
-  if (!aWorkerPrivate) {
-    // We may be on a non-worker thread!
-    return ShouldResistFingerprinting();
-  }
-  bool isChrome = aWorkerPrivate->UsesSystemPrincipal();
-  if (isChrome) {
-    return false;
-  }
-  return ShouldResistFingerprinting(aWorkerPrivate->GetDocument());
-}
-
 inline void LogDomainAndPrefList(const char* exemptedDomainsPrefName,
                                  nsAutoCString& url, bool isExemptDomain) {
   nsAutoCString list;
