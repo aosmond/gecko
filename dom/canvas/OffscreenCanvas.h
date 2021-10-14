@@ -154,10 +154,12 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   layers::ImageContainer* GetImageContainer();
 
+  bool ShouldResistFingerprinting() const;
+
  private:
   ~OffscreenCanvas();
 
-  nsCOMPtr<nsIGlobalObject> GetGlobalObject();
+  nsCOMPtr<nsIGlobalObject> GetGlobalObject() const;
 
   void CanvasAttrChanged() {
     mAttrDirty = true;
