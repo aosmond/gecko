@@ -142,6 +142,7 @@ struct WorkerLoadInfoData {
   bool mServiceWorkersTestingInWindow;
   OriginAttributes mOriginAttributes;
   bool mIsThirdPartyContextToTopWindow;
+  bool mShouldResistFingerprinting;
 
   enum {
     eNotSet,

@@ -99,6 +99,7 @@ WorkerLoadInfoData::WorkerLoadInfoData()
       mHasStorageAccessPermissionGranted(false),
       mServiceWorkersTestingInWindow(false),
       mIsThirdPartyContextToTopWindow(true),
+      mShouldResistFingerprinting(false),
       mSecureContext(eNotSet) {}
 
 nsresult WorkerLoadInfo::SetPrincipalsAndCSPOnMainThread(
