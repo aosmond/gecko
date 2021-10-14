@@ -7,6 +7,7 @@
 #include "OffscreenCanvas.h"
 
 #include "mozilla/dom/BlobImpl.h"
+#include "mozilla/dom/Document.h"
 #include "mozilla/dom/OffscreenCanvasBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/WorkerPrivate.h"
@@ -255,16 +256,7 @@ already_AddRefed<Promise> OffscreenCanvas::ToBlob(JSContext* aCx,
 
   RefPtr<EncodeCompleteCallback> callback = new EncodeCallback(global, promise);
 
-  bool usePlaceholder;
-  if (NS_IsMainThread()) {
-    nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetGlobalObject());
-    Document* doc = window->GetExtantDoc();
-    usePlaceholder =
-        doc ? nsContentUtils::ShouldResistFingerprinting(doc) : false;
-  } else {
-    dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
-    usePlaceholder = nsContentUtils::ShouldResistFingerprinting(workerPrivate);
-  }
+  bool usePlaceholder = ShouldResistFingerprinting();
   CanvasRenderingContextHelper::ToBlob(aCx, global, callback, aType, aParams,
                                        usePlaceholder, aRv);
 
@@ -280,13 +272,29 @@ already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(
   return mCurrentContext->GetSurfaceSnapshot(aOutAlphaType);
 }
 
-nsCOMPtr<nsIGlobalObject> OffscreenCanvas::GetGlobalObject() {
+nsCOMPtr<nsIGlobalObject> OffscreenCanvas::GetGlobalObject() const {
   if (NS_IsMainThread()) {
     return GetParentObject();
   }
 
   dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
   return workerPrivate->GlobalScope();
+}
+
+bool OffscreenCanvas::ShouldResistFingerprinting() const {
+  if (NS_IsMainThread()) {
+    nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetGlobalObject());
+    Document* doc = window->GetExtantDoc();
+    if (doc) {
+      return nsContentUtils::ShouldResistFingerprinting(doc);
+    }
+  } else {
+    dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
+    if (workerPrivate) {
+      return workerPrivate->ShouldResistFingerprinting();
+    }
+  }
+  return nsContentUtils::ShouldResistFingerprinting();
 }
 
 /* static */
