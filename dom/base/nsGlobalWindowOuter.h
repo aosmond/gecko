@@ -234,6 +234,7 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
 
   // nsIGlobalObject
   bool ShouldResistFingerprinting() const override;
+  uint32_t GetPrincipalHashValue() const override;
 
   // nsIGlobalJSObjectHolder
   JSObject* GetGlobalJSObject() final { return GetWrapper(); }
