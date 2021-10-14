@@ -156,6 +156,8 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   bool ShouldResistFingerprinting() const;
 
+  uint32_t GetPrincipalHashValue() const;
+
  private:
   ~OffscreenCanvas();
 
