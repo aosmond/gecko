@@ -114,6 +114,8 @@ class WorkerGlobalScopeBase : public DOMEventTargetHelper,
 
   bool ShouldResistFingerprinting() const final;
 
+  uint32_t GetPrincipalHashValue() const final;
+
   StorageAccess GetStorageAccess() final;
 
   Maybe<ClientInfo> GetClientInfo() const final;
