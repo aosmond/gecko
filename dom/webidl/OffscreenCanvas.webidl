@@ -10,12 +10,12 @@
 [Exposed=(Window,Worker),
  Pref="gfx.offscreencanvas.enabled"]
 interface OffscreenCanvas : EventTarget {
-  constructor(unsigned long width, unsigned long height);
+  constructor([EnforceRange] unsigned long width, [EnforceRange] unsigned long height);
 
   [Pure, SetterThrows]
-  attribute unsigned long width;
+  attribute [EnforceRange] unsigned long width;
   [Pure, SetterThrows]
-  attribute unsigned long height;
+  attribute [EnforceRange] unsigned long height;
 
   [Throws]
   nsISupports? getContext(DOMString contextId,
