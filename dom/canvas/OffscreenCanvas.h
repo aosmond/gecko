@@ -32,9 +32,13 @@ class ImageContainer;
 }  // namespace layers
 
 namespace dom {
+enum class OffscreenRenderingContextId : uint8_t;
 class Blob;
 class ImageBitmap;
 struct ImageEncodeOptions;
+
+using OwningOffscreenRenderingContext = class
+    OwningOffscreenCanvasRenderingContext2DOrImageBitmapRenderingContextOrWebGLRenderingContextOrWebGL2RenderingContextOrGPUCanvasContext;
 
 // This is helper class for transferring OffscreenCanvas to worker thread.
 // Because OffscreenCanvas is not thread-safe. So we cannot pass Offscreen-
@@ -107,9 +111,10 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
     }
   }
 
-  already_AddRefed<nsISupports> GetContext(
-      JSContext* aCx, const nsAString& aContextId,
-      JS::Handle<JS::Value> aContextOptions, ErrorResult& aRv);
+  void GetContext(JSContext* aCx, const OffscreenRenderingContextId& aContextId,
+                  JS::Handle<JS::Value> aContextOptions,
+                  Nullable<OwningOffscreenRenderingContext>& aResult,
+                  ErrorResult& aRv);
 
   already_AddRefed<ImageBitmap> TransferToImageBitmap(ErrorResult& aRv);
 
