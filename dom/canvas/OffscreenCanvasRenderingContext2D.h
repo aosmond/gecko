@@ -1,0 +1,50 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim:set ts=2 sw=2 sts=2 et cindent: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#ifndef MOZILLA_DOM_OFFSCREENCANVASRENDERINGCONTEXT2D_H_
+#define MOZILLA_DOM_OFFSCREENCANVASRENDERINGCONTEXT2D_H_
+
+#include "mozilla/RefPtr.h"
+#include "nsCycleCollectionParticipant.h"
+#include "nsISupports.h"
+#include "nsWrapperCache.h"
+
+struct JSContext;
+class nsIGlobalObject;
+
+namespace mozilla {
+namespace dom {
+class OffscreenCanvas;
+
+class OffscreenCanvasRenderingContext2D final : public nsISupports,
+                                                public nsWrapperCache {
+ public:
+  // nsISupports interface + CC
+  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(
+      OffscreenCanvasRenderingContext2D)
+
+  explicit OffscreenCanvasRenderingContext2D(OffscreenCanvas* aOffscreenCanvas);
+
+  nsIGlobalObject* GetParentObject() const;
+  JSObject* WrapObject(JSContext* aCx,
+                       JS::Handle<JSObject*> aGivenProto) override;
+
+  OffscreenCanvas* Canvas() { return mOffscreenCanvas; }
+  const OffscreenCanvas* Canvas() const { return mOffscreenCanvas; }
+
+  void Commit();
+
+ private:
+  ~OffscreenCanvasRenderingContext2D();
+
+  RefPtr<OffscreenCanvas> mOffscreenCanvas;
+};
+
+}  // namespace dom
+}  // namespace mozilla
+
+#endif  // MOZILLA_DOM_OFFSCREENCANVASRENDERINGCONTEXT2D_H_
