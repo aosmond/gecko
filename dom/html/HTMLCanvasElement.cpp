@@ -953,7 +953,7 @@ already_AddRefed<nsISupports> HTMLCanvasElement::GetContext(
   }
 
   mMaybeModified = true;  // For FirstContentfulPaint
-  return CanvasRenderingContextHelper::GetContext(
+  return CanvasRenderingContextHelper::GetOrCreateContext(
       aCx, aContextId,
       aContextOptions.isObject() ? aContextOptions : JS::NullHandleValue, aRv);
 }
