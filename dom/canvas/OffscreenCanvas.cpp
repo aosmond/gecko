@@ -208,6 +208,12 @@ already_AddRefed<ImageBitmap> OffscreenCanvas::TransferToImageBitmap(
   return result.forget();
 }
 
+already_AddRefed<Promise> OffscreenCanvas::ConvertToBlob(
+    const ImageEncodeOptions& aOptions, ErrorResult& aRv) {
+  aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+  return nullptr;
+}
+
 already_AddRefed<Promise> OffscreenCanvas::ToBlob(JSContext* aCx,
                                                   const nsAString& aType,
                                                   JS::Handle<JS::Value> aParams,
