@@ -73,7 +73,7 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
                   layers::LayersBackend aCompositorBackend,
                   layers::CanvasRenderer* aRenderer);
 
-  nsCOMPtr<nsIGlobalObject> GetParentObject() const { return GetOwnerGlobal(); }
+  nsIGlobalObject* GetParentObject() const { return GetOwnerGlobal(); }
 
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;

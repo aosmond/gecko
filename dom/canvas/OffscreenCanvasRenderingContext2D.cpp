@@ -12,7 +12,7 @@ namespace mozilla {
 namespace dom {
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(OffscreenCanvasRenderingContext2D,
-                                      mGlobal, mOffscreenCanvas)
+                                      mOffscreenCanvas)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(OffscreenCanvasRenderingContext2D)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
@@ -23,14 +23,14 @@ NS_IMPL_CYCLE_COLLECTING_ADDREF(OffscreenCanvasRenderingContext2D)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(OffscreenCanvasRenderingContext2D)
 
 OffscreenCanvasRenderingContext2D::OffscreenCanvasRenderingContext2D(
-    nsIGlobalObject* aGlobal)
-    : mGlobal(aGlobal) {}
+    OffscreenCanvas* aOffscreenCanvas)
+    : mOffscreenCanvas(aOffscreenCanvas) {}
 
 OffscreenCanvasRenderingContext2D::~OffscreenCanvasRenderingContext2D() =
     default;
 
-nsISupports* OffscreenCanvasRenderingContext2D::GetParentObject() const {
-  return mGlobal;
+nsIGlobalObject* OffscreenCanvasRenderingContext2D::GetParentObject() const {
+  return mOffscreenCanvas->GetParentObject();
 }
 
 JSObject* OffscreenCanvasRenderingContext2D::WrapObject(

@@ -26,9 +26,9 @@ class OffscreenCanvasRenderingContext2D final : public nsISupports,
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(
       OffscreenCanvasRenderingContext2D)
 
-  OffscreenCanvasRenderingContext2D(nsIGlobalObject* aGlobal);
+  explicit OffscreenCanvasRenderingContext2D(OffscreenCanvas* aOffscreenCanvas);
 
-  nsISupports* GetParentObject() const;
+  nsIGlobalObject* GetParentObject() const;
   JSObject* WrapObject(JSContext* aCx,
                        JS::Handle<JSObject*> aGivenProto) override;
 
@@ -40,7 +40,6 @@ class OffscreenCanvasRenderingContext2D final : public nsISupports,
  private:
   ~OffscreenCanvasRenderingContext2D();
 
-  nsCOMPtr<nsIGlobalObject> mGlobal;
   RefPtr<OffscreenCanvas> mOffscreenCanvas;
 };
 
