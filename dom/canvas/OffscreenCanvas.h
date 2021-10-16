@@ -34,6 +34,7 @@ class ImageContainer;
 namespace dom {
 enum class OffscreenRenderingContextId : uint8_t;
 class Blob;
+class EncodeCompleteCallback;
 class ImageBitmap;
 struct ImageEncodeOptions;
 
@@ -174,6 +175,9 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
   ~OffscreenCanvas();
 
   nsCOMPtr<nsIGlobalObject> GetGlobalObject() const;
+
+  already_AddRefed<EncodeCompleteCallback> CreateEncodeCompleteCallback(
+      nsCOMPtr<nsIGlobalObject>&& aGlobal, Promise* aPromise);
 
   void CanvasAttrChanged() {
     mAttrDirty = true;
