@@ -39,7 +39,7 @@ interface OffscreenCanvas : EventTarget {
   attribute EventHandler oncontextrestored;
 
   // Deprecated by convertToBlob
-  [Throws]
+  [Deprecated="OffscreenCanvasToBlob", Throws]
   Promise<Blob> toBlob(optional DOMString type = "",
                        optional any encoderOptions);
 };
