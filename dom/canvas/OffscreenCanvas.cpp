@@ -9,10 +9,10 @@
 #include "mozilla/dom/BlobImpl.h"
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/OffscreenCanvasBinding.h"
+#include "mozilla/dom/OffscreenCanvasListener.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerScope.h"
-#include "mozilla/layers/CanvasRenderer.h"
 #include "mozilla/layers/CanvasClient.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/Telemetry.h"
@@ -28,9 +28,9 @@
 namespace mozilla::dom {
 
 OffscreenCanvasCloneData::OffscreenCanvasCloneData(
-    layers::CanvasRenderer* aRenderer, uint32_t aWidth, uint32_t aHeight,
+    OffscreenCanvasListener* aListener, uint32_t aWidth, uint32_t aHeight,
     layers::LayersBackend aCompositorBackend, bool aNeutered, bool aIsWriteOnly)
-    : mRenderer(aRenderer),
+    : mListener(aListener),
       mWidth(aWidth),
       mHeight(aHeight),
       mCompositorBackendType(aCompositorBackend),
@@ -42,7 +42,7 @@ OffscreenCanvasCloneData::~OffscreenCanvasCloneData() = default;
 OffscreenCanvas::OffscreenCanvas(nsIGlobalObject* aGlobal, uint32_t aWidth,
                                  uint32_t aHeight,
                                  layers::LayersBackend aCompositorBackend,
-                                 layers::CanvasRenderer* aRenderer)
+                                 OffscreenCanvasListener* aListener)
     : DOMEventTargetHelper(aGlobal),
       mAttrDirty(false),
       mNeutered(false),
@@ -50,7 +50,7 @@ OffscreenCanvas::OffscreenCanvas(nsIGlobalObject* aGlobal, uint32_t aWidth,
       mWidth(aWidth),
       mHeight(aHeight),
       mCompositorBackendType(aCompositorBackend),
-      mCanvasRenderer(aRenderer) {}
+      mListener(aListener) {}
 
 OffscreenCanvas::~OffscreenCanvas() { ClearResources(); }
 
@@ -133,7 +133,7 @@ void OffscreenCanvas::GetContext(
 
   MOZ_ASSERT(mCurrentContext);
 
-  if (mCanvasRenderer) {
+  if (mListener) {
     // mCanvasRenderer->SetContextType(contextType);
     if (contextType == CanvasContextType::WebGL1 ||
         contextType == CanvasContextType::WebGL2) {
@@ -171,7 +171,7 @@ void OffscreenCanvas::GetContext(
 }
 
 layers::ImageContainer* OffscreenCanvas::GetImageContainer() {
-  if (!mCanvasRenderer) {
+  if (!mListener) {
     return nullptr;
   }
   // return mCanvasRenderer->GetImageContainer();
@@ -188,7 +188,7 @@ OffscreenCanvas::CreateContext(CanvasContextType aContextType) {
 }
 
 void OffscreenCanvas::CommitFrameToCompositor() {
-  if (!mCanvasRenderer) {
+  if (!mListener) {
     // This offscreen canvas doesn't associate to any HTML canvas element.
     // So, just bail out.
     return;
@@ -226,7 +226,7 @@ void OffscreenCanvas::CommitFrameToCompositor() {
 }
 
 OffscreenCanvasCloneData* OffscreenCanvas::ToCloneData() {
-  return new OffscreenCanvasCloneData(mCanvasRenderer, mWidth, mHeight,
+  return new OffscreenCanvasCloneData(mListener, mWidth, mHeight,
                                       mCompositorBackendType, mNeutered,
                                       mIsWriteOnly);
 }
@@ -399,7 +399,7 @@ already_AddRefed<OffscreenCanvas> OffscreenCanvas::CreateFromCloneData(
   MOZ_ASSERT(aData);
   RefPtr<OffscreenCanvas> wc =
       new OffscreenCanvas(aGlobal, aData->mWidth, aData->mHeight,
-                          aData->mCompositorBackendType, aData->mRenderer);
+                          aData->mCompositorBackendType, aData->mListener);
   if (aData->mNeutered) {
     wc->SetNeutered();
   }
