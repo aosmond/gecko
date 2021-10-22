@@ -15,7 +15,7 @@ namespace wr {
 
 RenderSharedSurfaceTextureHost::RenderSharedSurfaceTextureHost(
     gfx::SourceSurfaceSharedDataWrapper* aSurface)
-    : mSurface(aSurface), mMap(), mLocked(false) {
+    : mSurface(aSurface), mMap() {
   MOZ_COUNT_CTOR_INHERITED(RenderSharedSurfaceTextureHost, RenderTextureHost);
   MOZ_ASSERT(aSurface);
 }
@@ -26,12 +26,13 @@ RenderSharedSurfaceTextureHost::~RenderSharedSurfaceTextureHost() {
 
 wr::WrExternalImage RenderSharedSurfaceTextureHost::Lock(
     uint8_t aChannelIndex, gl::GLContext* aGL, wr::ImageRendering aRendering) {
-  if (!mLocked) {
+  if (!mMap.mData) {
     if (NS_WARN_IF(!mSurface->Map(gfx::DataSourceSurface::MapType::READ_WRITE,
                                   &mMap))) {
       return InvalidToWrExternalImage();
     }
-    mLocked = true;
+    MOZ_ASSERT(mMap.mData);
+    MOZ_ASSERT(mMap.mStride);
   }
 
   return RawDataToWrExternalImage(mMap.mData,
@@ -39,9 +40,10 @@ wr::WrExternalImage RenderSharedSurfaceTextureHost::Lock(
 }
 
 void RenderSharedSurfaceTextureHost::Unlock() {
-  if (mLocked) {
+  if (mMap.mData) {
     mSurface->Unmap();
-    mLocked = false;
+    mMap.mData = nullptr;
+    mMap.mStride = 0;
   }
 }
 
@@ -62,17 +64,19 @@ gfx::ColorDepth RenderSharedSurfaceTextureHost::GetColorDepth() const {
 bool RenderSharedSurfaceTextureHost::MapPlane(RenderCompositor* aCompositor,
                                               uint8_t aChannelIndex,
                                               PlaneInfo& aPlaneInfo) {
-  if (NS_WARN_IF(
-          !mSurface->Map(gfx::DataSourceSurface::MapType::READ, &mMap))) {
-    return false;
+  if (!mMap.mData) {
+    if (NS_WARN_IF(
+            !mSurface->Map(gfx::DataSourceSurface::MapType::READ, &mMap))) {
+      return false;
+    }
+    MOZ_ASSERT(mMap.mData);
+    MOZ_ASSERT(mMap.mStride);
   }
   aPlaneInfo.mData = mMap.mData;
   aPlaneInfo.mStride = mMap.mStride;
   aPlaneInfo.mSize = mSurface->GetSize();
   return true;
 }
-
-void RenderSharedSurfaceTextureHost::UnmapPlanes() { mSurface->Unmap(); }
 
 }  // namespace wr
 }  // namespace mozilla

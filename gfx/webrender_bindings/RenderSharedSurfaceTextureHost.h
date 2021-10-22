@@ -42,14 +42,13 @@ class RenderSharedSurfaceTextureHost final : public RenderTextureHostSWGL {
   bool MapPlane(RenderCompositor* aCompositor, uint8_t aChannelIndex,
                 PlaneInfo& aPlaneInfo) override;
 
-  void UnmapPlanes() override;
+  void UnmapPlanes() override { Unlock(); }
 
  private:
   virtual ~RenderSharedSurfaceTextureHost();
 
   RefPtr<gfx::SourceSurfaceSharedDataWrapper> mSurface;
   gfx::DataSourceSurface::MappedSurface mMap;
-  bool mLocked;
 };
 
 }  // namespace wr
