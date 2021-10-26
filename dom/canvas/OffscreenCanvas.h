@@ -36,7 +36,7 @@ enum class OffscreenRenderingContextId : uint8_t;
 class Blob;
 class EncodeCompleteCallback;
 class ImageBitmap;
-class OffscreenCanvasListener;
+class OffscreenCanvasIndirectContext;
 struct ImageEncodeOptions;
 
 using OwningOffscreenRenderingContext = class
@@ -47,13 +47,13 @@ using OwningOffscreenRenderingContext = class
 // Canvas to worker thread directly. Thus, we create this helper class and
 // store necessary data in it then pass it to worker thread.
 struct OffscreenCanvasCloneData final {
-  OffscreenCanvasCloneData(OffscreenCanvasListener* aListener, uint32_t aWidth,
-                           uint32_t aHeight,
+  OffscreenCanvasCloneData(OffscreenCanvasIndirectContext* aIndirectContext,
+                           uint32_t aWidth, uint32_t aHeight,
                            layers::LayersBackend aCompositorBackend,
                            bool aNeutered, bool aIsWriteOnly);
   ~OffscreenCanvasCloneData();
 
-  RefPtr<OffscreenCanvasListener> mListener;
+  RefPtr<OffscreenCanvasIndirectContext> mIndirectContext;
   uint32_t mWidth;
   uint32_t mHeight;
   layers::LayersBackend mCompositorBackendType;
@@ -73,7 +73,7 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   OffscreenCanvas(nsIGlobalObject* aGlobal, uint32_t aWidth, uint32_t aHeight,
                   layers::LayersBackend aCompositorBackend,
-                  OffscreenCanvasListener* aListener);
+                  OffscreenCanvasIndirectContext* aIndirectContext);
 
   nsIGlobalObject* GetParentObject() const { return GetOwnerGlobal(); }
 
@@ -196,7 +196,7 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
   layers::LayersBackend mCompositorBackendType;
 
   RefPtr<layers::CanvasClient> mCanvasClient;
-  RefPtr<OffscreenCanvasListener> mListener;
+  RefPtr<OffscreenCanvasIndirectContext> mIndirectContext;
 };
 
 }  // namespace dom

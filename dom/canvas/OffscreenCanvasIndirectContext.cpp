@@ -4,31 +4,46 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "OffscreenCanvasListener.h"
+#include "OffscreenCanvasIndirectContext.h"
 #include "mozilla/SVGObserverUtils.h"
 
 namespace mozilla {
 namespace dom {
 
-OffscreenCanvasListener::OffscreenCanvasListener(
+NS_IMPL_ISUPPORTS(OffscreenCanvasIndirectContext,
+                  nsICanvasRenderingContextDisplay, nsIRunnable, nsINamed)
+
+OffscreenCanvasIndirectContext::OffscreenCanvasIndirectContext(
     HTMLCanvasElement* aCanvasElement)
-    : Runnable("mozilla::dom::OffscreenCanvasListener"),
-      mMutex("mozilla::dom::OffscreenCanvasListener"),
+    : mMutex("mozilla::dom::OffscreenCanvasIndirectContext"),
       mCanvasElement(aCanvasElement) {}
 
-void OffscreenCanvasListener::Destroy() {
+OffscreenCanvasIndirectContext::~OffscreenCanvasIndirectContext() = default;
+
+NS_IMETHODIMP OffscreenCanvasIndirectContext::Run() {
+  InvalidateElement();
+  return NS_OK;
+}
+
+NS_IMETHODIMP OffscreenCanvasIndirectContext::GetName(nsACString& aNameOut) {
+  aNameOut.AssignLiteral("OffscreenCanvasIndirectContext::InvalidateElement");
+  return NS_OK;
+}
+
+void OffscreenCanvasIndirectContext::Destroy() {
   MOZ_ASSERT(NS_IsMainThread());
 
   MutexAutoLock lock(mMutex);
   mCanvasElement = nullptr;
 }
 
-layers::SurfaceDescriptor OffscreenCanvasListener::GetFrontBufferDesc() const {
+layers::SurfaceDescriptor OffscreenCanvasIndirectContext::GetFrontBufferDesc()
+    const {
   MutexAutoLock lock(mMutex);
   return mFrontBufferDesc;
 }
 
-bool OffscreenCanvasListener::Invalidate(
+bool OffscreenCanvasIndirectContext::Invalidate(
     layers::SurfaceDescriptor&& aFrontBufferDesc) {
   MutexAutoLock lock(mMutex);
   if (!mCanvasElement) {
@@ -46,7 +61,7 @@ bool OffscreenCanvasListener::Invalidate(
   return true;
 }
 
-void OffscreenCanvasListener::InvalidateElement() {
+void OffscreenCanvasIndirectContext::InvalidateElement() {
   MOZ_ASSERT(NS_IsMainThread());
 
   HTMLCanvasElement* canvasElement;
@@ -62,6 +77,23 @@ void OffscreenCanvasListener::InvalidateElement() {
     SVGObserverUtils::InvalidateDirectRenderingObservers(canvasElement);
     canvasElement->InvalidateCanvasContent(nullptr);
   }
+}
+
+mozilla::UniquePtr<uint8_t[]> OffscreenCanvasIndirectContext::GetImageBuffer(
+    int32_t* format) {
+  return nullptr;
+}
+
+NS_IMETHODIMP OffscreenCanvasIndirectContext::GetInputStream(
+    const char* mimeType, const nsAString& encoderOptions,
+    nsIInputStream** stream) {
+  return NS_ERROR_FAILURE;
+}
+
+already_AddRefed<mozilla::gfx::SourceSurface>
+OffscreenCanvasIndirectContext::GetSurfaceSnapshot(
+    gfxAlphaType* out_alphaType) {
+  return nullptr;
 }
 
 }  // namespace dom

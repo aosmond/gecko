@@ -20,6 +20,13 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/NotNull.h"
 
+#define NS_ICANVASRENDERINGCONTEXTDISPLAY_IID        \
+  {                                                  \
+    0x165a763e, 0xbe19, 0x4a94, {                    \
+      0x8a, 0xf6, 0xed, 0x2c, 0x84, 0x13, 0x11, 0x34 \
+    }                                                \
+  }
+
 #define NS_ICANVASRENDERINGCONTEXTINTERNAL_IID       \
   {                                                  \
     0xb84f2fed, 0x9d4b, 0x430b, {                    \
@@ -49,8 +56,58 @@ class SourceSurface;
 }  // namespace gfx
 }  // namespace mozilla
 
-class nsICanvasRenderingContextInternal : public nsISupports,
-                                          public nsAPostRefreshObserver {
+class nsICanvasRenderingContextDisplay : public nsISupports {
+ public:
+  using CanvasRenderer = mozilla::layers::CanvasRenderer;
+  using WebRenderCanvasData = mozilla::layers::WebRenderCanvasData;
+
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICANVASRENDERINGCONTEXTDISPLAY_IID)
+
+  // Creates an image buffer. Returns null on failure.
+  virtual mozilla::UniquePtr<uint8_t[]> GetImageBuffer(int32_t* format) = 0;
+
+  // Gives you a stream containing the image represented by this context.
+  // The format is given in mimeTime, for example "image/png".
+  //
+  // If the image format does not support transparency or includeTransparency
+  // is false, alpha will be discarded and the result will be the image
+  // composited on black.
+  NS_IMETHOD GetInputStream(const char* mimeType,
+                            const nsAString& encoderOptions,
+                            nsIInputStream** stream) = 0;
+
+  // This gets an Azure SourceSurface for the canvas, this will be a snapshot
+  // of the canvas at the time it was called.
+  // If premultAlpha is provided, then it assumed the callee can handle
+  // un-premultiplied surfaces, and *premultAlpha will be set to false
+  // if one is returned.
+  virtual already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(
+      gfxAlphaType* out_alphaType = nullptr) = 0;
+
+  virtual RefPtr<mozilla::gfx::SourceSurface> GetFrontBufferSnapshot(bool) {
+    return GetSurfaceSnapshot();
+  }
+
+  virtual already_AddRefed<mozilla::layers::Image> GetAsImage() {
+    return nullptr;
+  }
+  virtual bool UpdateWebRenderCanvasData(
+      mozilla::nsDisplayListBuilder* aBuilder,
+      WebRenderCanvasData* aCanvasData) {
+    return false;
+  }
+  virtual bool InitializeCanvasRenderer(mozilla::nsDisplayListBuilder* aBuilder,
+                                        CanvasRenderer* aRenderer) {
+    return false;
+  }
+};
+
+NS_DEFINE_STATIC_IID_ACCESSOR(nsICanvasRenderingContextDisplay,
+                              NS_ICANVASRENDERINGCONTEXTDISPLAY_IID)
+
+class nsICanvasRenderingContextInternal
+    : public nsICanvasRenderingContextDisplay,
+      public nsAPostRefreshObserver {
  public:
   using CanvasRenderer = mozilla::layers::CanvasRenderer;
   using Layer = mozilla::layers::Layer;
@@ -99,31 +156,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
       nsIDocShell* aDocShell,
       mozilla::NotNull<mozilla::gfx::DrawTarget*> aTarget) = 0;
 
-  // Creates an image buffer. Returns null on failure.
-  virtual mozilla::UniquePtr<uint8_t[]> GetImageBuffer(int32_t* format) = 0;
-
-  // Gives you a stream containing the image represented by this context.
-  // The format is given in mimeTime, for example "image/png".
-  //
-  // If the image format does not support transparency or includeTransparency
-  // is false, alpha will be discarded and the result will be the image
-  // composited on black.
-  NS_IMETHOD GetInputStream(const char* mimeType,
-                            const nsAString& encoderOptions,
-                            nsIInputStream** stream) = 0;
-
-  // This gets an Azure SourceSurface for the canvas, this will be a snapshot
-  // of the canvas at the time it was called.
-  // If premultAlpha is provided, then it assumed the callee can handle
-  // un-premultiplied surfaces, and *premultAlpha will be set to false
-  // if one is returned.
-  virtual already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(
-      gfxAlphaType* out_alphaType = nullptr) = 0;
-
-  virtual RefPtr<mozilla::gfx::SourceSurface> GetFrontBufferSnapshot(bool) {
-    return GetSurfaceSnapshot();
-  }
-
   // If this is called with true, the backing store of the canvas should
   // be created as opaque; all compositing operators should assume the
   // dst alpha is always 1.0.  If this is never called, the context's
@@ -139,19 +171,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   // Invalidate this context and release any held resources, in preperation
   // for possibly reinitializing with SetDimensions/InitializeWithSurface.
   NS_IMETHOD Reset() = 0;
-
-  virtual already_AddRefed<mozilla::layers::Image> GetAsImage() {
-    return nullptr;
-  }
-  virtual bool UpdateWebRenderCanvasData(
-      mozilla::nsDisplayListBuilder* aBuilder,
-      WebRenderCanvasData* aCanvasData) {
-    return false;
-  }
-  virtual bool InitializeCanvasRenderer(mozilla::nsDisplayListBuilder* aBuilder,
-                                        CanvasRenderer* aRenderer) {
-    return false;
-  }
 
   virtual void MarkContextClean() = 0;
 
