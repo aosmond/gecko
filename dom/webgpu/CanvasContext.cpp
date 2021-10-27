@@ -21,12 +21,13 @@ namespace webgpu {
 NS_IMPL_CYCLE_COLLECTING_ADDREF(CanvasContext)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(CanvasContext)
 
-GPU_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(CanvasContext, mTexture, mBridge,
-                                       mCanvasElement, mOffscreenCanvas)
+GPU_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_WEAK(CanvasContext, mTexture, mBridge,
+                                            mCanvasElement, mOffscreenCanvas)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CanvasContext)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
   NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingContextInternal)
+  NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 

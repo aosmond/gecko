@@ -6,14 +6,13 @@
 #ifndef nsICanvasRenderingContextInternal_h___
 #define nsICanvasRenderingContextInternal_h___
 
-#include <memory>
-
 #include "gfxRect.h"
 #include "mozilla/gfx/2D.h"
 #include "nsISupports.h"
 #include "nsIInputStream.h"
 #include "nsIDocShell.h"
 #include "nsRefreshObservers.h"
+#include "nsWeakReference.h"
 #include "mozilla/dom/HTMLCanvasElement.h"
 #include "mozilla/dom/OffscreenCanvas.h"
 #include "mozilla/RefPtr.h"
@@ -49,7 +48,7 @@ class SourceSurface;
 }  // namespace gfx
 }  // namespace mozilla
 
-class nsICanvasRenderingContextInternal : public nsISupports,
+class nsICanvasRenderingContextInternal : public nsSupportsWeakReference,
                                           public nsAPostRefreshObserver {
  public:
   using CanvasRenderer = mozilla::layers::CanvasRenderer;
@@ -207,9 +206,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   RefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
   RefPtr<mozilla::dom::OffscreenCanvas> mOffscreenCanvas;
   RefPtr<nsRefreshDriver> mRefreshDriver;
-
- public:
-  const std::shared_ptr<nsICanvasRenderingContextInternal* const> mSharedPtrPtr;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsICanvasRenderingContextInternal,

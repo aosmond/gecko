@@ -114,7 +114,7 @@ void ShareableCanvasRenderer::UpdateCompositableClient() {
   }
   ResetDirty();
 
-  const auto context = mData.GetContext();
+  nsCOMPtr<nsICanvasRenderingContextInternal> context = mData.GetContext();
   if (!context) return;
   const auto& provider = context->GetBufferProvider();
   const auto webgl = context->AsWebgl();

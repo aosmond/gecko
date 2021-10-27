@@ -839,6 +839,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CanvasRenderingContext2D)
     }
   }
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_REFERENCE
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CanvasRenderingContext2D)
@@ -895,6 +896,7 @@ NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CanvasRenderingContext2D)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
   NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingContextInternal)
+  NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
@@ -5401,7 +5403,7 @@ bool CanvasRenderingContext2D::UpdateWebRenderCanvasData(
 
   if (!mResetLayer && renderer) {
     CanvasRendererData data;
-    data.mContext = mSharedPtrPtr;
+    data.mContext = do_GetWeakReference(this);
     data.mSize = GetSize();
 
     if (renderer->IsDataValid(data)) {
@@ -5424,7 +5426,7 @@ bool CanvasRenderingContext2D::UpdateWebRenderCanvasData(
 bool CanvasRenderingContext2D::InitializeCanvasRenderer(
     nsDisplayListBuilder* aBuilder, CanvasRenderer* aRenderer) {
   CanvasRendererData data;
-  data.mContext = mSharedPtrPtr;
+  data.mContext = do_GetWeakReference(this);
   data.mSize = GetSize();
   data.mIsOpaque = mOpaque;
   data.mDoPaintCallbacks = true;

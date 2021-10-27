@@ -45,12 +45,14 @@ void CanvasRenderer::Initialize(const CanvasRendererData& aData) {
 }
 
 bool CanvasRenderer::IsDataValid(const CanvasRendererData& aData) const {
-  return mData.GetContext() == aData.GetContext();
+  nsCOMPtr<nsICanvasRenderingContextInternal> c1 = mData.GetContext();
+  nsCOMPtr<nsICanvasRenderingContextInternal> c2 = aData.GetContext();
+  return c1 == c2;
 }
 
 std::shared_ptr<BorrowedSourceSurface> CanvasRenderer::BorrowSnapshot(
     const bool requireAlphaPremult) const {
-  const auto context = mData.GetContext();
+  nsCOMPtr<nsICanvasRenderingContextInternal> context = mData.GetContext();
   if (!context) return nullptr;
   RefPtr<PersistentBufferProvider> provider = context->GetBufferProvider();
 
@@ -70,14 +72,14 @@ std::shared_ptr<BorrowedSourceSurface> CanvasRenderer::BorrowSnapshot(
 
 void CanvasRenderer::FirePreTransactionCallback() const {
   if (!mData.mDoPaintCallbacks) return;
-  const auto context = mData.GetContext();
+  nsCOMPtr<nsICanvasRenderingContextInternal> context = mData.GetContext();
   if (!context) return;
   context->OnBeforePaintTransaction();
 }
 
 void CanvasRenderer::FireDidTransactionCallback() const {
   if (!mData.mDoPaintCallbacks) return;
-  const auto context = mData.GetContext();
+  nsCOMPtr<nsICanvasRenderingContextInternal> context = mData.GetContext();
   if (!context) return;
   context->OnDidPaintTransaction();
 }

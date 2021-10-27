@@ -7,7 +7,7 @@
 #ifndef GFX_CANVASRENDERER_H
 #define GFX_CANVASRENDERER_H
 
-#include <memory>            // for weak_ptr
+#include <memory>            // for shared_ptr
 #include <stdint.h>          // for uint32_t
 #include "GLContextTypes.h"  // for GLContext
 #include "gfxContext.h"      // for gfxContext, etc
@@ -19,6 +19,7 @@
 #include "mozilla/gfx/2D.h"       // for DrawTarget
 #include "mozilla/mozalloc.h"     // for operator delete, etc
 #include "mozilla/WeakPtr.h"      // for WeakPtr
+#include "nsICanvasRenderingContextInternal.h"
 #include "nsISupportsImpl.h"      // for MOZ_COUNT_CTOR, etc
 
 class nsICanvasRenderingContextInternal;
@@ -36,8 +37,7 @@ struct CanvasRendererData final {
   CanvasRendererData();
   ~CanvasRendererData();
 
-  std::weak_ptr<nsICanvasRenderingContextInternal* const>
-      mContext;  // weak_ptr to ptr (bug 1635644)
+  nsWeakPtr mContext;  // weak pointer to nsICanvasRenderingContextInternal
 
   // The size of the canvas content
   gfx::IntSize mSize = {0, 0};
@@ -48,10 +48,10 @@ struct CanvasRendererData final {
 
   gl::OriginPos mOriginPos = gl::OriginPos::TopLeft;
 
-  nsICanvasRenderingContextInternal* GetContext() const {
-    const auto ptrToPtr = mContext.lock();
-    if (!ptrToPtr) return nullptr;
-    return *ptrToPtr;
+  already_AddRefed<nsICanvasRenderingContextInternal> GetContext() const {
+    nsCOMPtr<nsICanvasRenderingContextInternal> context =
+        do_QueryReferent(mContext);
+    return context.forget();
   }
 };
 

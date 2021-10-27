@@ -413,7 +413,7 @@ bool ClientWebGLContext::InitializeCanvasRenderer(
   if (IsContextLost()) return false;
 
   layers::CanvasRendererData data;
-  data.mContext = mSharedPtrPtr;
+  data.mContext = do_GetWeakReference(this);
   data.mOriginPos = gl::OriginPos::BottomLeft;
 
   const auto& options = *mInitialOptions;
@@ -6367,16 +6367,35 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(WebGLVertexArrayJS, mIndexBuffer,
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ClientWebGLContext)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
   NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingContextInternal)
+  NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ClientWebGLContext)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ClientWebGLContext)
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_WEAK_PTR(
-    ClientWebGLContext, mExtLoseContext, mNotLost,
-    // Don't forget nsICanvasRenderingContextInternal:
-    mCanvasElement, mOffscreenCanvas)
+NS_IMPL_CYCLE_COLLECTION_CLASS(ClientWebGLContext)
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ClientWebGLContext)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mExtLoseContext)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mNotLost)
+  // Don't forget nsICanvasRenderingContextInternal:
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mCanvasElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mOffscreenCanvas)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_REFERENCE
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ClientWebGLContext)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mExtLoseContext)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mNotLost)
+  // Don't forget nsICanvasRenderingContextInternal:
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCanvasElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOffscreenCanvas)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
+
+NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(ClientWebGLContext)
 
 // -----------------------------
 
