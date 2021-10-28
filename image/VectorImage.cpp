@@ -784,6 +784,10 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
     return ImgDrawResult::NOT_SUPPORTED;
   }
 
+  if (mAnimationConsumers == 0) {
+    SendOnUnlockedDraw(aFlags);
+  }
+
   AutoProfilerImagePaintMarker PROFILER_RAII(this);
 #ifdef DEBUG
   NotifyDrawingObservers();
