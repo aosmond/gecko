@@ -31,6 +31,11 @@ interface imgIRequest : nsIRequest
   readonly attribute imgIContainer image;
 
   /**
+   * Producer ID for image containers created by this image.
+   */
+  [infallible] readonly attribute unsigned long producerId;
+
+  /**
    * Provider ID for image providers created by this image.
    */
   [infallible] readonly attribute unsigned long providerId;
