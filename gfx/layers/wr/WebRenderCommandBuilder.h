@@ -21,6 +21,10 @@
 
 namespace mozilla {
 
+namespace image {
+class WebRenderImageProvider;
+}
+
 namespace layers {
 
 class ImageClient;
@@ -69,6 +73,10 @@ class WebRenderCommandBuilder final {
       nsDisplayItem* aItem, ImageContainer* aContainer,
       mozilla::wr::IpcResourceUpdateQueue& aResources);
 
+  Maybe<wr::ImageKey> CreateImageProviderKey(
+      nsDisplayItem* aItem, image::WebRenderImageProvider* aProvider,
+      mozilla::wr::IpcResourceUpdateQueue& aResources);
+
   WebRenderUserDataRefTable* GetWebRenderUserDataTable() {
     return &mWebRenderUserDatas;
   }
@@ -84,6 +92,13 @@ class WebRenderCommandBuilder final {
                      mozilla::wr::IpcResourceUpdateQueue& aResources,
                      const LayoutDeviceRect& aRect,
                      const LayoutDeviceRect& aClip);
+
+  bool PushImageProvider(nsDisplayItem* aItem,
+                         image::WebRenderImageProvider* aProvider,
+                         mozilla::wr::DisplayListBuilder& aBuilder,
+                         mozilla::wr::IpcResourceUpdateQueue& aResources,
+                         const LayoutDeviceRect& aRect,
+                         const LayoutDeviceRect& aClip);
 
   Maybe<wr::ImageMask> BuildWrMaskImage(
       nsDisplayMasksAndClipPaths* aMaskItem, wr::DisplayListBuilder& aBuilder,

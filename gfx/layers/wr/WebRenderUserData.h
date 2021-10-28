@@ -9,6 +9,7 @@
 
 #include <vector>
 #include "mozilla/webrender/WebRenderAPI.h"
+#include "mozilla/image/WebRenderImageProvider.h"
 #include "mozilla/layers/AnimationInfo.h"
 #include "mozilla/dom/RemoteBrowser.h"
 #include "mozilla/UniquePtr.h"
@@ -44,6 +45,7 @@ class WebRenderCanvasData;
 class WebRenderCanvasRenderer;
 class WebRenderCanvasRendererAsync;
 class WebRenderImageData;
+class WebRenderImageProviderData;
 class WebRenderFallbackData;
 class WebRenderLocalCanvasData;
 class RenderRootStateManager;
@@ -71,6 +73,13 @@ class WebRenderUserData {
   static bool ProcessInvalidateForImage(nsIFrame* aFrame, DisplayItemType aType,
                                         ContainerProducerID aProducerId);
 
+  static bool ProcessInvalidateForImageProvider(nsIFrame* aFrame, DisplayItemType aType,
+                                                ContainerProducerID aProducerId,
+                                                image::ImageProviderId aProviderId);
+
+  static bool ProcessInvalidateForImageProvider(nsIFrame* aFrame, DisplayItemType aType,
+                                                image::ImageProviderId aProviderId);
+
   NS_INLINE_DECL_REFCOUNTING(WebRenderUserData)
 
   WebRenderUserData(RenderRootStateManager* aManager, nsDisplayItem* aItem);
@@ -78,6 +87,7 @@ class WebRenderUserData {
                     nsIFrame* aFrame);
 
   virtual WebRenderImageData* AsImageData() { return nullptr; }
+  virtual WebRenderImageProviderData* AsImageProviderData() { return nullptr; }
   virtual WebRenderFallbackData* AsFallbackData() { return nullptr; }
   virtual WebRenderCanvasData* AsCanvasData() { return nullptr; }
   virtual WebRenderLocalCanvasData* AsLocalCanvasData() { return nullptr; }
@@ -93,6 +103,7 @@ class WebRenderUserData {
     eRemote,
     eGroup,
     eMask,
+    eImageProvider,
     eBlobImage,  // SVG image
   };
 
@@ -184,6 +195,29 @@ class WebRenderImageData : public WebRenderUserData {
   // destruction of the key.
   // TODO: we surely can come up with a simpler/safer way to model this.
   bool mOwnsKey;
+};
+
+/// Holds some data used to share ImageLib results with the parent process.
+/// This may be either in the form of a blob recording or a rasterized surface.
+class WebRenderImageProviderData final : public WebRenderUserData {
+ public:
+  WebRenderImageProviderData(RenderRootStateManager* aManager,
+                             nsDisplayItem* aItem);
+  WebRenderImageProviderData(RenderRootStateManager* aManager,
+                             uint32_t aDisplayItemKey, nsIFrame* aFrame);
+  ~WebRenderImageProviderData() override;
+
+  WebRenderImageProviderData* AsImageProviderData() override { return this; }
+  UserDataType GetType() override { return UserDataType::eImageProvider; }
+  static UserDataType Type() { return UserDataType::eImageProvider; }
+
+  Maybe<wr::ImageKey> UpdateImageKey(image::WebRenderImageProvider* aProvider,
+                                     wr::IpcResourceUpdateQueue& aResources);
+
+  bool Invalidate(image::ImageProviderId aProviderId) const;
+
+ protected:
+  RefPtr<image::WebRenderImageProvider> mProvider;
 };
 
 /// Holds some data used to share blob recordings from VectorImages with the

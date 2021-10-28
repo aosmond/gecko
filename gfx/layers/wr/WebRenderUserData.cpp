@@ -6,6 +6,7 @@
 
 #include "WebRenderUserData.h"
 
+#include "mozilla/image/WebRenderImageProvider.h"
 #include "mozilla/layers/AnimationHelper.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/ImageClient.h"
@@ -18,6 +19,8 @@
 #include "nsDisplayListInvalidation.h"
 #include "nsIFrame.h"
 #include "WebRenderCanvasRenderer.h"
+
+using namespace mozilla::image;
 
 namespace mozilla {
 namespace layers {
@@ -62,6 +65,34 @@ bool WebRenderUserData::ProcessInvalidateForImage(
   RefPtr<WebRenderImageData> image =
       GetWebRenderUserData<WebRenderImageData>(aFrame, type);
   if (image && image->UsingSharedSurface(aProducerId)) {
+    return true;
+  }
+
+  aFrame->SchedulePaint();
+  return false;
+}
+
+/* static */
+bool WebRenderUserData::ProcessInvalidateForImageProvider(
+    nsIFrame* aFrame, DisplayItemType aType, ImageProviderId aProviderId) {
+  MOZ_ASSERT(aFrame);
+
+  if (!aFrame->HasProperty(WebRenderUserDataProperty::Key())) {
+    return false;
+  }
+
+  auto type = static_cast<uint32_t>(aType);
+  RefPtr<WebRenderFallbackData> fallback =
+      GetWebRenderUserData<WebRenderFallbackData>(aFrame, type);
+  if (fallback) {
+    fallback->SetInvalid(true);
+    aFrame->SchedulePaint();
+    return true;
+  }
+
+  RefPtr<WebRenderImageProviderData> image =
+      GetWebRenderUserData<WebRenderImageProviderData>(aFrame, type);
+  if (image && image->Invalidate(aProviderId)) {
     return true;
   }
 
@@ -279,6 +310,44 @@ void WebRenderImageData::CreateImageClientIfNeeded() {
 
     mImageClient->Connect();
   }
+}
+
+WebRenderImageProviderData::WebRenderImageProviderData(RenderRootStateManager* aManager, nsDisplayItem* aItem)
+    : WebRenderUserData(aManager, aItem) {}
+
+WebRenderImageProviderData::WebRenderImageProviderData(
+    RenderRootStateManager* aManager, uint32_t aDisplayItemKey,
+    nsIFrame* aFrame)
+    : WebRenderUserData(aManager, aDisplayItemKey, aFrame) {}
+
+WebRenderImageProviderData::~WebRenderImageProviderData() = default;
+
+Maybe<wr::ImageKey> WebRenderImageProviderData::UpdateImageKey(
+    WebRenderImageProvider* aProvider, wr::IpcResourceUpdateQueue& aResources) {
+  MOZ_ASSERT(aProvider);
+
+  if (mProvider != aProvider) {
+    mProvider = aProvider;
+  }
+
+  wr::ImageKey key = {};
+  nsresult rv = mProvider->UpdateKey(mManager, aResources, key);
+  if (NS_FAILED(rv)) {
+    return Nothing();
+  }
+
+  return Some(key);
+}
+
+bool WebRenderImageProviderData::Invalidate(ImageProviderId aProviderId) const {
+  if (!aProviderId || mProvider->GetProviderId() != aProviderId) {
+    return false;
+  }
+
+  wr::ImageKey key = {};
+  nsresult rv =
+      mProvider->UpdateKey(mManager, mManager->AsyncResourceUpdates(), key);
+  return NS_SUCCEEDED(rv);
 }
 
 WebRenderBlobImageData::WebRenderBlobImageData(RenderRootStateManager* aManager,
