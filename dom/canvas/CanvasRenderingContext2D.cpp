@@ -839,6 +839,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CanvasRenderingContext2D)
     }
   }
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CanvasRenderingContext2D)
@@ -5401,7 +5402,7 @@ bool CanvasRenderingContext2D::UpdateWebRenderCanvasData(
 
   if (!mResetLayer && renderer) {
     CanvasRendererData data;
-    data.mContext = mSharedPtrPtr;
+    data.mContext = this;
     data.mSize = GetSize();
 
     if (renderer->IsDataValid(data)) {
@@ -5424,7 +5425,7 @@ bool CanvasRenderingContext2D::UpdateWebRenderCanvasData(
 bool CanvasRenderingContext2D::InitializeCanvasRenderer(
     nsDisplayListBuilder* aBuilder, CanvasRenderer* aRenderer) {
   CanvasRendererData data;
-  data.mContext = mSharedPtrPtr;
+  data.mContext = this;
   data.mSize = GetSize();
   data.mIsOpaque = mOpaque;
   data.mDoPaintCallbacks = true;

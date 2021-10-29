@@ -6,8 +6,6 @@
 #ifndef nsICanvasRenderingContextInternal_h___
 #define nsICanvasRenderingContextInternal_h___
 
-#include <memory>
-
 #include "gfxRect.h"
 #include "mozilla/gfx/2D.h"
 #include "nsISupports.h"
@@ -19,6 +17,7 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/NotNull.h"
+#include "mozilla/WeakPtr.h"
 
 #define NS_ICANVASRENDERINGCONTEXTINTERNAL_IID       \
   {                                                  \
@@ -50,14 +49,11 @@ class SourceSurface;
 }  // namespace mozilla
 
 class nsICanvasRenderingContextInternal : public nsISupports,
-                                          public nsAPostRefreshObserver {
+                                          public nsAPostRefreshObserver,
+                                          public mozilla::SupportsWeakPtr {
  public:
   using CanvasRenderer = mozilla::layers::CanvasRenderer;
-  using Layer = mozilla::layers::Layer;
-  using LayerManager = mozilla::layers::LayerManager;
   using WebRenderCanvasData = mozilla::layers::WebRenderCanvasData;
-  using CompositableHandle = mozilla::layers::CompositableHandle;
-  using LayerTransactionChild = mozilla::layers::LayerTransactionChild;
 
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICANVASRENDERINGCONTEXTINTERNAL_IID)
 
@@ -207,9 +203,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   RefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
   RefPtr<mozilla::dom::OffscreenCanvas> mOffscreenCanvas;
   RefPtr<nsRefreshDriver> mRefreshDriver;
-
- public:
-  const std::shared_ptr<nsICanvasRenderingContextInternal* const> mSharedPtrPtr;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsICanvasRenderingContextInternal,
