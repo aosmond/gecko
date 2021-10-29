@@ -6,8 +6,6 @@
 #ifndef nsICanvasRenderingContextInternal_h___
 #define nsICanvasRenderingContextInternal_h___
 
-#include <memory>
-
 #include "gfxRect.h"
 #include "mozilla/gfx/2D.h"
 #include "nsISupports.h"
@@ -16,9 +14,19 @@
 #include "nsRefreshObservers.h"
 #include "mozilla/dom/HTMLCanvasElement.h"
 #include "mozilla/dom/OffscreenCanvas.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/NotNull.h"
+#include "mozilla/WeakPtr.h"
+#include "mozilla/layers/LayersSurfaces.h"
+
+#define NS_ICANVASRENDERINGDISPLAY_IID               \
+  {                                                  \
+    0x165a763e, 0xbe19, 0x4a94, {                    \
+      0x8a, 0xf6, 0xed, 0x2c, 0x84, 0x13, 0x11, 0x34 \
+    }                                                \
+  }
 
 #define NS_ICANVASRENDERINGCONTEXTINTERNAL_IID       \
   {                                                  \
@@ -34,6 +42,7 @@ namespace mozilla {
 class nsDisplayListBuilder;
 class ClientWebGLContext;
 class PresShell;
+class WebGLFramebufferJS;
 namespace layers {
 class CanvasRenderer;
 class CompositableHandle;
@@ -49,16 +58,51 @@ class SourceSurface;
 }  // namespace gfx
 }  // namespace mozilla
 
-class nsICanvasRenderingContextInternal : public nsISupports,
-                                          public nsAPostRefreshObserver {
+class nsICanvasRenderingDisplay : public nsISupports,
+                                  public mozilla::SupportsWeakPtr {
  public:
   using CanvasRenderer = mozilla::layers::CanvasRenderer;
-  using Layer = mozilla::layers::Layer;
-  using LayerManager = mozilla::layers::LayerManager;
   using WebRenderCanvasData = mozilla::layers::WebRenderCanvasData;
-  using CompositableHandle = mozilla::layers::CompositableHandle;
-  using LayerTransactionChild = mozilla::layers::LayerTransactionChild;
 
+  NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICANVASRENDERINGDISPLAY_IID)
+
+  // This gets an Azure SourceSurface for the canvas, this will be a snapshot
+  // of the canvas at the time it was called.
+  // If premultAlpha is provided, then it assumed the callee can handle
+  // un-premultiplied surfaces, and *premultAlpha will be set to false
+  // if one is returned.
+  virtual already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(
+      gfxAlphaType* out_alphaType = nullptr) = 0;
+
+  virtual RefPtr<mozilla::gfx::SourceSurface> GetFrontBufferSnapshot(bool) {
+    return GetSurfaceSnapshot();
+  }
+
+  virtual void OnBeforePaintTransaction() {}
+  virtual void OnDidPaintTransaction() {}
+
+  virtual mozilla::layers::PersistentBufferProvider* GetBufferProvider() {
+    return nullptr;
+  }
+
+  virtual mozilla::Maybe<mozilla::layers::SurfaceDescriptor> GetFrontBuffer(
+      mozilla::WebGLFramebufferJS*, const bool webvr = false) {
+    return mozilla::Nothing();
+  }
+
+  virtual mozilla::Maybe<mozilla::layers::SurfaceDescriptor> PresentFrontBuffer(
+      mozilla::WebGLFramebufferJS* fb, mozilla::layers::TextureType,
+      const bool webvr = false) {
+    return GetFrontBuffer(fb, webvr);
+  }
+};
+
+NS_DEFINE_STATIC_IID_ACCESSOR(nsICanvasRenderingDisplay,
+                              NS_ICANVASRENDERINGDISPLAY_IID)
+
+class nsICanvasRenderingContextInternal : public nsICanvasRenderingDisplay,
+                                          public nsAPostRefreshObserver {
+ public:
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_ICANVASRENDERINGCONTEXTINTERNAL_IID)
 
   nsICanvasRenderingContextInternal();
@@ -112,18 +156,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
                             const nsAString& encoderOptions,
                             nsIInputStream** stream) = 0;
 
-  // This gets an Azure SourceSurface for the canvas, this will be a snapshot
-  // of the canvas at the time it was called.
-  // If premultAlpha is provided, then it assumed the callee can handle
-  // un-premultiplied surfaces, and *premultAlpha will be set to false
-  // if one is returned.
-  virtual already_AddRefed<mozilla::gfx::SourceSurface> GetSurfaceSnapshot(
-      gfxAlphaType* out_alphaType = nullptr) = 0;
-
-  virtual RefPtr<mozilla::gfx::SourceSurface> GetFrontBufferSnapshot(bool) {
-    return GetSurfaceSnapshot();
-  }
-
   // If this is called with true, the backing store of the canvas should
   // be created as opaque; all compositing operators should assume the
   // dst alpha is always 1.0.  If this is never called, the context's
@@ -143,11 +175,13 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   virtual already_AddRefed<mozilla::layers::Image> GetAsImage() {
     return nullptr;
   }
+
   virtual bool UpdateWebRenderCanvasData(
       mozilla::nsDisplayListBuilder* aBuilder,
       WebRenderCanvasData* aCanvasData) {
     return false;
   }
+
   virtual bool InitializeCanvasRenderer(mozilla::nsDisplayListBuilder* aBuilder,
                                         CanvasRenderer* aRenderer) {
     return false;
@@ -186,13 +220,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
 
   virtual void OnMemoryPressure() {}
 
-  virtual void OnBeforePaintTransaction() {}
-  virtual void OnDidPaintTransaction() {}
-  virtual mozilla::layers::PersistentBufferProvider* GetBufferProvider() {
-    return nullptr;
-  }
-  virtual mozilla::ClientWebGLContext* AsWebgl() { return nullptr; }
-
   //
   // shmem support
   //
@@ -207,9 +234,6 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   RefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
   RefPtr<mozilla::dom::OffscreenCanvas> mOffscreenCanvas;
   RefPtr<nsRefreshDriver> mRefreshDriver;
-
- public:
-  const std::shared_ptr<nsICanvasRenderingContextInternal* const> mSharedPtrPtr;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsICanvasRenderingContextInternal,
