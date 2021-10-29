@@ -384,6 +384,12 @@ Maybe<layers::SurfaceDescriptor> ClientWebGLContext::GetFrontBuffer(
   return ret;
 }
 
+Maybe<layers::SurfaceDescriptor> ClientWebGLContext::PresentFrontBuffer(
+    WebGLFramebufferJS* const fb, const layers::TextureType type, bool webvr) {
+  Present(fb, type, webvr);
+  return GetFrontBuffer(fb, webvr);
+}
+
 void ClientWebGLContext::ClearVRSwapChain() { Run<RPROC(ClearVRSwapChain)>(); }
 
 // -
@@ -414,7 +420,7 @@ bool ClientWebGLContext::InitializeCanvasRenderer(
   if (IsContextLost()) return false;
 
   layers::CanvasRendererData data;
-  data.mContext = mSharedPtrPtr;
+  data.mDisplay = this;
   data.mOriginPos = gl::OriginPos::BottomLeft;
 
   const auto& options = *mInitialOptions;
@@ -6378,6 +6384,7 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(WebGLVertexArrayJS, mIndexBuffer,
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ClientWebGLContext)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
+  NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingDisplay)
   NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingContextInternal)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
