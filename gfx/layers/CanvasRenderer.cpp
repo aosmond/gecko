@@ -45,14 +45,14 @@ void CanvasRenderer::Initialize(const CanvasRendererData& aData) {
 }
 
 bool CanvasRenderer::IsDataValid(const CanvasRendererData& aData) const {
-  return mData.GetContext() == aData.GetContext();
+  return mData.GetDisplay() == aData.GetDisplay();
 }
 
 std::shared_ptr<BorrowedSourceSurface> CanvasRenderer::BorrowSnapshot(
     const bool requireAlphaPremult) const {
-  const auto context = mData.GetContext();
-  if (!context) return nullptr;
-  RefPtr<PersistentBufferProvider> provider = context->GetBufferProvider();
+  const auto display = mData.GetDisplay();
+  if (!display) return nullptr;
+  RefPtr<PersistentBufferProvider> provider = display->GetBufferProvider();
 
   RefPtr<gfx::SourceSurface> ss;
 
@@ -61,7 +61,7 @@ std::shared_ptr<BorrowedSourceSurface> CanvasRenderer::BorrowSnapshot(
   }
   if (!ss) {
     provider = nullptr;
-    ss = context->GetFrontBufferSnapshot(requireAlphaPremult);
+    ss = display->GetFrontBufferSnapshot(requireAlphaPremult);
   }
   if (!ss) return nullptr;
 
@@ -70,16 +70,16 @@ std::shared_ptr<BorrowedSourceSurface> CanvasRenderer::BorrowSnapshot(
 
 void CanvasRenderer::FirePreTransactionCallback() const {
   if (!mData.mDoPaintCallbacks) return;
-  const auto context = mData.GetContext();
-  if (!context) return;
-  context->OnBeforePaintTransaction();
+  const auto display = mData.GetDisplay();
+  if (!display) return;
+  display->OnBeforePaintTransaction();
 }
 
 void CanvasRenderer::FireDidTransactionCallback() const {
   if (!mData.mDoPaintCallbacks) return;
-  const auto context = mData.GetContext();
-  if (!context) return;
-  context->OnDidPaintTransaction();
+  const auto display = mData.GetDisplay();
+  if (!display) return;
+  display->OnDidPaintTransaction();
 }
 
 TextureType TexTypeForWebgl(KnowsCompositor* const knowsCompositor) {
