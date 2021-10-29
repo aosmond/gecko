@@ -36,7 +36,7 @@ struct CanvasRendererData final {
   CanvasRendererData();
   ~CanvasRendererData();
 
-  WeakPtr<nsICanvasRenderingContextInternal> mContext;
+  WeakPtr<nsICanvasRenderingDisplay> mDisplay;
 
   // The size of the canvas content
   gfx::IntSize mSize = {0, 0};
@@ -47,9 +47,7 @@ struct CanvasRendererData final {
 
   gl::OriginPos mOriginPos = gl::OriginPos::TopLeft;
 
-  nsICanvasRenderingContextInternal* GetContext() const {
-    return mContext.get();
-  }
+  nsICanvasRenderingDisplay* GetDisplay() const { return mDisplay.get(); }
 };
 
 // Based class which used for canvas rendering. There are many derived classes
