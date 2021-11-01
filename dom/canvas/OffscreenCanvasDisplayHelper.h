@@ -8,6 +8,7 @@
 #define MOZILLA_DOM_OFFSCREENCANVASDISPLAYHELPER_H_
 
 #include "CanvasRenderingContextHelper.h"
+#include "ImageContainer.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/RefPtr.h"
@@ -30,7 +31,11 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
                                         uint32_t aWidth, uint32_t aHeight);
 
   CanvasContextType GetContextType() const;
-  void SetContextType(CanvasContextType aType);
+
+  already_AddRefed<layers::ImageContainer> GetImageContainer() const;
+
+  void UpdateContext(layers::ImageContainer* aContainer,
+                     CanvasContextType aType);
 
   bool UpdateParameters(uint32_t aWidth, uint32_t aHeight, bool aHasAlpha,
                         bool aIsPremultiplied);
@@ -58,12 +63,15 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
 
   mutable Mutex mMutex;
   HTMLCanvasElement* MOZ_NON_OWNING_REF mCanvasElement;
+  RefPtr<layers::ImageContainer> mImageContainer;
   RefPtr<gfx::SourceSurface> mFrontBufferSurface;
   Maybe<layers::SurfaceDescriptor> mFrontBufferDesc;
 
   CanvasContextType mType = CanvasContextType::NoContext;
   uint32_t mWidth;
   uint32_t mHeight;
+  mozilla::layers::ImageContainer::ProducerID mImageProducerID;
+  mozilla::layers::ImageContainer::FrameID mLastFrameID = 0;
   bool mPendingInvalidate = false;
   bool mPendingUpdateParameters = false;
   bool mHasAlpha = false;

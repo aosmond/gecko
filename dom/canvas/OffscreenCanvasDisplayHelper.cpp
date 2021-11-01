@@ -7,6 +7,7 @@
 #include "OffscreenCanvasDisplayHelper.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/TextureClientSharedSurface.h"
+#include "mozilla/layers/TextureWrapperImage.h"
 #include "mozilla/SVGObserverUtils.h"
 
 namespace mozilla::dom {
@@ -26,7 +27,8 @@ OffscreenCanvasDisplayHelper::OffscreenCanvasDisplayHelper(
     : mMutex("mozilla::dom::OffscreenCanvasDisplayHelper"),
       mCanvasElement(aCanvasElement),
       mWidth(aWidth),
-      mHeight(aHeight) {}
+      mHeight(aHeight),
+      mImageProducerID(layers::ImageContainer::AllocateProducerID()) {}
 
 OffscreenCanvasDisplayHelper::~OffscreenCanvasDisplayHelper() = default;
 
@@ -52,8 +54,17 @@ CanvasContextType OffscreenCanvasDisplayHelper::GetContextType() const {
   return mType;
 }
 
-void OffscreenCanvasDisplayHelper::SetContextType(CanvasContextType aType) {
+already_AddRefed<layers::ImageContainer>
+OffscreenCanvasDisplayHelper::GetImageContainer() const {
   MutexAutoLock lock(mMutex);
+  RefPtr<layers::ImageContainer> container = mImageContainer;
+  return container.forget();
+}
+
+void OffscreenCanvasDisplayHelper::UpdateContext(
+    layers::ImageContainer* aContainer, CanvasContextType aType) {
+  MutexAutoLock lock(mMutex);
+  mImageContainer = aContainer;
   mType = aType;
 }
 
@@ -79,6 +90,9 @@ bool OffscreenCanvasDisplayHelper::UpdateParameters(uint32_t aWidth,
 bool OffscreenCanvasDisplayHelper::Invalidate(
     nsICanvasRenderingContextInternal* aContext,
     layers::TextureType aTextureType) {
+  gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
+  layers::TextureFlags flags = TextureFlags::NO_FLAGS;
+
   {
     MutexAutoLock lock(mMutex);
     if (!mCanvasElement) {
@@ -86,14 +100,44 @@ bool OffscreenCanvasDisplayHelper::Invalidate(
       // present directly anymore.
       return false;
     }
+
+    if (!mHasAlpha) {
+      format = gfx::SurfaceFormat::B8G8R8X8;
+    } else if (!mIsPremultiplied) {
+      flags |= TextureFlags::NON_PREMULTIPLIED;
+    }
   }
+
+  auto imageBridge = layers::ImageBridgeChild::GetSingleton();
+  if (!imageBridge) {
+    return false;
+  }
+
+  RefPtr<layers::Image> image;
+  RefPtr<gfx::SourceSurface> surface;
 
   Maybe<layers::SurfaceDescriptor> desc =
       aContext->PresentFrontBuffer(nullptr, aTextureType);
-  RefPtr<gfx::SourceSurface> surface;
-  if (!desc) {
+  if (desc) {
+    RefPtr<layers::TextureClient> texture =
+        layers::SharedSurfaceTextureData::CreateTextureClient(
+            *desc, format, gfx::IntSize(mWidth, mHeight), flags, imageBridge);
+    if (texture) {
+      image = new layers::TextureWrapperImage(
+          texture, gfx::IntRect(0, 0, mWidth, mHeight));
+    }
+  } else {
     surface = aContext->GetFrontBufferSnapshot(/* requireAlphaPremult */ true);
+    if (surface) {
+      image = new layers::SourceSurfaceImage(surface);
+    }
   }
+
+  // Image containers are thread safe, so we don't need to lock to update that.
+  AutoTArray<layers::ImageContainer::NonOwningImage, 1> imageList;
+  imageList.AppendElement(layers::ImageContainer::NonOwningImage(
+      image, TimeStamp(), mLastFrameID++, mImageProducerID));
+  mImageContainer->SetCurrentImages(imageList);
 
   MutexAutoLock lock(mMutex);
   mFrontBufferDesc = std::move(desc);

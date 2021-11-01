@@ -142,9 +142,12 @@ void OffscreenCanvas::GetContext(
     return;
   }
 
+  mImageContainer =
+      MakeRefPtr<layers::ImageContainer>(layers::ImageContainer::ASYNCHRONOUS);
+
   MOZ_ASSERT(mCurrentContext);
   if (mDisplay) {
-    mDisplay->SetContextType(mCurrentContextType);
+    mDisplay->UpdateContext(mImageContainer, mCurrentContextType);
   }
 
   switch (mCurrentContextType) {
@@ -194,6 +197,13 @@ void OffscreenCanvas::CommitFrameToCompositor() {
   }
 
   mDisplay->Invalidate(mCurrentContext, mTextureType);
+}
+
+void OffscreenCanvas::Invalidate() {
+  RefPtr<OffscreenCanvas> self = this;
+  NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
+      "OffscreenCanvas::Invalidate",
+      [self = std::move(self)] { self->CommitFrameToCompositor(); }));
 }
 
 OffscreenCanvasCloneData* OffscreenCanvas::ToCloneData() {
