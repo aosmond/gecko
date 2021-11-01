@@ -32,6 +32,7 @@ class ClientWebGLContext;
 namespace layers {
 class CanvasRenderer;
 class Image;
+class ImageContainer;
 class Layer;
 class LayerManager;
 class OOPCanvasRenderer;
@@ -52,6 +53,7 @@ class CanvasCaptureMediaStream;
 class File;
 class HTMLCanvasPrintState;
 class OffscreenCanvas;
+class OffscreenCanvasDisplayHelper;
 class PrintCallback;
 class PWebGLChild;
 class RequestedFrameRefreshObserver;
@@ -356,6 +358,10 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
   ClientWebGLContext* GetWebGLContext();
   webgpu::CanvasContext* GetWebGPUContext();
 
+  bool IsOffscreen() const { return !!mOffscreenCanvas; }
+
+  already_AddRefed<layers::ImageContainer> GetImageContainer();
+
  protected:
   bool mResetLayer;
   bool mMaybeModified;  // we fetched the context, so we may have written to the
@@ -367,6 +373,7 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
   RefPtr<RequestedFrameRefreshObserver> mRequestedFrameRefreshObserver;
   RefPtr<CanvasRenderer> mCanvasRenderer;
   RefPtr<OffscreenCanvas> mOffscreenCanvas;
+  RefPtr<OffscreenCanvasDisplayHelper> mOffscreenDisplay;
   RefPtr<HTMLCanvasElementObserver> mContextObserver;
 
  public:
