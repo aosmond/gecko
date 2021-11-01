@@ -216,8 +216,6 @@ class nsICanvasRenderingContextInternal : public nsICanvasRenderingDisplay,
     return nsString();
   }
 
-  virtual void OnVisibilityChange() {}
-
   virtual void OnMemoryPressure() {}
 
   //
