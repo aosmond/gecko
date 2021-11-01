@@ -17,6 +17,7 @@
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/webgpu/CanvasContext.h"
+#include "nsProxyRelease.h"
 #include "CanvasRenderingContext2D.h"
 #include "CanvasUtils.h"
 #include "ClientWebGLContext.h"
@@ -37,7 +38,10 @@ OffscreenCanvasCloneData::OffscreenCanvasCloneData(
       mNeutered(aNeutered),
       mIsWriteOnly(aIsWriteOnly) {}
 
-OffscreenCanvasCloneData::~OffscreenCanvasCloneData() = default;
+OffscreenCanvasCloneData::~OffscreenCanvasCloneData() {
+  NS_ReleaseOnMainThread("OffscreenCanvasCloseData::mDisplay",
+                         mDisplay.forget());
+}
 
 OffscreenCanvas::OffscreenCanvas(nsIGlobalObject* aGlobal, uint32_t aWidth,
                                  uint32_t aHeight,
@@ -69,6 +73,8 @@ already_AddRefed<OffscreenCanvas> OffscreenCanvas::Constructor(
 }
 
 void OffscreenCanvas::ClearResources() {
+  NS_ReleaseOnMainThread("OffscreenCanvas::mDisplay", mDisplay.forget());
+
   if (mCanvasClient) {
     mCanvasClient->Clear();
 
@@ -196,10 +202,6 @@ void OffscreenCanvas::CommitFrameToCompositor() {
 
   Maybe<layers::SurfaceDescriptor> desc =
       mCurrentContext->GetFrontBuffer(nullptr);
-  if (!desc) {
-    return;
-  }
-
   mDisplay->Invalidate(std::move(desc));
 }
 

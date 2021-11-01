@@ -9,8 +9,15 @@
 
 namespace mozilla::dom {
 
-NS_IMPL_ISUPPORTS(OffscreenCanvasDisplayHelper, nsICanvasRenderingDisplay,
-                  nsIRunnable, nsINamed)
+NS_IMPL_ADDREF(OffscreenCanvasDisplayHelper)
+NS_IMPL_RELEASE(OffscreenCanvasDisplayHelper)
+
+NS_INTERFACE_MAP_BEGIN(OffscreenCanvasDisplayHelper)
+  NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsICanvasRenderingDisplay)
+  NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingDisplay)
+  NS_INTERFACE_MAP_ENTRY(nsIRunnable)
+  NS_INTERFACE_MAP_ENTRY(nsINamed)
+NS_INTERFACE_MAP_END
 
 OffscreenCanvasDisplayHelper::OffscreenCanvasDisplayHelper(
     HTMLCanvasElement* aCanvasElement)
@@ -37,7 +44,7 @@ void OffscreenCanvasDisplayHelper::Destroy() {
 }
 
 bool OffscreenCanvasDisplayHelper::Invalidate(
-    layers::SurfaceDescriptor&& aFrontBufferDesc) {
+    Maybe<layers::SurfaceDescriptor>&& aFrontBufferDesc) {
   MutexAutoLock lock(mMutex);
   if (!mCanvasElement) {
     // Our weak reference to the canvas element has been cleared, so we cannot
@@ -75,7 +82,7 @@ void OffscreenCanvasDisplayHelper::InvalidateElement() {
 Maybe<layers::SurfaceDescriptor> OffscreenCanvasDisplayHelper::GetFrontBuffer(
     WebGLFramebufferJS*, const bool webvr) {
   MutexAutoLock lock(mMutex);
-  return Some(mFrontBufferDesc);
+  return mFrontBufferDesc;
 }
 
 already_AddRefed<gfx::SourceSurface>

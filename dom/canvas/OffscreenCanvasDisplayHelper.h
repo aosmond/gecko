@@ -7,6 +7,7 @@
 #ifndef MOZILLA_DOM_OFFSCREENCANVASDISPLAYHELPER_H_
 #define MOZILLA_DOM_OFFSCREENCANVASDISPLAYHELPER_H_
 
+#include "mozilla/Maybe.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/RefPtr.h"
 #include "nsICanvasRenderingContextInternal.h"
@@ -26,7 +27,7 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
  public:
   explicit OffscreenCanvasDisplayHelper(HTMLCanvasElement* aCanvasElement);
 
-  bool Invalidate(layers::SurfaceDescriptor&& aFrontBufferDesc);
+  bool Invalidate(Maybe<layers::SurfaceDescriptor>&& aFrontBufferDesc);
 
   void Destroy();
 
@@ -48,10 +49,18 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
 
   mutable Mutex mMutex;
   HTMLCanvasElement* MOZ_NON_OWNING_REF mCanvasElement;
-  layers::SurfaceDescriptor mFrontBufferDesc;
+  Maybe<layers::SurfaceDescriptor> mFrontBufferDesc;
   bool mPendingInvalidate;
 };
 
 }  // namespace mozilla::dom
+
+/**
+ * Casting OffscreenCanvasDisplayHelper to nsISupports is ambiguous.
+ * This method handles that.
+ */
+inline nsISupports* ToSupports(mozilla::dom::OffscreenCanvasDisplayHelper* p) {
+  return NS_ISUPPORTS_CAST(nsICanvasRenderingDisplay*, p);
+}
 
 #endif  // MOZILLA_DOM_OFFSCREENCANVASDISPLAYHELPER_H_
