@@ -188,41 +188,19 @@ OffscreenCanvas::CreateContext(CanvasContextType aContextType) {
 }
 
 void OffscreenCanvas::CommitFrameToCompositor() {
-  if (!mDisplay) {
+  if (!mDisplay || !mCurrentContext) {
     // This offscreen canvas doesn't associate to any HTML canvas element.
     // So, just bail out.
     return;
   }
-  MOZ_CRASH("todo");
 
-  // The attributes has changed, we have to notify main
-  // thread to change canvas size.
-  if (mAttrDirty) {
-    MOZ_CRASH("todo");
-    // if (mCanvasRenderer) {
-    //  mCanvasRenderer->SetWidth(mWidth);
-    //  mCanvasRenderer->SetHeight(mHeight);
-    //  mCanvasRenderer->NotifyElementAboutAttributesChanged();
-    //}
-    mAttrDirty = false;
+  Maybe<layers::SurfaceDescriptor> desc =
+      mCurrentContext->GetFrontBuffer(nullptr);
+  if (!desc) {
+    return;
   }
 
-  // CanvasContextType contentType = mCanvasRenderer->GetContextType();
-  // if (mCurrentContext && (contentType == CanvasContextType::WebGL1 ||
-  //                        contentType == CanvasContextType::WebGL2)) {
-  //  MOZ_ASSERT_UNREACHABLE("WebGL OffscreenCanvas not yet supported.");
-  //  return;
-  //}
-  // if (mCurrentContext && (contentType == CanvasContextType::WebGPU)) {
-  //  MOZ_ASSERT_UNREACHABLE("WebGPU OffscreenCanvas not yet supported.");
-  //  return;
-  //}
-
-  // if (mCanvasRenderer && mCanvasRenderer->mGLContext) {
-  //  mCanvasRenderer->NotifyElementAboutInvalidation();
-  //  ImageBridgeChild::GetSingleton()->UpdateAsyncCanvasRenderer(
-  //      mCanvasRenderer);
-  //}
+  mDisplay->Invalidate(std::move(desc));
 }
 
 OffscreenCanvasCloneData* OffscreenCanvas::ToCloneData() {
