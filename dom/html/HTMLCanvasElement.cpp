@@ -26,6 +26,7 @@
 #include "mozilla/dom/VideoStreamTrack.h"
 #include "mozilla/dom/MouseEvent.h"
 #include "mozilla/dom/OffscreenCanvas.h"
+#include "mozilla/dom/OffscreenCanvasDisplayHelper.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/gfx/Rect.h"
 #include "mozilla/layers/CanvasRenderer.h"
@@ -819,31 +820,38 @@ void HTMLCanvasElement::ToBlob(JSContext* aCx, BlobCallback& aCallback,
   CanvasRenderingContextHelper::ToBlob(aCx, global, aCallback, aType, aParams,
                                        usePlaceholder, aRv);
 }
-#define DISABLE_OFFSCREEN_CANVAS 1
+
 OffscreenCanvas* HTMLCanvasElement::TransferControlToOffscreen(
     ErrorResult& aRv) {
-  if (DISABLE_OFFSCREEN_CANVAS) {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-    return nullptr;
-  }
   if (mCurrentContext) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
   }
 
   if (!mOffscreenCanvas) {
-    MOZ_CRASH("todo");
-
     nsPIDOMWindowInner* win = OwnerDoc()->GetInnerWindow();
     if (!win) {
       aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
       return nullptr;
     }
 
-    // nsIntSize sz = GetWidthHeight();
-    // mOffscreenCanvas =
-    //    new OffscreenCanvas(win->AsGlobal(), sz.width, sz.height,
-    //                        GetCompositorBackendType(), renderer);
+    LayersBackend backend = LayersBackend::LAYERS_NONE;
+    TextureType textureType = TextureType::Unknown;
+    nsIWidget* docWidget = nsContentUtils::WidgetForDocument(OwnerDoc());
+    if (docWidget) {
+      WindowRenderer* renderer = docWidget->GetWindowRenderer();
+      if (renderer) {
+        backend = renderer->GetCompositorBackendType();
+        textureType = TexTypeForWebgl(renderer->AsKnowsCompositor());
+      }
+    }
+
+    nsIntSize sz = GetWidthHeight();
+    mOffscreenDisplay =
+        MakeRefPtr<OffscreenCanvasDisplayHelper>(this, sz.width, sz.height);
+    mOffscreenCanvas =
+        new OffscreenCanvas(win->AsGlobal(), sz.width, sz.height, backend,
+                            textureType, mOffscreenDisplay);
     if (mWriteOnly) {
       mOffscreenCanvas->SetWriteOnly();
     }
@@ -934,6 +942,11 @@ already_AddRefed<nsISupports> HTMLCanvasElement::MozGetIPCContext(
   // We only support 2d shmem contexts for now.
   if (!aContextId.EqualsLiteral("2d")) {
     aRv.Throw(NS_ERROR_INVALID_ARG);
+    return nullptr;
+  }
+
+  if (mOffscreenCanvas) {
+    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
     return nullptr;
   }
 
@@ -1083,10 +1096,17 @@ bool HTMLCanvasElement::GetOpaqueAttr() {
 }
 
 CanvasContextType HTMLCanvasElement::GetCurrentContextType() {
+  if (mOffscreenDisplay) {
+    return mOffscreenDisplay->GetContextType();
+  }
   return mCurrentContextType;
 }
 
 already_AddRefed<Image> HTMLCanvasElement::GetAsImage() {
+  if (mOffscreenDisplay) {
+    return mOffscreenDisplay->GetAsImage();
+  }
+
   if (mCurrentContext) {
     return mCurrentContext->GetAsImage();
   }
@@ -1100,11 +1120,10 @@ already_AddRefed<Image> HTMLCanvasElement::GetAsImage() {
 
 bool HTMLCanvasElement::UpdateWebRenderCanvasData(
     nsDisplayListBuilder* aBuilder, WebRenderCanvasData* aCanvasData) {
+  MOZ_ASSERT(!mOffscreenDisplay);
+
   if (mCurrentContext) {
     return mCurrentContext->UpdateWebRenderCanvasData(aBuilder, aCanvasData);
-  }
-  if (mOffscreenCanvas) {
-    MOZ_CRASH("todo");
   }
 
   // Clear CanvasRenderer of WebRenderCanvasData
@@ -1117,9 +1136,8 @@ bool HTMLCanvasElement::InitializeCanvasRenderer(nsDisplayListBuilder* aBuilder,
   if (mCurrentContext) {
     return mCurrentContext->InitializeCanvasRenderer(aBuilder, aRenderer);
   }
-
-  if (mOffscreenCanvas) {
-    MOZ_CRASH("todo");
+  if (mOffscreenDisplay) {
+    return mOffscreenDisplay->InitializeCanvasRenderer(aBuilder, aRenderer);
   }
 
   return false;
@@ -1278,6 +1296,13 @@ webgpu::CanvasContext* HTMLCanvasElement::GetWebGPUContext() {
   }
 
   return static_cast<webgpu::CanvasContext*>(GetCurrentContext());
+}
+
+already_AddRefed<ImageContainer> HTMLCanvasElement::GetImageContainer() {
+  if (mOffscreenDisplay) {
+    return mOffscreenDisplay->GetImageContainer();
+  }
+  return nullptr;
 }
 
 }  // namespace mozilla::dom
