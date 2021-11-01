@@ -27,6 +27,9 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
  public:
   explicit OffscreenCanvasDisplayHelper(HTMLCanvasElement* aCanvasElement);
 
+  bool UpdateParameters(uint32_t aWidth, uint32_t aHeight, bool aHasAlpha,
+                        bool aIsPremultiplied);
+
   bool Invalidate(Maybe<layers::SurfaceDescriptor>&& aFrontBufferDesc);
 
   void Destroy();
@@ -45,12 +48,18 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
 
  private:
   ~OffscreenCanvasDisplayHelper();
+  void DispatchEvent();
   void InvalidateElement();
 
   mutable Mutex mMutex;
   HTMLCanvasElement* MOZ_NON_OWNING_REF mCanvasElement;
   Maybe<layers::SurfaceDescriptor> mFrontBufferDesc;
-  bool mPendingInvalidate;
+  uint32_t mWidth = 0;
+  uint32_t mHeight = 0;
+  bool mPendingInvalidate = false;
+  bool mPendingUpdateParameters = false;
+  bool mHasAlpha = false;
+  bool mIsPremultiplied = false;
 };
 
 }  // namespace mozilla::dom

@@ -27,7 +27,9 @@ OffscreenCanvasDisplayHelper::OffscreenCanvasDisplayHelper(
 OffscreenCanvasDisplayHelper::~OffscreenCanvasDisplayHelper() = default;
 
 NS_IMETHODIMP OffscreenCanvasDisplayHelper::Run() {
-  InvalidateElement();
+  if (mPendingInvalidate) {
+    InvalidateElement();
+  }
   return NS_OK;
 }
 
@@ -43,6 +45,32 @@ void OffscreenCanvasDisplayHelper::Destroy() {
   mCanvasElement = nullptr;
 }
 
+void OffscreenCanvasDisplayHelper::DispatchEvent() {
+  if (!mPendingInvalidate) {
+    nsCOMPtr<nsIRunnable> self(this);
+    NS_DispatchToMainThread(self.forget());
+  }
+}
+
+bool OffscreenCanvasDisplayHelper::UpdateParameters(uint32_t aWidth,
+                                                    uint32_t aHeight,
+                                                    bool aHasAlpha,
+                                                    bool aIsPremultiplied) {
+  MutexAutoLock lock(mMutex);
+  if (!mCanvasElement) {
+    // Our weak reference to the canvas element has been cleared, so we cannot
+    // present directly anymore.
+    return false;
+  }
+
+  mWidth = aWidth;
+  mHeight = aHeight;
+  mHasAlpha = aHasAlpha;
+  mIsPremultiplied = aIsPremultiplied;
+  mPendingUpdateParameters = true;
+  return true;
+}
+
 bool OffscreenCanvasDisplayHelper::Invalidate(
     Maybe<layers::SurfaceDescriptor>&& aFrontBufferDesc) {
   MutexAutoLock lock(mMutex);
@@ -53,11 +81,9 @@ bool OffscreenCanvasDisplayHelper::Invalidate(
   }
 
   mFrontBufferDesc = std::move(aFrontBufferDesc);
-  if (!mPendingInvalidate) {
-    nsCOMPtr<nsIRunnable> self(this);
-    NS_DispatchToMainThread(self.forget());
-    mPendingInvalidate = true;
-  }
+
+  DispatchEvent();
+  mPendingInvalidate = true;
   return true;
 }
 
@@ -92,12 +118,43 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot(gfxAlphaType* out_alphaType) {
 
 bool OffscreenCanvasDisplayHelper::UpdateWebRenderCanvasData(
     nsDisplayListBuilder* aBuilder, WebRenderCanvasData* aCanvasData) {
-  return false;
+  // FIXME(aosmond): What about dimension size change in the OffscreenCanvas?
+  CanvasRenderer* renderer = aCanvasData->GetCanvasRenderer();
+  if (renderer) {
+    MutexAutoLock lock(mMutex);
+    if (!mPendingUpdateParameters) {
+      return true;
+    }
+  }
+
+  renderer = aCanvasData->CreateCanvasRenderer();
+  if (!InitializeCanvasRenderer(aBuilder, renderer)) {
+    aCanvasData->ClearCanvasRenderer();
+    return false;
+  }
+
+  return true;
 }
 
 bool OffscreenCanvasDisplayHelper::InitializeCanvasRenderer(
     nsDisplayListBuilder* aBuilder, CanvasRenderer* aRenderer) {
-  return false;
+  MutexAutoLock lock(mMutex);
+  // FIXME(aosmond): Check for context lost?
+
+  layers::CanvasRendererData data;
+  data.mDisplay = this;
+  data.mOriginPos = gl::OriginPos::BottomLeft;
+  data.mIsOpaque = !mHasAlpha;
+  data.mIsAlphaPremult = !mHasAlpha || mIsPremultiplied;
+  data.mSize = {mWidth, mHeight};
+  if (aBuilder->IsPaintingToWindow() && mCanvasElement) {
+    data.mDoPaintCallbacks = true;
+  }
+
+  aRenderer->Initialize(data);
+  aRenderer->SetDirty();
+  mPendingUpdateParameters = false;
+  return true;
 }
 
 }  // namespace mozilla::dom

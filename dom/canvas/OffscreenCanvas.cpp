@@ -138,22 +138,6 @@ void OffscreenCanvas::GetContext(
   }
 
   MOZ_ASSERT(mCurrentContext);
-
-  if (mDisplay) {
-    // mCanvasRenderer->SetContextType(contextType);
-    if (contextType == CanvasContextType::WebGL1 ||
-        contextType == CanvasContextType::WebGL2) {
-      MOZ_ASSERT_UNREACHABLE("WebGL OffscreenCanvas not yet supported.");
-      aResult.SetNull();
-      return;
-    }
-    if (contextType == CanvasContextType::WebGPU) {
-      MOZ_ASSERT_UNREACHABLE("WebGPU OffscreenCanvas not yet supported.");
-      aResult.SetNull();
-      return;
-    }
-  }
-
   switch (mCurrentContextType) {
     case CanvasContextType::ImageBitmap:
       aResult.SetValue().SetAsImageBitmapRenderingContext() =

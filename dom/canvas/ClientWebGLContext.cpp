@@ -215,8 +215,8 @@ void ClientWebGLContext::OnContextLoss(
     if (!strong) return;
     strong->Event_webglcontextlost();
   };
-  already_AddRefed<mozilla::Runnable> runnable =
-      NS_NewRunnableFunction("enqueue Event_webglcontextlost", fnRun);
+  auto runnable =
+      NS_NewCancelableRunnableFunction("enqueue Event_webglcontextlost", fnRun);
   NS_DispatchToCurrentThread(std::move(runnable));
 }
 
@@ -253,8 +253,8 @@ void ClientWebGLContext::RestoreContext(
     if (!strong) return;
     strong->Event_webglcontextrestored();
   };
-  already_AddRefed<mozilla::Runnable> runnable =
-      NS_NewRunnableFunction("enqueue Event_webglcontextrestored", fnRun);
+  auto runnable = NS_NewCancelableRunnableFunction(
+      "enqueue Event_webglcontextrestored", fnRun);
   NS_DispatchToCurrentThread(std::move(runnable));
 }
 
