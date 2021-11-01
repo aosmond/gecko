@@ -1503,7 +1503,7 @@ webgl::AvailabilityRunnable& ClientWebGLContext::EnsureAvailabilityRunnable()
 
 webgl::AvailabilityRunnable::AvailabilityRunnable(
     const ClientWebGLContext* const webgl)
-    : Runnable("webgl::AvailabilityRunnable"), mWebGL(webgl) {}
+    : DiscardableRunnable("webgl::AvailabilityRunnable"), mWebGL(webgl) {}
 
 webgl::AvailabilityRunnable::~AvailabilityRunnable() {
   MOZ_ASSERT(mQueries.empty());
