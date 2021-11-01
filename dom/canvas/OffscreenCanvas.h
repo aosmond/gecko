@@ -172,6 +172,8 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   bool ShouldResistFingerprinting() const;
 
+  void Invalidate();
+
  private:
   ~OffscreenCanvas();
 
@@ -195,6 +197,7 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
   layers::TextureType mTextureType;
 
   RefPtr<layers::CanvasClient> mCanvasClient;
+  RefPtr<layers::ImageContainer> mImageContainer;
   RefPtr<OffscreenCanvasDisplayHelper> mDisplay;
 };
 
