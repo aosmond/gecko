@@ -52,6 +52,7 @@ class CanvasCaptureMediaStream;
 class File;
 class HTMLCanvasPrintState;
 class OffscreenCanvas;
+class OffscreenCanvasDisplayHelper;
 class PrintCallback;
 class PWebGLChild;
 class RequestedFrameRefreshObserver;
@@ -367,6 +368,7 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
   RefPtr<RequestedFrameRefreshObserver> mRequestedFrameRefreshObserver;
   RefPtr<CanvasRenderer> mCanvasRenderer;
   RefPtr<OffscreenCanvas> mOffscreenCanvas;
+  RefPtr<OffscreenCanvasDisplayHelper> mOffscreenDisplay;
   RefPtr<HTMLCanvasElementObserver> mContextObserver;
 
  public:
