@@ -48,7 +48,11 @@ void SharedSurface_DMABUF::ProducerReleaseImpl() { mSurface->FenceSet(); }
 
 Maybe<layers::SurfaceDescriptor> SharedSurface_DMABUF::ToSurfaceDescriptor() {
   layers::SurfaceDescriptor desc;
-  if (!mSurface->Serialize(desc)) return {};
+  if (!mSurface->Serialize(desc)) {
+	  printf_stderr("SharedSurface_DMABUF::ToSurfaceDescriptor failed\n");
+	  return {};
+  }
+	  printf_stderr("SharedSurface_DMABUF::ToSurfaceDescriptor success\n");
   return Some(desc);
 }
 

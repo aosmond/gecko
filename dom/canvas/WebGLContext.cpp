@@ -221,12 +221,11 @@ void WebGLContext::DestroyResourcesAndContext() {
 }
 
 void ClientWebGLContext::MarkCanvasDirty() {
-  if (!mCanvasElement) return;
-
   mCapturedFrameInvalidated = true;
 
   if (mIsCanvasDirty) return;
   mIsCanvasDirty = true;
+  if (!mCanvasElement) return;
 
   SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
 
@@ -947,6 +946,7 @@ Maybe<layers::SurfaceDescriptor> WebGLContext::GetFrontBuffer(
     swapChain = &xrFb->mOpaqueSwapChain;
   }
   const auto& front = swapChain->FrontBuffer();
+  printf_stderr("[AO] WebGLContext::GetFrontBuffer -- front %d\n", bool(front));
   if (!front) return {};
 
   return front->ToSurfaceDescriptor();

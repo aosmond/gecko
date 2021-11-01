@@ -359,6 +359,7 @@ void ClientWebGLContext::EndComposition() {
 void ClientWebGLContext::Present(WebGLFramebufferJS* const xrFb,
                                  const layers::TextureType type,
                                  const bool webvr) {
+  printf_stderr("[AO] ClientWebGLContext::Present -- dirty %d\n", mIsCanvasDirty);
   if (!mIsCanvasDirty && !xrFb) return;
   if (!xrFb) {
     mIsCanvasDirty = false;
@@ -374,12 +375,14 @@ Maybe<layers::SurfaceDescriptor> ClientWebGLContext::GetFrontBuffer(
 
   const auto& inProcess = mNotLost->inProcess;
   if (inProcess) {
+    printf_stderr("[AO] ClientWebGLContext::GetFrontBuffer -- in process\n");
     return inProcess->GetFrontBuffer(fb ? fb->mId : 0, vr);
   }
 
   const auto& child = mNotLost->outOfProcess;
   child->FlushPendingCmds();
   Maybe<layers::SurfaceDescriptor> ret;
+  printf_stderr("[AO] ClientWebGLContext::GetFrontBuffer -- child\n");
   if (!child->SendGetFrontBuffer(fb ? fb->mId : 0, vr, &ret)) return {};
   return ret;
 }
@@ -451,6 +454,7 @@ mozilla::dom::Document* ClientWebGLContext::GetOwnerDoc() const {
 }
 
 void ClientWebGLContext::Commit() {
+  printf_stderr("[AO] ClientWebGLContext::Commit -- offscreen canvas %p\n", mOffscreenCanvas.get());
   if (mOffscreenCanvas) {
     mOffscreenCanvas->CommitFrameToCompositor();
   }

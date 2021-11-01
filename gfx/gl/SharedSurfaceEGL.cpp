@@ -121,6 +121,7 @@ void SharedSurface_EGLImage::ProducerReadAcquireImpl() {
 }
 
 Maybe<layers::SurfaceDescriptor> SharedSurface_EGLImage::ToSurfaceDescriptor() {
+  printf_stderr("[AO] SharedSurface_EGLImage::ToSurfaceDescriptor\n");
   return Some(layers::EGLImageDescriptor((uintptr_t)mImage, (uintptr_t)mSync,
                                          mDesc.size, true));
 }
@@ -248,6 +249,7 @@ bool SharedSurface_SurfaceTexture::IsBufferAvailable() const {
 
 Maybe<layers::SurfaceDescriptor>
 SharedSurface_SurfaceTexture::ToSurfaceDescriptor() {
+  printf_stderr("[AO] SharedSurface_SurfaceTexture::ToSurfaceDescriptor\n");
   return Some(layers::SurfaceTextureDescriptor(
       mSurface->GetHandle(), mDesc.size, gfx::SurfaceFormat::R8G8B8A8,
       false /* NOT continuous */, false /* Do not ignore transform */));

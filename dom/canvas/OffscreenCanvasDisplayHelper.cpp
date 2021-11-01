@@ -27,6 +27,7 @@ OffscreenCanvasDisplayHelper::OffscreenCanvasDisplayHelper(
 OffscreenCanvasDisplayHelper::~OffscreenCanvasDisplayHelper() = default;
 
 NS_IMETHODIMP OffscreenCanvasDisplayHelper::Run() {
+  printf_stderr("[AO][%p] Run\n", this);
   if (mPendingInvalidate) {
     InvalidateElement();
   }
@@ -47,6 +48,7 @@ void OffscreenCanvasDisplayHelper::Destroy() {
 
 void OffscreenCanvasDisplayHelper::DispatchEvent() {
   if (!mPendingInvalidate) {
+    printf_stderr("[AO][%p] DispatchEvent\n", this);
     nsCOMPtr<nsIRunnable> self(this);
     NS_DispatchToMainThread(self.forget());
   }
@@ -77,11 +79,13 @@ bool OffscreenCanvasDisplayHelper::Invalidate(
   if (!mCanvasElement) {
     // Our weak reference to the canvas element has been cleared, so we cannot
     // present directly anymore.
+    printf_stderr("[AO][%p] Invalidate failed\n", this);
     return false;
   }
 
   mFrontBufferDesc = std::move(aFrontBufferDesc);
 
+  printf_stderr("[AO][%p] Invalidate queued\n", this);
   DispatchEvent();
   mPendingInvalidate = true;
   return true;
@@ -99,6 +103,7 @@ void OffscreenCanvasDisplayHelper::InvalidateElement() {
     canvasElement = mCanvasElement;
   }
 
+  printf_stderr("[AO][%p] InvalidateElement -- %p\n", this, canvasElement);
   if (canvasElement) {
     SVGObserverUtils::InvalidateDirectRenderingObservers(canvasElement);
     canvasElement->InvalidateCanvasContent(nullptr);
@@ -108,6 +113,8 @@ void OffscreenCanvasDisplayHelper::InvalidateElement() {
 Maybe<layers::SurfaceDescriptor> OffscreenCanvasDisplayHelper::GetFrontBuffer(
     WebGLFramebufferJS*, const bool webvr) {
   MutexAutoLock lock(mMutex);
+  printf_stderr("[AO][%p] GetFrontBuffer -- %d\n", this,
+                mFrontBufferDesc.isSome());
   return mFrontBufferDesc;
 }
 
@@ -123,6 +130,8 @@ bool OffscreenCanvasDisplayHelper::UpdateWebRenderCanvasData(
   if (renderer) {
     MutexAutoLock lock(mMutex);
     if (!mPendingUpdateParameters) {
+      printf_stderr("[AO][%p] UpdateWebRenderCanvasData -- reuse %p\n", this,
+                    renderer);
       return true;
     }
   }
@@ -141,6 +150,8 @@ bool OffscreenCanvasDisplayHelper::InitializeCanvasRenderer(
   MutexAutoLock lock(mMutex);
   // FIXME(aosmond): Check for context lost?
 
+  printf_stderr("[AO][%p] Initialize -- %p (%dx%d)\n", this, aRenderer, mWidth,
+                mHeight);
   layers::CanvasRendererData data;
   data.mDisplay = this;
   data.mOriginPos = gl::OriginPos::BottomLeft;

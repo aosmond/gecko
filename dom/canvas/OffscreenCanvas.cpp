@@ -101,6 +101,9 @@ void OffscreenCanvas::GetContext(
     JSContext* aCx, const OffscreenRenderingContextId& aContextId,
     JS::Handle<JS::Value> aContextOptions,
     Nullable<OwningOffscreenRenderingContext>& aResult, ErrorResult& aRv) {
+  printf_stderr("[AO] OffscreenCanvas::GetContext %p display %p\n", this,
+                mDisplay.get());
+
   if (mNeutered) {
     aResult.SetNull();
     aRv.Throw(NS_ERROR_FAILURE);
@@ -125,6 +128,7 @@ void OffscreenCanvas::GetContext(
       MOZ_FALLTHROUGH_ASSERT("Unhandled canvas type!");
     case OffscreenRenderingContextId::_2d:
       // We only support non-Canvas 2D for now.
+      MOZ_ASSERT_UNREACHABLE("Unhandled canvas type!");
       aResult.SetNull();
       aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
       return;
@@ -136,6 +140,8 @@ void OffscreenCanvas::GetContext(
     aResult.SetNull();
     return;
   }
+
+  printf_stderr("[AO] OffscreenCanvas::GetContext %p got it\n", this);
 
   MOZ_ASSERT(mCurrentContext);
   switch (mCurrentContextType) {
@@ -183,6 +189,8 @@ void OffscreenCanvas::CommitFrameToCompositor() {
     // So, just bail out.
     return;
   }
+
+  static_cast<ClientWebGLContext*>(mCurrentContext.get())->Present(nullptr, TextureType::DMABUF);
 
   Maybe<layers::SurfaceDescriptor> desc =
       mCurrentContext->GetFrontBuffer(nullptr);

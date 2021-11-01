@@ -872,6 +872,7 @@ OffscreenCanvas* HTMLCanvasElement::TransferControlToOffscreen(
     mOffscreenDisplay = MakeRefPtr<OffscreenCanvasDisplayHelper>(this);
     mOffscreenDisplay->UpdateParameters(
         sz.width, sz.height, /* aHasAlpha */ true, /* aIsPremultiplied */ true);
+    mCurrentContextType = CanvasContextType::WebGL2;
 
     mOffscreenCanvas =
         new OffscreenCanvas(win->AsGlobal(), sz.width, sz.height,
@@ -1038,6 +1039,7 @@ void HTMLCanvasElement::InvalidateCanvasContent(const gfx::Rect* damageRect) {
   // We don't need to flush anything here; if there's no frame or if
   // we plan to reframe we don't need to invalidate it anyway.
   nsIFrame* frame = GetPrimaryFrame();
+  printf_stderr("[AO] HTMLCanvasElement::InvalidateCanvasContent -- damage %p, frame %p\n", damageRect, frame);
   if (!frame) return;
 
   ActiveLayerTracker::NotifyContentChange(frame);
@@ -1056,19 +1058,23 @@ void HTMLCanvasElement::InvalidateCanvasContent(const gfx::Rect* damageRect) {
   }
 
   if (localData && wr::AsUint64(localData->mImageKey)) {
+    printf_stderr("[AO] HTMLCanvasElement::InvalidateCanvasContent -- local\n");
     localData->mDirty = true;
     frame->SchedulePaint(nsIFrame::PAINT_COMPOSITE_ONLY);
   } else if (renderer) {
+    printf_stderr("[AO] HTMLCanvasElement::InvalidateCanvasContent -- renderer\n");
     renderer->SetDirty();
     frame->SchedulePaint(nsIFrame::PAINT_COMPOSITE_ONLY);
   } else {
     if (damageRect) {
       nsIntSize size = GetWidthHeight();
       if (size.width != 0 && size.height != 0) {
+        printf_stderr("[AO] HTMLCanvasElement::InvalidateCanvasContent -- damage invalidate\n");
         gfx::IntRect invalRect = gfx::IntRect::Truncate(*damageRect);
         frame->InvalidateLayer(DisplayItemType::TYPE_CANVAS, &invalRect);
       }
     } else {
+      printf_stderr("[AO] HTMLCanvasElement::InvalidateCanvasContent -- invalidate\n");
       frame->InvalidateLayer(DisplayItemType::TYPE_CANVAS);
     }
 
@@ -1097,6 +1103,7 @@ void HTMLCanvasElement::InvalidateCanvas() {
   // We don't need to flush anything here; if there's no frame or if
   // we plan to reframe we don't need to invalidate it anyway.
   nsIFrame* frame = GetPrimaryFrame();
+  printf_stderr("[AO] HTMLCanvasElement::InvalidateCanvas -- frame %p\n", frame);
   if (!frame) return;
 
   frame->InvalidateFrame();

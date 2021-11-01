@@ -29,6 +29,7 @@ SharedSurface_Basic::SharedSurface_Basic(const SharedSurfaceDesc& desc,
     : SharedSurface(desc, std::move(fb)) {}
 
 Maybe<layers::SurfaceDescriptor> SharedSurface_Basic::ToSurfaceDescriptor() {
+  printf_stderr("[AO] SharedSurface_Basic::ToSurfaceDescriptor\n");
   return Nothing();
 }
 

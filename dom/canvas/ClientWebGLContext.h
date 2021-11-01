@@ -1039,6 +1039,7 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
   void AfterDrawCall() {
     if (!mNotLost) return;
     const auto& state = State();
+    printf_stderr("[AO] ClientWebGLContext::AfterDrawCall -- boundDrawFb %d\n", bool(state.mBoundDrawFb));
     if (!state.mBoundDrawFb) {
       MarkCanvasDirty();
     }
