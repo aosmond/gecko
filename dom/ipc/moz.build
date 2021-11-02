@@ -73,6 +73,7 @@ EXPORTS.mozilla.dom += [
     "URLClassifierParent.h",
     "UserActivationIPCUtils.h",
     "VsyncChild.h",
+    "VsyncMainChild.h",
     "VsyncParent.h",
     "WindowGlobalActor.h",
     "WindowGlobalChild.h",
@@ -135,7 +136,7 @@ UNIFIED_SOURCES += [
 SOURCES += [
     "ContentChild.cpp",
     "ProcessHangMonitor.cpp",
-    "VsyncChild.cpp",
+    "VsyncMainChild.cpp",
     "VsyncParent.cpp",
 ]
 
