@@ -108,6 +108,25 @@ class nsDisplayCanvas final : public nsPaintedDisplayItem {
         static_cast<HTMLCanvasElement*>(mFrame->GetContent());
     element->HandlePrintCallback(mFrame->PresContext());
 
+    // If we have a container, then this has an OffscreenCanvas which we update
+    // asynchronously, likely from a worker thread.
+    RefPtr<ImageContainer> container = element->GetImageContainer();
+    if (container) {
+      nsHTMLCanvasFrame* canvasFrame =
+          static_cast<nsHTMLCanvasFrame*>(mFrame);
+      nsIntSize canvasSizeInPx = canvasFrame->GetCanvasSize();
+      IntrinsicSize intrinsicSize = IntrinsicSizeFromCanvasSize(canvasSizeInPx);
+      AspectRatio intrinsicRatio = IntrinsicRatioFromCanvasSize(canvasSizeInPx);
+      nsRect area = mFrame->GetContentRectRelativeToSelf() + ToReferenceFrame();
+      nsRect dest = nsLayoutUtils::ComputeObjectDestRect(
+          area, intrinsicSize, intrinsicRatio, mFrame->StylePosition());
+      LayoutDeviceRect bounds = LayoutDeviceRect::FromAppUnits(
+          dest, mFrame->PresContext()->AppUnitsPerDevPixel());
+      aManager->CommandBuilder().PushImage(this, container, aBuilder,
+                                           aResources, aSc, bounds, bounds);
+      return true;
+    }
+
     switch (element->GetCurrentContextType()) {
       case CanvasContextType::Canvas2D:
       case CanvasContextType::WebGL1:

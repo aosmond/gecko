@@ -66,6 +66,12 @@ void OffscreenCanvasDisplayHelper::UpdateContext(
   MutexAutoLock lock(mMutex);
   mImageContainer = aContainer;
   mType = aType;
+
+  if (!mPendingInvalidate) {
+    nsCOMPtr<nsIRunnable> self(this);
+    NS_DispatchToMainThread(self.forget());
+    mPendingInvalidate = true;
+  }
 }
 
 bool OffscreenCanvasDisplayHelper::UpdateParameters(uint32_t aWidth,
@@ -138,16 +144,11 @@ bool OffscreenCanvasDisplayHelper::Invalidate(
   imageList.AppendElement(layers::ImageContainer::NonOwningImage(
       image, TimeStamp(), mLastFrameID++, mImageProducerID));
   mImageContainer->SetCurrentImages(imageList);
+  printf_stderr("[AO] SetCurrentImages\n");
 
   MutexAutoLock lock(mMutex);
   mFrontBufferDesc = std::move(desc);
   mFrontBufferSurface = std::move(surface);
-
-  if (!mPendingInvalidate) {
-    nsCOMPtr<nsIRunnable> self(this);
-    NS_DispatchToMainThread(self.forget());
-    mPendingInvalidate = true;
-  }
   return true;
 }
 

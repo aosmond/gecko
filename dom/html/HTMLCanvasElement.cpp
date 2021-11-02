@@ -1295,4 +1295,11 @@ webgpu::CanvasContext* HTMLCanvasElement::GetWebGPUContext() {
   return static_cast<webgpu::CanvasContext*>(GetCurrentContext());
 }
 
+already_AddRefed<ImageContainer> HTMLCanvasElement::GetImageContainer() {
+  if (mOffscreenDisplay) {
+    return mOffscreenDisplay->GetImageContainer();
+  }
+  return nullptr;
+}
+
 }  // namespace mozilla::dom

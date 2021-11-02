@@ -32,6 +32,7 @@ class ClientWebGLContext;
 namespace layers {
 class CanvasRenderer;
 class Image;
+class ImageContainer;
 class Layer;
 class LayerManager;
 class OOPCanvasRenderer;
@@ -356,6 +357,8 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
  public:
   ClientWebGLContext* GetWebGLContext();
   webgpu::CanvasContext* GetWebGPUContext();
+
+  already_AddRefed<layers::ImageContainer> GetImageContainer();
 
  protected:
   bool mResetLayer;
