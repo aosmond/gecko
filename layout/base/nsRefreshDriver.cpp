@@ -1892,7 +1892,7 @@ struct DocumentFrameCallbacks {
   explicit DocumentFrameCallbacks(Document* aDocument) : mDocument(aDocument) {}
 
   RefPtr<Document> mDocument;
-  nsTArray<Document::FrameRequest> mCallbacks;
+  nsTArray<FrameRequest> mCallbacks;
 };
 
 static bool HasPendingAnimations(PresShell* aPresShell) {
