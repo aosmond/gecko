@@ -200,6 +200,7 @@ void OffscreenCanvas::CommitFrameToCompositor() {
 }
 
 void OffscreenCanvas::Invalidate() {
+  printf_stderr("[AO] Queue Invalidate\n");
   RefPtr<OffscreenCanvas> self = this;
   NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
       "OffscreenCanvas::Invalidate",
