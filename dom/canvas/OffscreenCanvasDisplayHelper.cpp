@@ -211,7 +211,12 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot(gfxAlphaType* out_alphaType) {
   RefPtr<layers::TextureClient> texture =
       layers::SharedSurfaceTextureData::CreateTextureClient(
           *desc, format, gfx::IntSize(mWidth, mHeight), flags, imageBridge);
-  if (!texture) {
+  if (NS_WARN_IF(!texture)) {
+    return nullptr;
+  }
+
+  TextureClientAutoLock autoLock(texture, OpenMode::OPEN_READ);
+  if (NS_WARN_IF(!autoLock.Succeeded())) {
     return nullptr;
   }
 
