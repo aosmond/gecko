@@ -297,6 +297,8 @@ class WorkerGlobalScope : public WorkerGlobalScopeBase,
 
   void StorageAccessPermissionGranted();
 
+  virtual void OnDocumentVisible(bool aVisible) {}
+
  protected:
   ~WorkerGlobalScope();
 
