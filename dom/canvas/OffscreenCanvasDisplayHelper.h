@@ -35,7 +35,7 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
   already_AddRefed<layers::ImageContainer> GetImageContainer() const;
 
   void UpdateContext(layers::ImageContainer* aContainer,
-                     CanvasContextType aType);
+                     CanvasContextType aType, int32_t aChildId);
 
   bool UpdateParameters(uint32_t aWidth, uint32_t aHeight, bool aHasAlpha,
                         bool aIsPremultiplied);
@@ -66,6 +66,8 @@ class OffscreenCanvasDisplayHelper final : public nsICanvasRenderingDisplay,
   CanvasContextType mType = CanvasContextType::NoContext;
   uint32_t mWidth;
   uint32_t mHeight;
+  uint32_t mContextManagerId = 0;
+  int32_t mContextChildId = 0;
   mozilla::layers::ImageContainer::ProducerID mImageProducerID;
   mozilla::layers::ImageContainer::FrameID mLastFrameID = 0;
   bool mPendingInvalidate = false;

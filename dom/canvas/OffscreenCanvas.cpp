@@ -112,24 +112,24 @@ void OffscreenCanvas::GetContext(
     return;
   }
 
-  mImageContainer =
-      MakeRefPtr<layers::ImageContainer>(layers::ImageContainer::ASYNCHRONOUS);
+  int32_t childId = 0;
 
   MOZ_ASSERT(mCurrentContext);
-  if (mDisplay) {
-    mDisplay->UpdateContext(mImageContainer, mCurrentContextType);
-  }
-
   switch (mCurrentContextType) {
     case CanvasContextType::ImageBitmap:
       aResult.SetValue().SetAsImageBitmapRenderingContext() =
           *static_cast<ImageBitmapRenderingContext*>(mCurrentContext.get());
       break;
     case CanvasContextType::WebGL1:
-    case CanvasContextType::WebGL2:
-      aResult.SetValue().SetAsWebGLRenderingContext() =
-          *static_cast<ClientWebGLContext*>(mCurrentContext.get());
+    case CanvasContextType::WebGL2: {
+      auto* webgl = static_cast<ClientWebGLContext*>(mCurrentContext.get());
+      WebGLChild* webglChild = webgl->GetChild();
+      if (webglChild) {
+        childId = webglChild->Id();
+      }
+      aResult.SetValue().SetAsWebGLRenderingContext() = *webgl;
       break;
+    }
     case CanvasContextType::WebGPU:
       aResult.SetValue().SetAsGPUCanvasContext() =
           *static_cast<webgpu::CanvasContext*>(mCurrentContext.get());
@@ -139,6 +139,13 @@ void OffscreenCanvas::GetContext(
     case CanvasContextType::Canvas2D:
       aResult.SetNull();
       break;
+  }
+
+  mImageContainer =
+      MakeRefPtr<layers::ImageContainer>(layers::ImageContainer::ASYNCHRONOUS);
+
+  if (mDisplay) {
+    mDisplay->UpdateContext(mImageContainer, mCurrentContextType, childId);
   }
 }
 

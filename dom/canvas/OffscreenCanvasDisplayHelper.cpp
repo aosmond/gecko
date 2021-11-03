@@ -62,10 +62,16 @@ OffscreenCanvasDisplayHelper::GetImageContainer() const {
 }
 
 void OffscreenCanvasDisplayHelper::UpdateContext(
-    layers::ImageContainer* aContainer, CanvasContextType aType) {
+    layers::ImageContainer* aContainer, CanvasContextType aType,
+    int32_t aChildId) {
   MutexAutoLock lock(mMutex);
   mImageContainer = aContainer;
   mType = aType;
+
+  if (aChildId) {
+    mContextManagerId = CanvasManagerChild::Get()->Id();
+    mContextChildId = aChildId;
+  }
 
   if (!mPendingInvalidate) {
     nsCOMPtr<nsIRunnable> self(this);
@@ -185,9 +191,11 @@ already_AddRefed<gfx::SourceSurface>
 OffscreenCanvasDisplayHelper::GetSurfaceSnapshot(gfxAlphaType* out_alphaType) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
-  layers::TextureFlags flags = TextureFlags::NO_FLAGS;
   Maybe<layers::SurfaceDescriptor> desc;
+
+  bool hasAlpha;
+  uint32_t managerId;
+  int32_t childId;
 
   {
     MutexAutoLock lock(mMutex);
@@ -196,36 +204,16 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot(gfxAlphaType* out_alphaType) {
       return surface.forget();
     }
 
-    desc = mFrontBufferDesc;
-    if (!mHasAlpha) {
-      format = gfx::SurfaceFormat::B8G8R8X8;
-    } else if (!mIsPremultiplied) {
-      flags |= TextureFlags::NON_PREMULTIPLIED;
-    }
+    hasAlpha = mHasAlpha;
+    managerId = mContextManagerId;
+    childId = mContextChildId;
   }
 
-  if (!desc) {
+  if (NS_WARN_IF(!managerId || !childId)) {
     return nullptr;
   }
 
-  auto imageBridge = layers::ImageBridgeChild::GetSingleton();
-  if (!imageBridge) {
-    return nullptr;
-  }
-
-  RefPtr<layers::TextureClient> texture =
-      layers::SharedSurfaceTextureData::CreateTextureClient(
-          *desc, format, gfx::IntSize(mWidth, mHeight), flags, imageBridge);
-  if (NS_WARN_IF(!texture)) {
-    return nullptr;
-  }
-
-  TextureClientAutoLock autoLock(texture, OpenMode::OPEN_READ);
-  if (NS_WARN_IF(!autoLock.Succeeded())) {
-    return nullptr;
-  }
-
-  return texture->BorrowSnapshot();
+  return CanvasManagerChild::Get()->GetSnapshot(managerId, childId, hasAlpha);
 }
 
 already_AddRefed<layers::Image> OffscreenCanvasDisplayHelper::GetAsImage() {
