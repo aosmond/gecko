@@ -34,6 +34,7 @@ class nsISerialEventTarget;
 
 namespace mozilla {
 class ErrorResult;
+struct VsyncEvent;
 
 namespace extensions {
 
@@ -298,6 +299,9 @@ class WorkerGlobalScope : public WorkerGlobalScopeBase,
   void StorageAccessPermissionGranted();
 
   virtual void OnDocumentVisible(bool aVisible) {}
+
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY
+  virtual void OnVsync(const VsyncEvent& aVsync) {}
 
  protected:
   ~WorkerGlobalScope();
