@@ -28,3 +28,6 @@ interface DedicatedWorkerGlobalScope : WorkerGlobalScope {
   attribute EventHandler onmessage;
   attribute EventHandler onmessageerror;
 };
+
+// https://html.spec.whatwg.org/multipage/imagebitmap-and-animations.html#animation-frames
+DedicatedWorkerGlobalScope includes AnimationFrameProvider;
