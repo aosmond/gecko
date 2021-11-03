@@ -1111,10 +1111,6 @@ already_AddRefed<Image> HTMLCanvasElement::GetAsImage() {
     return mCurrentContext->GetAsImage();
   }
 
-  if (mOffscreenCanvas) {
-    MOZ_CRASH("todo");
-  }
-
   return nullptr;
 }
 
