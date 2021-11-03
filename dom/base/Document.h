@@ -276,6 +276,7 @@ enum class ViewportFitType : uint8_t;
 class WindowContext;
 class WindowGlobalChild;
 class WindowProxyHolder;
+class WorkerDocumentListener;
 class XPathEvaluator;
 class XPathExpression;
 class XPathNSResolver;
@@ -2125,6 +2126,9 @@ class Document : public nsINode,
    * aType >= FlushType::Style.
    */
   void FlushExternalResources(FlushType aType);
+
+  void AddWorkerDocumentListener(WorkerDocumentListener* aListener);
+  void RemoveWorkerDocumentListener(WorkerDocumentListener* aListener);
 
   // Triggers an update of <svg:use> element shadow trees.
   void UpdateSVGUseElementShadowTrees() {
@@ -5249,6 +5253,8 @@ class Document : public nsINode,
   RefPtr<ChromeObserver> mChromeObserver;
 
   RefPtr<HTMLAllCollection> mAll;
+
+  nsTHashSet<RefPtr<WorkerDocumentListener>> mWorkerListeners;
 
   // Pres shell resolution saved before entering fullscreen mode.
   float mSavedResolution;
