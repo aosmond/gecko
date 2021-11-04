@@ -179,8 +179,6 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
  private:
   ~OffscreenCanvas();
 
-  nsCOMPtr<nsIGlobalObject> GetGlobalObject() const;
-
   already_AddRefed<EncodeCompleteCallback> CreateEncodeCompleteCallback(
       nsCOMPtr<nsIGlobalObject>&& aGlobal, Promise* aPromise);
 

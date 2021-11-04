@@ -232,6 +232,9 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
     return EnsureInnerWindow() ? GetWrapper() : nullptr;
   }
 
+  // nsIGlobalObject
+  bool ShouldResistFingerprinting() const override;
+
   // nsIGlobalJSObjectHolder
   JSObject* GetGlobalJSObject() final { return GetWrapper(); }
   JSObject* GetGlobalJSObjectPreserveColor() const final {
