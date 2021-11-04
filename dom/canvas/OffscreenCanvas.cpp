@@ -338,6 +338,7 @@ bool OffscreenCanvas::ShouldResistFingerprinting() const {
 }
 
 uint32_t OffscreenCanvas::GetPrincipalHashValue() const {
+#if 0
   if (NS_IsMainThread()) {
     nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetGlobalObject());
     Document* doc = window->GetExtantDoc();
@@ -350,6 +351,7 @@ uint32_t OffscreenCanvas::GetPrincipalHashValue() const {
       return workerPrivate->GetPrincipalHashValue();
     }
   }
+#endif
   return 0;
 }
 
