@@ -272,7 +272,7 @@ already_AddRefed<Promise> OffscreenCanvas::ConvertToBlob(
     return nullptr;
   }
 
-  nsCOMPtr<nsIGlobalObject> global = GetGlobalObject();
+  nsCOMPtr<nsIGlobalObject> global = GetOwnerGlobal();
 
   RefPtr<Promise> promise = Promise::Create(global, aRv);
   if (aRv.Failed()) {
