@@ -54,7 +54,7 @@ OffscreenCanvas::OffscreenCanvas(nsIGlobalObject* aGlobal, uint32_t aWidth,
       mTextureType(aTextureType),
       mDisplay(aDisplay) {}
 
-OffscreenCanvas::~OffscreenCanvas() = default
+OffscreenCanvas::~OffscreenCanvas() = default;
 
 JSObject* OffscreenCanvas::WrapObject(JSContext* aCx,
                                       JS::Handle<JSObject*> aGivenProto) {

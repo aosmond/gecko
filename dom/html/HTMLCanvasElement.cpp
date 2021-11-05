@@ -1129,11 +1129,10 @@ bool HTMLCanvasElement::UpdateWebRenderCanvasData(
 
 bool HTMLCanvasElement::InitializeCanvasRenderer(nsDisplayListBuilder* aBuilder,
                                                  CanvasRenderer* aRenderer) {
+  MOZ_ASSERT(!mOffscreenDisplay);
+
   if (mCurrentContext) {
     return mCurrentContext->InitializeCanvasRenderer(aBuilder, aRenderer);
-  }
-  if (mOffscreenDisplay) {
-    return mOffscreenDisplay->InitializeCanvasRenderer(aBuilder, aRenderer);
   }
 
   return false;
