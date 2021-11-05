@@ -213,7 +213,7 @@ MACOSX_WORKER_TYPES = {
 }
 
 
-TEST_VARIANTS = load_yaml("taskcluster", "ci", "test", "variants.yml")
+TEST_VARIANTS = load_yaml("/home/aosmond/dev/gecko/taskcluster/ci/test/variants.yml")
 """List of available test variants defined."""
 
 DYNAMIC_CHUNK_DURATION = 20 * 60  # seconds
