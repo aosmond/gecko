@@ -14,11 +14,15 @@ namespace mozilla {
 namespace layers {
 
 class TestSurfaceAllocator final : public ISurfaceAllocator {
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(TestSurfaceAllocator, final)
+
  public:
   TestSurfaceAllocator() = default;
-  virtual ~TestSurfaceAllocator() = default;
 
   bool IsSameProcess() const override { return true; }
+
+ private:
+  ~TestSurfaceAllocator() override = default;
 };
 
 }  // namespace layers

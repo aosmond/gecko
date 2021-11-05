@@ -273,14 +273,9 @@ class CompositorBridgeParent final : public CompositorBridgeParentBase,
   friend class mozilla::ipc::ProtocolFuzzerHelper;
 #endif
 
- public:
-  NS_IMETHOD_(MozExternalRefCountType) AddRef() override {
-    return CompositorBridgeParentBase::AddRef();
-  }
-  NS_IMETHOD_(MozExternalRefCountType) Release() override {
-    return CompositorBridgeParentBase::Release();
-  }
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CompositorBridgeParent, final)
 
+ public:
   explicit CompositorBridgeParent(CompositorManagerParent* aManager,
                                   CSSToLayoutDeviceScale aScale,
                                   const TimeDuration& aVsyncRate,

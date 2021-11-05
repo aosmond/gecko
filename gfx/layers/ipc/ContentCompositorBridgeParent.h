@@ -31,6 +31,8 @@ class CompositorOptions;
 class ContentCompositorBridgeParent final : public CompositorBridgeParentBase {
   friend class CompositorBridgeParent;
 
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ContentCompositorBridgeParent, final)
+
  public:
   explicit ContentCompositorBridgeParent(CompositorManagerParent* aManager)
       : CompositorBridgeParentBase(aManager), mDestroyCalled(false) {}

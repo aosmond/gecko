@@ -66,7 +66,7 @@ mozilla::ipc::SharedMemory::SharedMemoryType OptimalShmemType();
 class ISurfaceAllocator {
  public:
   MOZ_DECLARE_REFCOUNTED_TYPENAME(ISurfaceAllocator)
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ISurfaceAllocator)
+  NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
   ISurfaceAllocator() = default;
 

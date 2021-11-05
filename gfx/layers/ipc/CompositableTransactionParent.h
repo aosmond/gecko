@@ -23,6 +23,8 @@ namespace layers {
 // so both manager protocols implement this and we keep a reference to them
 // through this interface.
 class CompositableParentManager : public HostIPCAllocator {
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CompositableParentManager, final)
+
  public:
   CompositableParentManager() = default;
 
@@ -40,6 +42,8 @@ class CompositableParentManager : public HostIPCAllocator {
   RefPtr<CompositableHost> FindCompositable(const CompositableHandle& aHandle);
 
  protected:
+  ~CompositableParentManager() override = default;
+
   /**
    * Handle the IPDL messages that affect PCompositable actors.
    */
