@@ -7,11 +7,14 @@
 #define _include_gfx_ipc_CanvasManagerParent_h__
 
 #include "mozilla/gfx/PCanvasManagerParent.h"
+#include "mozilla/layers/ISurfaceAllocator.h"
 #include "nsHashtablesFwd.h"
 
 namespace mozilla::gfx {
 
-class CanvasManagerParent final : public PCanvasManagerParent {
+class CanvasManagerParent final : public PCanvasManagerParent,
+                                  public mozilla::layers::ISurfaceAllocator,
+                                  public mozilla::ipc::IShmemAllocator {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasManagerParent, override);
 
@@ -24,6 +27,20 @@ class CanvasManagerParent final : public PCanvasManagerParent {
   void Bind(Endpoint<PCanvasManagerParent>&& aEndpoint);
   void ActorDestroy(ActorDestroyReason aWhy) override;
   already_AddRefed<PWebGLParent> AllocPWebGLParent();
+  mozilla::ipc::IPCResult RecvReadbackPixels(const SurfaceDescriptor& aDesc,
+                                             Shmem* const aOutShmem,
+                                             IntSize* const aOutSize);
+
+  bool IsSameProcess() const override;
+  mozilla::ipc::IShmemAllocator* AsShmemAllocator() override { return this; }
+
+  bool AllocShmem(size_t aSize,
+                  mozilla::ipc::SharedMemory::SharedMemoryType aShmType,
+                  mozilla::ipc::Shmem* aShmem) override;
+  bool AllocUnsafeShmem(size_t aSize,
+                        mozilla::ipc::SharedMemory::SharedMemoryType aShmType,
+                        mozilla::ipc::Shmem* aShmem) override;
+  bool DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
  private:
   static void ShutdownInternal();

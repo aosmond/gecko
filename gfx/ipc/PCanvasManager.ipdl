@@ -7,6 +7,9 @@
 
 include protocol PWebGL;
 
+using mozilla::gfx::IntSize from "mozilla/gfx/Point.h";
+using mozilla::layers::SurfaceDescriptor from "mozilla/layers/LayersSurfaces.h";
+
 namespace mozilla {
 namespace gfx {
 
@@ -23,6 +26,9 @@ namespace gfx {
 parent:
   // Actor that represents one WebGL context.
   async PWebGL();
+
+  // Readback pixel data from the surface descriptor into a shmem.
+  sync ReadbackPixels(SurfaceDescriptor aDesc) returns (Shmem shmem, IntSize size);
 };
 
 } // gfx

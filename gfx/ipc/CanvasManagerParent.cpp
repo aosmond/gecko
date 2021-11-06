@@ -8,6 +8,7 @@
 #include "mozilla/dom/WebGLParent.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/CompositorThread.h"
+#include "mozilla/layers/TextureHost.h"
 #include "mozilla/webrender/RenderThread.h"
 #include "nsIThread.h"
 
@@ -73,6 +74,32 @@ void CanvasManagerParent::ActorDestroy(ActorDestroyReason aWhy) {
 
 already_AddRefed<dom::PWebGLParent> CanvasManagerParent::AllocPWebGLParent() {
   return MakeAndAddRef<dom::WebGLParent>();
+}
+
+mozilla::ipc::IPCResult CanvasManagerParent::RecvReadbackPixels(
+    const SurfaceDescriptor& aDesc, Shmem* const aOutShmem,
+    IntSize* const aOutSize) {
+  return IPC_OK();
+}
+
+bool CanvasManagerParent::IsSameProcess() const {
+  return OtherPid() == base::GetCurrentProcId();
+}
+
+bool CanvasManagerParent::AllocShmem(
+    size_t aSize, mozilla::ipc::SharedMemory::SharedMemoryType aShmType,
+    mozilla::ipc::Shmem* aShmem) {
+  return PCanvasManagerParent::AllocShmem(aSize, aShmType, aShmem);
+}
+
+bool CanvasManagerParent::AllocUnsafeShmem(
+    size_t aSize, mozilla::ipc::SharedMemory::SharedMemoryType aShmType,
+    mozilla::ipc::Shmem* aShmem) {
+  return PCanvasManagerParent::AllocUnsafeShmem(aSize, aShmType, aShmem);
+}
+
+bool CanvasManagerParent::DeallocShmem(mozilla::ipc::Shmem& aShmem) {
+  return PCanvasManagerParent::DeallocShmem(aShmem);
 }
 
 }  // namespace mozilla::gfx
