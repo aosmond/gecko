@@ -161,12 +161,6 @@ class CompositorBridgeParentBase : public PCompositorBridgeParent,
                         mozilla::ipc::Shmem* aShmem) override;
   bool DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
-  NS_IMETHOD_(MozExternalRefCountType) AddRef() override {
-    return HostIPCAllocator::AddRef();
-  }
-  NS_IMETHOD_(MozExternalRefCountType) Release() override {
-    return HostIPCAllocator::Release();
-  }
   virtual bool IsRemote() const { return false; }
 
   virtual UniquePtr<SurfaceDescriptor> LookupSurfaceDescriptorForClientTexture(
