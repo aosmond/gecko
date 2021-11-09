@@ -5169,7 +5169,7 @@
 
 - name: gfx.offscreencanvas.enabled
   type: RelaxedAtomicBool
-  value: false
+  value: true
   mirror: always
 
 - name: gfx.omta.background-color
