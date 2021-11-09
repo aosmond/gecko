@@ -87,4 +87,57 @@ already_AddRefed<dom::PWebGLParent> CanvasManagerParent::AllocPWebGLParent() {
   return MakeAndAddRef<dom::WebGLParent>();
 }
 
+mozilla::ipc::IPCResult CanvasManagerParent::RecvInitialize(
+    const uint32_t& aId) {
+  if (!aId) {
+    return IPC_FAIL(this, "invalid id");
+  }
+  if (mId) {
+    return IPC_FAIL(this, "already initialized");
+  }
+  mId = aId;
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
+    const uint32_t& aManagerId, const int32_t& aProtocolId, Shmem* aOutShmem,
+    IntSize* aOutSize) {
+  if (!aManagerId) {
+    return IPC_FAIL(this, "invalid id");
+  }
+
+  IProtocol* actor = nullptr;
+  for (CanvasManagerParent* i : sManagers) {
+    if (i->OtherPidMaybeInvalid() == OtherPidMaybeInvalid() &&
+        i->mId == aManagerId) {
+      actor = i->Lookup(aProtocolId);
+      break;
+    }
+  }
+
+  if (!actor) {
+    return IPC_FAIL(this, "invalid actor");
+  }
+
+  if (actor->GetProtocolId() != ProtocolId::PWebGLMsgStart) {
+    return IPC_FAIL(this, "unsupported actor");
+  }
+
+  RefPtr<WebGLParent> webgl = static_cast<WebGLParent*>(actor);
+  webgl::FrontBufferSnapshotIpc buffer;
+  mozilla::ipc::IPCResult rv = webgl->GetFrontBufferSnapshot(&buffer, this);
+  if (!rv.Ok()) {
+    return IPC_FAIL(this, "front buffer failed");
+  }
+
+  if (!buffer.shmem || !buffer.shmem->IsReadable()) {
+    return IPC_FAIL(this, "invalid shmem");
+  }
+
+  *aOutShmem = std::move(buffer.shmem.ref());
+  aOutSize->width = buffer.surfSize.x;
+  aOutSize->height = buffer.surfSize.y;
+  return IPC_OK();
+}
+
 }  // namespace mozilla::gfx
