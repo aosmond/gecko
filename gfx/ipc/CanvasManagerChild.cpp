@@ -7,6 +7,7 @@
 #include "CanvasManagerChild.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
+#include "mozilla/gfx/2D.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/CompositorManagerChild.h"
 
@@ -21,7 +22,9 @@ namespace mozilla::gfx {
 // via a shutdown callback from IPCWorkerRef for worker threads.
 MOZ_THREAD_LOCAL(CanvasManagerChild*) CanvasManagerChild::sLocalManager;
 
-CanvasManagerChild::CanvasManagerChild() = default;
+Atomic<uint32_t> CanvasManagerChild::sNextId(0);
+
+CanvasManagerChild::CanvasManagerChild(uint32_t aId) : mId(aId) {}
 CanvasManagerChild::~CanvasManagerChild() = default;
 
 void CanvasManagerChild::ActorDestroy(ActorDestroyReason aReason) {
@@ -91,7 +94,7 @@ void CanvasManagerChild::Destroy() {
     return nullptr;
   }
 
-  auto manager = MakeRefPtr<CanvasManagerChild>();
+  auto manager = MakeRefPtr<CanvasManagerChild>(++sNextId);
 
   if (worker) {
     // The IPCWorkerRef will let us know when the worker is shutting down. This
@@ -122,8 +125,63 @@ void CanvasManagerChild::Destroy() {
     return nullptr;
   }
 
+  manager->SendInitialize(manager->Id());
   sLocalManager.set(manager);
   return manager;
+}
+
+already_AddRefed<DataSourceSurface> CanvasManagerChild::GetSnapshot(
+    uint32_t aManagerId, int32_t aProtocolId, bool aHasAlpha) {
+  if (!CanSend()) {
+    return nullptr;
+  }
+
+  Shmem shmem;
+  IntSize size;
+  if (!SendGetSnapshot(aManagerId, aProtocolId, &shmem, &size)) {
+    return nullptr;
+  }
+
+  if (!shmem.IsReadable()) {
+    return nullptr;
+  }
+
+  if (size.IsEmpty()) {
+    DeallocShmem(shmem);
+    return nullptr;
+  }
+
+  CheckedInt32 stride = CheckedInt32(size.width) * sizeof(uint32_t);
+  if (!stride.isValid()) {
+    DeallocShmem(shmem);
+    return nullptr;
+  }
+
+  CheckedInt32 length = stride * size.height;
+  if (!length.isValid() || size_t(length.value()) != shmem.Size<uint8_t>()) {
+    DeallocShmem(shmem);
+    return nullptr;
+  }
+
+  RefPtr<DataSourceSurface> surface =
+      Factory::CreateDataSourceSurfaceWithStride(size, SurfaceFormat::B8G8R8A8,
+                                                 stride.value(),
+                                                 /* aZero */ false);
+  if (!surface) {
+    DeallocShmem(shmem);
+    return nullptr;
+  }
+
+  gfx::DataSourceSurface::ScopedMap map(surface,
+                                        gfx::DataSourceSurface::READ_WRITE);
+  if (!map.IsMapped()) {
+    DeallocShmem(shmem);
+    return nullptr;
+  }
+
+  memcpy(map.GetData(), shmem.get<uint8_t>(), shmem.Size<uint8_t>());
+  DeallocShmem(shmem);
+  return surface.forget();
 }
 
 }  // namespace mozilla::gfx
