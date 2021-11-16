@@ -337,6 +337,9 @@ function testAPIs(contextType) {
         methods = webgl1Methods.concat(webgl2Methods);
     for (var i=0; i<methods.length; i++) {
       var r = assertFunction(gl, methods[i]);
+      if (!r) {
+        testFailed("missing method " + methods[i]);
+      }
       passed = passed && r;
     }
 
@@ -344,6 +347,7 @@ function testAPIs(contextType) {
     for (var i in gl) {
       if (typeof gl[i] == "function" && methods.indexOf(i) == -1) {
         if (!extended) {
+          testFailed("unknown extended method " + gl[i]);
           extended = true;
         }
       }
