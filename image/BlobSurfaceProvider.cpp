@@ -216,11 +216,8 @@ Maybe<BlobImageKeyData> BlobSurfaceProvider::RecordDrawing(
                         size.height,
                         uri ? uri->GetSpecOrDefault().get() : "N/A"));
 
-    AutoRestoreSVGState autoRestore(svgContext, animTime, mSVGDocumentWrapper,
-                                    contextPaint);
-
-    mSVGDocumentWrapper->UpdateViewportBounds(viewportSize);
-    mSVGDocumentWrapper->FlushImageTransformInvalidation();
+    AutoRestoreSVGState autoRestore(svgContext, viewportSize, animTime,
+                                    mSVGDocumentWrapper, contextPaint);
 
     RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     MOZ_ASSERT(ctx);  // Already checked the draw target above.

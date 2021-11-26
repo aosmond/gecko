@@ -6,6 +6,7 @@
 
 #include "2D.h"
 #include "Blur.h"
+#include "DrawTargetSkia.h"
 #include "Logging.h"
 #include "PathHelpers.h"
 #include "Tools.h"
@@ -271,6 +272,15 @@ bool DrawTarget::Unrotate(IntPoint aRotation) {
     return true;
   }
   return false;
+}
+
+already_AddRefed<DrawTarget> DrawTarget::CreateSoftwareDrawTarget(
+    const IntSize& aSize, SurfaceFormat aFormat) const {
+  auto dt = MakeRefPtr<DrawTargetSkia>();
+  if (!dt->Init(aSize, aFormat)) {
+    return nullptr;
+  }
+  return dt.forget();
 }
 
 }  // namespace gfx

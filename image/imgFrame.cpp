@@ -292,7 +292,7 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
                                     const SurfaceFormat aFormat,
                                     SamplingFilter aSamplingFilter,
                                     uint32_t aImageFlags,
-                                    gfx::BackendType aBackend) {
+                                    DrawTarget* aDrawTarget) {
   // Assert for properties that should be verified by decoders,
   // warn for properties related to bad content.
   if (!SurfaceCache::IsLegalSize(aSize)) {
@@ -306,10 +306,13 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
 
   RefPtr<DrawTarget> target;
 
-  bool canUseDataSurface = Factory::DoesBackendSupportDataDrawtarget(aBackend);
+  bool canUseDataSurface = aDrawTarget
+                               ? Factory::DoesBackendSupportDataDrawtarget(
+                                     aDrawTarget->GetBackendType())
+                               : true;
   if (canUseDataSurface) {
-    // It's safe to use data surfaces for content on this platform, so we can
-    // get away with using volatile buffers.
+    // It's safe to use data surfaces for content on this pathway, so we can
+    // get away with using shared memory buffers.
     MOZ_ASSERT(!mRawSurface, "Called imgFrame::InitWithDrawable() twice?");
 
     mRawSurface = AllocateBufferForImage(mImageSize, mFormat);
@@ -324,22 +327,17 @@ nsresult imgFrame::InitWithDrawable(gfxDrawable* aDrawable,
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
-    target = gfxPlatform::CreateDrawTargetForData(
-        mRawSurface->GetData(), mImageSize, mRawSurface->Stride(), mFormat);
+    target = Factory::CreateDrawTargetForData(
+        BackendType::SKIA, mRawSurface->GetData(), mImageSize,
+        mRawSurface->Stride(), mFormat);
   } else {
     // We can't use data surfaces for content, so we'll create an offscreen
     // surface instead.  This means if someone later calls RawAccessRef(), we
     // may have to do an expensive readback, but we warned callers about that in
     // the documentation for this method.
     MOZ_ASSERT(!mOptSurface, "Called imgFrame::InitWithDrawable() twice?");
-
-    if (gfxPlatform::GetPlatform()->SupportsAzureContentForType(aBackend)) {
-      target = gfxPlatform::GetPlatform()->CreateDrawTargetForBackend(
-          aBackend, mImageSize, mFormat);
-    } else {
-      target = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
-          mImageSize, mFormat);
-    }
+    MOZ_ASSERT(aDrawTarget);
+    target = aDrawTarget->CreateSoftwareDrawTarget(mImageSize, mFormat);
   }
 
   if (!target || !target->IsValid()) {

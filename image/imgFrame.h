@@ -83,7 +83,7 @@ class imgFrame {
   nsresult InitWithDrawable(gfxDrawable* aDrawable, const nsIntSize& aSize,
                             const SurfaceFormat aFormat,
                             SamplingFilter aSamplingFilter,
-                            uint32_t aImageFlags, gfx::BackendType aBackend);
+                            uint32_t aImageFlags, gfx::DrawTarget* aDrawTarget);
 
   DrawableFrameRef DrawableRef();
 

@@ -194,6 +194,13 @@ DrawTargetRecording::DrawTargetRecording(const DrawTargetRecording* aDT,
   mFormat = aFormat;
 }
 
+DrawTargetRecording::DrawTargetRecording(const DrawTargetRecording* aDT,
+                                         DrawTarget* aFinalDT, IntRect aRect,
+                                         SurfaceFormat aFormat)
+    : mRecorder(aDT->mRecorder), mFinalDT(aFinalDT), mRect(aRect) {
+  mFormat = aFormat;
+}
+
 DrawTargetRecording::~DrawTargetRecording() {
   mRecorder->RecordEvent(RecordedDrawTargetDestruction(ReferencePtr(this)));
 }
@@ -553,6 +560,23 @@ already_AddRefed<DrawTarget> DrawTargetRecording::CreateSimilarDrawTarget(
         "Content-process DrawTargetRecording can't create requested similar "
         "drawtarget");
   }
+  return similarDT.forget();
+}
+
+already_AddRefed<DrawTarget> DrawTargetRecording::CreateSoftwareDrawTarget(
+    const IntSize& aSize, SurfaceFormat aFormat) const {
+  RefPtr<DrawTarget> finalDT =
+      mFinalDT->CreateSoftwareDrawTarget(IntSize(1, 1), aFormat);
+  if (!finalDT) {
+    return nullptr;
+  }
+
+  MOZ_ASSERT(!finalDT->IsRecording());
+
+  RefPtr<DrawTarget> similarDT = new DrawTargetRecording(
+      this, finalDT, IntRect(IntPoint(0, 0), aSize), aFormat);
+  mRecorder->RecordEvent(
+      RecordedCreateSoftwareDrawTarget(similarDT.get(), aSize, aFormat));
   return similarDT.forget();
 }
 

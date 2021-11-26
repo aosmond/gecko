@@ -12,10 +12,15 @@
 #include "mozilla/MemoryReporting.h"
 
 class nsIRequest;
+class gfxContext;
 class gfxDrawable;
 
 namespace mozilla {
 struct MediaFeatureChange;
+
+namespace gfx {
+class DrawTarget;
+}
 
 namespace image {
 
@@ -88,6 +93,8 @@ class VectorImage final : public ImageResource, public nsIStreamListener {
       const gfx::IntSize& aSize, const Maybe<SVGImageContext>& aSVGContext,
       uint32_t aFlags);
 
+  bool MayCache(const gfx::IntSize& aSize, uint32_t aFlags) const;
+
   bool MaybeRestrictSVGContext(Maybe<SVGImageContext>& aNewSVGContext,
                                const Maybe<SVGImageContext>& aSVGContext,
                                uint32_t aFlags);
@@ -96,17 +103,17 @@ class VectorImage final : public ImageResource, public nsIStreamListener {
   already_AddRefed<gfxDrawable> CreateSVGDrawable(
       const SVGDrawingParameters& aParams);
 
-  /// Rasterize the SVG into a surface. aWillCache will be set to whether or
-  /// not the new surface was put into the cache.
+  /// Rasterize the SVG into a surface.
   already_AddRefed<gfx::SourceSurface> CreateSurface(
       const SVGDrawingParameters& aParams, gfxDrawable* aSVGDrawable,
-      bool& aWillCache);
+      gfx::DrawTarget* aDrawTarget, bool aRequestCache);
 
   /// Send a frame complete notification if appropriate. Must be called only
   /// after all drawing has been completed.
-  void SendFrameComplete(bool aDidCache, uint32_t aFlags);
+  void SendFrameComplete(uint32_t aFlags);
 
-  void Show(gfxDrawable* aDrawable, const SVGDrawingParameters& aParams);
+  void Show(gfxDrawable* aDrawable, gfxContext* aContext,
+            const SVGDrawingParameters& aParams);
 
   nsresult Init(const char* aMimeType, uint32_t aFlags);
 

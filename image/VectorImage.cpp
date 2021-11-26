@@ -707,29 +707,26 @@ VectorImage::GetFrameAtSize(const IntSize& aSize, uint32_t aWhichFrame,
                        ? 0.0f
                        : mSVGDocumentWrapper->GetCurrentTimeAsFloat();
 
-  // By using a null gfxContext, we ensure that we will always attempt to
-  // create a surface, even if we aren't capable of caching it (e.g. due to our
-  // flags, having an animation, etc). Otherwise CreateSurface will assume that
-  // the caller is capable of drawing directly to its own draw target if we
-  // cannot cache.
   Maybe<SVGImageContext> svgContext;
   SVGDrawingParameters params(
-      nullptr, decodeSize, aSize, ImageRegion::Create(decodeSize),
-      SamplingFilter::POINT, svgContext, animTime, aFlags, 1.0);
+      decodeSize, aSize, ImageRegion::Create(decodeSize), SamplingFilter::POINT,
+      svgContext, animTime, aFlags, 1.0);
 
-  bool didCache;  // Was the surface put into the cache?
+  bool requestCache = MayCache(params.size, params.flags);
 
   AutoRestoreSVGState autoRestore(params, mSVGDocumentWrapper,
                                   /* aContextPaint */ false);
 
   RefPtr<gfxDrawable> svgDrawable = CreateSVGDrawable(params);
-  RefPtr<SourceSurface> surface = CreateSurface(params, svgDrawable, didCache);
+  RefPtr<SourceSurface> surface = CreateSurface(
+      params, svgDrawable, /* aDrawTarget */ nullptr, requestCache);
   if (!surface) {
-    MOZ_ASSERT(!didCache);
     return nullptr;
   }
 
-  SendFrameComplete(didCache, params.flags);
+  if (requestCache) {
+    SendFrameComplete(params.flags);
+  }
   return surface.forget();
 }
 
@@ -850,25 +847,13 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
     float animTime =
         mHaveAnimations ? mSVGDocumentWrapper->GetCurrentTimeAsFloat() : 0.0f;
 
-    // By using a null gfxContext, we ensure that we will always attempt to
-    // create a surface, even if we aren't capable of caching it (e.g. due to
-    // our flags, having an animation, etc). Otherwise CreateSurface will assume
-    // that the caller is capable of drawing directly to its own draw target if
-    // we cannot cache.
     SVGDrawingParameters params(
-        nullptr, rasterSize, aSize, ImageRegion::Create(rasterSize),
+        rasterSize, aSize, ImageRegion::Create(rasterSize),
         SamplingFilter::POINT, aSVGContext, animTime, aFlags, 1.0);
 
     RefPtr<gfxDrawable> svgDrawable = CreateSVGDrawable(params);
     bool contextPaint = aSVGContext && aSVGContext->GetContextPaint();
     AutoRestoreSVGState autoRestore(params, mSVGDocumentWrapper, contextPaint);
-
-    mSVGDocumentWrapper->UpdateViewportBounds(params.viewportSize);
-    mSVGDocumentWrapper->FlushImageTransformInvalidation();
-
-    // Given we have no context, the default backend is fine.
-    BackendType backend =
-        gfxPlatform::GetPlatform()->GetDefaultContentBackend();
 
     // Try to create an imgFrame, initializing the surface it contains by
     // drawing our gfxDrawable into it. (We use FILTER_NEAREST since we never
@@ -876,7 +861,7 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
     auto frame = MakeNotNull<RefPtr<imgFrame>>();
     nsresult rv = frame->InitWithDrawable(
         svgDrawable, params.size, SurfaceFormat::OS_RGBA, SamplingFilter::POINT,
-        params.flags, backend);
+        params.flags, /* aDrawTarget */ nullptr);
 
     // If we couldn't create the frame, it was probably because it would end
     // up way too big. Generally it also wouldn't fit in the cache, but the
@@ -898,9 +883,9 @@ VectorImage::GetImageProvider(WindowRenderer* aRenderer,
         // no longer need rather than waiting for the cache to expire them.
         SurfaceCache::PruneImage(ImageKey(this));
       }
-
-      SendFrameComplete(/* aDidCache */ true, aFlags);
     }
+
+    SendFrameComplete(aFlags);
   }
 
   MOZ_ASSERT(provider);
@@ -975,17 +960,11 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
     SendOnUnlockedDraw(aFlags);
   }
 
-  // We should bypass the cache when:
-  // - We are using a DrawTargetRecording because we prefer the drawing commands
-  //   in general to the rasterized surface. This allows blob images to avoid
-  //   rasterized SVGs with WebRender.
-  // - The size exceeds what we are willing to cache as a rasterized surface.
-  //   We don't do this for WebRender because the performance of the fallback
-  //   path is quite bad and upscaling the SVG from the clamped size is better
-  //   than bringing the browser to a crawl.
-  if (aContext->GetDrawTarget()->GetBackendType() == BackendType::RECORDING ||
-      (!gfxVars::UseWebRender() &&
-       aSize != SurfaceCache::ClampVectorSize(aSize))) {
+  auto* drawTarget = aContext->GetDrawTarget();
+  bool usingD2D = drawTarget->GetFinalBackendType() == BackendType::DIRECT2D1_1;
+  if (drawTarget->IsRecording()) {
+    // This allows blob images to avoid rasterized SVGs and instead include
+    // them in the recording.
     aFlags |= FLAG_BYPASS_SURFACE_CACHE;
   }
 
@@ -1004,7 +983,7 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
   bool contextPaint =
       MaybeRestrictSVGContext(newSVGContext, aSVGContext, aFlags);
 
-  SVGDrawingParameters params(aContext, aSize, aSize, aRegion, aSamplingFilter,
+  SVGDrawingParameters params(aSize, aSize, aRegion, aSamplingFilter,
                               newSVGContext ? newSVGContext : aSVGContext,
                               animTime, aFlags, aOpacity);
 
@@ -1016,7 +995,7 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
   if (sourceSurface) {
     RefPtr<gfxDrawable> drawable =
         new gfxSurfaceDrawable(sourceSurface, params.size);
-    Show(drawable, params);
+    Show(drawable, aContext, params);
     return ImgDrawResult::SUCCESS;
   }
 
@@ -1028,20 +1007,33 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
   }
 
   AutoRestoreSVGState autoRestore(params, mSVGDocumentWrapper, contextPaint);
-
-  bool didCache;  // Was the surface put into the cache?
   RefPtr<gfxDrawable> svgDrawable = CreateSVGDrawable(params);
-  sourceSurface = CreateSurface(params, svgDrawable, didCache);
-  if (!sourceSurface) {
-    MOZ_ASSERT(!didCache);
-    Show(svgDrawable, params);
-    return ImgDrawResult::SUCCESS;
+
+  // Attempt to rasterize into a surface if we are able to cache the results,
+  // or if we must use an intermediate surface because the drawing will be
+  // (eventually, for recordings) with Direct2D which lacks PushLayerWithBlend
+  // support.
+  bool requestCache = MayCache(params.size, params.flags);
+  if (usingD2D || requestCache) {
+    sourceSurface =
+        CreateSurface(params, svgDrawable, drawTarget, requestCache);
+    if (sourceSurface) {
+      RefPtr<gfxDrawable> drawable =
+          new gfxSurfaceDrawable(sourceSurface, params.size);
+      Show(drawable, aContext, params);
+      if (requestCache) {
+        SendFrameComplete(params.flags);
+      }
+      return ImgDrawResult::SUCCESS;
+    }
   }
 
-  RefPtr<gfxDrawable> drawable =
-      new gfxSurfaceDrawable(sourceSurface, params.size);
-  Show(drawable, params);
-  SendFrameComplete(didCache, params.flags);
+  if (usingD2D) {
+    // If we could not get an intermediate surface, give up.
+    return ImgDrawResult::TEMPORARY_ERROR;
+  }
+
+  Show(svgDrawable, aContext, params);
   return ImgDrawResult::SUCCESS;
 }
 
@@ -1052,6 +1044,11 @@ already_AddRefed<gfxDrawable> VectorImage::CreateSVGDrawable(
 
   RefPtr<gfxDrawable> svgDrawable = new gfxCallbackDrawable(cb, aParams.size);
   return svgDrawable.forget();
+}
+
+bool VectorImage::MayCache(const IntSize& aSize, uint32_t aFlags) const {
+  return !mHaveAnimations && !(aFlags & FLAG_BYPASS_SURFACE_CACHE) &&
+         SurfaceCache::CanHold(aSize);
 }
 
 Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
@@ -1097,29 +1094,9 @@ Tuple<RefPtr<SourceSurface>, IntSize> VectorImage::LookupCachedSurface(
 
 already_AddRefed<SourceSurface> VectorImage::CreateSurface(
     const SVGDrawingParameters& aParams, gfxDrawable* aSVGDrawable,
-    bool& aWillCache) {
+    gfx::DrawTarget* aDrawTarget, bool aRequestCache) {
   MOZ_ASSERT(mSVGDocumentWrapper->IsDrawing());
   MOZ_ASSERT(!(aParams.flags & FLAG_RECORD_BLOB));
-
-  mSVGDocumentWrapper->UpdateViewportBounds(aParams.viewportSize);
-  mSVGDocumentWrapper->FlushImageTransformInvalidation();
-
-  // Determine whether or not we should put the surface to be created into
-  // the cache. If we fail, we need to reset this to false to let the caller
-  // know nothing was put in the cache.
-  aWillCache = !(aParams.flags & FLAG_BYPASS_SURFACE_CACHE) &&
-               // Refuse to cache animated images:
-               // XXX(seth): We may remove this restriction in bug 922893.
-               !mHaveAnimations &&
-               // The image is too big to fit in the cache:
-               SurfaceCache::CanHold(aParams.size);
-
-  // If we weren't given a context, then we know we just want the rasterized
-  // surface. We will create the frame below but only insert it into the cache
-  // if we actually need to.
-  if (!aWillCache && aParams.context) {
-    return nullptr;
-  }
 
   // We're about to rerasterize, which may mean that some of the previous
   // surfaces we've rasterized aren't useful anymore. We can allow them to
@@ -1127,19 +1104,8 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   // invalidation. If this image is locked, any surfaces that are still useful
   // will become locked again when Draw touches them, and the remainder will
   // eventually expire.
-  if (aWillCache) {
+  if (aRequestCache) {
     SurfaceCache::UnlockEntries(ImageKey(this));
-  }
-
-  // If there is no context, the default backend is fine.
-  BackendType backend =
-      aParams.context ? aParams.context->GetDrawTarget()->GetBackendType()
-                      : gfxPlatform::GetPlatform()->GetDefaultContentBackend();
-
-  if (backend == BackendType::DIRECT2D1_1) {
-    // We don't want to draw arbitrary content with D2D anymore
-    // because it doesn't support PushLayerWithBlend so switch to skia
-    backend = BackendType::SKIA;
   }
 
   // Try to create an imgFrame, initializing the surface it contains by drawing
@@ -1147,13 +1113,12 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   auto frame = MakeNotNull<RefPtr<imgFrame>>();
   nsresult rv = frame->InitWithDrawable(
       aSVGDrawable, aParams.size, SurfaceFormat::OS_RGBA, SamplingFilter::POINT,
-      aParams.flags, backend);
+      aParams.flags, aDrawTarget);
 
   // If we couldn't create the frame, it was probably because it would end
   // up way too big. Generally it also wouldn't fit in the cache, but the prefs
   // could be set such that the cache isn't the limiting factor.
   if (NS_FAILED(rv)) {
-    aWillCache = false;
     return nullptr;
   }
 
@@ -1161,13 +1126,12 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
   // already been purged by the operating system.
   RefPtr<SourceSurface> surface = frame->GetSourceSurface();
   if (!surface) {
-    aWillCache = false;
     return nullptr;
   }
 
   // We created the frame, but only because we had no context to draw to
   // directly. All the caller wants is the surface in this case.
-  if (!aWillCache) {
+  if (!aRequestCache) {
     return surface.forget();
   }
 
@@ -1183,19 +1147,12 @@ already_AddRefed<SourceSurface> VectorImage::CreateSurface(
       // need rather than waiting for the cache to expire them.
       SurfaceCache::PruneImage(ImageKey(this));
     }
-  } else {
-    aWillCache = false;
   }
 
   return surface.forget();
 }
 
-void VectorImage::SendFrameComplete(bool aDidCache, uint32_t aFlags) {
-  // If the cache was not updated, we have nothing to do.
-  if (!aDidCache) {
-    return;
-  }
-
+void VectorImage::SendFrameComplete(uint32_t aFlags) {
   // Send out an invalidation so that surfaces that are still in use get
   // re-locked. See the discussion of the UnlockSurfaces call above.
   if (!(aFlags & FLAG_ASYNC_NOTIFY)) {
@@ -1214,24 +1171,24 @@ void VectorImage::SendFrameComplete(bool aDidCache, uint32_t aFlags) {
   }
 }
 
-void VectorImage::Show(gfxDrawable* aDrawable,
+void VectorImage::Show(gfxDrawable* aDrawable, gfxContext* aContext,
                        const SVGDrawingParameters& aParams) {
   // The surface size may differ from the size at which we wish to draw. As
   // such, we may need to adjust the context/region to take this into account.
-  gfxContextMatrixAutoSaveRestore saveMatrix(aParams.context);
+  gfxContextMatrixAutoSaveRestore saveMatrix(aContext);
   ImageRegion region(aParams.region);
   if (aParams.drawSize != aParams.size) {
     gfx::Size scale(double(aParams.drawSize.width) / aParams.size.width,
                     double(aParams.drawSize.height) / aParams.size.height);
-    aParams.context->Multiply(gfxMatrix::Scaling(scale.width, scale.height));
+    aContext->Multiply(gfxMatrix::Scaling(scale.width, scale.height));
     region.Scale(1.0 / scale.width, 1.0 / scale.height);
   }
 
   MOZ_ASSERT(aDrawable, "Should have a gfxDrawable by now");
-  gfxUtils::DrawPixelSnapped(aParams.context, aDrawable,
-                             SizeDouble(aParams.size), region,
-                             SurfaceFormat::OS_RGBA, aParams.samplingFilter,
-                             aParams.flags, aParams.opacity, false);
+  gfxUtils::DrawPixelSnapped(aContext, aDrawable, SizeDouble(aParams.size),
+                             region, SurfaceFormat::OS_RGBA,
+                             aParams.samplingFilter, aParams.flags,
+                             aParams.opacity, false);
 
   AutoProfilerImagePaintMarker PROFILER_RAII(this);
 #ifdef DEBUG

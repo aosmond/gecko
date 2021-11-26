@@ -21,11 +21,12 @@ class MOZ_STACK_CLASS AutoRestoreSVGState final {
   AutoRestoreSVGState(const SVGDrawingParameters& aParams,
                       SVGDocumentWrapper* aSVGDocumentWrapper,
                       bool aContextPaint)
-      : AutoRestoreSVGState(aParams.svgContext, aParams.animationTime,
-                            aSVGDocumentWrapper, aContextPaint) {}
+      : AutoRestoreSVGState(aParams.svgContext, aParams.viewportSize,
+                            aParams.animationTime, aSVGDocumentWrapper,
+                            aContextPaint) {}
 
   AutoRestoreSVGState(const Maybe<SVGImageContext>& aSVGContext,
-                      float aAnimationTime,
+                      const nsIntSize& aViewportSize, float aAnimationTime,
                       SVGDocumentWrapper* aSVGDocumentWrapper,
                       bool aContextPaint)
       : mIsDrawing(aSVGDocumentWrapper->mIsDrawing)
@@ -47,6 +48,9 @@ class MOZ_STACK_CLASS AutoRestoreSVGState final {
       mContextPaint.emplace(*aSVGContext->GetContextPaint(),
                             *aSVGDocumentWrapper->GetDocument());
     }
+
+    aSVGDocumentWrapper->UpdateViewportBounds(aViewportSize);
+    aSVGDocumentWrapper->FlushImageTransformInvalidation();
   }
 
  private:

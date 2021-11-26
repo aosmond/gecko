@@ -27,6 +27,9 @@ class DrawTargetRecording : public DrawTarget {
   virtual BackendType GetBackendType() const override {
     return BackendType::RECORDING;
   }
+  virtual BackendType GetFinalBackendType() const override {
+    return mFinalDT->GetFinalBackendType();
+  }
   virtual bool IsRecording() const override { return true; }
 
   virtual void Link(const char* aDestination, const Rect& aRect) override;
@@ -300,6 +303,13 @@ class DrawTargetRecording : public DrawTarget {
   virtual already_AddRefed<DrawTarget> CreateSimilarDrawTargetWithBacking(
       const IntSize& aSize, SurfaceFormat aFormat) const override;
 
+  /**
+   * Create a software-backed DrawTarget whose snapshot may be used with this
+   * DrawTarget.
+   */
+  already_AddRefed<DrawTarget> CreateSoftwareDrawTarget(
+      const IntSize& aSize, SurfaceFormat aFormat) const override;
+
   bool CanCreateSimilarDrawTarget(const IntSize& aSize,
                                   SurfaceFormat aFormat) const override;
   /**
@@ -366,6 +376,18 @@ class DrawTargetRecording : public DrawTarget {
    */
   DrawTargetRecording(const DrawTargetRecording* aDT, IntRect aRect,
                       SurfaceFormat aFormat);
+
+  /**
+   * Used for creating a DrawTargetRecording for a CreateSoftwareDrawTarget
+   * call.
+   *
+   * @param aDT DrawTargetRecording on which CreateSoftwareDrawTarget was called
+   * @param aFinalDT DrawTarget backing the new DrawTargetRecording
+   * @param aSize size of the the similar DrawTarget
+   * @param aFormat format of the similar DrawTarget
+   */
+  DrawTargetRecording(const DrawTargetRecording* aDT, DrawTarget* aFinalDT,
+                      IntRect aRect, SurfaceFormat aFormat);
 
   Path* GetPathForPathRecording(const Path* aPath) const;
   already_AddRefed<PathRecording> EnsurePathStored(const Path* aPath);

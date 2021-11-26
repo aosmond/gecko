@@ -1063,6 +1063,7 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
   virtual DrawTargetType GetType() const = 0;
 
   virtual BackendType GetBackendType() const = 0;
+  virtual BackendType GetFinalBackendType() const { return GetBackendType(); }
 
   virtual bool IsRecording() const { return false; }
 
@@ -1474,6 +1475,13 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
       const IntSize& aSize, SurfaceFormat aFormat) const {
     return CreateSimilarDrawTarget(aSize, aFormat);
   }
+
+  /**
+   * Create a software-backed DrawTarget whose snapshot may be used with this
+   * DrawTarget.
+   */
+  virtual already_AddRefed<DrawTarget> CreateSoftwareDrawTarget(
+      const IntSize& aSize, SurfaceFormat aFormat) const;
 
   /**
    * Create a DrawTarget whose snapshot is optimized for use with this

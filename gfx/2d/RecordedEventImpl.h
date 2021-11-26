@@ -132,6 +132,36 @@ class RecordedCreateSimilarDrawTarget
   MOZ_IMPLICIT RecordedCreateSimilarDrawTarget(S& aStream);
 };
 
+class RecordedCreateSoftwareDrawTarget
+    : public RecordedEventDerived<RecordedCreateSoftwareDrawTarget> {
+ public:
+  RecordedCreateSoftwareDrawTarget(ReferencePtr aRefPtr, const IntSize& aSize,
+                                   SurfaceFormat aFormat)
+      : RecordedEventDerived(CREATESOFTWAREDRAWTARGET),
+        mRefPtr(aRefPtr),
+        mSize(aSize),
+        mFormat(aFormat) {}
+
+  bool PlayEvent(Translator* aTranslator) const override;
+
+  template <class S>
+  void Record(S& aStream) const;
+  virtual void OutputSimpleEventInfo(
+      std::stringstream& aStringStream) const override;
+
+  std::string GetName() const override { return "CreateSoftwareDrawTarget"; }
+
+  ReferencePtr mRefPtr;
+  IntSize mSize;
+  SurfaceFormat mFormat;
+
+ private:
+  friend class RecordedEvent;
+
+  template <class S>
+  MOZ_IMPLICIT RecordedCreateSoftwareDrawTarget(S& aStream);
+};
+
 class RecordedCreateClippedDrawTarget
     : public RecordedDrawingEvent<RecordedCreateClippedDrawTarget> {
  public:
@@ -2019,6 +2049,51 @@ inline void RecordedCreateSimilarDrawTarget::OutputSimpleEventInfo(
     std::stringstream& aStringStream) const {
   aStringStream << "[" << mRefPtr
                 << "] CreateSimilarDrawTarget (Size: " << mSize.width << "x"
+                << mSize.height << ")";
+}
+
+inline bool RecordedCreateSoftwareDrawTarget::PlayEvent(
+    Translator* aTranslator) const {
+  RefPtr<DrawTarget> drawTarget = aTranslator->GetReferenceDrawTarget();
+  if (!drawTarget) {
+    // We might end up with a null reference draw target due to a device
+    // failure, just return false so that we can recover.
+    return false;
+  }
+
+  RefPtr<DrawTarget> newDT =
+      drawTarget->CreateSoftwareDrawTarget(mSize, mFormat);
+
+  // If we couldn't create a DrawTarget this will probably cause us to crash
+  // with nullptr later in the playback, so return false to abort.
+  if (!newDT) {
+    return false;
+  }
+
+  aTranslator->AddDrawTarget(mRefPtr, newDT);
+  return true;
+}
+
+template <class S>
+void RecordedCreateSoftwareDrawTarget::Record(S& aStream) const {
+  WriteElement(aStream, mRefPtr);
+  WriteElement(aStream, mSize);
+  WriteElement(aStream, mFormat);
+}
+
+template <class S>
+RecordedCreateSoftwareDrawTarget::RecordedCreateSoftwareDrawTarget(S& aStream)
+    : RecordedEventDerived(CREATESOFTWAREDRAWTARGET) {
+  ReadElement(aStream, mRefPtr);
+  ReadElement(aStream, mSize);
+  ReadElementConstrained(aStream, mFormat, SurfaceFormat::A8R8G8B8_UINT32,
+                         SurfaceFormat::UNKNOWN);
+}
+
+inline void RecordedCreateSoftwareDrawTarget::OutputSimpleEventInfo(
+    std::stringstream& aStringStream) const {
+  aStringStream << "[" << mRefPtr
+                << "] CreateSoftwareDrawTarget (Size: " << mSize.width << "x"
                 << mSize.height << ")";
 }
 
@@ -4030,6 +4105,7 @@ inline void RecordedDestination::OutputSimpleEventInfo(
   f(FILTERNODESETATTRIBUTE, RecordedFilterNodeSetAttribute);       \
   f(FILTERNODESETINPUT, RecordedFilterNodeSetInput);               \
   f(CREATESIMILARDRAWTARGET, RecordedCreateSimilarDrawTarget);     \
+  f(CREATESOFTWAREDRAWTARGET, RecordedCreateSoftwareDrawTarget);   \
   f(CREATECLIPPEDDRAWTARGET, RecordedCreateClippedDrawTarget);     \
   f(CREATEDRAWTARGETFORFILTER, RecordedCreateDrawTargetForFilter); \
   f(FONTDATA, RecordedFontData);                                   \
