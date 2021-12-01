@@ -1867,7 +1867,7 @@ ImgDrawResult nsImageFrame::DisplayAltFeedbackWithoutLayer(
                                         getter_AddRefs(provider));
       if (provider) {
         bool wrResult = aManager->CommandBuilder().PushImageProvider(
-            aItem, provider, aBuilder, aResources, destRect, bounds);
+            aItem, provider, result, aBuilder, aResources, destRect, bounds);
         result &= wrResult ? ImgDrawResult::SUCCESS : ImgDrawResult::NOT_READY;
       } else {
         // We don't use &= here because we want the result to be NOT_READY so
@@ -2145,8 +2145,9 @@ bool nsDisplayImage::CreateWebRenderCommands(
         ImgDrawResult newDrawResult = mPrevImage->GetImageProvider(
             aManager->LayerManager(), decodeSize, svgContext, region, prevFlags,
             getter_AddRefs(prevProvider));
-        if (prevProvider && newDrawResult == ImgDrawResult::SUCCESS) {
-          drawResult = newDrawResult;
+        if (prevProvider && (newDrawResult == ImgDrawResult::SUCCESS ||
+                             newDrawResult == ImgDrawResult::SUBSTITUTED)) {
+          drawResult = ImgDrawResult::SUBSTITUTED;
           provider = std::move(prevProvider);
           flags = prevFlags;
           break;
@@ -2176,7 +2177,7 @@ bool nsDisplayImage::CreateWebRenderCommands(
   // help us. Hence we can ignore the return value from PushImage.
   if (provider) {
     aManager->CommandBuilder().PushImageProvider(
-        this, provider, aBuilder, aResources, destRect, destRect);
+        this, provider, drawResult, aBuilder, aResources, destRect, destRect);
   }
 
   nsDisplayItemGenericImageGeometry::UpdateDrawResult(this, drawResult);

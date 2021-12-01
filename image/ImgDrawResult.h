@@ -29,6 +29,10 @@ namespace image {
  * StartDecodingWithResult. This should probably go away eventually, somehow,
  * see bug 1471583.
  *
+ * SUBSTITUTED: The image was drawn successfully, but we used a substitute
+ * because the preferred size is still decoding. We should invalidate greedily
+ * in this case.
+ *
  * INCOMPLETE: We successfully drew a frame that was partially decoded. (Note
  * that successfully drawing a partially decoded frame may not actually draw any
  * pixels!) Drawing again with FLAG_SYNC_DECODE would improve the result.
@@ -56,9 +60,8 @@ namespace image {
  *                otherwise valid.
  */
 enum class [[nodiscard]] ImgDrawResult : uint8_t{
-    SUCCESS,      SUCCESS_NOT_COMPLETE, INCOMPLETE, WRONG_SIZE,
-    NOT_READY,    TEMPORARY_ERROR,      BAD_IMAGE,  BAD_ARGS,
-    NOT_SUPPORTED};
+    SUCCESS,   SUCCESS_NOT_COMPLETE, SUBSTITUTED, INCOMPLETE, WRONG_SIZE,
+    NOT_READY, TEMPORARY_ERROR,      BAD_IMAGE,   BAD_ARGS,   NOT_SUPPORTED};
 
 /**
  * You can combine ImgDrawResults with &. By analogy to bitwise-&, the result is
