@@ -86,7 +86,6 @@ UNIFIED_SOURCES += [
     "ImageBitmap.cpp",
     "ImageBitmapRenderingContext.cpp",
     "ImageData.cpp",
-    "nsICanvasRenderingContextInternal.cpp",
     "OffscreenCanvas.cpp",
     "XRWebGLLayer.cpp",
 ]
@@ -94,6 +93,7 @@ UNIFIED_SOURCES += [
 SOURCES += [
     "DrawTargetWebgl.cpp",  # Isolate Skia
     "ImageUtils.cpp",
+    "nsICanvasRenderingContextInternal.cpp",
 ]
 
 # WebGL Sources
