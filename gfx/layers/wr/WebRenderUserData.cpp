@@ -277,9 +277,16 @@ bool WebRenderImageProviderData::Invalidate(ImageProviderId aProviderId) const {
     return false;
   }
 
-  if (mDrawResult != ImgDrawResult::SUCCESS &&
-      mDrawResult != ImgDrawResult::BAD_IMAGE) {
-    return false;
+  switch (mDrawResult) {
+    case ImgDrawResult::SUCCESS:
+    case ImgDrawResult::SUCCESS_NOT_COMPLETE:
+    case ImgDrawResult::INCOMPLETE:
+    case ImgDrawResult::BAD_IMAGE:
+      // We don't need to invalidate for incomplete images because imagelib will
+      // issue a resource update directly instead of requiring a scene rebuild.
+      break;
+    default:
+      return false;
   }
 
   wr::ImageKey key = {};

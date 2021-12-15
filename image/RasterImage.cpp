@@ -625,19 +625,21 @@ RasterImage::GetImageProvider(WindowRenderer* aRenderer,
     return ImgDrawResult::NOT_READY;
   }
 
-  if (!result.Surface()->IsFinished()) {
-    result.Surface().TakeProvider(aProvider);
-    return ImgDrawResult::INCOMPLETE;
-  }
-
-  result.Surface().TakeProvider(aProvider);
+  ImgDrawResult drawResult = ImgDrawResult::SUCCESS;
   switch (result.Type()) {
     case MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND:
     case MatchType::SUBSTITUTE_BECAUSE_PENDING:
-      return ImgDrawResult::WRONG_SIZE;
+      drawResult = ImgDrawResult::WRONG_SIZE;
+      break;
     default:
-      return ImgDrawResult::SUCCESS;
+      if (!result.Surface()->IsFinished()) {
+        drawResult = ImgDrawResult::INCOMPLETE;
+      }
+      break;
   }
+
+  result.Surface().TakeProvider(aProvider);
+  return drawResult;
 }
 
 size_t RasterImage::SizeOfSourceWithComputedFallback(
