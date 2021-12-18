@@ -1495,7 +1495,7 @@
 
 # Add support for canvas path objects
 - name: canvas.path.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: true
   mirror: always
 
