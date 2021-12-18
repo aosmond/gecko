@@ -15,6 +15,7 @@ interface OffscreenCanvasRenderingContext2D {
 };
 
 OffscreenCanvasRenderingContext2D includes CanvasDrawImage;
+OffscreenCanvasRenderingContext2D includes CanvasDrawPath;
 OffscreenCanvasRenderingContext2D includes CanvasFillStrokeStyles;
-//OffscreenCanvasRenderingContext2D includes CanvasImageData;
+OffscreenCanvasRenderingContext2D includes CanvasImageData;
 OffscreenCanvasRenderingContext2D includes CanvasRect;
