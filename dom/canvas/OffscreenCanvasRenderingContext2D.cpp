@@ -40,7 +40,9 @@ nsIGlobalObject* OffscreenCanvasRenderingContext2D::GetParentObject() const {
   return mOffscreenCanvas->GetOwnerGlobal();
 }
 
-void OffscreenCanvasRenderingContext2D::Commit() {}
+void OffscreenCanvasRenderingContext2D::Commit() {
+  mOffscreenCanvas->CommitFrameToCompositor();
+}
 
 }  // namespace dom
 }  // namespace mozilla
