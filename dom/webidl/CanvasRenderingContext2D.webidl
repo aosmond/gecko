@@ -338,7 +338,7 @@ interface mixin CanvasHitRegions {
   [Pref="canvas.hitregions.enabled"] void clearHitRegions();
 };
 
-[Exposed=Window]
+[Exposed=(Window,Worker)]
 interface CanvasGradient {
   // opaque object
   [Throws]
@@ -346,7 +346,7 @@ interface CanvasGradient {
   void addColorStop(float offset, UTF8String color);
 };
 
-[Exposed=Window]
+[Exposed=(Window,Worker)]
 interface CanvasPattern {
   // opaque object
   // [Throws, LenientFloat] - could not do this overload because of bug 1020975
