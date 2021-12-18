@@ -40,7 +40,11 @@ class OffscreenCanvasRenderingContext2D final
 
   void Commit();
 
+  void OnShutdown() override;
+
  private:
+  bool AlreadyShutDown() const override { return !mShutdownObserver; }
+
   ~OffscreenCanvasRenderingContext2D() override;
 
   RefPtr<OffscreenCanvasShutdownObserver> mShutdownObserver;

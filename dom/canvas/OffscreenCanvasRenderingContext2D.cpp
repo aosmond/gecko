@@ -76,6 +76,11 @@ nsIGlobalObject* OffscreenCanvasRenderingContext2D::GetParentObject() const {
   return mOffscreenCanvas->GetOwnerGlobal();
 }
 
+void OffscreenCanvasRenderingContext2D::OnShutdown() {
+  CanvasRenderingContext2D::OnShutdown();
+  mShutdownObserver = nullptr;
+}
+
 void OffscreenCanvasRenderingContext2D::Commit() {
   mOffscreenCanvas->CommitFrameToCompositor();
 }

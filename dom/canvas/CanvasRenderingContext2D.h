@@ -512,7 +512,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   // return true and fills in the bound rect if element has a hit region.
   bool GetHitRegionRect(Element* aElement, nsRect& aRect) override;
 
-  void OnShutdown();
+  virtual void OnShutdown();
 
   /**
    * Update CurrentState().filter with the filter description for
@@ -746,7 +746,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
 
   RefPtr<CanvasShutdownObserver> mShutdownObserver;
   void RemoveShutdownObserver();
-  bool AlreadyShutDown() const { return !mShutdownObserver; }
+  virtual bool AlreadyShutDown() const { return !mShutdownObserver; }
 
   /**
    * Flag to avoid duplicate calls to InvalidateFrame. Set to true whenever
