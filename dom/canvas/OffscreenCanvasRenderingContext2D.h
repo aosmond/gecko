@@ -43,11 +43,14 @@ class OffscreenCanvasRenderingContext2D final
   void OnShutdown() override;
 
  private:
-  bool AlreadyShutDown() const override { return !mShutdownObserver; }
+  bool AlreadyShutDown() const override {
+    return !mOffscreenShutdownObserver &&
+           CanvasRenderingContext2D::AlreadyShutDown();
+  }
 
   ~OffscreenCanvasRenderingContext2D() override;
 
-  RefPtr<OffscreenCanvasShutdownObserver> mShutdownObserver;
+  RefPtr<OffscreenCanvasShutdownObserver> mOffscreenShutdownObserver;
   RefPtr<WeakWorkerRef> mWorkerRef;
 };
 

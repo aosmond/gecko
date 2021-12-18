@@ -53,16 +53,17 @@ OffscreenCanvasRenderingContext2D::OffscreenCanvasRenderingContext2D(
     : CanvasRenderingContext2D(aCompositorBackend) {
   WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
   if (workerPrivate) {
-    mShutdownObserver = MakeAndAddRef<OffscreenCanvasShutdownObserver>(this);
+    mOffscreenShutdownObserver =
+        MakeAndAddRef<OffscreenCanvasShutdownObserver>(this);
     mWorkerRef = WeakWorkerRef::Create(
         workerPrivate,
-        [observer = mShutdownObserver] { observer->OnShutdown(); });
+        [observer = mOffscreenShutdownObserver] { observer->OnShutdown(); });
   }
 }
 
 OffscreenCanvasRenderingContext2D::~OffscreenCanvasRenderingContext2D() {
-  if (mShutdownObserver) {
-    mShutdownObserver->ClearOwner();
+  if (mOffscreenShutdownObserver) {
+    mOffscreenShutdownObserver->ClearOwner();
   }
 }
 
@@ -78,7 +79,7 @@ nsIGlobalObject* OffscreenCanvasRenderingContext2D::GetParentObject() const {
 
 void OffscreenCanvasRenderingContext2D::OnShutdown() {
   CanvasRenderingContext2D::OnShutdown();
-  mShutdownObserver = nullptr;
+  mOffscreenShutdownObserver = nullptr;
 }
 
 void OffscreenCanvasRenderingContext2D::Commit() {
