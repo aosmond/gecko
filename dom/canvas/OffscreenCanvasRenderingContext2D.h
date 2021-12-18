@@ -16,6 +16,8 @@ class nsIGlobalObject;
 namespace mozilla {
 namespace dom {
 class OffscreenCanvas;
+class OffscreenCanvasShutdownObserver;
+class WeakWorkerRef;
 
 class OffscreenCanvasRenderingContext2D final
     : public CanvasRenderingContext2D {
@@ -40,6 +42,9 @@ class OffscreenCanvasRenderingContext2D final
 
  private:
   ~OffscreenCanvasRenderingContext2D() override;
+
+  RefPtr<OffscreenCanvasShutdownObserver> mShutdownObserver;
+  RefPtr<WeakWorkerRef> mWorkerRef;
 };
 
 }  // namespace dom

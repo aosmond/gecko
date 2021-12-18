@@ -985,8 +985,11 @@ CanvasRenderingContext2D::CanvasRenderingContext2D(
       mWriteOnly(false) {
   sNumLivingContexts++;
 
-  mShutdownObserver = new CanvasShutdownObserver(this);
-  nsContentUtils::RegisterShutdownObserver(mShutdownObserver);
+  // For workers, OffscreenCanvasRenderingContext does the observation.
+  if (NS_IsMainThread()) {
+    mShutdownObserver = new CanvasShutdownObserver(this);
+    nsContentUtils::RegisterShutdownObserver(mShutdownObserver);
+  }
 }
 
 CanvasRenderingContext2D::~CanvasRenderingContext2D() {
