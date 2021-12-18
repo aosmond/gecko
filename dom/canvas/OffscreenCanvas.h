@@ -34,7 +34,7 @@ class ImageBitmap;
 struct ImageEncodeOptions;
 
 using OwningOffscreenRenderingContext = class
-    OwningImageBitmapRenderingContextOrWebGLRenderingContextOrWebGL2RenderingContextOrGPUCanvasContext;
+    OwningOffscreenCanvasRenderingContext2DOrImageBitmapRenderingContextOrWebGLRenderingContextOrWebGL2RenderingContextOrGPUCanvasContext;
 
 // This is helper class for transferring OffscreenCanvas to worker thread.
 // Because OffscreenCanvas is not thread-safe. So we cannot pass Offscreen-

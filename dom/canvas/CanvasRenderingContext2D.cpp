@@ -817,6 +817,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CanvasRenderingContext2D)
   // Make sure we remove ourselves from the list of demotable contexts (raw
   // pointers), since we're logically destructed at this point.
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCanvasElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mOffscreenCanvas)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocShell)
   for (uint32_t i = 0; i < tmp->mStyleStack.Length(); i++) {
     ImplCycleCollectionUnlink(tmp->mStyleStack[i].patternStyles[Style::STROKE]);
@@ -845,6 +846,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CanvasRenderingContext2D)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCanvasElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOffscreenCanvas)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocShell)
   for (uint32_t i = 0; i < tmp->mStyleStack.Length(); i++) {
     ImplCycleCollectionTraverse(
@@ -1130,14 +1132,14 @@ nsresult CanvasRenderingContext2D::Redraw() {
 
   mIsEntireFrameInvalid = true;
 
-  if (!mCanvasElement) {
+  if (mCanvasElement) {
+    SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
+    mCanvasElement->InvalidateCanvasContent(nullptr);
+  } else if (mOffscreenCanvas) {
+    mOffscreenCanvas->QueueCommitToCompositor();
+  } else {
     NS_ASSERTION(mDocShell, "Redraw with no canvas element or docshell!");
-    return NS_OK;
   }
-
-  SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
-
-  mCanvasElement->InvalidateCanvasContent(nullptr);
 
   return NS_OK;
 }
@@ -1156,14 +1158,14 @@ void CanvasRenderingContext2D::Redraw(const gfx::Rect& aR) {
     return;
   }
 
-  if (!mCanvasElement) {
+  if (mCanvasElement) {
+    SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
+    mCanvasElement->InvalidateCanvasContent(&aR);
+  } else if (mOffscreenCanvas) {
+    mOffscreenCanvas->QueueCommitToCompositor();
+  } else {
     NS_ASSERTION(mDocShell, "Redraw with no canvas element or docshell!");
-    return;
   }
-
-  SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
-
-  mCanvasElement->InvalidateCanvasContent(&aR);
 }
 
 void CanvasRenderingContext2D::DidRefresh() {}

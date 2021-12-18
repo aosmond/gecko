@@ -70,9 +70,10 @@ struct DOMMatrix2DInit;
 /**
  ** CanvasRenderingContext2D
  **/
-class CanvasRenderingContext2D final : public nsICanvasRenderingContextInternal,
-                                       public nsWrapperCache,
-                                       public BasicRenderingContext2D {
+class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
+                                 public nsWrapperCache,
+                                 public BasicRenderingContext2D {
+ protected:
   virtual ~CanvasRenderingContext2D();
 
  public:
