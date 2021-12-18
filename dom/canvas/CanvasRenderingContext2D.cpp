@@ -20,6 +20,8 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/HTMLCanvasElement.h"
 #include "mozilla/dom/GeneratePlaceholderCanvasData.h"
+#include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerRunnable.h"
 #include "nsPresContext.h"
 
 #include "nsIInterfaceRequestorUtils.h"
@@ -1509,6 +1511,12 @@ PresShell* CanvasRenderingContext2D::GetPresShell() {
   }
   if (mDocShell) {
     return mDocShell->GetPresShell();
+  }
+  if (NS_IsMainThread() && mOffscreenCanvas) {
+    Document* doc = mOffscreenCanvas->GetOwnerDoc();
+    if (doc) {
+      return doc->GetPresShell();
+    }
   }
   return nullptr;
 }
@@ -3253,11 +3261,53 @@ void CanvasRenderingContext2D::TransformWillUpdate() {
 
 void CanvasRenderingContext2D::SetFont(const nsACString& aFont,
                                        ErrorResult& aError) {
-  SetFontInternal(aFont, aError);
+  if (NS_IsMainThread()) {
+    SetFontInternal(aFont, aError);
+    return;
+  }
+
+  class SetFontRunnable final : public WorkerMainThreadRunnable {
+   public:
+    SetFontRunnable(WorkerPrivate* aWorkerPrivate,
+                    CanvasRenderingContext2D* aContext, const nsACString& aFont,
+                    ErrorResult& aError)
+        : WorkerMainThreadRunnable(aWorkerPrivate,
+                                   "CanvasRenderingContext2D::SetFont"_ns),
+          mContext(aContext),
+          mFont(aFont),
+          mError(aError) {}
+
+    bool MainThreadRun() override {
+      mContext->SetFontInternal(mFont, mError);
+      return true;
+    }
+
+   private:
+    CanvasRenderingContext2D* mContext;
+    const nsACString& mFont;
+    ErrorResult& mError;
+  };
+
+  WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
+  if (!workerPrivate) {
+    aError = NS_ERROR_FAILURE;
+    return;
+  }
+
+  auto runnable =
+      MakeRefPtr<SetFontRunnable>(workerPrivate, this, aFont, aError);
+
+  ErrorResult dispatchError;
+  runnable->Dispatch(Canceling, dispatchError);
+  if (NS_WARN_IF(dispatchError.Failed())) {
+    aError = NS_ERROR_FAILURE;
+  }
 }
 
 bool CanvasRenderingContext2D::SetFontInternal(const nsACString& aFont,
                                                ErrorResult& aError) {
+  MOZ_ASSERT(NS_IsMainThread());
+
   /*
    * If font is defined with relative units (e.g. ems) and the parent
    * ComputedStyle changes in between calls, setting the font to the
@@ -3266,7 +3316,7 @@ bool CanvasRenderingContext2D::SetFontInternal(const nsACString& aFont,
    * string is equal to the old one.
    */
 
-  if (!mCanvasElement && !mDocShell) {
+  if (!mCanvasElement && !mDocShell && !mOffscreenCanvas) {
     NS_WARNING(
         "Canvas element must be non-null or a docshell must be provided");
     aError.Throw(NS_ERROR_FAILURE);
@@ -3792,6 +3842,105 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
     const nsAString& aRawText, float aX, float aY,
     const Optional<double>& aMaxWidth, TextDrawOperation aOp,
     ErrorResult& aError) {
+  TextMetrics* textMetrics = nullptr;
+  Maybe<gfxRect> boundingBox;
+  bool redraw = false;
+
+  if (mCanvasElement || mDocShell) {
+    DrawOrMeasureTextOnMainThread(aRawText, aX, aY, aMaxWidth, aOp,
+                                  &textMetrics, &boundingBox, &redraw, aError);
+  } else if (mOffscreenCanvas) {
+    if (NS_IsMainThread()) {
+      DrawOrMeasureTextOnMainThread(aRawText, aX, aY, aMaxWidth, aOp,
+                                    &textMetrics, &boundingBox, &redraw,
+                                    aError);
+    } else {
+      class DrawOrMeasureTextRunnable final : public WorkerMainThreadRunnable {
+       public:
+        DrawOrMeasureTextRunnable(WorkerPrivate* aWorkerPrivate,
+                                  CanvasRenderingContext2D* aContext,
+                                  const nsAString& aRawText, float aX, float aY,
+                                  const Optional<double>& aMaxWidth,
+                                  TextDrawOperation aOp,
+                                  TextMetrics** aTextMetrics,
+                                  Maybe<gfxRect>* aBoundingBox, bool* aRedraw,
+                                  ErrorResult& aError)
+            : WorkerMainThreadRunnable(
+                  aWorkerPrivate,
+                  "CanvasRenderingContext2D::DrawOrMeasureText"_ns),
+              mContext(aContext),
+              mRawText(aRawText),
+              mX(aX),
+              mY(aY),
+              mMaxWidth(aMaxWidth),
+              mOp(aOp),
+              mTextMetrics(aTextMetrics),
+              mBoundingBox(aBoundingBox),
+              mRedraw(aRedraw),
+              mError(aError) {}
+
+        bool MainThreadRun() override {
+          mContext->DrawOrMeasureTextOnMainThread(
+              mRawText, mX, mY, mMaxWidth, mOp, mTextMetrics, mBoundingBox,
+              mRedraw, mError);
+          return true;
+        }
+
+       private:
+        CanvasRenderingContext2D* mContext;
+        const nsAString& mRawText;
+        float mX;
+        float mY;
+        const Optional<double>& mMaxWidth;
+        TextDrawOperation mOp;
+        TextMetrics** mTextMetrics;
+        Maybe<gfxRect>* mBoundingBox;
+        bool* mRedraw;
+        ErrorResult& mError;
+      };
+
+      WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
+      if (!workerPrivate) {
+        aError = NS_ERROR_FAILURE;
+        return nullptr;
+      }
+
+      auto runnable = MakeRefPtr<DrawOrMeasureTextRunnable>(
+          workerPrivate, this, aRawText, aX, aY, aMaxWidth, aOp, &textMetrics,
+          &boundingBox, &redraw, aError);
+
+      ErrorResult dispatchError;
+      runnable->Dispatch(Canceling, dispatchError);
+      if (NS_WARN_IF(dispatchError.Failed())) {
+        aError = NS_ERROR_FAILURE;
+        return nullptr;
+      }
+    }
+  } else {
+    NS_WARNING(
+        "Canvas element must be non-null or a docshell must be provided");
+    aError = NS_ERROR_FAILURE;
+    return nullptr;
+  }
+
+  if (redraw) {
+    if (boundingBox) {
+      RedrawUser(boundingBox.ref());
+    } else {
+      Redraw();
+    }
+  }
+
+  return textMetrics;
+}
+
+void CanvasRenderingContext2D::DrawOrMeasureTextOnMainThread(
+    const nsAString& aRawText, float aX, float aY,
+    const Optional<double>& aMaxWidth, TextDrawOperation aOp,
+    TextMetrics** aTextMetrics, Maybe<gfxRect>* aBoundingBox, bool* aRedraw,
+    ErrorResult& aError) {
+  MOZ_ASSERT(NS_IsMainThread());
+
   // Approximated baselines. In an ideal world, we'd read the baseline info
   // directly from the font (where available). Alas we currently lack
   // that functionality. These numbers are best guesses and should
@@ -3800,17 +3949,10 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
   const double kHangingBaselineDefault = 0.8;      // fraction of ascent
   const double kIdeographicBaselineDefault = 0.5;  // fraction of descent
 
-  if (!mCanvasElement && !mDocShell) {
-    NS_WARNING(
-        "Canvas element must be non-null or a docshell must be provided");
-    aError = NS_ERROR_FAILURE;
-    return nullptr;
-  }
-
   RefPtr<PresShell> presShell = GetPresShell();
   if (NS_WARN_IF(!presShell)) {
     aError = NS_ERROR_FAILURE;
-    return nullptr;
+    return;
   }
 
   Document* document = presShell->GetDocument();
@@ -3835,7 +3977,7 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
     canvasStyle = nsComputedDOMStyle::GetComputedStyle(mCanvasElement);
     if (!canvasStyle) {
       aError = NS_ERROR_FAILURE;
-      return nullptr;
+      return;
     }
 
     isRTL = canvasStyle->StyleVisibility()->mDirection == StyleDirection::Rtl;
@@ -3848,13 +3990,13 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
   const bool doCalculateBounds = NeedToCalculateBounds();
   if (presShell->IsDestroying()) {
     aError = NS_ERROR_FAILURE;
-    return nullptr;
+    return;
   }
 
   gfxFontGroup* currentFontStyle = GetCurrentFontStyle();
   if (!currentFontStyle) {
     aError = NS_ERROR_FAILURE;
-    return nullptr;
+    return;
   }
 
   MOZ_ASSERT(!presShell->IsDestroying(),
@@ -3870,10 +4012,10 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
   if (currentFontStyle->GetStyle()->size == 0.0F) {
     aError = NS_OK;
     if (aOp == TextDrawOperation::MEASURE) {
-      return new TextMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                             0.0, 0.0);
+      *aTextMetrics = new TextMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                      0.0, 0.0, 0.0, 0.0);
     }
-    return nullptr;
+    return;
   }
 
   if (!IsFinite(aX) || !IsFinite(aY)) {
@@ -3881,10 +4023,10 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
     // This may not be correct - what should TextMetrics contain in the case of
     // infinite width or height?
     if (aOp == TextDrawOperation::MEASURE) {
-      return new TextMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                             0.0, 0.0);
+      *aTextMetrics = new TextMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                      0.0, 0.0, 0.0, 0.0);
     }
-    return nullptr;
+    return;
   }
 
   CanvasBidiProcessor processor;
@@ -3929,7 +4071,7 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
       presShell->GetPresContext(), processor, nsBidiPresUtils::MODE_MEASURE,
       nullptr, 0, &totalWidthCoord, &mBidiEngine);
   if (aError.Failed()) {
-    return nullptr;
+    return;
   }
 
   float totalWidth = float(totalWidthCoord) / processor.mAppUnitsPerDevPixel;
@@ -4014,7 +4156,7 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
         fontMetrics.emAscent * kHangingBaselineDefault - baselineAnchor;
     double ideographicBaseline =
         -fontMetrics.emDescent * kIdeographicBaselineDefault - baselineAnchor;
-    return new TextMetrics(
+    *aTextMetrics = new TextMetrics(
         totalWidth, actualBoundingBoxLeft, actualBoundingBoxRight,
         fontMetrics.maxAscent - baselineAnchor,   // fontBBAscent
         fontMetrics.maxDescent + baselineAnchor,  // fontBBDescent
@@ -4024,6 +4166,7 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
         hangingBaseline,
         -baselineAnchor,  // alphabeticBaseline
         ideographicBaseline);
+    return;
   }
 
   // If we did not actually calculate bounds, set up a simple bounding box
@@ -4039,7 +4182,7 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
   EnsureTarget();
   if (!IsTargetValid()) {
     aError = NS_ERROR_FAILURE;
-    return nullptr;
+    return;
   }
 
   Matrix oldTransform = mTarget->GetTransform();
@@ -4073,23 +4216,57 @@ TextMetrics* CanvasRenderingContext2D::DrawOrMeasureText(
       nullptr, 0, nullptr, &mBidiEngine);
 
   if (aError.Failed()) {
-    return nullptr;
+    return;
   }
 
   mTarget->SetTransform(oldTransform);
 
+  *aRedraw = true;
   if (aOp == CanvasRenderingContext2D::TextDrawOperation::FILL &&
       !doCalculateBounds) {
-    RedrawUser(boundingBox);
-  } else {
-    Redraw();
+    *aBoundingBox = Some(boundingBox);
   }
 
   aError = NS_OK;
-  return nullptr;
 }
 
 gfxFontGroup* CanvasRenderingContext2D::GetCurrentFontStyle() {
+  if (!NS_IsMainThread()) {
+    class GetCurrentFontStyleRunnable final : public WorkerMainThreadRunnable {
+     public:
+      GetCurrentFontStyleRunnable(WorkerPrivate* aWorkerPrivate,
+                                  CanvasRenderingContext2D* aContext,
+                                  gfxFontGroup** aFontGroup)
+          : WorkerMainThreadRunnable(
+                aWorkerPrivate,
+                "CanvasRenderingContext2D::GetCurrentFontStyle"_ns),
+            mContext(aContext),
+            mFontGroup(aFontGroup) {}
+
+      bool MainThreadRun() override {
+        *mFontGroup = mContext->GetCurrentFontStyle();
+        return true;
+      }
+
+     private:
+      CanvasRenderingContext2D* mContext;
+      gfxFontGroup** mFontGroup;
+    };
+
+    WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
+    if (!workerPrivate) {
+      return nullptr;
+    }
+
+    gfxFontGroup* fontGroup = nullptr;
+    auto runnable = MakeRefPtr<GetCurrentFontStyleRunnable>(workerPrivate, this,
+                                                            &fontGroup);
+
+    ErrorResult dispatchError;
+    runnable->Dispatch(Canceling, dispatchError);
+    return fontGroup;
+  }
+
   // Use lazy (re)initialization for the fontGroup since it's rather expensive.
 
   RefPtr<PresShell> presShell = GetPresShell();

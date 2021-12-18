@@ -178,6 +178,8 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   void QueueCommitToCompositor();
 
+  Document* GetOwnerDoc() const;
+
  private:
   ~OffscreenCanvas();
 
@@ -196,6 +198,8 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   uint32_t mWidth;
   uint32_t mHeight;
+
+  uint64_t mWindowID = 0;
 
   layers::LayersBackend mCompositorBackendType;
   layers::TextureType mTextureType;

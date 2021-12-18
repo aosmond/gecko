@@ -897,6 +897,14 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
                                  const Optional<double>& aMaxWidth,
                                  TextDrawOperation aOp, ErrorResult& aError);
 
+  void DrawOrMeasureTextOnMainThread(const nsAString& aRawText, float aX,
+                                     float aY,
+                                     const Optional<double>& aMaxWidth,
+                                     TextDrawOperation aOp,
+                                     TextMetrics** aTextMetrics,
+                                     Maybe<gfxRect>* aBoundingBox,
+                                     bool* aRedraw, ErrorResult& aError);
+
   // A clip or a transform, recorded and restored in order.
   struct ClipState {
     explicit ClipState(mozilla::gfx::Path* aClip) : clip(aClip) {}

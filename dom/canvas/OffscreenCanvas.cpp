@@ -11,6 +11,7 @@
 #include "mozilla/dom/OffscreenCanvasDisplayHelper.h"
 #include "mozilla/dom/OffscreenCanvasRenderingContext2D.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerScope.h"
 #include "mozilla/layers/ImageBridgeChild.h"
@@ -24,6 +25,7 @@
 #include "ImageBitmap.h"
 #include "ImageBitmapRenderingContext.h"
 #include "nsContentUtils.h"
+#include "nsGlobalWindowInner.h"
 #include "WebGLChild.h"
 
 namespace mozilla::dom {
@@ -55,7 +57,17 @@ OffscreenCanvas::OffscreenCanvas(nsIGlobalObject* aGlobal, uint32_t aWidth,
       mHeight(aHeight),
       mCompositorBackendType(aCompositorBackend),
       mTextureType(aTextureType),
-      mDisplay(aDisplay) {}
+      mDisplay(aDisplay) {
+  nsPIDOMWindowInner* innerWindow = aGlobal->AsInnerWindow();
+  if (innerWindow) {
+    mWindowID = innerWindow->WindowID();
+  } else {
+    WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
+    if (workerPrivate) {
+      mWindowID = workerPrivate->WindowID();
+    }
+  }
+}
 
 OffscreenCanvas::~OffscreenCanvas() = default;
 
@@ -324,6 +336,17 @@ already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(
 
 bool OffscreenCanvas::ShouldResistFingerprinting() const {
   return nsContentUtils::ShouldResistFingerprinting(GetOwnerGlobal());
+}
+
+Document* OffscreenCanvas::GetOwnerDoc() const {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  auto* window = nsGlobalWindowInner::GetInnerWindowWithId(mWindowID);
+  if (!window) {
+    return nullptr;
+  }
+
+  return window->GetExtantDoc();
 }
 
 /* static */
