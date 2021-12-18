@@ -5084,7 +5084,7 @@ already_AddRefed<ImageData> CanvasRenderingContext2D::GetImageData(
 already_AddRefed<ImageData> CanvasRenderingContext2D::GetImageData(
     JSContext* aCx, int32_t aSx, int32_t aSy, int32_t aSw, int32_t aSh,
     Maybe<nsIPrincipal*> aSubjectPrincipal, ErrorResult& aError) {
-  if (!mCanvasElement && !mDocShell) {
+  if (!mCanvasElement && !mDocShell && !mOffscreenCanvas) {
     NS_ERROR("No canvas element and no docshell in GetImageData!!!");
     aError.Throw(NS_ERROR_DOM_SECURITY_ERR);
     return nullptr;
@@ -5092,6 +5092,7 @@ already_AddRefed<ImageData> CanvasRenderingContext2D::GetImageData(
 
   // Check only if we have a canvas element; if we were created with a docshell,
   // then it's special internal use.
+  // FIXME(aosmond): OffscreenCanvas security check??!
   if (IsWriteOnly() ||
       (mCanvasElement && !mCanvasElement->CallerCanRead(aCx))) {
     // XXX ERRMSG we need to report an error to developers here! (bug 329026)
