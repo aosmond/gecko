@@ -186,6 +186,37 @@ OffscreenCanvas::CreateContext(CanvasContextType aContextType) {
   return ret.forget();
 }
 
+void OffscreenCanvas::UpdateDisplayData(
+    const OffscreenCanvasDisplayData& aData) {
+  if (!mDisplay) {
+    return;
+  }
+
+  mPendingUpdate = Some(aData);
+  QueueCommitToCompositor();
+}
+
+void OffscreenCanvas::QueueCommitToCompositor() {
+  if (!mDisplay || !mCurrentContext || mPendingCommit) {
+    // If we already have a commit pending, or we have no bound display/context,
+    // just bail out.
+    return;
+  }
+
+  mPendingCommit = NS_NewCancelableRunnableFunction(
+      "OffscreenCanvas::QueueCommitToCompositor",
+      [self = RefPtr{this}] { self->DequeueCommitToCompositor(); });
+  NS_DispatchToCurrentThread(mPendingCommit);
+}
+
+void OffscreenCanvas::DequeueCommitToCompositor() {
+  MOZ_ASSERT(mPendingCommit);
+  mPendingCommit = nullptr;
+  mDisplay->CommitFrameToCompositor(mCurrentContext, mTextureType,
+                                    mPendingUpdate);
+  mPendingUpdate.reset();
+}
+
 void OffscreenCanvas::CommitFrameToCompositor() {
   if (!mDisplay || !mCurrentContext) {
     // This offscreen canvas doesn't associate to any HTML canvas element.
@@ -193,24 +224,15 @@ void OffscreenCanvas::CommitFrameToCompositor() {
     return;
   }
 
-  mDisplay->CommitFrameToCompositor(mCurrentContext, mTextureType);
-}
-
-void OffscreenCanvas::UpdateParameters(uint32_t aWidth, uint32_t aHeight,
-                                       bool aHasAlpha, bool aIsPremultiplied,
-                                       bool aIsOriginBottomLeft) {
-  if (!mDisplay) {
-    return;
+  if (mPendingCommit) {
+    // We got an explicit commit while waiting for an implicit.
+    mPendingCommit->Cancel();
+    mPendingCommit = nullptr;
   }
 
-  mDisplay->UpdateParameters(aWidth, aHeight, aHasAlpha, aIsPremultiplied,
-                             aIsOriginBottomLeft);
-}
-
-void OffscreenCanvas::QueueCommitToCompositor() {
-  NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
-      "OffscreenCanvas::QueueCommitToCompositor",
-      [self = RefPtr{this}] { self->CommitFrameToCompositor(); }));
+  mDisplay->CommitFrameToCompositor(mCurrentContext, mTextureType,
+                                    mPendingUpdate);
+  mPendingUpdate.reset();
 }
 
 OffscreenCanvasCloneData* OffscreenCanvas::ToCloneData() {
