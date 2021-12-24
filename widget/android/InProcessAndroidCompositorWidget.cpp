@@ -32,7 +32,13 @@ RefPtr<CompositorWidget> CompositorWidget::CreateLocal(
 InProcessAndroidCompositorWidget::InProcessAndroidCompositorWidget(
     const AndroidCompositorWidgetInitData& aInitData,
     const layers::CompositorOptions& aOptions, nsWindow* aWindow)
-    : AndroidCompositorWidget(aInitData, aOptions), mWindow(aWindow) {}
+    : AndroidCompositorWidget(aInitData, aOptions), mWindow(aWindow) {
+  // When we fallback from WR to SW-WR, there have been issues where mSurface
+  // is null, possibly because we never get a OnCompositorSurfaceChanged call
+  // from the upper layers in Android, which doesn't realize the compositors
+  // were torn down and reinitialized beneath it.
+  OnCompositorSurfaceChanged();
+}
 
 void InProcessAndroidCompositorWidget::ObserveVsync(VsyncObserver* aObserver) {
   if (RefPtr<CompositorVsyncDispatcher> cvd =
