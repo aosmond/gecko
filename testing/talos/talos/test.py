@@ -627,6 +627,38 @@ class glterrain(PageloaderTest):
 
 
 @register_test()
+class glterrainworker(PageloaderTest):
+    """
+    Simple rotating WebGL scene with moving light source over a
+    textured terrain, running on a DOM worker thread.
+    Measures average frame intervals.
+    The same sequence is measured 4 times for combinations of alpha and
+    antialias as canvas properties.
+    Each of these 4 runs is reported as a different test name.
+    """
+
+    tpmanifest = "${talos}/tests/webgl/glterrain_worker.manifest"
+    tpcycles = 1
+    tppagecycles = 25
+    tploadnocache = True
+    tpmozafterpaint = False
+    tpchrome = False
+    timeout = 600
+    gecko_profile_interval = 10
+    gecko_profile_entries = 2000000
+    win_counters = w7_counters = linux_counters = mac_counters = None
+    """ ASAP mode """
+    preferences = {
+        "layout.frame_rate": 0,
+        "docshell.event_starvation_delay_hint": 1,
+        "dom.send_after_paint_to_content": False,
+        "gfx.offscreencanvas.enabled": True,
+    }
+    filters = filter.ignore_first.prepare(1) + filter.median.prepare()
+    unit = "frame interval"
+
+
+@register_test()
 class glvideo(PageloaderTest):
     """
     WebGL video texture update with 1080p video.

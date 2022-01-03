@@ -309,6 +309,7 @@ ASAP tests are:
 -  `basic_compositor_video <#basic_compositor_video>`_
 -  `displaylist_mutate <#displaylist_mutate>`_
 -  `glterrain <#glterrain>`_
+-  `glterrain-worker <#glterrain-worker>`_
 -  `rasterflood_svg <#rasterflood_svg>`_
 -  `rasterflood_gradient <#rasterflood_gradient>`_
 -  `tsvgx <#tsvgx>`_

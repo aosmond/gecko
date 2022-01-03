@@ -59,7 +59,7 @@
             "pagesets_name": "tp5n.zip"
         },
         "webgl": {
-            "tests": ["glterrain", "glvideo", "motionmark_webgl"]
+            "tests": ["glterrain", "glterrain-worker", "glvideo", "motionmark_webgl"]
         },
         "xperf": {
             "tests": ["tp5n"],

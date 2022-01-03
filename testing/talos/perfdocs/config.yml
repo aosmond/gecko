@@ -298,6 +298,27 @@ suites:
                     * 1;1.WebGL-terrain-alpha-no-AA-yes;23.0464;23.5234;23.34595;23.40609;22.54349;22.0554;22.7933;23.00685;23.023649;22.51255;23.25975;23.65819;22.572249;22.9195;22.44325;22.95015;23.3567;23.02089;22.1459;23.04545;23.09235;23.40855;23.3296;23.18849;23.273249
                     * 2;2.WebGL-terrain-alpha-yes-AA-no;24.01795;23.889449;24.2683;24.34649;23.0562;24.02275;23.54819;24.1874;23.93545;23.53629;23.305149;23.62459;24.01589;24.06405;24.143449;23.998549;24.08205;24.26989;24.0736;24.2346;24.01145;23.7817;23.90785;24.7118;24.2834
                     * 3;3.WebGL-terrain-alpha-yes-AA-yes;25.91375;25.87005;25.64875;25.15615;25.5475;24.497449;24.56385;25.57529;25.54889;26.31559;24.143949;25.09895;24.75049;25.2087;25.52385;25.9017;25.4439;24.3495;25.9269;25.734449;26.4126;25.547449;25.667249;25.679349;25.9565
+            glterrain-worker: >
+                - contact: :aosmond
+                - source: `glterrain-worker <https://dxr.mozilla.org/mozilla-central/source/testing/talos/talos/tests/webgl/benchmarks/terrain_worker>`__
+                - type: `Page load`_
+                - data: we load the perftest.html page (which generates 4 metrics to track) 25 times, resulting in 4 sets of 25 data points
+                - summarization: Measures average frames interval while animating a simple WebGL scene on a DOM worker thread
+                    * subtest: `ignore first`_ data point, then take the `median`_ of the remaining 24; `source: test.py <https://dxr.mozilla.org/mozilla-central/source/testing/talos/talos/test.py#l381>`__
+                    * suite: `geometric mean`_ of the 4 subtest results.
+                - description:
+                    This tests animates a simple WebGL scene (static textured landscape, one
+                    moving light source, rotating viewport) and measure the frames
+                    throughput (expressed as average interval) over 100 frames. The WebGL
+                    context itself executes on a DOM worker thread. It runs in ASAP mode
+                    (vsync off) and measures the same scene 4 times (for all combination of
+                    antialiasing and alpha. It reports the results as 4 values) one for each
+                    combination. Lower results are better.
+                - **Example Data**
+                    * 0;0.WebGL-terrain-worker-alpha-no-AA-no;19.8189;20.57185;20.5069;21.09645;20.40045;20.89025;20.34285;20.8525;20.45845;20.6499;19.94505;20.05285;20.316049;19.46745;19.46135;20.63865;20.4789;19.97015;19.9546;20.40365;20.74385;20.828649;20.78295;20.51685;20.97069
+                    * 1;1.WebGL-terrain-worker-alpha-no-AA-yes;23.0464;23.5234;23.34595;23.40609;22.54349;22.0554;22.7933;23.00685;23.023649;22.51255;23.25975;23.65819;22.572249;22.9195;22.44325;22.95015;23.3567;23.02089;22.1459;23.04545;23.09235;23.40855;23.3296;23.18849;23.273249
+                    * 2;2.WebGL-terrain-worker-alpha-yes-AA-no;24.01795;23.889449;24.2683;24.34649;23.0562;24.02275;23.54819;24.1874;23.93545;23.53629;23.305149;23.62459;24.01589;24.06405;24.143449;23.998549;24.08205;24.26989;24.0736;24.2346;24.01145;23.7817;23.90785;24.7118;24.2834
+                    * 3;3.WebGL-terrain-worker-alpha-yes-AA-yes;25.91375;25.87005;25.64875;25.15615;25.5475;24.497449;24.56385;25.57529;25.54889;26.31559;24.143949;25.09895;24.75049;25.2087;25.52385;25.9017;25.4439;24.3495;25.9269;25.734449;26.4126;25.547449;25.667249;25.679349;25.9565
             glvideo: >
                 - contact: :jgilbert
                 - source: `glvideo <https://dxr.mozilla.org/mozilla-central/source/testing/talos/talos/tests/webgl/benchmarks/video>`__
