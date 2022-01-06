@@ -37,10 +37,12 @@ CompositorThreadHolder* CompositorThreadHolder::GetSingleton() {
 
 CompositorThreadHolder::CompositorThreadHolder()
     : mCompositorThread(CreateCompositorThread()) {
+  printf_stderr("[AO] CompositorThreadHolder -- construct\n");
   MOZ_ASSERT(NS_IsMainThread());
 }
 
 CompositorThreadHolder::~CompositorThreadHolder() {
+  printf_stderr("[AO] CompositorThreadHolder -- destruct\n");
   sFinishedCompositorShutDown = true;
 }
 
@@ -115,12 +117,22 @@ void CompositorThreadHolder::Shutdown() {
     return;
   }
 
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown ImageBridgeParent\n");
   ImageBridgeParent::Shutdown();
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown VRManagerParent\n");
   gfx::VRManagerParent::Shutdown();
+  printf_stderr(
+      "[AO] CompositorThreadHolder -- shutdown "
+      "MediaSystemResourceService\n");
   MediaSystemResourceService::Shutdown();
+  printf_stderr(
+      "[AO] CompositorThreadHolder -- shutdown CompositorManagerParent\n");
   CompositorManagerParent::Shutdown();
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown CanvasTranslator\n");
   CanvasTranslator::Shutdown();
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown gfxGradientCache\n");
   gfx::gfxGradientCache::Shutdown();
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown dispatch\n");
 
   // Ensure there are no pending tasks that would cause an access to the
   // thread's HangMonitor. APZ and Canvas can keep a reference to the compositor
@@ -138,10 +150,12 @@ void CompositorThreadHolder::Shutdown() {
   sCompositorThreadHolder = nullptr;
   sBackgroundHangMonitor = nullptr;
 
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown spin\n");
   SpinEventLoopUntil("CompositorThreadHolder::Shutdown"_ns, [&]() {
     bool finished = sFinishedCompositorShutDown;
     return finished;
   });
+  printf_stderr("[AO] CompositorThreadHolder -- shutdown spun\n");
 
   // At this point, the CompositorThreadHolder instance will have been
   // destroyed, but the compositor thread itself may still be running due to

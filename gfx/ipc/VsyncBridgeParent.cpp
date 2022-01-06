@@ -29,6 +29,7 @@ RefPtr<VsyncBridgeParent> VsyncBridgeParent::Start(
 VsyncBridgeParent::VsyncBridgeParent() : mOpen(false) {
   MOZ_COUNT_CTOR(VsyncBridgeParent);
   mCompositorThreadRef = CompositorThreadHolder::GetSingleton();
+  printf_stderr("[AO] [%p] VsyncBridgeParent -- hold compth\n", this);
 }
 
 VsyncBridgeParent::~VsyncBridgeParent() { MOZ_COUNT_DTOR(VsyncBridgeParent); }
@@ -67,6 +68,7 @@ void VsyncBridgeParent::ShutdownImpl() {
 }
 
 void VsyncBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
+  printf_stderr("[AO] [%p] VsyncBridgeParent -- release compth\n", this);
   mOpen = false;
   mCompositorThreadRef = nullptr;
 }

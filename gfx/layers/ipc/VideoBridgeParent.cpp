@@ -22,6 +22,7 @@ static VideoBridgeParent* sVideoBridgeFromGpuProcess;
 VideoBridgeParent::VideoBridgeParent(VideoBridgeSource aSource)
     : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()),
       mClosed(false) {
+  printf_stderr("[AO] [%p] VideoBridgeParent -- hold compth\n", this);
   mSelfRef = this;
   switch (aSource) {
     default:
@@ -36,6 +37,10 @@ VideoBridgeParent::VideoBridgeParent(VideoBridgeSource aSource)
 }
 
 VideoBridgeParent::~VideoBridgeParent() {
+  if (mCompositorThreadHolder) {
+    printf_stderr(
+        "[AO] [%p] VideoBridgeParent -- release compth (destructor)\n", this);
+  }
   if (sVideoBridgeFromRddProcess == this) {
     sVideoBridgeFromRddProcess = nullptr;
   }
@@ -99,10 +104,18 @@ void VideoBridgeParent::Shutdown() {
 }
 
 void VideoBridgeParent::ReleaseCompositorThread() {
+  if (mCompositorThreadHolder) {
+    printf_stderr("[AO] [%p] VideoBridgeParent -- release compth (release)\n",
+                  this);
+  }
   mCompositorThreadHolder = nullptr;
 }
 
 void VideoBridgeParent::ActorDealloc() {
+  if (mCompositorThreadHolder) {
+    printf_stderr("[AO] [%p] VideoBridgeParent -- release compth (dealloc)\n",
+                  this);
+  }
   mCompositorThreadHolder = nullptr;
   ReleaseCompositorThread();
   mSelfRef = nullptr;

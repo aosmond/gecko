@@ -71,11 +71,17 @@ ImageBridgeParent::ImageBridgeParent(nsISerialEventTarget* aThread,
     : mThread(aThread),
       mClosed(false),
       mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {
+  printf_stderr("[AO] [%p] ImageBridgeParent -- hold compth\n", this);
   MOZ_ASSERT(NS_IsMainThread());
   SetOtherProcessId(aChildProcessId);
 }
 
-ImageBridgeParent::~ImageBridgeParent() = default;
+ImageBridgeParent::~ImageBridgeParent() {
+  if (mCompositorThreadHolder) {
+    printf_stderr(
+        "[AO] [%p] ImageBridgeParent -- release compth (destructor)\n", this);
+  }
+}
 
 /* static */
 ImageBridgeParent* ImageBridgeParent::CreateSameProcess() {
@@ -364,6 +370,7 @@ bool ImageBridgeParent::NotifyImageComposites(
 }
 
 void ImageBridgeParent::DeferredDestroy() {
+  printf_stderr("[AO] [%p] ImageBridgeParent -- release compth\n", this);
   mCompositorThreadHolder = nullptr;
   mSelfRef = nullptr;  // "this" ImageBridge may get deleted here.
 }

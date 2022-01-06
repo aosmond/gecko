@@ -117,9 +117,17 @@ CompositorManagerParent::CreateSameProcessWidgetCompositorBridge(
 }
 
 CompositorManagerParent::CompositorManagerParent()
-    : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {}
+    : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {
+  printf_stderr("[AO] [%p] CompositorManagerParent -- hold compth\n", this);
+}
 
-CompositorManagerParent::~CompositorManagerParent() = default;
+CompositorManagerParent::~CompositorManagerParent() {
+  if (mCompositorThreadHolder) {
+    printf_stderr(
+        "[AO] [%p] CompositorManagerParent -- release compth (destructor)\n",
+        this);
+  }
+}
 
 void CompositorManagerParent::Bind(
     Endpoint<PCompositorManagerParent>&& aEndpoint, bool aIsRoot) {
@@ -176,6 +184,7 @@ void CompositorManagerParent::ActorDealloc() {
 }
 
 void CompositorManagerParent::DeferredDestroy() {
+  printf_stderr("[AO] [%p] CompositorManagerParent -- release compth\n", this);
   mCompositorThreadHolder = nullptr;
 }
 

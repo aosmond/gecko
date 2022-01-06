@@ -26,6 +26,7 @@ CanvasThreadHolder::CanvasThreadHolder(
     : mCanvasThread(aCanvasThread),
       mCanvasWorkers(aCanvasWorkers),
       mCompositorThreadKeepAlive(CompositorThreadHolder::GetSingleton()) {
+  printf_stderr("[AO] [%p] CanvasThreadHolder -- hold compth\n", this);
   MOZ_ASSERT(NS_IsInCompositorThread());
   MOZ_ASSERT(mCanvasThread);
   MOZ_ASSERT(mCanvasWorkers);
@@ -34,6 +35,7 @@ CanvasThreadHolder::CanvasThreadHolder(
 CanvasThreadHolder::~CanvasThreadHolder() {
   // Note we can't just use NS_IsInCompositorThread() here because
   // sCompositorThreadHolder might have already gone.
+  printf_stderr("[AO] [%p] CanvasThreadHolder -- release compth\n", this);
   MOZ_ASSERT(
       mCompositorThreadKeepAlive->GetCompositorThread()->IsOnCurrentThread());
 }

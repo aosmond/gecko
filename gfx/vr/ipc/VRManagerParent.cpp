@@ -39,6 +39,10 @@ VRManagerParent::VRManagerParent(ProcessId aChildProcessId,
 
 VRManagerParent::~VRManagerParent() {
   MOZ_ASSERT(!mVRManagerHolder);
+  if (mCompositorThreadHolder) {
+    printf_stderr("[AO] [%p] VRManagerParent -- release compth (destructor)\n",
+                  this);
+  }
 
   MOZ_COUNT_DTOR(VRManagerParent);
 }
@@ -107,6 +111,7 @@ VRManagerParent* VRManagerParent::CreateSameProcess() {
   RefPtr<VRManagerParent> vmp =
       new VRManagerParent(base::GetCurrentProcId(), false);
   vmp->mCompositorThreadHolder = CompositorThreadHolder::GetSingleton();
+  printf_stderr("[AO] [%p] VRManagerParent -- hold compth (same)\n", vmp.get());
   vmp->mSelfRef = vmp;
   CompositorThread()->Dispatch(
       NewRunnableFunction("RegisterVRManagerIncompositorThreadRunnable",
@@ -119,6 +124,7 @@ bool VRManagerParent::CreateForGPUProcess(
   RefPtr<VRManagerParent> vmp =
       new VRManagerParent(aEndpoint.OtherPid(), false);
   vmp->mCompositorThreadHolder = CompositorThreadHolder::GetSingleton();
+  printf_stderr("[AO] [%p] VRManagerParent -- hold compth (gpu)\n", vmp.get());
   vmp->mSelfRef = vmp;
   CompositorThread()->Dispatch(NewRunnableMethod<Endpoint<PVRManagerParent>&&>(
       "gfx::VRManagerParent::Bind", vmp, &VRManagerParent::Bind,
@@ -150,11 +156,18 @@ void VRManagerParent::ActorAlloc() {
   // reference management, and probably shouldn't manage
   // `mCompositorThreadHolder` in the alloc/dealloc methods.
   PVRManagerParent::ActorAlloc();
+  if (!mCompositorThreadHolder) {
+    printf_stderr("[AO] [%p] VRManagerParent -- hold compth (alloc)\n", this);
+  }
   mCompositorThreadHolder = CompositorThreadHolder::GetSingleton();
 }
 
 void VRManagerParent::ActorDealloc() {
   UnregisterFromManager();
+  if (mCompositorThreadHolder) {
+    printf_stderr("[AO] [%p] VRManagerParent -- release compth (dealloc)\n",
+                  this);
+  }
   mCompositorThreadHolder = nullptr;
   mSelfRef = nullptr;
 }
