@@ -1528,6 +1528,12 @@
   value: false
   mirror: always
 
+# Is support of OffscreenCanvas + Canvas2D enabled?
+- name: canvas.offscreen.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 #---------------------------------------------------------------------------
 # Prefs starting with "channelclassifier."
 #---------------------------------------------------------------------------

@@ -8,7 +8,7 @@
  */
 
 [Exposed=(Window,Worker),
- Pref="gfx.offscreencanvas.enabled"]
+ Pref="canvas.offscreen.enabled"]
 interface OffscreenCanvasRenderingContext2D {
   [Throws]
   void commit();
