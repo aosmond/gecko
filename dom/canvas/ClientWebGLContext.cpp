@@ -945,6 +945,7 @@ RefPtr<gfx::SourceSurface> ClientWebGLContext::GetFrontBufferSnapshot(
 
   const auto& surfSize = res.surfSize;
   const webgl::RaiiShmem shmem{child, res.shmem.ref()};
+  if (!shmem) return nullptr;
   const auto& shmemBytes = shmem.ByteRange();
   if (!surfSize.x) return nullptr;  // Zero means failure.
 
@@ -3198,6 +3199,10 @@ void ClientWebGLContext::GetBufferSubData(GLenum target, GLintptr srcByteOffset,
     return;
   }
   const webgl::RaiiShmem shmem{child, rawShmem};
+  if (!shmem) {
+    EnqueueError(LOCAL_GL_OUT_OF_MEMORY, "Failed to map in sub data buffer.");
+    return;
+  }
 
   const auto shmemView = shmem.ByteRange();
   MOZ_RELEASE_ASSERT(shmemView.length() == 1 + destView.length());
@@ -4796,6 +4801,8 @@ void ClientWebGLContext::DoReadPixels(const webgl::ReadPixelsDesc& desc,
   const auto& byteStride = res.byteStride;
   const auto& subrect = res.subrect;
   const webgl::RaiiShmem shmem{child, res.shmem};
+  if (!shmem) return;
+
   const auto& shmemBytes = shmem.ByteRange();
 
   uint8_t bpp;
