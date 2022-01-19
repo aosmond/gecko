@@ -1031,6 +1031,9 @@ RefPtr<gfx::DataSourceSurface> ClientWebGLContext::BackBufferSnapshot() {
     }
   });
 
+  // Avoid allocating if we lost the context while setting up.
+  if (IsContextLost()) return nullptr;
+
   const auto surfFormat = options.alpha ? gfx::SurfaceFormat::B8G8R8A8
                                         : gfx::SurfaceFormat::B8G8R8X8;
   const auto stride = size.x * 4;
@@ -1062,6 +1065,9 @@ RefPtr<gfx::DataSourceSurface> ClientWebGLContext::BackBufferSnapshot() {
     const auto desc = webgl::ReadPixelsDesc{{0, 0}, size};
     const auto range = Range<uint8_t>(map.GetData(), stride * size.y);
     DoReadPixels(desc, range);
+
+    // Avoid returning an empty buffer if we lost the context while reading.
+    if (IsContextLost()) return nullptr;
 
     const auto begin = range.begin().get();
 
