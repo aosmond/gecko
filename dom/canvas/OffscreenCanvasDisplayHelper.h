@@ -57,9 +57,15 @@ class OffscreenCanvasDisplayHelper final {
   void MaybeQueueInvalidateElement();
   void InvalidateElement();
 
+  bool TransformSurface(const gfx::DataSourceSurface::ScopedMap& aSrcMap,
+                        const gfx::DataSourceSurface::ScopedMap& aDstMap,
+                        gfx::SurfaceFormat aFormat, const gfx::IntSize& aSize,
+                        bool aNeedsPremult, gl::OriginPos aOriginPos) const;
+
   mutable Mutex mMutex;
   HTMLCanvasElement* MOZ_NON_OWNING_REF mCanvasElement;
   RefPtr<layers::ImageContainer> mImageContainer;
+  RefPtr<gfx::SourceSurface> mFrontBufferSurface;
 
   OffscreenCanvasDisplayData mData;
   CanvasContextType mType = CanvasContextType::NoContext;
