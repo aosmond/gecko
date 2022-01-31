@@ -342,6 +342,9 @@ already_AddRefed<Promise> OffscreenCanvas::ConvertToBlob(
   CanvasRenderingContextHelper::ToBlob(callback, type, encodeOptions,
                                        /* aUsingCustomOptions */ false,
                                        usePlaceholder, aRv);
+  if (aRv.Failed()) {
+    promise->MaybeReject(std::move(aRv));
+  }
 
   return promise.forget();
 }
