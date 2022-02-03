@@ -1030,6 +1030,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   bool mWriteOnly;
   bool mClipsNeedConverting = false;
 
+  virtual void AddZoneWaitingForGC();
   virtual void AddAssociatedMemory();
   virtual void RemoveAssociatedMemory();
 };

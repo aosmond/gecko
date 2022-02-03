@@ -1419,7 +1419,9 @@ void CanvasRenderingContext2D::RegisterAllocation() {
     registered = true;
     RegisterStrongMemoryReporter(new Canvas2dPixelsReporter());
   }
+}
 
+void CanvasRenderingContext2D::AddZoneWaitingForGC() {
   JSObject* wrapper = GetWrapperPreserveColor();
   if (wrapper) {
     CycleCollectedJSRuntime::Get()->AddZoneWaitingForGC(
