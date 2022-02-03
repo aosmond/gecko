@@ -1536,6 +1536,22 @@ CanvasRenderingContext2D::SetDimensions(int32_t aWidth, int32_t aHeight) {
   return NS_OK;
 }
 
+void CanvasRenderingContext2D::AddAssociatedMemory() {
+  JSObject* wrapper = GetWrapperMaybeDead();
+  if (wrapper) {
+    JS::AddAssociatedMemory(wrapper, BindingJSObjectMallocBytes(this),
+                            JS::MemoryUse::DOMBinding);
+  }
+}
+
+void CanvasRenderingContext2D::RemoveAssociatedMemory() {
+  JSObject* wrapper = GetWrapperMaybeDead();
+  if (wrapper) {
+    JS::RemoveAssociatedMemory(wrapper, BindingJSObjectMallocBytes(this),
+                               JS::MemoryUse::DOMBinding);
+  }
+}
+
 void CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight) {
   Reset();
 
@@ -1548,19 +1564,10 @@ void CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight) {
     // Update the memory size associated with the wrapper object when we change
     // the dimensions. Note that we need to keep updating dying wrappers before
     // they are finalized so that the memory accounting balances out.
-    JSObject* wrapper = GetWrapperMaybeDead();
-    if (wrapper) {
-      JS::RemoveAssociatedMemory(wrapper, BindingJSObjectMallocBytes(this),
-                                 JS::MemoryUse::DOMBinding);
-    }
-
+    RemoveAssociatedMemory();
     mWidth = aWidth;
     mHeight = aHeight;
-
-    if (wrapper) {
-      JS::AddAssociatedMemory(wrapper, BindingJSObjectMallocBytes(this),
-                              JS::MemoryUse::DOMBinding);
-    }
+    AddAssociatedMemory();
   }
 
   if (mOffscreenCanvas) {

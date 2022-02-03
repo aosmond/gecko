@@ -1029,6 +1029,9 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
 
   bool mWriteOnly;
   bool mClipsNeedConverting = false;
+
+  virtual void AddAssociatedMemory();
+  virtual void RemoveAssociatedMemory();
 };
 
 size_t BindingJSObjectMallocBytes(CanvasRenderingContext2D* aContext);
