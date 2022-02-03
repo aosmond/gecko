@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "OffscreenCanvasRenderingContext2D.h"
+#include "mozilla/CycleCollectedJSRuntime.h"
 #include "mozilla/dom/OffscreenCanvasRenderingContext2DBinding.h"
 #include "mozilla/dom/OffscreenCanvas.h"
 #include "mozilla/dom/WorkerCommon.h"
@@ -129,6 +130,14 @@ void OffscreenCanvasRenderingContext2D::Commit(ErrorResult& aRv) {
   }
 
   mOffscreenCanvas->CommitFrameToCompositor();
+}
+
+void OffscreenCanvasRenderingContext2D::AddZoneWaitingForGC() {
+  JSObject* wrapper = GetWrapperPreserveColor();
+  if (wrapper) {
+    CycleCollectedJSRuntime::Get()->AddZoneWaitingForGC(
+        JS::GetObjectZone(wrapper));
+  }
 }
 
 void OffscreenCanvasRenderingContext2D::AddAssociatedMemory() {

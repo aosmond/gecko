@@ -52,6 +52,7 @@ class OffscreenCanvasRenderingContext2D final
            CanvasRenderingContext2D::AlreadyShutDown();
   }
 
+  void AddZoneWaitingForGC() override;
   void AddAssociatedMemory() override;
   void RemoveAssociatedMemory() override;
 
