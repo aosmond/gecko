@@ -42,6 +42,18 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(OffscreenCanvasRenderingContext2D)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
 NS_INTERFACE_MAP_END_INHERITING(CanvasRenderingContext2D)
 
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(OffscreenCanvasRenderingContext2D)
+  return tmp->HasKnownLiveWrapper();
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
+
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(OffscreenCanvasRenderingContext2D)
+  return tmp->HasKnownLiveWrapper();
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
+
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(OffscreenCanvasRenderingContext2D)
+  return tmp->HasKnownLiveWrapper();
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
+
 NS_IMPL_ADDREF_INHERITED(OffscreenCanvasRenderingContext2D,
                          CanvasRenderingContext2D)
 NS_IMPL_RELEASE_INHERITED(OffscreenCanvasRenderingContext2D,

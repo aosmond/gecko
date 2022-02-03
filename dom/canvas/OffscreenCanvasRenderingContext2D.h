@@ -23,7 +23,7 @@ class OffscreenCanvasRenderingContext2D final
  public:
   // nsISupports interface + CC
   NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS_INHERITED(
+  NS_DECL_CYCLE_COLLECTION_SKIPPABLE_SCRIPT_HOLDER_CLASS_INHERITED(
       OffscreenCanvasRenderingContext2D, CanvasRenderingContext2D)
 
   explicit OffscreenCanvasRenderingContext2D(
