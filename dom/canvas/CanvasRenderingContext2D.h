@@ -487,8 +487,6 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
 
   enum class Style : uint8_t { STROKE = 0, FILL, MAX };
 
-  nsINode* GetParentObject() { return mCanvasElement; }
-
   void LineTo(const mozilla::gfx::Point& aPoint) {
     if (mPathBuilder) {
       mPathBuilder->LineTo(aPoint);
