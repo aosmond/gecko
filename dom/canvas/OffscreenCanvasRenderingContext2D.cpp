@@ -131,6 +131,22 @@ void OffscreenCanvasRenderingContext2D::Commit(ErrorResult& aRv) {
   mOffscreenCanvas->CommitFrameToCompositor();
 }
 
+void OffscreenCanvasRenderingContext2D::AddAssociatedMemory() {
+  JSObject* wrapper = GetWrapperMaybeDead();
+  if (wrapper) {
+    JS::AddAssociatedMemory(wrapper, BindingJSObjectMallocBytes(this),
+                            JS::MemoryUse::DOMBinding);
+  }
+}
+
+void OffscreenCanvasRenderingContext2D::RemoveAssociatedMemory() {
+  JSObject* wrapper = GetWrapperMaybeDead();
+  if (wrapper) {
+    JS::RemoveAssociatedMemory(wrapper, BindingJSObjectMallocBytes(this),
+                               JS::MemoryUse::DOMBinding);
+  }
+}
+
 size_t BindingJSObjectMallocBytes(OffscreenCanvasRenderingContext2D* aContext) {
   int32_t width = aContext->GetWidth();
   int32_t height = aContext->GetHeight();

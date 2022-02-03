@@ -52,6 +52,9 @@ class OffscreenCanvasRenderingContext2D final
            CanvasRenderingContext2D::AlreadyShutDown();
   }
 
+  void AddAssociatedMemory() override;
+  void RemoveAssociatedMemory() override;
+
   ~OffscreenCanvasRenderingContext2D() override;
 
   RefPtr<OffscreenCanvasShutdownObserver> mOffscreenShutdownObserver;
