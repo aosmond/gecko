@@ -58,6 +58,8 @@ class OffscreenCanvasRenderingContext2D final
   RefPtr<WeakWorkerRef> mWorkerRef;
 };
 
+size_t BindingJSObjectMallocBytes(OffscreenCanvasRenderingContext2D* aContext);
+
 }  // namespace mozilla::dom
 
 #endif  // MOZILLA_DOM_OFFSCREENCANVASRENDERINGCONTEXT2D_H_

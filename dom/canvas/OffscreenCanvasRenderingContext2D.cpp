@@ -131,4 +131,20 @@ void OffscreenCanvasRenderingContext2D::Commit(ErrorResult& aRv) {
   mOffscreenCanvas->CommitFrameToCompositor();
 }
 
+size_t BindingJSObjectMallocBytes(OffscreenCanvasRenderingContext2D* aContext) {
+  int32_t width = aContext->GetWidth();
+  int32_t height = aContext->GetHeight();
+
+  // TODO: Bug 1552137: No memory will be allocated if either dimension is
+  // greater than gfxPrefs::gfx_canvas_max_size(). We should check this here
+  // too.
+
+  CheckedInt<uint32_t> bytes = CheckedInt<uint32_t>(width) * height * 4;
+  if (!bytes.isValid()) {
+    return 0;
+  }
+
+  return bytes.value();
+}
+
 }  // namespace mozilla::dom
