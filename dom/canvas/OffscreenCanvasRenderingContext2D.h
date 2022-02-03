@@ -41,6 +41,9 @@ class OffscreenCanvasRenderingContext2D final
 
   void OnShutdown() override;
 
+  NS_IMETHOD InitializeWithDrawTarget(
+      nsIDocShell* aShell, NotNull<gfx::DrawTarget*> aTarget) override;
+
  private:
   void AddShutdownObserver() override;
   void RemoveShutdownObserver() override;

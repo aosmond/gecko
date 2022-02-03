@@ -64,6 +64,11 @@ nsIGlobalObject* OffscreenCanvasRenderingContext2D::GetParentObject() const {
   return mOffscreenCanvas->GetOwnerGlobal();
 }
 
+NS_IMETHODIMP OffscreenCanvasRenderingContext2D::InitializeWithDrawTarget(
+    nsIDocShell* aShell, NotNull<gfx::DrawTarget*> aTarget) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
 void OffscreenCanvasRenderingContext2D::AddShutdownObserver() {
   WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
   if (!workerPrivate) {
