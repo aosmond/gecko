@@ -16,10 +16,9 @@ namespace webgpu {
 GPU_IMPL_CYCLE_COLLECTION(CommandBuffer, mParent)
 GPU_IMPL_JS_WRAP(CommandBuffer)
 
-CommandBuffer::CommandBuffer(
-    Device* const aParent, RawId aId,
-    nsTArray<WeakPtr<dom::HTMLCanvasElement>>&& aTargetCanvases)
-    : ChildOf(aParent), mId(aId), mTargetCanvases(std::move(aTargetCanvases)) {
+CommandBuffer::CommandBuffer(Device* const aParent, RawId aId,
+                             nsTArray<WeakPtr<CanvasContext>>&& aTargetContexts)
+    : ChildOf(aParent), mId(aId), mTargetContexts(std::move(aTargetContexts)) {
   if (!aId) {
     mValid = false;
   }
@@ -42,8 +41,10 @@ Maybe<RawId> CommandBuffer::Commit() {
     return Nothing();
   }
   mValid = false;
-  for (const auto& targetCanvas : mTargetCanvases) {
-    targetCanvas->InvalidateCanvasContent(nullptr);
+  for (const auto& targetContext : mTargetContexts) {
+    if (targetContext) {
+      targetContext->RequestFrameReadback();
+    }
   }
   return Some(mId);
 }
