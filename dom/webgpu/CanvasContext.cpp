@@ -8,11 +8,10 @@
 #include "nsDisplayList.h"
 #include "LayerUserData.h"
 #include "mozilla/dom/HTMLCanvasElement.h"
-#include "mozilla/layers/CompositorManagerChild.h"
+#include "mozilla/layers/CompositableInProcessManager.h"
 #include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/LayersSurfaces.h"
 #include "mozilla/layers/RenderRootStateManager.h"
-#include "mozilla/layers/WebRenderBridgeChild.h"
 #include "ipc/WebGPUChild.h"
 
 namespace mozilla {
@@ -76,10 +75,9 @@ void CanvasContext::Configure(const dom::GPUCanvasConfiguration& aDesc) {
   }
 
   gfx::IntSize actualSize(mWidth, mHeight);
-  mExternalImageId.emplace(
-      layers::CompositorManagerChild::GetInstance()->GetNextExternalImageId());
-  mTexture = aDesc.mDevice->InitSwapChain(aDesc, mExternalImageId.ref(),
-                                          mGfxFormat, &actualSize);
+  mHandle = layers::CompositableInProcessManager::GetNextHandle();
+  mTexture =
+      aDesc.mDevice->InitSwapChain(aDesc, mHandle, mGfxFormat, &actualSize);
   mTexture->mTargetCanvasElement = mCanvasElement;
   mBridge = aDesc.mDevice->GetBridge();
   mGfxSize = actualSize;
@@ -101,10 +99,10 @@ wr::ImageKey CanvasContext::CreateImageKey(
 }
 
 void CanvasContext::Unconfigure() {
-  if (mBridge && mBridge->IsOpen() && mExternalImageId) {
-    mBridge->SendSwapChainDestroy(mExternalImageId.ref());
+  if (mBridge && mBridge->IsOpen() && mHandle) {
+    mBridge->SendSwapChainDestroy(mHandle);
   }
-  mExternalImageId.reset();
+  mHandle = layers::CompositableHandle();
   mBridge = nullptr;
   mTexture = nullptr;
   mGfxFormat = gfx::SurfaceFormat::UNKNOWN;
@@ -130,7 +128,7 @@ bool CanvasContext::UpdateWebRenderLocalCanvasData(
 
   aCanvasData->mGpuBridge = mBridge.get();
   aCanvasData->mGpuTextureId = mTexture->mId;
-  aCanvasData->mExternalImageId = mExternalImageId.ref();
+  aCanvasData->mHandle = mHandle;
   aCanvasData->mFormat = mGfxFormat;
   return true;
 }

@@ -9,6 +9,7 @@
 #include "nsICanvasRenderingContextInternal.h"
 #include "nsWrapperCache.h"
 #include "ObjectModel.h"
+#include "mozilla/layers/LayersTypes.h"
 #include "mozilla/webrender/WebRenderAPI.h"
 
 namespace mozilla {
@@ -47,7 +48,7 @@ class CanvasContext final : public nsICanvasRenderingContextInternal,
 
   wr::ImageDescriptor MakeImageDescriptor() const;
 
-  Maybe<wr::ExternalImageId> mExternalImageId;
+  layers::CompositableHandle mHandle;
 
  public:  // nsICanvasRenderingContextInternal
   int32_t GetWidth() override { return mWidth; }
