@@ -11,6 +11,7 @@ namespace mozilla::layers {
 
 std::map<std::pair<base::ProcessId, uint64_t>, RefPtr<WebRenderImageHost>>
     CompositableInProcessManager::sCompositables;
+StaticMutex CompositableInProcessManager::sMutex;
 
 Atomic<uint64_t> CompositableInProcessManager::sNextHandle(1);
 
@@ -22,8 +23,8 @@ Atomic<uint64_t> CompositableInProcessManager::sNextHandle(1);
 /* static */ RefPtr<WebRenderImageHost> CompositableInProcessManager::Add(
     const CompositableHandle& aHandle, base::ProcessId aForPid,
     const TextureInfo& aTextureInfo) {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   MOZ_RELEASE_ASSERT(aHandle.Value());
+  StaticMutexAutoLock lock(sMutex);
 
   const auto key = std::pair(aForPid, aHandle.Value());
   if (sCompositables.find(key) != sCompositables.end()) {
@@ -38,7 +39,7 @@ Atomic<uint64_t> CompositableInProcessManager::sNextHandle(1);
 
 /* static */ RefPtr<WebRenderImageHost> CompositableInProcessManager::Find(
     const CompositableHandle& aHandle, base::ProcessId aForPid) {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  StaticMutexAutoLock lock(sMutex);
 
   const auto key = std::pair(aForPid, aHandle.Value());
   const auto i = sCompositables.find(key);
@@ -51,7 +52,7 @@ Atomic<uint64_t> CompositableInProcessManager::sNextHandle(1);
 
 /* static */ void CompositableInProcessManager::Release(
     const CompositableHandle& aHandle, base::ProcessId aForPid) {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  StaticMutexAutoLock lock(sMutex);
 
   const auto key = std::pair(aForPid, aHandle.Value());
   const auto i = sCompositables.find(key);

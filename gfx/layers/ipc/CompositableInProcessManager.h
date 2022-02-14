@@ -7,6 +7,7 @@
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/WebRenderImageHost.h"
 #include "mozilla/Atomics.h"
+#include "mozilla/Mutex.h"
 #include <map>
 #include <utility>
 
@@ -42,6 +43,7 @@ class CompositableInProcessManager final {
   static std::map<std::pair<base::ProcessId, uint64_t>,
                   RefPtr<WebRenderImageHost>>
       sCompositables;
+  static StaticMutex sMutex;
 
   static Atomic<uint64_t> sNextHandle;
 };
