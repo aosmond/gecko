@@ -227,14 +227,12 @@ class WebRenderInProcessImageData final : public WebRenderUserData {
   UserDataType GetType() override { return UserDataType::eInProcessImage; }
   static UserDataType Type() { return UserDataType::eInProcessImage; }
 
-  void CreateWebRenderCommands(mozilla::wr::DisplayListBuilder& aBuilder,
-                               const CompositableHandle& aHandle,
-                               const StackingContextHelper& aSc,
-                               const LayoutDeviceRect& aBounds,
-                               const LayoutDeviceRect& aSCBounds,
-                               const wr::ImageRendering& aFilter,
-                               const wr::MixBlendMode& aMixBlendMode,
-                               bool aIsBackfaceVisible);
+  void CreateWebRenderCommands(
+      mozilla::wr::DisplayListBuilder& aBuilder,
+      const CompositableHandle& aHandle, const StackingContextHelper& aSc,
+      const LayoutDeviceRect& aBounds, const LayoutDeviceRect& aSCBounds,
+      VideoInfo::Rotation aRotation, const wr::ImageRendering& aFilter,
+      const wr::MixBlendMode& aMixBlendMode, bool aIsBackfaceVisible);
 
  protected:
   Maybe<wr::PipelineId> mPipelineId;

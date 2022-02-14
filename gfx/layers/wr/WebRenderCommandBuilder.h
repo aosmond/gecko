@@ -93,6 +93,14 @@ class WebRenderCommandBuilder final {
                          const LayoutDeviceRect& aRect,
                          const LayoutDeviceRect& aClip);
 
+  void PushInProcessImage(nsDisplayItem* aItem,
+                          const CompositableHandle& aHandle,
+                          mozilla::wr::DisplayListBuilder& aBuilder,
+                          mozilla::wr::IpcResourceUpdateQueue& aResources,
+                          mozilla::wr::ImageRendering aRendering,
+                          const StackingContextHelper& aSc, gfx::IntSize& aSize,
+                          const LayoutDeviceRect& aAsyncImageBounds);
+
   Maybe<wr::ImageMask> BuildWrMaskImage(
       nsDisplayMasksAndClipPaths* aMaskItem, wr::DisplayListBuilder& aBuilder,
       wr::IpcResourceUpdateQueue& aResources, const StackingContextHelper& aSc,

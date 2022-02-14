@@ -308,8 +308,8 @@ void WebRenderInProcessImageData::CreateWebRenderCommands(
     mozilla::wr::DisplayListBuilder& aBuilder,
     const CompositableHandle& aHandle, const StackingContextHelper& aSc,
     const LayoutDeviceRect& aBounds, const LayoutDeviceRect& aSCBounds,
-    const wr::ImageRendering& aFilter, const wr::MixBlendMode& aMixBlendMode,
-    bool aIsBackfaceVisible) {
+    VideoInfo::Rotation aRotation, const wr::ImageRendering& aFilter,
+    const wr::MixBlendMode& aMixBlendMode, bool aIsBackfaceVisible) {
   MOZ_ASSERT(aHandle);
 
   if (mPipelineId.isSome() && !(mHandle == aHandle)) {
@@ -341,8 +341,7 @@ void WebRenderInProcessImageData::CreateWebRenderCommands(
                       /*ignoreMissingPipelines*/ false);
 
   WrBridge()->AddWebRenderParentCommand(OpUpdateAsyncImagePipeline(
-      mPipelineId.value(), aSCBounds, VideoInfo::Rotation::kDegree_0, aFilter,
-      aMixBlendMode));
+      mPipelineId.value(), aSCBounds, aRotation, aFilter, aMixBlendMode));
 }
 
 WebRenderFallbackData::WebRenderFallbackData(RenderRootStateManager* aManager,

@@ -2053,6 +2053,23 @@ bool WebRenderCommandBuilder::PushImageProvider(
   return true;
 }
 
+void WebRenderCommandBuilder::PushInProcessImage(
+    nsDisplayItem* aItem, const CompositableHandle& aHandle,
+    mozilla::wr::DisplayListBuilder& aBuilder,
+    mozilla::wr::IpcResourceUpdateQueue& aResources,
+    mozilla::wr::ImageRendering aRendering, const StackingContextHelper& aSc,
+    gfx::IntSize& aSize, const LayoutDeviceRect& aAsyncImageBounds) {
+  RefPtr<WebRenderInProcessImageData> imageData =
+      CreateOrRecycleWebRenderUserData<WebRenderInProcessImageData>(aItem);
+  MOZ_ASSERT(imageData);
+
+  LayoutDeviceRect scBounds(LayoutDevicePoint(0, 0), aAsyncImageBounds.Size());
+  imageData->CreateWebRenderCommands(aBuilder, aHandle, aSc, aAsyncImageBounds,
+                                     scBounds, VideoInfo::Rotation::kDegree_0,
+                                     aRendering, wr::MixBlendMode::Normal,
+                                     !aItem->BackfaceIsHidden());
+}
+
 static void PaintItemByDrawTarget(nsDisplayItem* aItem, gfx::DrawTarget* aDT,
                                   const LayoutDevicePoint& aOffset,
                                   const IntRect& visibleRect,
