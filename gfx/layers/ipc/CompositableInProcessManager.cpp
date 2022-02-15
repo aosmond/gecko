@@ -43,6 +43,7 @@ Atomic<uint64_t> CompositableInProcessManager::sNextHandle(1);
 
   auto host = MakeRefPtr<WebRenderImageHost>(aTextureInfo);
   sCompositables[key] = host;
+  host->SetAsyncRef(AsyncCompositableRef(aForPid, aHandle));
   return host;
 }
 
