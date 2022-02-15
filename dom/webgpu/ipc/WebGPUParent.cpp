@@ -56,7 +56,6 @@ class PresentationData {
   RawId mQueueId = 0;
   RefPtr<layers::WebRenderImageHost> mImageHost;
   RefPtr<layers::MemoryTextureHost> mTextureHost;
-  RefPtr<layers::WebRenderTextureHost> mWrTextureHost;
   uint32_t mSourcePitch = 0;
   uint32_t mTargetPitch = 0;
   uint32_t mRowCount = 0;
@@ -66,18 +65,15 @@ class PresentationData {
   std::vector<RawId> mQueuedBufferIds;
   Mutex mBuffersLock;
 
-  PresentationData(
-      RawId aDeviceId, RawId aQueueId,
-      already_AddRefed<layers::WebRenderImageHost> aImageHost,
-      already_AddRefed<layers::MemoryTextureHost> aTextureHost,
-      already_AddRefed<layers::WebRenderTextureHost> aWrTextureHost,
-      uint32_t aSourcePitch, uint32_t aTargetPitch, uint32_t aRows,
-      const nsTArray<RawId>& aBufferIds)
+  PresentationData(RawId aDeviceId, RawId aQueueId,
+                   already_AddRefed<layers::WebRenderImageHost> aImageHost,
+                   already_AddRefed<layers::MemoryTextureHost> aTextureHost,
+                   uint32_t aSourcePitch, uint32_t aTargetPitch, uint32_t aRows,
+                   const nsTArray<RawId>& aBufferIds)
       : mDeviceId(aDeviceId),
         mQueueId(aQueueId),
         mImageHost(aImageHost),
         mTextureHost(aTextureHost),
-        mWrTextureHost(aWrTextureHost),
         mSourcePitch(aSourcePitch),
         mTargetPitch(aTargetPitch),
         mRowCount(aRows),
@@ -549,18 +545,20 @@ ipc::IPCResult WebGPUParent::RecvDeviceCreateSwapChain(
   }
   layers::TextureInfo texInfo(layers::CompositableType::IMAGE);
   layers::TextureFlags texFlags = layers::TextureFlags::NO_FLAGS;
-  layers::SurfaceDescriptor surfaceDesc;
   wr::ExternalImageId externalId =
       layers::CompositableInProcessManager::GetNextExternalImageId();
+
   RefPtr<layers::WebRenderImageHost> imageHost =
       layers::CompositableInProcessManager::Add(aHandle, OtherPid(), texInfo);
+
   auto textureHost =
       MakeRefPtr<layers::MemoryTextureHost>(textureHostData, aDesc, texFlags);
-  auto wrTextureHost = MakeRefPtr<layers::WebRenderTextureHost>(
-      surfaceDesc, texFlags, textureHost, externalId);
+  textureHost->DisableExternalTextures();
+  textureHost->EnsureRenderTexture(Some(externalId));
+
   auto data = MakeRefPtr<PresentationData>(
-      aSelfId, aQueueId, imageHost.forget(), textureHost.forget(),
-      wrTextureHost.forget(), bufferStride, textureStride, rows, aBufferIds);
+      aSelfId, aQueueId, imageHost.forget(), textureHost.forget(), bufferStride,
+      textureStride, rows, aBufferIds);
   if (!mCanvasMap.insert({aHandle.Value(), data}).second) {
     NS_ERROR("External image is already registered as WebGPU canvas!");
   }
@@ -603,17 +601,29 @@ static void PresentCallback(ffi::WGPUBufferMapAsyncStatus status,
       req->mResolver(true);
       layers::CompositorThread()->Dispatch(NS_NewRunnableFunction(
           "webgpu::WebGPUParent::PresentCallback",
-          [imageHost = data->mImageHost, texture = data->mWrTextureHost,
+          [imageHost = data->mImageHost, texture = data->mTextureHost,
            frameID = data->mNextFrameID++]() {
+            layers::SurfaceDescriptor surfaceDesc;
             AutoTArray<layers::CompositableHost::TimedTexture, 1> textures;
+
             layers::CompositableHost::TimedTexture* timedTexture =
                 textures.AppendElement();
-            timedTexture->mTexture = texture;
+
+            // TODO(aosmond): We recreate the WebRenderTextureHost object each
+            // time so that the pipeline actually updates, as it checks if the
+            // texture is the same as before issuing the transaction update to
+            // WR. We really ought to be cycling between a front and buffer back
+            // here to avoid a race uploading the texture and doing the copy in
+            // PresentCallback.
+            timedTexture->mTexture = new layers::WebRenderTextureHost(
+                surfaceDesc, texture->GetFlags(), texture,
+                texture->GetMaybeExternalImageId().ref());
             timedTexture->mTimeStamp = TimeStamp();
             timedTexture->mPictureRect =
                 gfx::IntRect(gfx::IntPoint(0, 0), texture->GetSize());
             timedTexture->mFrameID = frameID;
             timedTexture->mProducerID = 0;
+
             imageHost->UseTextureHost(textures);
           }));
     } else {
@@ -764,7 +774,6 @@ ipc::IPCResult WebGPUParent::RecvSwapChainDestroy(
   RefPtr<PresentationData> data = lookup->second.get();
   mCanvasMap.erase(lookup);
   data->mTextureHost = nullptr;
-  data->mWrTextureHost = nullptr;
   layers::CompositableInProcessManager::Release(aHandle, OtherPid());
 
   MutexAutoLock lock(data->mBuffersLock);
