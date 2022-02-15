@@ -6,9 +6,11 @@
 #include "WebGPUParent.h"
 #include "mozilla/webgpu/ffi/wgpu.h"
 #include "mozilla/layers/CompositableInProcessManager.h"
+#include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/TextureHost.h"
 #include "mozilla/layers/WebRenderImageHost.h"
+#include "mozilla/layers/WebRenderTextureHost.h"
 
 namespace mozilla {
 namespace webgpu {
@@ -54,23 +56,28 @@ class PresentationData {
   RawId mQueueId = 0;
   RefPtr<layers::WebRenderImageHost> mImageHost;
   RefPtr<layers::MemoryTextureHost> mTextureHost;
+  RefPtr<layers::WebRenderTextureHost> mWrTextureHost;
   uint32_t mSourcePitch = 0;
   uint32_t mTargetPitch = 0;
   uint32_t mRowCount = 0;
+  uint32_t mNextFrameID = 1;
   std::vector<RawId> mUnassignedBufferIds;
   std::vector<RawId> mAvailableBufferIds;
   std::vector<RawId> mQueuedBufferIds;
   Mutex mBuffersLock;
 
-  PresentationData(RawId aDeviceId, RawId aQueueId,
-                   already_AddRefed<layers::WebRenderImageHost> aImageHost,
-                   already_AddRefed<layers::MemoryTextureHost> aTextureHost,
-                   uint32_t aSourcePitch, uint32_t aTargetPitch, uint32_t aRows,
-                   const nsTArray<RawId>& aBufferIds)
+  PresentationData(
+      RawId aDeviceId, RawId aQueueId,
+      already_AddRefed<layers::WebRenderImageHost> aImageHost,
+      already_AddRefed<layers::MemoryTextureHost> aTextureHost,
+      already_AddRefed<layers::WebRenderTextureHost> aWrTextureHost,
+      uint32_t aSourcePitch, uint32_t aTargetPitch, uint32_t aRows,
+      const nsTArray<RawId>& aBufferIds)
       : mDeviceId(aDeviceId),
         mQueueId(aQueueId),
         mImageHost(aImageHost),
         mTextureHost(aTextureHost),
+        mWrTextureHost(aWrTextureHost),
         mSourcePitch(aSourcePitch),
         mTargetPitch(aTargetPitch),
         mRowCount(aRows),
@@ -541,15 +548,19 @@ ipc::IPCResult WebGPUParent::RecvDeviceCreateSwapChain(
     return IPC_OK();
   }
   layers::TextureInfo texInfo(layers::CompositableType::IMAGE);
+  layers::TextureFlags texFlags = layers::TextureFlags::NO_FLAGS;
+  layers::SurfaceDescriptor surfaceDesc;
+  wr::ExternalImageId externalId =
+      layers::CompositableInProcessManager::GetNextExternalImageId();
   RefPtr<layers::WebRenderImageHost> imageHost =
       layers::CompositableInProcessManager::Add(aHandle, OtherPid(), texInfo);
-  RefPtr<layers::MemoryTextureHost> textureHost = new layers::MemoryTextureHost(
-      textureHostData, aDesc, layers::TextureFlags::NO_FLAGS);
-  textureHost->DisableExternalTextures();
-  // textureHost->CreateRenderTexture(aExternalId); // FIXME(aosmond)
-  RefPtr<PresentationData> data = new PresentationData(
-      aSelfId, aQueueId, imageHost.forget(), textureHost.forget(), bufferStride,
-      textureStride, rows, aBufferIds);
+  auto textureHost =
+      MakeRefPtr<layers::MemoryTextureHost>(textureHostData, aDesc, texFlags);
+  auto wrTextureHost = MakeRefPtr<layers::WebRenderTextureHost>(
+      surfaceDesc, texFlags, textureHost, externalId);
+  auto data = MakeRefPtr<PresentationData>(
+      aSelfId, aQueueId, imageHost.forget(), textureHost.forget(),
+      wrTextureHost.forget(), bufferStride, textureStride, rows, aBufferIds);
   if (!mCanvasMap.insert({aHandle.Value(), data}).second) {
     NS_ERROR("External image is already registered as WebGPU canvas!");
   }
@@ -590,6 +601,21 @@ static void PresentCallback(ffi::WGPUBufferMapAsyncStatus status,
         ptr += data->mSourcePitch;
       }
       req->mResolver(true);
+      layers::CompositorThread()->Dispatch(NS_NewRunnableFunction(
+          "webgpu::WebGPUParent::PresentCallback",
+          [imageHost = data->mImageHost, texture = data->mWrTextureHost,
+           frameID = data->mNextFrameID++]() {
+            AutoTArray<layers::CompositableHost::TimedTexture, 1> textures;
+            layers::CompositableHost::TimedTexture* timedTexture =
+                textures.AppendElement();
+            timedTexture->mTexture = texture;
+            timedTexture->mTimeStamp = TimeStamp();
+            timedTexture->mPictureRect =
+                gfx::IntRect(gfx::IntPoint(0, 0), texture->GetSize());
+            timedTexture->mFrameID = frameID;
+            timedTexture->mProducerID = 0;
+            imageHost->UseTextureHost(textures);
+          }));
     } else {
       NS_WARNING("WebGPU present skipped: the swapchain is resized!");
       req->mResolver(false);
@@ -738,8 +764,8 @@ ipc::IPCResult WebGPUParent::RecvSwapChainDestroy(
   RefPtr<PresentationData> data = lookup->second.get();
   mCanvasMap.erase(lookup);
   data->mTextureHost = nullptr;
+  data->mWrTextureHost = nullptr;
   layers::CompositableInProcessManager::Release(aHandle, OtherPid());
-  // layers::TextureHost::DestroyRenderTexture(aExternalId); // FIXME(aosmond)
 
   MutexAutoLock lock(data->mBuffersLock);
   ipc::ByteBuf dropByteBuf;
@@ -763,7 +789,6 @@ void WebGPUParent::ActorDestroy(ActorDestroyReason aWhy) {
   for (const auto& p : mCanvasMap) {
     const CompositableHandle handle(p.first);
     layers::CompositableInProcessManager::Release(handle, OtherPid());
-    // layers::TextureHost::DestroyRenderTexture(extId); FIXME
   }
   mCanvasMap.clear();
   ffi::wgpu_server_poll_all_devices(mContext, true);
