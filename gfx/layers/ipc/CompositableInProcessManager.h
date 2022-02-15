@@ -6,6 +6,7 @@
 
 #include "mozilla/layers/LayersTypes.h"
 #include "mozilla/layers/WebRenderImageHost.h"
+#include "mozilla/webrender/WebRenderTypes.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Mutex.h"
 #include <map>
@@ -24,8 +25,8 @@ namespace mozilla::layers {
  */
 class CompositableInProcessManager final {
  public:
-  void Initialize();
-  void Shutdown();
+  static void Initialize(uint32_t aNamespace);
+  static void Shutdown();
 
   static RefPtr<WebRenderImageHost> Add(const CompositableHandle& aHandle,
                                         base::ProcessId aForPid,
@@ -39,12 +40,34 @@ class CompositableInProcessManager final {
     return CompositableHandle(sNextHandle++);
   }
 
+  static uint32_t GetNextResourceId() {
+    uint32_t resourceId = sNextResourceId++;
+    MOZ_RELEASE_ASSERT(resourceId != 0);
+    return resourceId;
+  }
+
+  static wr::ImageKey GetNextImageKey() {
+    MOZ_ASSERT(sNamespace != 0);
+    return wr::ImageKey{{sNamespace}, GetNextResourceId()};
+  }
+
+  static wr::ExternalImageId GetNextExternalImageId() {
+    return wr::ToExternalImageId(GetShiftedNamespace() | GetNextResourceId());
+  }
+
  private:
+  static uint64_t GetShiftedNamespace() {
+    MOZ_ASSERT(sNamespace != 0);
+    return static_cast<uint64_t>(sNamespace) << 32;
+  }
+
   static std::map<std::pair<base::ProcessId, uint64_t>,
                   RefPtr<WebRenderImageHost>>
       sCompositables;
   static StaticMutex sMutex;
 
+  static uint32_t sNamespace;
+  static Atomic<uint32_t> sNextResourceId;
   static Atomic<uint64_t> sNextHandle;
 };
 

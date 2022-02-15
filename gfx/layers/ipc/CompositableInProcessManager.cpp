@@ -13,10 +13,19 @@ std::map<std::pair<base::ProcessId, uint64_t>, RefPtr<WebRenderImageHost>>
     CompositableInProcessManager::sCompositables;
 StaticMutex CompositableInProcessManager::sMutex;
 
+uint32_t CompositableInProcessManager::sNamespace(0);
+Atomic<uint32_t> CompositableInProcessManager::sNextResourceId(1);
 Atomic<uint64_t> CompositableInProcessManager::sNextHandle(1);
 
+/* static */ void CompositableInProcessManager::Initialize(
+    uint32_t aNamespace) {
+  MOZ_ASSERT(NS_IsMainThread());
+  sNamespace = aNamespace;
+}
+
 /* static */ void CompositableInProcessManager::Shutdown() {
-  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
+  MOZ_ASSERT(NS_IsMainThread());
+  StaticMutexAutoLock lock(sMutex);
   sCompositables.clear();
 }
 
