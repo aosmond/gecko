@@ -616,8 +616,8 @@ static void PresentCallback(ffi::WGPUBufferMapAsyncStatus status,
             // here to avoid a race uploading the texture and doing the copy in
             // PresentCallback.
             timedTexture->mTexture = new layers::WebRenderTextureHost(
-                surfaceDesc, texture->GetFlags(), texture,
-                texture->GetMaybeExternalImageId().ref());
+                surfaceDesc, layers::TextureFlags::BORROWED_EXTERNAL_ID,
+                texture, texture->GetMaybeExternalImageId().ref());
             timedTexture->mTimeStamp = TimeStamp();
             timedTexture->mPictureRect =
                 gfx::IntRect(gfx::IntPoint(0, 0), texture->GetSize());
