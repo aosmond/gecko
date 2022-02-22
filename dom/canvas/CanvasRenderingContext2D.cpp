@@ -302,12 +302,9 @@ class CanvasGeneralPattern {
           gradient->mCenter, gradient->mAngle, 0, 1,
           gradient->GetGradientStopsForTarget(aRT));
     } else if (state.patternStyles[aStyle]) {
-      if (aCtx->mCanvasElement) {
-        CanvasUtils::DoDrawImageSecurityCheck(
-            aCtx->mCanvasElement, state.patternStyles[aStyle]->mPrincipal,
-            state.patternStyles[aStyle]->mForceWriteOnly,
-            state.patternStyles[aStyle]->mCORSUsed);
-      }
+      aCtx->DoSecurityCheck(state.patternStyles[aStyle]->mPrincipal,
+                            state.patternStyles[aStyle]->mForceWriteOnly,
+                            state.patternStyles[aStyle]->mCORSUsed);
 
       ExtendMode mode;
       if (state.patternStyles[aStyle]->mRepeat ==
@@ -4684,11 +4681,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
     imgSize = res.mSize;
     intrinsicImgSize = res.mIntrinsicSize;
-
-    if (!offscreenCanvas && mCanvasElement) {
-      CanvasUtils::DoDrawImageSecurityCheck(mCanvasElement, res.mPrincipal,
-                                            res.mIsWriteOnly, res.mCORSUsed);
-    }
+    DoSecurityCheck(res.mPrincipal, res.mIsWriteOnly, res.mCORSUsed);
 
     if (res.mSourceSurface) {
       if (res.mImageRequest) {
