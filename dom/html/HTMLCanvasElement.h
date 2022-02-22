@@ -313,6 +313,7 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
 
  protected:
   virtual ~HTMLCanvasElement();
+  void Destroy();
 
   virtual JSObject* WrapNode(JSContext* aCx,
                              JS::Handle<JSObject*> aGivenProto) override;
