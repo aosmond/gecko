@@ -33,6 +33,7 @@ void TextureView::Cleanup() {
       bridge->SendTextureViewDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu

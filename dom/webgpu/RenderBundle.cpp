@@ -34,6 +34,7 @@ void RenderBundle::Cleanup() {
       bridge->SendRenderBundleDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu

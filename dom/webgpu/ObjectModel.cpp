@@ -23,6 +23,11 @@ template <typename T>
 ChildOf<T>::~ChildOf() = default;
 
 template <typename T>
+void ChildOf<T>::Cleanup() {
+  mParent = nullptr;
+}
+
+template <typename T>
 nsIGlobalObject* ChildOf<T>::GetParentObject() const {
   return mParent->GetParentObject();
 }

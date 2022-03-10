@@ -70,6 +70,7 @@ void Buffer::Cleanup() {
       bridge->SendBufferDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 void Buffer::SetMapped(ipc::Shmem&& aShmem, bool aWritable) {

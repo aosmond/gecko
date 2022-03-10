@@ -28,6 +28,7 @@ void Sampler::Cleanup() {
       bridge->SendSamplerDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu

@@ -34,6 +34,7 @@ void CommandBuffer::Cleanup() {
       bridge->SendCommandBufferDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 Maybe<RawId> CommandBuffer::Commit() {

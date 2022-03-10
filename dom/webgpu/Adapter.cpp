@@ -66,13 +66,17 @@ Adapter::Adapter(Instance* const aParent,
   }
 }
 
-Adapter::~Adapter() { Cleanup(); }
-
-void Adapter::Cleanup() {
+Adapter::~Adapter() {
   if (mValid && mBridge && mBridge->IsOpen()) {
     mValid = false;
     mBridge->SendAdapterDestroy(mId);
   }
+  ChildOf::Cleanup();
+}
+
+void Adapter::Cleanup() {
+  mFeatures = nullptr;
+  mLimits = nullptr;
 }
 
 const RefPtr<SupportedFeatures>& Adapter::Features() const { return mFeatures; }

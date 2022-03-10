@@ -66,14 +66,14 @@ Device::Device(Adapter* const aParent, RawId aId,
   mBridge->RegisterDevice(this);
 }
 
-Device::~Device() { Cleanup(); }
-
-void Device::Cleanup() {
+Device::~Device() {
   if (mValid && mBridge) {
     mValid = false;
     mBridge->UnregisterDevice(mId);
   }
 }
+
+void Device::Cleanup() { mQueue = nullptr; }
 
 void Device::CleanupUnregisteredInParent() {
   if (mBridge) {

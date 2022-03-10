@@ -28,6 +28,7 @@ void BindGroup::Cleanup() {
       bridge->SendBindGroupDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu

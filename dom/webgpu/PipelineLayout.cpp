@@ -28,6 +28,7 @@ void PipelineLayout::Cleanup() {
       bridge->SendPipelineLayoutDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu

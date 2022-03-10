@@ -91,9 +91,7 @@ Texture::Texture(Device* const aParent, RawId aId,
       mId(aId),
       mBytesPerBlock(GetBytesPerBlock(aDesc.mFormat)) {}
 
-Texture::~Texture() { Cleanup(); }
-
-void Texture::Cleanup() {
+Texture::~Texture() {
   if (mValid && mParent) {
     mValid = false;
     auto bridge = mParent->GetBridge();
@@ -101,7 +99,10 @@ void Texture::Cleanup() {
       bridge->SendTextureDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
+
+void Texture::Cleanup() {}
 
 already_AddRefed<TextureView> Texture::CreateView(
     const dom::GPUTextureViewDescriptor& aDesc) {

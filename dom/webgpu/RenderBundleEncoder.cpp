@@ -82,6 +82,7 @@ void RenderBundleEncoder::Cleanup() {
   if (mValid) {
     mValid = false;
   }
+  ChildOf::Cleanup();
 }
 
 void RenderBundleEncoder::SetBindGroup(

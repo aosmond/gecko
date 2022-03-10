@@ -28,6 +28,7 @@ void ShaderModule::Cleanup() {
       bridge->SendShaderModuleDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu

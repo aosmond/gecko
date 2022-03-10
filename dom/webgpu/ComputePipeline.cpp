@@ -37,6 +37,7 @@ void ComputePipeline::Cleanup() {
       }
     }
   }
+  ChildOf::Cleanup();
 }
 
 already_AddRefed<BindGroupLayout> ComputePipeline::GetBindGroupLayout(

@@ -107,6 +107,7 @@ void CommandEncoder::Cleanup() {
       bridge->SendCommandEncoderDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 void CommandEncoder::CopyBufferToBuffer(const Buffer& aSource,

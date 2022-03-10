@@ -21,6 +21,8 @@ class ChildOf {
   explicit ChildOf(T* const parent);
   virtual ~ChildOf();
 
+  void Cleanup();
+
   RefPtr<T> mParent;
 
  public:

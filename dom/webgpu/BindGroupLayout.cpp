@@ -32,6 +32,7 @@ void BindGroupLayout::Cleanup() {
       bridge->SendBindGroupLayoutDestroy(mId);
     }
   }
+  ChildOf::Cleanup();
 }
 
 }  // namespace webgpu
