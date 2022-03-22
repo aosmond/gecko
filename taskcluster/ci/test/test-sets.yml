@@ -463,6 +463,10 @@ linux-tsan-tests:
     - mochitest-browser-chrome
     - mochitest-media
     - mochitest-plain
+    - mochitest-webgl1-core
+    - mochitest-webgl1-ext
+    - mochitest-webgl2-core
+    - mochitest-webgl2-ext
     - mochitest-webgpu
     - reftest
     - web-platform-tests
