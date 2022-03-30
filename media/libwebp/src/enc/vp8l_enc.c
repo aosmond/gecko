@@ -1913,10 +1913,10 @@ WebPEncodingError VP8LEncodeStream(const WebPConfig* const config,
   int ok_main;
 
   // Analyze image (entropy, num_palettes etc)
-  if (enc_main == NULL ||
+  if (!VP8LBitWriterInit(&bw_side, 0) || enc_main == NULL ||
       !EncoderAnalyze(enc_main, crunch_configs, &num_crunch_configs_main,
                       &red_and_blue_always_zero) ||
-      !EncoderInit(enc_main) || !VP8LBitWriterInit(&bw_side, 0)) {
+      !EncoderInit(enc_main)) {
     err = VP8_ENC_ERROR_OUT_OF_MEMORY;
     goto Error;
   }
