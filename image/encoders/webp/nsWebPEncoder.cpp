@@ -30,6 +30,7 @@ nsWebPEncoder::nsWebPEncoder()
       mReentrantMonitor("nsWebPEncoder.mReentrantMonitor") {}
 
 nsWebPEncoder::~nsWebPEncoder() {
+  printf_stderr("[AO] nsWebPEncoder destroy %p\n", mImageBuffer);
   if (mImageBuffer) {
     WebPFree(mImageBuffer);
     mImageBuffer = nullptr;
