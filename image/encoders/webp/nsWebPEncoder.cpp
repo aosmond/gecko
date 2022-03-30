@@ -111,6 +111,7 @@ nsWebPEncoder::InitFromData(const uint8_t* aData,
         WebPEncodeRGBA(aData, aWidth, aHeight, aStride, quality, &mImageBuffer);
   } else if (aInputFormat == INPUT_FORMAT_HOSTARGB) {
     UniquePtr<uint8_t[]> aDest = MakeUnique<uint8_t[]>(aStride * aHeight);
+    printf_stderr("[AO] BGRA encoding src %p dst %p len %u width %u height %u stride %u quality %d stride*height %u\n", aData, aDest.get(), aLength, aWidth, aHeight, aStride, quality, aStride * aHeight);
 
     for (uint32_t y = 0; y < aHeight; y++) {
       for (uint32_t x = 0; x < aWidth; x++) {
@@ -135,8 +136,21 @@ nsWebPEncoder::InitFromData(const uint8_t* aData,
       }
     }
 
+    uint32_t hits = 0;
+    uint32_t len = aStride * aHeight;
+    for (uint32_t i = 0; i < len; ++i) {
+      if (aDest.get()[i] != aData[i]) {
+        printf_stderr("[AO] src %u dst %u index %u\n", aData[i], aDest.get()[i], i);
+	if (++hits == 12) {
+          break;
+	}
+      }
+    }
+
     size = WebPEncodeRGBA(aDest.get(), aWidth, aHeight, aStride, quality,
                           &mImageBuffer);
+
+    printf_stderr("[AO] BGRA encoding complete %p\n", mImageBuffer);
   }
 
   mFinished = true;
