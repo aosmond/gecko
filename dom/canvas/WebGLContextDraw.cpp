@@ -868,18 +868,22 @@ void WebGLContext::DrawElementsInstanced(GLenum mode, GLsizei indexCount,
 
     uint32_t maxVertId = 0;
     const auto isFetchValid = [&]() {
+      printf_stderr("[AO] indexCount %d instanceCount %d\n", indexCount, instanceCount);
       if (!indexCount || !instanceCount) return true;
 
       const auto globalMaxVertId =
           indexBuffer->GetIndexedFetchMaxVert(type, 0, indexCapacity);
+      printf_stderr("[AO] globalMaxVertId %u (%d) maxVerts %lu\n", globalMaxVertId ? globalMaxVertId.value() : 0, globalMaxVertId.isSome(), fetchLimits->maxVerts);
       if (!globalMaxVertId) return true;
       if (globalMaxVertId.value() < fetchLimits->maxVerts) return true;
 
       const auto exactMaxVertId =
           indexBuffer->GetIndexedFetchMaxVert(type, byteOffset, indexCount);
       maxVertId = exactMaxVertId.value();
+      printf_stderr("[AO] exactMaxVertId %u\n", maxVertId);
       return maxVertId < fetchLimits->maxVerts;
     }();
+    printf_stderr("[AO] isFetchValid %d\n", isFetchValid);
     if (!isFetchValid) {
       ErrorInvalidOperation(
           "Indexed vertex fetch requires %u vertices, but"

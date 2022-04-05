@@ -635,15 +635,23 @@ webgl::LinkedProgramInfo::GetDrawFetchLimits() const {
   bool hasActiveAttrib = false;
   bool hasActiveDivisor0 = false;
 
+  printf_stderr("[AO] check for progAttrib\n");
   for (const auto& progAttrib : activeAttribs) {
     const auto& loc = progAttrib.location;
-    if (loc == -1) continue;
+    if (loc == -1) {
+      printf_stderr("[AO] no more progAttrib\n");
+      continue;
+    }
     hasActiveAttrib |= true;
 
     const auto& binding = vao->AttribBinding(loc);
     const auto& buffer = binding.buffer;
     const auto& layout = binding.layout;
     hasActiveDivisor0 |= (layout.divisor == 0);
+
+    printf_stderr("[AO] next progAttrib %d\n", loc);
+    printf_stderr("[AO] layout isArray %d byteOffset %lu byteSize %u byteStride %u divisor %u\n",
+        layout.isArray, layout.byteOffset, layout.byteSize, layout.byteStride, layout.divisor);
 
     webgl::AttribBaseType attribDataBaseType;
     if (layout.isArray) {
@@ -656,17 +664,25 @@ webgl::LinkedProgramInfo::GetDrawFetchLimits() const {
       const auto availBytes = buffer->ByteLength();
       const auto availElems = AvailGroups(availBytes, layout.byteOffset,
                                           layout.byteSize, layout.byteStride);
+      printf_stderr("[AO] buffer %p byteLength %lu availElems %lu\n", buffer.get(), availBytes, availElems);
       if (layout.divisor) {
         const auto availInstances =
             CheckedInt<uint64_t>(availElems) * layout.divisor;
         if (availInstances.isValid()) {
+          printf_stderr("[AO] maxInstances %lu availInstances %lu\n", fetchLimits.maxInstances, availInstances.value());
           fetchLimits.maxInstances =
               std::min(fetchLimits.maxInstances, availInstances.value());
         }  // If not valid, it overflowed too large, so we're super safe.
+	else {
+          printf_stderr("[AO] availInstances invalid\n");
+	}
       } else {
+        auto oldMaxVerts = fetchLimits.maxVerts;
         fetchLimits.maxVerts = std::min(fetchLimits.maxVerts, availElems);
+        printf_stderr("[AO] maxVerts %lu -> %lu\n", oldMaxVerts, fetchLimits.maxVerts);
       }
     } else {
+      printf_stderr("[AO] no divisor\n");
       attribDataBaseType = webgl->mGenericVertexAttribTypes[loc];
     }
 
@@ -679,9 +695,11 @@ webgl::LinkedProgramInfo::GetDrawFetchLimits() const {
           "Vertex attrib %u requires data of type %s,"
           " but is being supplied with type %s.",
           loc, progType, dataType);
+      printf_stderr("[AO] end check for progAttrib -- bad type\n");
       return nullptr;
     }
   }
+  printf_stderr("[AO] end check for progAttrib\n");
 
   if (!webgl->IsWebGL2() && hasActiveAttrib && !hasActiveDivisor0) {
     webgl->ErrorInvalidOperation(
