@@ -555,9 +555,7 @@ class ImageSurfaceCache {
 
   IntSize SuggestedSize(const IntSize& aSize) const {
     IntSize suggestedSize = SuggestedSizeInternal(aSize);
-    if (mIsVectorImage) {
-      suggestedSize = SurfaceCache::ClampVectorSize(suggestedSize);
-    }
+    suggestedSize = SurfaceCache::ClampSize(mIsVectorImage, suggestedSize);
     return suggestedSize;
   }
 
@@ -1843,13 +1841,19 @@ bool SurfaceCache::IsLegalSize(const IntSize& aSize) {
   return true;
 }
 
-IntSize SurfaceCache::ClampVectorSize(const IntSize& aSize) {
+IntSize SurfaceCache::ClampSize(ImageKey aImageKey, const IntSize& aSize) {
+  return ClampSize(aImageKey->GetType() == imgIContainer::TYPE_VECTOR, aSize);
+}
+
+IntSize SurfaceCache::ClampSize(bool aIsVectorImage, const IntSize& aSize) {
   // If we exceed the maximum, we need to scale the size downwards to fit.
   // It shouldn't get here if it is significantly larger because
   // VectorImage::UseSurfaceCacheForSize should prevent us from requesting
   // a rasterized version of a surface greater than 4x the maximum.
   int32_t maxSizeKB =
-      StaticPrefs::image_cache_max_rasterized_svg_threshold_kb();
+      aIsVectorImage
+          ? StaticPrefs::image_cache_max_rasterized_svg_threshold_kb()
+          : StaticPrefs::image_cache_max_rasterized_decoded_threshold_kb();
   if (maxSizeKB <= 0) {
     return aSize;
   }
@@ -1861,14 +1865,6 @@ IntSize SurfaceCache::ClampVectorSize(const IntSize& aSize) {
 
   double scale = sqrt(double(maxSizeKB) / proposedKB);
   return IntSize(int32_t(scale * aSize.width), int32_t(scale * aSize.height));
-}
-
-IntSize SurfaceCache::ClampSize(ImageKey aImageKey, const IntSize& aSize) {
-  if (aImageKey->GetType() != imgIContainer::TYPE_VECTOR) {
-    return aSize;
-  }
-
-  return ClampVectorSize(aSize);
 }
 
 /* static */

@@ -469,9 +469,9 @@ struct SurfaceCache {
   static bool IsLegalSize(const IntSize& aSize);
 
   /**
-   * @return clamped size for the given vector image size to rasterize at.
+   * @return clamped size for the given image type and size to rasterize at.
    */
-  static IntSize ClampVectorSize(const IntSize& aSize);
+  static IntSize ClampSize(const bool aIsVectorImage, const IntSize& aSize);
 
   /**
    * @return clamped size for the given image and size to rasterize at.

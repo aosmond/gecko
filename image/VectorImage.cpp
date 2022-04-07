@@ -988,7 +988,7 @@ VectorImage::Draw(gfxContext* aContext, const nsIntSize& aSize,
   //   than bringing the browser to a crawl.
   if (aContext->GetDrawTarget()->GetBackendType() == BackendType::RECORDING ||
       (!gfxVars::UseWebRender() &&
-       aSize != SurfaceCache::ClampVectorSize(aSize))) {
+       aSize != SurfaceCache::ClampSize(/* aIsVectorImage */ true, aSize))) {
     aFlags |= FLAG_BYPASS_SURFACE_CACHE;
   }
 

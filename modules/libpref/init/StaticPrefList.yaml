@@ -6151,7 +6151,21 @@
 # an SVG.
 - name: image.cache.max-rasterized-svg-threshold-kb
   type: RelaxedAtomicInt32
+#ifdef HAVE_64BIT_BUILD
   value: 200*1024
+#else
+  value: 100*1024
+#endif
+  mirror: always
+
+# Maximum size of a surface in KB we are willing to produce for decode images.
+- name: image.cache.max-rasterized-decoded-threshold-kb
+  type: RelaxedAtomicInt32
+#ifdef HAVE_64BIT_BUILD
+  value: 0
+#else
+  value: 200*1024
+#endif
   mirror: always
 
 # The maximum size, in bytes, of the decoded images we cache.
