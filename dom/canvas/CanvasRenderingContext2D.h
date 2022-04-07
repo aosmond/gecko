@@ -84,6 +84,8 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
 
+  static bool TextEnabledOnWorkerThread(JSContext* aCx, JSObject* aObj);
+
   HTMLCanvasElement* GetCanvas() const {
     if (!mCanvasElement || mCanvasElement->IsInNativeAnonymousSubtree()) {
       return nullptr;

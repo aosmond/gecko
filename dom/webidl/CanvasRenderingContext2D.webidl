@@ -207,7 +207,7 @@ interface mixin CanvasShadowStyles {
 };
 
 interface mixin CanvasFilters {
-  [Pref="canvas.filters.enabled", SetterThrows]
+  [Pref="canvas.filters.enabled", SetterThrows, Func="mozilla::dom::OffscreenCanvas::PrefEnabledOnWorkerThread"]
   attribute UTF8String filter; // (default empty string = no filter)
 };
 
@@ -248,11 +248,11 @@ interface mixin CanvasUserInterface {
 
 interface mixin CanvasText {
   // text (see also the CanvasPathDrawingStyles interface)
-  [Throws, LenientFloat]
+  [Throws, LenientFloat, Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   void fillText(DOMString text, double x, double y, optional double maxWidth);
-  [Throws, LenientFloat]
+  [Throws, LenientFloat, Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   void strokeText(DOMString text, double x, double y, optional double maxWidth);
-  [NewObject, Throws]
+  [NewObject, Throws, Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   TextMetrics measureText(DOMString text);
 };
 
@@ -298,10 +298,13 @@ interface mixin CanvasPathDrawingStyles {
 
 interface mixin CanvasTextDrawingStyles {
   // text
-  [SetterThrows]
+  [SetterThrows, Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   attribute UTF8String font; // (default 10px sans-serif)
+  [Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   attribute DOMString textAlign; // "start", "end", "left", "right", "center" (default: "start")
+  [Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   attribute DOMString textBaseline; // "top", "hanging", "middle", "alphabetic", "ideographic", "bottom" (default: "alphabetic")
+  [Func="mozilla::dom::CanvasRenderingContext2D::TextEnabledOnWorkerThread"]
   attribute DOMString direction; // "ltr", "rtl", "inherit" (default: "inherit")
 };
 
@@ -359,7 +362,7 @@ interface CanvasPattern {
   void setTransform(optional DOMMatrix2DInit matrix = {});
 };
 
-[Exposed=Window]
+[Exposed=(Window,Worker)]
 interface TextMetrics {
 
   // x-direction

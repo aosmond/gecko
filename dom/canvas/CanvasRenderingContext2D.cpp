@@ -1058,6 +1058,12 @@ void CanvasRenderingContext2D::ContextState::SetGradientStyle(
 Atomic<uintptr_t> CanvasRenderingContext2D::sNumLivingContexts(0);
 DrawTarget* CanvasRenderingContext2D::sErrorTarget = nullptr;
 
+/* static */ bool CanvasRenderingContext2D::TextEnabledOnWorkerThread(
+    JSContext* aCx, JSObject* aObj) {
+  return NS_IsMainThread() ||
+         StaticPrefs::gfx_offscreencanvas_text_worker_enabled();
+}
+
 CanvasRenderingContext2D::CanvasRenderingContext2D(
     layers::LayersBackend aCompositorBackend)
     :  // these are the default values from the Canvas spec

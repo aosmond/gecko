@@ -1541,7 +1541,7 @@
 
 # Is support for CanvasRenderingContext2D.filter enabled?
 - name: canvas.filters.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: true
   mirror: always
 
@@ -3683,22 +3683,22 @@
   mirror: always
 
 - name: dom.textMetrics.actualBoundingBox.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: true
   mirror: always
 
 - name: dom.textMetrics.baselines.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: false
   mirror: always
 
 - name: dom.textMetrics.emHeight.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: false
   mirror: always
 
 - name: dom.textMetrics.fontBoundingBox.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: false
   mirror: always
 
@@ -5533,6 +5533,12 @@
   type: String
   value: "*.zoom.us"
   mirror: never
+
+# Enable text on worker threads with OffscreenCanvas.
+- name: gfx.offscreencanvas.text.worker-enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
 
 - name: gfx.omta.background-color
   type: bool
