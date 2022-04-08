@@ -17,6 +17,7 @@
 #include "Adapter.h"
 #include "Buffer.h"
 #include "ComputePipeline.h"
+#include "DeviceLostInfo.h"
 #include "Queue.h"
 #include "RenderBundleEncoder.h"
 #include "RenderPipeline.h"
@@ -69,8 +70,16 @@ Device::Device(Adapter* const aParent, RawId aId,
 Device::~Device() { Cleanup(); }
 
 void Device::Cleanup() {
-  if (mValid && mBridge) {
-    mValid = false;
+  if (!mValid) {
+    return;
+  }
+
+  mValid = false;
+  auto info = MakeRefPtr<DeviceLostInfo>(
+      this, dom::GPUDeviceLostReason::Destroyed, u"Device destroyed"_ns);
+  mLostPromise->MaybeResolve(info);
+
+  if (mBridge) {
     mBridge->UnregisterDevice(mId);
   }
 }
@@ -84,6 +93,13 @@ void Device::CleanupUnregisteredInParent() {
 
 void Device::GetLabel(nsAString& aValue) const { aValue = mLabel; }
 void Device::SetLabel(const nsAString& aLabel) { mLabel = aLabel; }
+
+dom::Promise* Device::GetLost(ErrorResult& aRv) {
+  if (!mLostPromise) {
+    mLostPromise = dom::Promise::Create(GetParentObject(), aRv);
+  }
+  return mLostPromise;
+}
 
 already_AddRefed<Buffer> Device::CreateBuffer(
     const dom::GPUBufferDescriptor& aDesc, ErrorResult& aRv) {
