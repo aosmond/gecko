@@ -6,12 +6,14 @@
 #include "WebGPUChild.h"
 #include "js/Warnings.h"  // JS::WarnUTF8
 #include "mozilla/EnumTypeTraits.h"
+#include "mozilla/dom/Promise.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/WebGPUBinding.h"
 #include "mozilla/dom/GPUUncapturedErrorEvent.h"
 #include "mozilla/webgpu/ValidationError.h"
 #include "mozilla/webgpu/ffi/wgpu.h"
 #include "Adapter.h"
+#include "DeviceLostInfo.h"
 #include "Sampler.h"
 
 namespace mozilla {
@@ -1048,6 +1050,22 @@ void WebGPUChild::UnregisterDevice(RawId aId) {
 void WebGPUChild::FreeUnregisteredInParentDevice(RawId aId) {
   ffi::wgpu_client_kill_device_id(mClient.get(), aId);
   mDeviceMap.erase(aId);
+}
+
+void WebGPUChild::ActorDestroy(ActorDestroyReason) {
+  // FIXME: Couldn't this be re-entrant? Do we need to copy the map?
+  for (const auto& targetIter : mDeviceMap) {
+    auto* device = targetIter.second.get();
+    MOZ_ASSERT(device);
+
+    ErrorResult rv;
+    auto* promise = device->GetLost(rv);
+    if (promise) {
+      auto info =
+          MakeRefPtr<DeviceLostInfo>(device, u"WebGPUChild destroyed"_ns);
+      promise->MaybeResolve(info);
+    }
+  }
 }
 
 }  // namespace webgpu
