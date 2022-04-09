@@ -103,6 +103,9 @@ class TextTrackList;
 class AudioTrackList;
 class VideoTrackList;
 
+using MediaSourceProvider = class MediaStreamOrMediaSourceHandle;
+using OwningMediaSourceProvider = class OwningMediaStreamOrMediaSourceHandle;
+
 enum class StreamCaptureType : uint8_t { CAPTURE_ALL_TRACKS, CAPTURE_AUDIO };
 
 enum class StreamCaptureBehavior : uint8_t {
@@ -690,9 +693,8 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   // via drawImage().
   already_AddRefed<layers::Image> GetCurrentImage();
 
-  already_AddRefed<DOMMediaStream> GetSrcObject() const;
-  void SetSrcObject(DOMMediaStream& aValue);
-  void SetSrcObject(DOMMediaStream* aValue);
+  void GetSrcObject(Nullable<OwningMediaSourceProvider>& aResult) const;
+  void SetSrcObject(const Nullable<MediaSourceProvider>& aValue);
 
   bool PreservesPitch() const { return mPreservesPitch; }
   void SetPreservesPitch(bool aPreservesPitch);
@@ -1491,6 +1493,10 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   // This is set when and only when mLoadingSrc corresponds to an object url
   // that resolved to a MediaSource.
   RefPtr<MediaSource> mMediaSource;
+
+  // Holds a reference to the MediaSourceHandle, if any, supplying data for
+  // playback from a worker thread.
+  RefPtr<MediaSourceHandle> mMediaSourceHandle;
 
   RefPtr<ChannelLoader> mChannelLoader;
 

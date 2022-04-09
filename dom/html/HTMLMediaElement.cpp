@@ -88,6 +88,7 @@
 #include "mozilla/dom/MediaEncryptedEvent.h"
 #include "mozilla/dom/MediaErrorBinding.h"
 #include "mozilla/dom/MediaSource.h"
+#include "mozilla/dom/MediaSourceHandle.h"
 #include "mozilla/dom/PlayPromise.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/TextTrack.h"
@@ -1771,6 +1772,8 @@ class HTMLMediaElement::AudioChannelAgentCallback final
       return true;
     }
 
+    // FIXME mMediaSourceHandle
+
     return false;
   }
 
@@ -2047,6 +2050,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLMediaElement,
                                                   nsGenericHTMLElement)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mStreamWindowCapturer)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMediaSource)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMediaSourceHandle)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSrcMediaSource)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSrcStream)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSrcAttrStream)
@@ -2100,6 +2104,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLMediaElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSrcStream)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSrcAttrStream)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mMediaSource)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mMediaSourceHandle)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSrcMediaSource)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSourcePointer)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoadBlockedDoc)
@@ -2327,23 +2332,34 @@ bool HTMLMediaElement::HasSuspendTaint() const {
   return mHasSuspendTaint;
 }
 
-already_AddRefed<DOMMediaStream> HTMLMediaElement::GetSrcObject() const {
-  return do_AddRef(mSrcAttrStream);
-}
-
-void HTMLMediaElement::SetSrcObject(DOMMediaStream& aValue) {
-  SetSrcObject(&aValue);
-}
-
-void HTMLMediaElement::SetSrcObject(DOMMediaStream* aValue) {
-  for (auto& outputStream : mOutputStreams) {
-    if (aValue == outputStream.mStream) {
-      ReportToConsole(nsIScriptError::warningFlag,
-                      "MediaElementStreamCaptureCycle");
-      return;
-    }
+void HTMLMediaElement::GetSrcObject(
+    Nullable<OwningMediaSourceProvider>& aResult) const {
+  if (mSrcAttrStream) {
+    aResult.SetValue().SetAsMediaStream() = mSrcAttrStream;
+  } else if (mMediaSourceHandle) {
+    aResult.SetValue().SetAsMediaSourceHandle() = mMediaSourceHandle;
   }
-  mSrcAttrStream = aValue;
+}
+
+void HTMLMediaElement::SetSrcObject(
+    const Nullable<MediaSourceProvider>& aValue) {
+  if (aValue.IsNull()) {
+    mSrcAttrStream = nullptr;
+    mMediaSourceHandle = nullptr;
+  } else if (aValue.Value().IsMediaStream()) {
+    DOMMediaStream* value = &aValue.Value().GetAsMediaStream();
+    for (auto& outputStream : mOutputStreams) {
+      if (value == outputStream.mStream) {
+        ReportToConsole(nsIScriptError::warningFlag,
+                        "MediaElementStreamCaptureCycle");
+        return;
+      }
+    }
+    mSrcAttrStream = value;
+  } else if (aValue.Value().IsMediaSourceHandle()) {
+    mMediaSourceHandle = &aValue.Value().GetAsMediaSourceHandle();
+  }
+
   UpdateAudioChannelPlayingState();
   DoLoad();
 }
@@ -2610,13 +2626,14 @@ static nsCString DocumentOrigin(Document* aDoc) {
 
 void HTMLMediaElement::Load() {
   LOG(LogLevel::Debug,
-      ("%p Load() hasSrcAttrStream=%d hasSrcAttr=%d hasSourceChildren=%d "
-       "handlingInput=%d hasAutoplayAttr=%d AllowedToPlay=%d "
-       "ownerDoc=%p (%s) ownerDocUserActivated=%d "
-       "muted=%d volume=%f",
-       this, !!mSrcAttrStream, HasAttr(nsGkAtoms::src), HasSourceChildren(this),
-       UserActivation::IsHandlingUserInput(), HasAttr(nsGkAtoms::autoplay),
-       AllowedToPlay(), OwnerDoc(), DocumentOrigin(OwnerDoc()).get(),
+      ("%p Load() hasSrcAttrStream=%d hasMediaSourceHandle=%d hasSrcAttr=%d "
+       "hasSourceChildren=%d handlingInput=%d hasAutoplayAttr=%d "
+       "AllowedToPlay=%d ownerDoc=%p (%s) ownerDocUserActivated=%d muted=%d "
+       "volume=%f",
+       this, !!mSrcAttrStream, !!mMediaSourceHandle, HasAttr(nsGkAtoms::src),
+       HasSourceChildren(this), UserActivation::IsHandlingUserInput(),
+       HasAttr(nsGkAtoms::autoplay), AllowedToPlay(), OwnerDoc(),
+       DocumentOrigin(OwnerDoc()).get(),
        OwnerDoc()->HasBeenUserGestureActivated(), mMuted, mVolume));
 
   if (mIsRunningLoadMethod) {
@@ -2692,7 +2709,8 @@ void HTMLMediaElement::SelectResourceWrapper() {
 }
 
 void HTMLMediaElement::SelectResource() {
-  if (!mSrcAttrStream && !HasAttr(nsGkAtoms::src) && !HasSourceChildren(this)) {
+  if (!mSrcAttrStream && !mMediaSourceHandle && !HasAttr(nsGkAtoms::src) &&
+      !HasSourceChildren(this)) {
     // The media element has neither a src attribute nor any source
     // element children, abort the load.
     ChangeNetworkState(NETWORK_EMPTY);
@@ -2715,6 +2733,8 @@ void HTMLMediaElement::SelectResource() {
   nsAutoString src;
   if (mSrcAttrStream) {
     SetupSrcMediaStreamPlayback(mSrcAttrStream);
+  } else if (mMediaSourceHandle) {
+    // FIXME
   } else if (GetAttr(nsGkAtoms::src, src)) {
     nsCOMPtr<nsIURI> uri;
     MediaResult rv = NewURIFromString(src, getter_AddRefs(uri));
@@ -3366,6 +3386,8 @@ void HTMLMediaElement::Seek(double aTime, SeekTarget::Type aSeekType,
 
   StopSuspendingAfterFirstFrame();
 
+  // FIXME: mMediaSourceHandle
+
   if (mSrcAttrStream) {
     // do nothing since media streams have an empty Seekable range.
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -3861,6 +3883,8 @@ void HTMLMediaElement::UpdateOutputTrackSources() {
           mOutputStreams[i].mFinishWhenEndedLoadingSrc = mLoadingSrc;
         } else if (mSrcAttrStream) {
           mOutputStreams[i].mFinishWhenEndedAttrStream = mSrcAttrStream;
+        } else if (mMediaSourceHandle) {
+          // FIXME
         } else if (mSrcMediaSource) {
           mOutputStreams[i].mFinishWhenEndedMediaSource = mSrcMediaSource;
         }
@@ -3882,6 +3906,7 @@ void HTMLMediaElement::UpdateOutputTrackSources() {
         mSrcMediaSource == mOutputStreams[i].mFinishWhenEndedMediaSource) {
       continue;
     }
+    // FIXME mMediaSourceHandle
     LOG(LogLevel::Debug,
         ("Playback ended or source changed. Discarding stream %p",
          mOutputStreams[i].mStream.get()));
@@ -4046,6 +4071,7 @@ already_AddRefed<DOMMediaStream> HTMLMediaElement::CaptureStreamInternal(
     if (mSrcMediaSource) {
       out->mFinishWhenEndedMediaSource = mSrcMediaSource;
     }
+    // FIXME mMediaSourceHandle
     MOZ_ASSERT(out->mFinishWhenEndedLoadingSrc ||
                out->mFinishWhenEndedAttrStream ||
                out->mFinishWhenEndedMediaSource);
@@ -6958,6 +6984,8 @@ void HTMLMediaElement::SetDefaultPlaybackRate(double aDefaultPlaybackRate,
     return;
   }
 
+  // FIXME mMediaSourceHandle
+
   if (aDefaultPlaybackRate < 0) {
     aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
     return;
@@ -6977,6 +7005,8 @@ void HTMLMediaElement::SetPlaybackRate(double aPlaybackRate, ErrorResult& aRv) {
   if (mSrcAttrStream) {
     return;
   }
+
+  // FIXME mMediaSourceHandle
 
   // Changing the playback rate of a media that has more than two channels is
   // not supported.

@@ -11,6 +11,8 @@
  * and create derivative works of this document.
  */
 
+typedef (MediaStream or MediaSourceHandle) MediaProvider;
+
 [Exposed=Window,
  InstrumentedProps=(disableRemotePlayback,remote)]
 interface HTMLMediaElement : HTMLElement {
@@ -113,7 +115,7 @@ partial interface HTMLMediaElement {
   [Func="HasDebuggerOrTabsPrivilege", NewObject]
   Promise<DOMString> mozRequestDebugLog();
 
-  attribute MediaStream? srcObject;
+  attribute MediaProvider? srcObject;
 
   attribute boolean preservesPitch;
 

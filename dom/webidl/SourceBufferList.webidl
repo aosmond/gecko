@@ -11,7 +11,7 @@
  */
 
 [Pref="media.mediasource.enabled",
- Exposed=Window]
+ Exposed=(Window,DedicatedWorker)]
 interface SourceBufferList : EventTarget {
   readonly attribute unsigned long length;
   attribute EventHandler onaddsourcebuffer;

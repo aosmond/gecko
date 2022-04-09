@@ -14,6 +14,8 @@
 #include "MediaContainerType.h"
 #include "MediaResult.h"
 #include "MediaSourceDemuxer.h"
+#include "MediaSourceHandle.h"
+#include "MediaSourceUtils.h"
 #include "SourceBuffer.h"
 #include "SourceBufferList.h"
 #include "mozilla/ErrorResult.h"
@@ -223,6 +225,11 @@ already_AddRefed<MediaSource> MediaSource::Constructor(
 
   RefPtr<MediaSource> mediaSource = new MediaSource(global);
   return mediaSource.forget();
+}
+
+/* static */ bool MediaSource::CanConstructInDedicatedWorker(
+    const GlobalObject& aGlobal) {
+  return true;
 }
 
 MediaSource::~MediaSource() {
@@ -587,6 +594,18 @@ void MediaSource::SetReadyState(MediaSourceReadyState aState) {
   NS_WARNING("Invalid MediaSource readyState transition");
 }
 
+MediaSourceHandle* MediaSource::GetHandle(ErrorResult& aRv) {
+  if (NS_IsMainThread()) {
+    aRv.ThrowNotSupportedError("Can only get handle on worker threads!");
+    return nullptr;
+  }
+
+  if (!mHandle) {
+    mHandle = MediaSourceHandle::Create(this);
+  }
+  return mHandle;
+}
+
 void MediaSource::DispatchSimpleEvent(const char* aName) {
   MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("Dispatch event '%s'", aName);
@@ -702,7 +721,7 @@ JSObject* MediaSource::WrapObject(JSContext* aCx,
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(MediaSource, DOMEventTargetHelper,
                                    mMediaElement, mSourceBuffers,
-                                   mActiveSourceBuffers)
+                                   mActiveSourceBuffers, mHandle)
 
 NS_IMPL_ADDREF_INHERITED(MediaSource, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(MediaSource, DOMEventTargetHelper)

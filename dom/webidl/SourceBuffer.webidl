@@ -16,7 +16,7 @@ enum SourceBufferAppendMode {
 };
 
 [Pref="media.mediasource.enabled",
- Exposed=Window]
+ Exposed=(Window,DedicatedWorker)]
 interface SourceBuffer : EventTarget {
   [SetterThrows]
   attribute SourceBufferAppendMode mode;

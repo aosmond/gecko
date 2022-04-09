@@ -61,6 +61,8 @@ class MediaSource final : public DOMEventTargetHelper,
   static already_AddRefed<MediaSource> Constructor(const GlobalObject& aGlobal,
                                                    ErrorResult& aRv);
 
+  static bool CanConstructInDedicatedWorker(const GlobalObject& aGlobal);
+
   SourceBufferList* SourceBuffers();
   SourceBufferList* ActiveSourceBuffers();
   MediaSourceReadyState ReadyState();
@@ -112,6 +114,8 @@ class MediaSource final : public DOMEventTargetHelper,
   // Used by SourceBuffer to call CreateSubDecoder.
   MediaSourceDecoder* GetDecoder() { return mDecoder; }
 
+  MediaSourceHandle* GetHandle(ErrorResult& aRv);
+
   nsIPrincipal* GetPrincipal() { return mPrincipal; }
 
   // Returns a structure describing the state of the MediaSource internal
@@ -159,6 +163,7 @@ class MediaSource final : public DOMEventTargetHelper,
   RefPtr<SourceBufferList> mActiveSourceBuffers;
 
   RefPtr<MediaSourceDecoder> mDecoder;
+  RefPtr<MediaSourceHandle> mHandle;
   // Ensures the media element remains alive to dispatch progress and
   // durationchanged events.
   RefPtr<HTMLMediaElement> mMediaElement;
