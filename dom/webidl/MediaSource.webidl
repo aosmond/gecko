@@ -22,7 +22,7 @@ enum MediaSourceEndOfStreamError {
 };
 
 [Pref="media.mediasource.enabled",
- Exposed=Window]
+ Exposed=(Window,DedicatedWorker)]
 interface MediaSource : EventTarget {
   [Throws]
   constructor();
@@ -35,6 +35,7 @@ interface MediaSource : EventTarget {
   attribute EventHandler onsourceopen;
   attribute EventHandler onsourceended;
   attribute EventHandler onsourceclose;
+  static readonly attribute boolean canConstructInDedicatedWorker;
   [NewObject, Throws]
   SourceBuffer addSourceBuffer(DOMString type);
   [Throws]
@@ -45,7 +46,12 @@ interface MediaSource : EventTarget {
   undefined setLiveSeekableRange(double start, double end);
   [Throws]
   undefined clearLiveSeekableRange();
+  [Throws]
+  MediaSourceHandle getHandle();
   static boolean isTypeSupported(DOMString type);
   [NewObject, ChromeOnly]
   Promise<MediaSourceDecoderDebugInfo> mozDebugReaderData();
 };
+
+[Exposed=(Window,DedicatedWorker)]
+interface MediaSourceHandle {};

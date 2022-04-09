@@ -131,6 +131,7 @@ enum StructuredCloneTags : uint32_t {
   // can be 'less' stable.
 
   SCTAG_DOM_IMAGEBITMAP,
+  SCTAG_DOM_MEDIASOURCEHANDLE,
   SCTAG_DOM_MAP_MESSAGEPORT,
   SCTAG_DOM_FORMDATA,
 

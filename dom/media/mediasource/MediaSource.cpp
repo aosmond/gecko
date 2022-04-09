@@ -14,6 +14,8 @@
 #include "MediaContainerType.h"
 #include "MediaResult.h"
 #include "MediaSourceDemuxer.h"
+#include "MediaSourceHandle.h"
+#include "MediaSourceUtils.h"
 #include "SourceBuffer.h"
 #include "SourceBufferList.h"
 #include "mozilla/ErrorResult.h"
@@ -88,8 +90,7 @@ static bool IsVP9Forced(DecoderDoctorDiagnostics* aDiagnostics) {
 
 namespace dom {
 
-static void RecordTypeForTelemetry(const nsAString& aType,
-                                   nsPIDOMWindowInner* aWindow) {
+static void RecordTypeForTelemetry(const nsAString& aType) {
   Maybe<MediaContainerType> containerType = MakeMediaContainerType(aType);
   if (!containerType) {
     return;
@@ -216,19 +217,23 @@ void MediaSource::IsTypeSupported(const nsAString& aType,
 /* static */
 already_AddRefed<MediaSource> MediaSource::Constructor(
     const GlobalObject& aGlobal, ErrorResult& aRv) {
-  nsCOMPtr<nsPIDOMWindowInner> window =
-      do_QueryInterface(aGlobal.GetAsSupports());
-  if (!window) {
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+  if (!global) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
 
-  RefPtr<MediaSource> mediaSource = new MediaSource(window);
+  RefPtr<MediaSource> mediaSource = new MediaSource(global);
   return mediaSource.forget();
 }
 
+/* static */ bool MediaSource::CanConstructInDedicatedWorker(
+    const GlobalObject& aGlobal) {
+  return true;
+}
+
 MediaSource::~MediaSource() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("");
   if (mDecoder) {
     mDecoder->DetachMediaSource();
@@ -236,26 +241,26 @@ MediaSource::~MediaSource() {
 }
 
 SourceBufferList* MediaSource::SourceBuffers() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT_IF(mReadyState == MediaSourceReadyState::Closed,
                 mSourceBuffers->IsEmpty());
   return mSourceBuffers;
 }
 
 SourceBufferList* MediaSource::ActiveSourceBuffers() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT_IF(mReadyState == MediaSourceReadyState::Closed,
                 mActiveSourceBuffers->IsEmpty());
   return mActiveSourceBuffers;
 }
 
 MediaSourceReadyState MediaSource::ReadyState() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   return mReadyState;
 }
 
 double MediaSource::Duration() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   if (mReadyState == MediaSourceReadyState::Closed) {
     return UnspecifiedNaN<double>();
   }
@@ -264,7 +269,7 @@ double MediaSource::Duration() {
 }
 
 void MediaSource::SetDuration(double aDuration, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   if (aDuration < 0 || std::isnan(aDuration)) {
     nsPrintfCString error("Invalid duration value %f", aDuration);
     MSE_API("SetDuration(aDuration=%f, invalid value)", aDuration);
@@ -283,24 +288,24 @@ void MediaSource::SetDuration(double aDuration, ErrorResult& aRv) {
 }
 
 void MediaSource::SetDuration(const media::TimeUnit& aDuration) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("SetDuration(aDuration=%f)", aDuration.ToSeconds());
   mDecoder->SetMediaSourceDuration(aDuration);
 }
 
 already_AddRefed<SourceBuffer> MediaSource::AddSourceBuffer(
     const nsAString& aType, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-  nsCOMPtr<nsPIDOMWindowInner> window = GetOwnerWindow();
-  Document* doc = window ? window->GetExtantDoc() : nullptr;
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
+  nsIGlobalObject* global = GetParentObject();
   DecoderDoctorDiagnostics diagnostics;
-  IsTypeSupported(
-      aType, &diagnostics, aRv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
-  RecordTypeForTelemetry(aType, window);
+  IsTypeSupported(aType, &diagnostics, aRv,
+                  global ? Some(global->ShouldResistFingerprinting(
+                               RFPTarget::MediaCapabilities))
+                         : Nothing());
+  RecordTypeForTelemetry(aType);
   bool supported = !aRv.Failed();
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  // FIXME(aosmond)
+  // diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
   MSE_API("AddSourceBuffer(aType=%s)%s", NS_ConvertUTF16toUTF8(aType).get(),
           supported ? "" : " [not supported]");
   if (!supported) {
@@ -328,7 +333,7 @@ already_AddRefed<SourceBuffer> MediaSource::AddSourceBuffer(
 
 RefPtr<MediaSource::ActiveCompletionPromise> MediaSource::SourceBufferIsActive(
     SourceBuffer* aSourceBuffer) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   mActiveSourceBuffers->ClearSimple();
   bool initMissing = false;
   bool found = false;
@@ -360,7 +365,7 @@ RefPtr<MediaSource::ActiveCompletionPromise> MediaSource::SourceBufferIsActive(
 }
 
 void MediaSource::CompletePendingTransactions() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_DEBUG("Resolving %u promises", unsigned(mCompletionPromises.Length()));
   for (auto& promise : mCompletionPromises) {
     promise.Resolve(true, __func__);
@@ -370,7 +375,7 @@ void MediaSource::CompletePendingTransactions() {
 
 void MediaSource::RemoveSourceBuffer(SourceBuffer& aSourceBuffer,
                                      ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   SourceBuffer* sourceBuffer = &aSourceBuffer;
   MSE_API("RemoveSourceBuffer(aSourceBuffer=%p)", sourceBuffer);
   if (!mSourceBuffers->Contains(sourceBuffer)) {
@@ -399,7 +404,7 @@ void MediaSource::RemoveSourceBuffer(SourceBuffer& aSourceBuffer,
 
 void MediaSource::EndOfStream(
     const Optional<MediaSourceEndOfStreamError>& aError, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("EndOfStream(aError=%d)",
           aError.WasPassed() ? uint32_t(aError.Value()) : 0);
   if (mReadyState != MediaSourceReadyState::Open ||
@@ -432,7 +437,7 @@ void MediaSource::EndOfStream(
 }
 
 void MediaSource::EndOfStream(const MediaResult& aError) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("EndOfStream(aError=%s)", aError.ErrorName().get());
 
   SetReadyState(MediaSourceReadyState::Ended);
@@ -443,19 +448,17 @@ void MediaSource::EndOfStream(const MediaResult& aError) {
 /* static */
 bool MediaSource::IsTypeSupported(const GlobalObject& aOwner,
                                   const nsAString& aType) {
-  MOZ_ASSERT(NS_IsMainThread());
   DecoderDoctorDiagnostics diagnostics;
   IgnoredErrorResult rv;
-  nsCOMPtr<nsPIDOMWindowInner> window =
-      do_QueryInterface(aOwner.GetAsSupports());
-  Document* doc = window ? window->GetExtantDoc() : nullptr;
-  IsTypeSupported(
-      aType, &diagnostics, rv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aOwner.GetAsSupports());
+  IsTypeSupported(aType, &diagnostics, rv,
+                  global ? Some(global->ShouldResistFingerprinting(
+                               RFPTarget::MediaCapabilities))
+                         : Nothing());
   bool supported = !rv.Failed();
-  RecordTypeForTelemetry(aType, window);
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  RecordTypeForTelemetry(aType);
+  // FIXME(aosmond)
+  // diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
   MOZ_LOG(GetMediaSourceAPILog(), mozilla::LogLevel::Debug,
           ("MediaSource::%s: IsTypeSupported(aType=%s) %s", __func__,
            NS_ConvertUTF16toUTF8(aType).get(),
@@ -465,7 +468,7 @@ bool MediaSource::IsTypeSupported(const GlobalObject& aOwner,
 
 void MediaSource::SetLiveSeekableRange(double aStart, double aEnd,
                                        ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   // 1. If the readyState attribute is not "open" then throw an
   // InvalidStateError exception and abort these steps.
@@ -488,7 +491,7 @@ void MediaSource::SetLiveSeekableRange(double aStart, double aEnd,
 }
 
 void MediaSource::ClearLiveSeekableRange(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   // 1. If the readyState attribute is not "open" then throw an
   // InvalidStateError exception and abort these steps.
@@ -503,7 +506,7 @@ void MediaSource::ClearLiveSeekableRange(ErrorResult& aRv) {
 }
 
 bool MediaSource::Attach(MediaSourceDecoder* aDecoder) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_DEBUG("Attach(aDecoder=%p) owner=%p", aDecoder, aDecoder->GetOwner());
   MOZ_ASSERT(aDecoder);
   MOZ_ASSERT(aDecoder->GetOwner());
@@ -511,7 +514,9 @@ bool MediaSource::Attach(MediaSourceDecoder* aDecoder) {
     return false;
   }
   MOZ_ASSERT(!mMediaElement);
-  mMediaElement = aDecoder->GetOwner()->GetMediaElement();
+  if (NS_IsMainThread()) {
+    mMediaElement = aDecoder->GetOwner()->GetMediaElement();
+  }
   MOZ_ASSERT(!mDecoder);
   mDecoder = aDecoder;
   mDecoder->AttachMediaSource(this);
@@ -520,7 +525,7 @@ bool MediaSource::Attach(MediaSourceDecoder* aDecoder) {
 }
 
 void MediaSource::Detach() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_RELEASE_ASSERT(mCompletionPromises.IsEmpty());
   MSE_DEBUG("mDecoder=%p owner=%p", mDecoder.get(),
             mDecoder ? mDecoder->GetOwner() : nullptr);
@@ -541,27 +546,26 @@ void MediaSource::Detach() {
   mDecoder = nullptr;
 }
 
-MediaSource::MediaSource(nsPIDOMWindowInner* aWindow)
-    : DOMEventTargetHelper(aWindow),
+MediaSource::MediaSource(nsIGlobalObject* aGlobal)
+    : DOMEventTargetHelper(aGlobal),
       mDecoder(nullptr),
       mPrincipal(nullptr),
-      mAbstractMainThread(AbstractThread::MainThread()),
+      mOwningEventTarget(GetCurrentSerialEventTarget()),
       mReadyState(MediaSourceReadyState::Closed) {
-  MOZ_ASSERT(NS_IsMainThread());
   mSourceBuffers = new SourceBufferList(this);
   mActiveSourceBuffers = new SourceBufferList(this);
 
-  nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(aWindow);
+  nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(aGlobal);
   if (sop) {
     mPrincipal = sop->GetPrincipal();
   }
 
-  MSE_API("MediaSource(aWindow=%p) mSourceBuffers=%p mActiveSourceBuffers=%p",
-          aWindow, mSourceBuffers.get(), mActiveSourceBuffers.get());
+  MSE_API("MediaSource(aGlobal=%p) mSourceBuffers=%p mActiveSourceBuffers=%p",
+          aGlobal, mSourceBuffers.get(), mActiveSourceBuffers.get());
 }
 
 void MediaSource::SetReadyState(MediaSourceReadyState aState) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT(aState != mReadyState);
   MSE_DEBUG("SetReadyState(aState=%" PRIu32 ") mReadyState=%" PRIu32,
             static_cast<uint32_t>(aState), static_cast<uint32_t>(mReadyState));
@@ -596,8 +600,20 @@ void MediaSource::SetReadyState(MediaSourceReadyState aState) {
   NS_WARNING("Invalid MediaSource readyState transition");
 }
 
+MediaSourceHandle* MediaSource::GetHandle(ErrorResult& aRv) {
+  if (NS_IsMainThread()) {
+    aRv.ThrowNotSupportedError("Can only get handle on worker threads!");
+    return nullptr;
+  }
+
+  if (!mHandle) {
+    mHandle = MediaSourceHandle::Create(this);
+  }
+  return mHandle;
+}
+
 void MediaSource::DispatchSimpleEvent(const char* aName) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("Dispatch event '%s'", aName);
   DispatchTrustedEvent(NS_ConvertUTF8toUTF16(aName));
 }
@@ -605,11 +621,11 @@ void MediaSource::DispatchSimpleEvent(const char* aName) {
 void MediaSource::QueueAsyncSimpleEvent(const char* aName) {
   MSE_DEBUG("Queuing event '%s'", aName);
   nsCOMPtr<nsIRunnable> event = new AsyncEventRunner<MediaSource>(this, aName);
-  mAbstractMainThread->Dispatch(event.forget());
+  mOwningEventTarget->Dispatch(event.forget());
 }
 
 void MediaSource::DurationChangeOnEndOfStream() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT(mReadyState == MediaSourceReadyState::Ended);
   // https://w3c.github.io/media-source/#dfn-end-of-stream
   // 3.1 Run the duration change algorithm with new duration set to the
@@ -646,7 +662,7 @@ void MediaSource::DurationChangeOnEndOfStream() {
 }
 
 void MediaSource::DurationChange(double aNewDuration, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_DEBUG("DurationChange(aNewDuration=%f)", aNewDuration);
 
   // 1. If the current value of duration is equal to new duration, then return.
@@ -676,12 +692,12 @@ void MediaSource::DurationChange(double aNewDuration, ErrorResult& aRv) {
 
 already_AddRefed<Promise> MediaSource::MozDebugReaderData(ErrorResult& aRv) {
   // Creating a JS promise
-  nsGlobalWindowInner* win = GetOwnerWindow();
-  if (!win) {
+  nsIGlobalObject* global = GetOwnerGlobal();
+  if (!global) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
-  RefPtr<Promise> domPromise = Promise::Create(win, aRv);
+  RefPtr<Promise> domPromise = Promise::Create(global, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -689,7 +705,7 @@ already_AddRefed<Promise> MediaSource::MozDebugReaderData(ErrorResult& aRv) {
   UniquePtr<MediaSourceDecoderDebugInfo> info =
       MakeUnique<MediaSourceDecoderDebugInfo>();
   mDecoder->RequestDebugInfo(*info)->Then(
-      mAbstractMainThread, __func__,
+      mOwningEventTarget, __func__,
       [domPromise, infoPtr = std::move(info)] {
         domPromise->MaybeResolve(infoPtr.get());
       },
@@ -700,8 +716,8 @@ already_AddRefed<Promise> MediaSource::MozDebugReaderData(ErrorResult& aRv) {
   return domPromise.forget();
 }
 
-nsPIDOMWindowInner* MediaSource::GetParentObject() const {
-  return GetOwnerWindow();
+nsIGlobalObject* MediaSource::GetParentObject() const {
+  return GetOwnerGlobal();
 }
 
 JSObject* MediaSource::WrapObject(JSContext* aCx,
@@ -711,7 +727,7 @@ JSObject* MediaSource::WrapObject(JSContext* aCx,
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(MediaSource, DOMEventTargetHelper,
                                    mMediaElement, mSourceBuffers,
-                                   mActiveSourceBuffers)
+                                   mActiveSourceBuffers, mHandle)
 
 NS_IMPL_ADDREF_INHERITED(MediaSource, DOMEventTargetHelper)
 NS_IMPL_RELEASE_INHERITED(MediaSource, DOMEventTargetHelper)
