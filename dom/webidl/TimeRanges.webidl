@@ -11,7 +11,7 @@
  * and create derivative works of this document.
  */
 
-[Exposed=Window]
+[Exposed=(Window,DedicatedWorker)]
 interface TimeRanges {
   readonly attribute unsigned long length;
 
