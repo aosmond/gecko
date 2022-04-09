@@ -47,7 +47,7 @@ typedef SourceBufferAttributes::AppendState AppendState;
 namespace dom {
 
 void SourceBuffer::SetMode(SourceBufferAppendMode aMode, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("SetMode(aMode=%" PRIu32 ")", static_cast<uint32_t>(aMode));
   if (!IsAttached() || mUpdating) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -80,7 +80,7 @@ void SourceBuffer::SetMode(SourceBufferAppendMode aMode, ErrorResult& aRv) {
 
 void SourceBuffer::SetTimestampOffset(double aTimestampOffset,
                                       ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("SetTimestampOffset(aTimestampOffset=%f)", aTimestampOffset);
   if (!IsAttached() || mUpdating) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -103,7 +103,7 @@ void SourceBuffer::SetTimestampOffset(double aTimestampOffset,
 }
 
 TimeRanges* SourceBuffer::GetBuffered(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   // http://w3c.github.io/media-source/index.html#widl-SourceBuffer-buffered
   // 1. If this object has been removed from the sourceBuffers attribute of the
   // parent media source then throw an InvalidStateError exception and abort
@@ -136,7 +136,7 @@ media::TimeIntervals SourceBuffer::GetTimeIntervals() {
 
 void SourceBuffer::SetAppendWindowStart(double aAppendWindowStart,
                                         ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("SetAppendWindowStart(aAppendWindowStart=%f)", aAppendWindowStart);
   DDLOG(DDLogCategory::API, "SetAppendWindowStart", aAppendWindowStart);
   if (!IsAttached() || mUpdating) {
@@ -153,7 +153,7 @@ void SourceBuffer::SetAppendWindowStart(double aAppendWindowStart,
 
 void SourceBuffer::SetAppendWindowEnd(double aAppendWindowEnd,
                                       ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("SetAppendWindowEnd(aAppendWindowEnd=%f)", aAppendWindowEnd);
   DDLOG(DDLogCategory::API, "SetAppendWindowEnd", aAppendWindowEnd);
   if (!IsAttached() || mUpdating) {
@@ -169,7 +169,7 @@ void SourceBuffer::SetAppendWindowEnd(double aAppendWindowEnd,
 }
 
 void SourceBuffer::AppendBuffer(const ArrayBuffer& aData, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("AppendBuffer(ArrayBuffer)");
   aData.ComputeState();
   DDLOG(DDLogCategory::API, "AppendBuffer", aData.Length());
@@ -178,7 +178,7 @@ void SourceBuffer::AppendBuffer(const ArrayBuffer& aData, ErrorResult& aRv) {
 
 void SourceBuffer::AppendBuffer(const ArrayBufferView& aData,
                                 ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("AppendBuffer(ArrayBufferView)");
   aData.ComputeState();
   DDLOG(DDLogCategory::API, "AppendBuffer", aData.Length());
@@ -187,7 +187,7 @@ void SourceBuffer::AppendBuffer(const ArrayBufferView& aData,
 
 already_AddRefed<Promise> SourceBuffer::AppendBufferAsync(
     const ArrayBuffer& aData, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   MSE_API("AppendBufferAsync(ArrayBuffer)");
   aData.ComputeState();
@@ -198,7 +198,7 @@ already_AddRefed<Promise> SourceBuffer::AppendBufferAsync(
 
 already_AddRefed<Promise> SourceBuffer::AppendBufferAsync(
     const ArrayBufferView& aData, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   MSE_API("AppendBufferAsync(ArrayBufferView)");
   aData.ComputeState();
@@ -208,7 +208,7 @@ already_AddRefed<Promise> SourceBuffer::AppendBufferAsync(
 }
 
 void SourceBuffer::Abort(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("Abort()");
   if (!IsAttached()) {
     DDLOG(DDLogCategory::API, "Abort", NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -248,7 +248,7 @@ void SourceBuffer::ResetParserState() {
 }
 
 void SourceBuffer::Remove(double aStart, double aEnd, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("Remove(aStart=%f, aEnd=%f)", aStart, aEnd);
   DDLOG(DDLogCategory::API, "Remove-from", aStart);
   DDLOG(DDLogCategory::API, "Remove-until", aEnd);
@@ -262,7 +262,7 @@ void SourceBuffer::Remove(double aStart, double aEnd, ErrorResult& aRv) {
 
 already_AddRefed<Promise> SourceBuffer::RemoveAsync(double aStart, double aEnd,
                                                     ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("RemoveAsync(aStart=%f, aEnd=%f)", aStart, aEnd);
   DDLOG(DDLogCategory::API, "Remove-from", aStart);
   DDLOG(DDLogCategory::API, "Remove-until", aEnd);
@@ -272,8 +272,7 @@ already_AddRefed<Promise> SourceBuffer::RemoveAsync(double aStart, double aEnd,
     return nullptr;
   }
 
-  nsCOMPtr<nsIGlobalObject> parentObject =
-      do_QueryInterface(mMediaSource->GetParentObject());
+  nsIGlobalObject* parentObject = mMediaSource->GetParentObject();
   if (!parentObject) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
@@ -330,7 +329,7 @@ void SourceBuffer::RangeRemoval(double aStart, double aEnd) {
   mTrackBuffersManager
       ->RangeRemoval(TimeUnit::FromSeconds(aStart), TimeUnit::FromSeconds(aEnd))
       ->Then(
-          mAbstractMainThread, __func__,
+          mOwningEventTarget, __func__,
           [self](bool) {
             self->mPendingRemoval.Complete();
             self->StopUpdating();
@@ -340,7 +339,7 @@ void SourceBuffer::RangeRemoval(double aStart, double aEnd) {
 }
 
 void SourceBuffer::ChangeType(const nsAString& aType, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   // 1. If type is an empty string then throw a TypeError exception and abort
   //    these steps.
@@ -418,7 +417,7 @@ void SourceBuffer::ChangeType(const nsAString& aType, ErrorResult& aRv) {
 }
 
 void SourceBuffer::Detach() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_DEBUG("Detach");
   if (!mMediaSource) {
     MSE_DEBUG("Already detached");
@@ -435,7 +434,7 @@ void SourceBuffer::Detach() {
 }
 
 void SourceBuffer::Ended() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT(IsAttached());
   MSE_DEBUG("Ended");
   mTrackBuffersManager->Ended();
@@ -445,13 +444,12 @@ SourceBuffer::SourceBuffer(MediaSource* aMediaSource,
                            const MediaContainerType& aType)
     : DOMEventTargetHelper(aMediaSource->GetParentObject()),
       mMediaSource(aMediaSource),
-      mAbstractMainThread(aMediaSource->AbstractMainThread()),
+      mOwningEventTarget(aMediaSource->OwningEventTarget()),
       mCurrentAttributes(aType.Type() == MEDIAMIMETYPE("audio/mpeg") ||
                          aType.Type() == MEDIAMIMETYPE("audio/aac")),
       mUpdating(false),
       mActive(false),
       mType(aType) {
-  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aMediaSource);
 
   mTrackBuffersManager =
@@ -471,7 +469,7 @@ SourceBuffer::SourceBuffer(MediaSource* aMediaSource,
 }
 
 SourceBuffer::~SourceBuffer() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT(!mMediaSource);
   MSE_DEBUG("");
 }
@@ -484,7 +482,7 @@ JSObject* SourceBuffer::WrapObject(JSContext* aCx,
 }
 
 void SourceBuffer::DispatchSimpleEvent(const char* aName) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_API("Dispatch event '%s'", aName);
   DispatchTrustedEvent(NS_ConvertUTF8toUTF16(aName));
 }
@@ -492,18 +490,18 @@ void SourceBuffer::DispatchSimpleEvent(const char* aName) {
 void SourceBuffer::QueueAsyncSimpleEvent(const char* aName) {
   MSE_DEBUG("Queuing event '%s'", aName);
   nsCOMPtr<nsIRunnable> event = new AsyncEventRunner<SourceBuffer>(this, aName);
-  mAbstractMainThread->Dispatch(event.forget());
+  mOwningEventTarget->Dispatch(event.forget());
 }
 
 void SourceBuffer::StartUpdating() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MOZ_ASSERT(!mUpdating);
   mUpdating = true;
   QueueAsyncSimpleEvent("updatestart");
 }
 
 void SourceBuffer::StopUpdating() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   if (!mUpdating) {
     // The buffer append or range removal algorithm  has been interrupted by
     // abort().
@@ -519,7 +517,7 @@ void SourceBuffer::StopUpdating() {
 }
 
 void SourceBuffer::AbortUpdating() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   mUpdating = false;
   QueueAsyncSimpleEvent("abort");
   QueueAsyncSimpleEvent("updateend");
@@ -530,7 +528,7 @@ void SourceBuffer::AbortUpdating() {
 }
 
 void SourceBuffer::CheckEndTime() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   // Check if we need to update mMediaSource duration
   double endTime = mCurrentAttributes.GetGroupEndTimestamp().ToSeconds();
   double duration = mMediaSource->Duration();
@@ -541,7 +539,7 @@ void SourceBuffer::CheckEndTime() {
 
 void SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength,
                               ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   MSE_DEBUG("AppendData(aLength=%u)", aLength);
 
   RefPtr<MediaByteBuffer> data = PrepareAppend(aData, aLength, aRv);
@@ -551,7 +549,7 @@ void SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength,
   StartUpdating();
 
   mTrackBuffersManager->AppendData(data.forget(), mCurrentAttributes)
-      ->Then(mAbstractMainThread, __func__, this,
+      ->Then(mOwningEventTarget, __func__, this,
              &SourceBuffer::AppendDataCompletedWithSuccess,
              &SourceBuffer::AppendDataErrored)
       ->Track(mPendingAppend);
@@ -560,15 +558,14 @@ void SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength,
 already_AddRefed<Promise> SourceBuffer::AppendDataAsync(const uint8_t* aData,
                                                         uint32_t aLength,
                                                         ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   if (!IsAttached()) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
   }
 
-  nsCOMPtr<nsIGlobalObject> parentObject =
-      do_QueryInterface(mMediaSource->GetParentObject());
+  nsIGlobalObject* parentObject = mMediaSource->GetParentObject();
   if (!parentObject) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
@@ -603,7 +600,7 @@ void SourceBuffer::AppendDataCompletedWithSuccess(
       MSE_DEBUG("Init segment received");
       RefPtr<SourceBuffer> self = this;
       mMediaSource->SourceBufferIsActive(this)
-          ->Then(mAbstractMainThread, __func__,
+          ->Then(mOwningEventTarget, __func__,
                  [self, this]() {
                    MSE_DEBUG("Complete AppendBuffer operation");
                    mCompletionPromise.Complete();
@@ -644,7 +641,7 @@ void SourceBuffer::AppendDataErrored(const MediaResult& aError) {
 }
 
 void SourceBuffer::AppendError(const MediaResult& aDecodeError) {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
 
   ResetParserState();
 
@@ -709,28 +706,28 @@ already_AddRefed<MediaByteBuffer> SourceBuffer::PrepareAppend(
 }
 
 double SourceBuffer::GetBufferedStart() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   ErrorResult dummy;
   RefPtr<TimeRanges> ranges = GetBuffered(dummy);
   return ranges->Length() > 0 ? ranges->GetStartTime() : 0;
 }
 
 double SourceBuffer::GetBufferedEnd() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   ErrorResult dummy;
   RefPtr<TimeRanges> ranges = GetBuffered(dummy);
   return ranges->Length() > 0 ? ranges->GetEndTime() : 0;
 }
 
 double SourceBuffer::HighestStartTime() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   return mTrackBuffersManager
              ? mTrackBuffersManager->HighestStartTime().ToSeconds()
              : 0.0;
 }
 
 double SourceBuffer::HighestEndTime() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
   return mTrackBuffersManager
              ? mTrackBuffersManager->HighestEndTime().ToSeconds()
              : 0.0;

@@ -25,10 +25,10 @@
 struct JSContext;
 class JSObject;
 class nsPIDOMWindowInner;
+class nsISerialEventTarget;
 
 namespace mozilla {
 
-class AbstractThread;
 class ErrorResult;
 template <typename T>
 class AsyncEventRunner;
@@ -60,6 +60,8 @@ class MediaSource final : public DOMEventTargetHelper,
   /** WebIDL Methods. */
   static already_AddRefed<MediaSource> Constructor(const GlobalObject& aGlobal,
                                                    ErrorResult& aRv);
+
+  static bool CanConstructInDedicatedWorker(const GlobalObject& aGlobal);
 
   SourceBufferList* SourceBuffers();
   SourceBufferList* ActiveSourceBuffers();
@@ -95,7 +97,7 @@ class MediaSource final : public DOMEventTargetHelper,
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(MediaSource, DOMEventTargetHelper)
   NS_DECLARE_STATIC_IID_ACCESSOR(MOZILLA_DOM_MEDIASOURCE_IMPLEMENTATION_IID)
 
-  nsPIDOMWindowInner* GetParentObject() const;
+  nsIGlobalObject* GetParentObject() const;
 
   JSObject* WrapObject(JSContext* aCx,
                        JS::Handle<JSObject*> aGivenProto) override;
@@ -111,6 +113,8 @@ class MediaSource final : public DOMEventTargetHelper,
   // Used by SourceBuffer to call CreateSubDecoder.
   MediaSourceDecoder* GetDecoder() { return mDecoder; }
 
+  MediaSourceHandle* GetHandle(ErrorResult& aRv);
+
   nsIPrincipal* GetPrincipal() { return mPrincipal; }
 
   // Returns a structure describing the state of the MediaSource internal
@@ -122,7 +126,7 @@ class MediaSource final : public DOMEventTargetHelper,
     return mLiveSeekableRange.value();
   }
 
-  AbstractThread* AbstractMainThread() const { return mAbstractMainThread; }
+  nsISerialEventTarget* OwningEventTarget() const { return mOwningEventTarget; }
 
   // Resolve all CompletionPromise pending.
   void CompletePendingTransactions();
@@ -133,7 +137,7 @@ class MediaSource final : public DOMEventTargetHelper,
 
   ~MediaSource();
 
-  explicit MediaSource(nsPIDOMWindowInner* aWindow);
+  explicit MediaSource(nsIGlobalObject* aGlobal);
 
   friend class AsyncEventRunner<MediaSource>;
   void DispatchSimpleEvent(const char* aName);
@@ -157,13 +161,14 @@ class MediaSource final : public DOMEventTargetHelper,
   RefPtr<SourceBufferList> mActiveSourceBuffers;
 
   RefPtr<MediaSourceDecoder> mDecoder;
+  RefPtr<MediaSourceHandle> mHandle;
   // Ensures the media element remains alive to dispatch progress and
   // durationchanged events.
   RefPtr<HTMLMediaElement> mMediaElement;
 
   RefPtr<nsIPrincipal> mPrincipal;
 
-  const RefPtr<AbstractThread> mAbstractMainThread;
+  const nsCOMPtr<nsISerialEventTarget> mOwningEventTarget;
 
   MediaSourceReadyState mReadyState;
 

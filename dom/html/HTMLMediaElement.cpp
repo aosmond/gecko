@@ -82,6 +82,7 @@
 #include "mozilla/dom/MediaEncryptedEvent.h"
 #include "mozilla/dom/MediaErrorBinding.h"
 #include "mozilla/dom/MediaSource.h"
+#include "mozilla/dom/MediaSourceHandle.h"
 #include "mozilla/dom/PlayPromise.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/TextTrack.h"
@@ -1902,6 +1903,7 @@ NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLMediaElement)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLMediaElement,
                                                   nsGenericHTMLElement)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMediaSource)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMediaSourceHandle)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSrcMediaSource)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSrcStream)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSrcAttrStream)
@@ -1953,6 +1955,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLMediaElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSrcStream)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSrcAttrStream)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mMediaSource)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mMediaSourceHandle)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSrcMediaSource)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSourcePointer)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoadBlockedDoc)
@@ -2178,23 +2181,34 @@ bool HTMLMediaElement::HasSuspendTaint() const {
   return mHasSuspendTaint;
 }
 
-already_AddRefed<DOMMediaStream> HTMLMediaElement::GetSrcObject() const {
-  return do_AddRef(mSrcAttrStream);
-}
-
-void HTMLMediaElement::SetSrcObject(DOMMediaStream& aValue) {
-  SetSrcObject(&aValue);
-}
-
-void HTMLMediaElement::SetSrcObject(DOMMediaStream* aValue) {
-  for (auto& outputStream : mOutputStreams) {
-    if (aValue == outputStream.mStream) {
-      ReportToConsole(nsIScriptError::warningFlag,
-                      "MediaElementStreamCaptureCycle");
-      return;
-    }
+void HTMLMediaElement::GetSrcObject(
+    Nullable<OwningMediaSourceProvider>& aResult) const {
+  if (mSrcAttrStream) {
+    aResult.SetValue().SetAsMediaStream() = mSrcAttrStream;
+  } else if (mMediaSourceHandle) {
+    aResult.SetValue().SetAsMediaSourceHandle() = mMediaSourceHandle;
   }
-  mSrcAttrStream = aValue;
+}
+
+void HTMLMediaElement::SetSrcObject(
+    const Nullable<MediaSourceProvider>& aValue) {
+  if (aValue.IsNull()) {
+    mSrcAttrStream = nullptr;
+    mMediaSourceHandle = nullptr;
+  } else if (aValue.Value().IsMediaStream()) {
+    DOMMediaStream* value = &aValue.Value().GetAsMediaStream();
+    for (auto& outputStream : mOutputStreams) {
+      if (value == outputStream.mStream) {
+        ReportToConsole(nsIScriptError::warningFlag,
+                        "MediaElementStreamCaptureCycle");
+        return;
+      }
+    }
+    mSrcAttrStream = value;
+  } else if (aValue.Value().IsMediaSourceHandle()) {
+    mMediaSourceHandle = &aValue.Value().GetAsMediaSourceHandle();
+  }
+
   UpdateAudioChannelPlayingState();
   DoLoad();
 }

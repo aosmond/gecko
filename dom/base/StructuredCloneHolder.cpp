@@ -44,6 +44,8 @@
 #include "mozilla/dom/JSExecutionManager.h"
 #include "mozilla/dom/MessagePort.h"
 #include "mozilla/dom/MessagePortBinding.h"
+#include "mozilla/dom/MediaSourceHandle.h"
+#include "mozilla/dom/MediaSourceBinding.h"
 #include "mozilla/dom/OffscreenCanvas.h"
 #include "mozilla/dom/OffscreenCanvasBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -1186,6 +1188,24 @@ bool StructuredCloneHolder::CustomReadTransferHandler(
     return true;
   }
 
+  if (aTag == SCTAG_DOM_MEDIASOURCEHANDLE &&
+      CloneScope() == StructuredCloneScope::SameProcess) {
+    MOZ_ASSERT(aContent);
+    MediaSourceHandleCloneData* data =
+        static_cast<MediaSourceHandleCloneData*>(aContent);
+    RefPtr<MediaSourceHandle> handle = MediaSourceHandle::Create(mGlobal, data);
+    delete data;
+
+    JS::Rooted<JS::Value> value(aCx);
+    if (!GetOrCreateDOMReflector(aCx, handle, &value)) {
+      JS_ClearPendingException(aCx);
+      return false;
+    }
+
+    aReturnObject.set(&value.toObject());
+    return true;
+  }
+
   return false;
 }
 
@@ -1259,6 +1279,27 @@ bool StructuredCloneHolder::CustomWriteTransferHandler(
         *aContent = clonedBitmap.release();
         MOZ_ASSERT(*aContent);
         bitmap->Close();
+
+        return true;
+      }
+
+      MediaSourceHandle* handle = nullptr;
+      rv = UNWRAP_OBJECT(MediaSourceHandle, &obj, handle);
+      if (NS_SUCCEEDED(rv)) {
+        MOZ_ASSERT(handle);
+
+        *aExtraData = 0;
+        *aTag = SCTAG_DOM_MEDIASOURCEHANDLE;
+        *aOwnership = JS::SCTAG_TMO_CUSTOM;
+
+        UniquePtr<MediaSourceHandleCloneData> clonedHandle =
+            handle->ToCloneData();
+        if (!clonedHandle) {
+          return false;
+        }
+
+        *aContent = clonedHandle.release();
+        MOZ_ASSERT(*aContent);
 
         return true;
       }

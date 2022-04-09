@@ -100,7 +100,7 @@ class SourceBufferList final : public DOMEventTargetHelper {
 
   RefPtr<MediaSource> mMediaSource;
   nsTArray<RefPtr<SourceBuffer> > mSourceBuffers;
-  const RefPtr<AbstractThread> mAbstractMainThread;
+  const nsCOMPtr<nsISerialEventTarget> mOwningEventTarget;
 };
 
 }  // namespace dom

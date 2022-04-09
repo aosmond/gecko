@@ -29,10 +29,10 @@
 
 class JSObject;
 struct JSContext;
+class nsISerialEventTarget;
 
 namespace mozilla {
 
-class AbstractThread;
 class ErrorResult;
 class MediaByteBuffer;
 template <typename T>
@@ -175,7 +175,7 @@ class SourceBuffer final : public DOMEventTargetHelper,
   void AppendDataErrored(const MediaResult& aError);
 
   RefPtr<MediaSource> mMediaSource;
-  const RefPtr<AbstractThread> mAbstractMainThread;
+  const nsCOMPtr<nsISerialEventTarget> mOwningEventTarget;
 
   RefPtr<TrackBuffersManager> mTrackBuffersManager;
   SourceBufferAttributes mCurrentAttributes;
