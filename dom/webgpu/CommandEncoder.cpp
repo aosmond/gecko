@@ -95,7 +95,9 @@ static ffi::WGPUExtent3d ConvertExtent(const dom::GPUExtent3D& aExtent) {
 
 CommandEncoder::CommandEncoder(Device* const aParent,
                                WebGPUChild* const aBridge, RawId aId)
-    : ChildOf(aParent), mId(aId), mBridge(aBridge) {}
+    : ChildOf(aParent), mId(aId), mBridge(aBridge) {
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
+}
 
 CommandEncoder::~CommandEncoder() { Cleanup(); }
 
@@ -114,6 +116,7 @@ void CommandEncoder::CopyBufferToBuffer(const Buffer& aSource,
                                         BufferAddress aDestinationOffset,
                                         BufferAddress aSize) {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     ffi::wgpu_command_encoder_copy_buffer_to_buffer(
         aSource.mId, aSourceOffset, aDestination.mId, aDestinationOffset, aSize,
@@ -127,6 +130,7 @@ void CommandEncoder::CopyBufferToTexture(
     const dom::GPUImageCopyTexture& aDestination,
     const dom::GPUExtent3D& aCopySize) {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     ffi::wgpu_command_encoder_copy_buffer_to_texture(
         ConvertBufferCopyView(aSource), ConvertTextureCopyView(aDestination),
@@ -144,6 +148,7 @@ void CommandEncoder::CopyTextureToBuffer(
     const dom::GPUImageCopyBuffer& aDestination,
     const dom::GPUExtent3D& aCopySize) {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     ffi::wgpu_command_encoder_copy_texture_to_buffer(
         ConvertTextureCopyView(aSource), ConvertBufferCopyView(aDestination),
@@ -156,6 +161,7 @@ void CommandEncoder::CopyTextureToTexture(
     const dom::GPUImageCopyTexture& aDestination,
     const dom::GPUExtent3D& aCopySize) {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     ffi::wgpu_command_encoder_copy_texture_to_texture(
         ConvertTextureCopyView(aSource), ConvertTextureCopyView(aDestination),
@@ -171,6 +177,7 @@ void CommandEncoder::CopyTextureToTexture(
 
 void CommandEncoder::PushDebugGroup(const nsAString& aString) {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     const NS_ConvertUTF16toUTF8 utf8(aString);
     ffi::wgpu_command_encoder_push_debug_group(utf8.get(), ToFFI(&bb));
@@ -179,6 +186,7 @@ void CommandEncoder::PushDebugGroup(const nsAString& aString) {
 }
 void CommandEncoder::PopDebugGroup() {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     ffi::wgpu_command_encoder_pop_debug_group(ToFFI(&bb));
     mBridge->SendCommandEncoderAction(mId, mParent->mId, std::move(bb));
@@ -186,6 +194,7 @@ void CommandEncoder::PopDebugGroup() {
 }
 void CommandEncoder::InsertDebugMarker(const nsAString& aString) {
   if (mValid && mBridge->IsOpen()) {
+    printf_stderr("[AO] [%p] %s\n", this, __func__);
     ipc::ByteBuf bb;
     const NS_ConvertUTF16toUTF8 utf8(aString);
     ffi::wgpu_command_encoder_insert_debug_marker(utf8.get(), ToFFI(&bb));
@@ -222,6 +231,7 @@ void CommandEncoder::EndComputePass(ffi::WGPUComputePass& aPass,
     return aRv.ThrowInvalidStateError("Command encoder is not valid");
   }
 
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
   ipc::ByteBuf byteBuf;
   ffi::wgpu_compute_pass_finish(&aPass, ToFFI(&byteBuf));
   mBridge->SendCommandEncoderAction(mId, mParent->mId, std::move(byteBuf));
@@ -233,6 +243,7 @@ void CommandEncoder::EndRenderPass(ffi::WGPURenderPass& aPass,
     return aRv.ThrowInvalidStateError("Command encoder is not valid");
   }
 
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
   ipc::ByteBuf byteBuf;
   ffi::wgpu_render_pass_finish(&aPass, ToFFI(&byteBuf));
   mBridge->SendCommandEncoderAction(mId, mParent->mId, std::move(byteBuf));
