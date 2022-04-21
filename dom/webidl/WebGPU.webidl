@@ -213,6 +213,7 @@ interface GPUOutOfMemoryError {
 [Pref="dom.webgpu.enabled",
  Exposed=(Window,DedicatedWorker)]
 interface GPUValidationError {
+    [Throws]
     constructor(DOMString message);
     readonly attribute DOMString message;
 };
