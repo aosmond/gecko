@@ -89,7 +89,7 @@ pub struct Instruction {
 }
 
 impl Instruction {
-    const fn expect(self, count: u16) -> Result<(), Error> {
+    fn expect(self, count: u16) -> Result<(), Error> {
         if self.wc == count {
             Ok(())
         } else {
@@ -105,7 +105,7 @@ impl Instruction {
 }
 
 impl crate::TypeInner {
-    const fn can_comparison_sample(&self) -> bool {
+    fn can_comparison_sample(&self) -> bool {
         match *self {
             crate::TypeInner::Image {
                 class:
@@ -151,7 +151,7 @@ impl<T> LookupHelper for FastHashMap<spirv::Word, T> {
 }
 
 impl crate::ImageDimension {
-    const fn required_coordinate_size(&self) -> Option<crate::VectorSize> {
+    fn required_coordinate_size(&self) -> Option<crate::VectorSize> {
         match *self {
             crate::ImageDimension::D1 => None,
             crate::ImageDimension::D2 => Some(crate::VectorSize::Bi),
@@ -203,7 +203,6 @@ struct Decoration {
     array_stride: Option<NonZeroU32>,
     matrix_stride: Option<NonZeroU32>,
     matrix_major: Option<Majority>,
-    invariant: bool,
     interpolation: Option<crate::Interpolation>,
     sampling: Option<crate::Sampling>,
     flags: DecorationFlags,
@@ -217,7 +216,7 @@ impl Decoration {
         }
     }
 
-    const fn resource_binding(&self) -> Option<crate::ResourceBinding> {
+    fn resource_binding(&self) -> Option<crate::ResourceBinding> {
         match *self {
             Decoration {
                 desc_set: Some(group),
@@ -233,9 +232,8 @@ impl Decoration {
             Decoration {
                 built_in: Some(built_in),
                 location: None,
-                invariant,
                 ..
-            } => Ok(crate::Binding::BuiltIn(map_builtin(built_in, invariant)?)),
+            } => map_builtin(built_in).map(crate::Binding::BuiltIn),
             Decoration {
                 built_in: None,
                 location: Some(location),
@@ -408,7 +406,7 @@ struct Body {
 
 impl Body {
     /// Creates a new empty `Body` with the specified `parent`
-    pub const fn with_parent(parent: usize) -> Self {
+    pub fn with_parent(parent: usize) -> Self {
         Body {
             parent,
             data: Vec::new(),
@@ -682,9 +680,6 @@ impl<I: Iterator<Item = u32>> Parser<I> {
             spirv::Decoration::MatrixStride => {
                 inst.expect(base_words + 2)?;
                 dec.matrix_stride = NonZeroU32::new(self.next()?);
-            }
-            spirv::Decoration::Invariant => {
-                dec.invariant = true;
             }
             spirv::Decoration::NoPerspective => {
                 dec.interpolation = Some(crate::Interpolation::Linear);
@@ -1472,10 +1467,10 @@ impl<I: Iterator<Item = u32>> Parser<I> {
                                     span,
                                 );
 
-                                if let Some(crate::Binding::BuiltIn(built_in)) =
+                                if let Some(crate::Binding::BuiltIn(builtin)) =
                                     members[index as usize].binding
                                 {
-                                    self.builtin_usage.insert(built_in);
+                                    self.builtin_usage.insert(builtin);
                                 }
 
                                 AccessExpression {
@@ -2849,7 +2844,7 @@ impl<I: Iterator<Item = u32>> Parser<I> {
                     // we can treat it as an extension of the current `Body`.
                     //
                     // NOTE: it's possible that another branch was already made to this block
-                    // setting the body index in which case it SHOULD NOT be overridden.
+                    // setting the body index in which case it SHOULD NOT be overriden.
                     // For example a switch with falltrough, the OpSwitch will set the body to
                     // the respective case and the case may branch to another case in which case
                     // the body index shouldn't be changed
@@ -3015,7 +3010,7 @@ impl<I: Iterator<Item = u32>> Parser<I> {
                     // others will be empty falltrough so that they all execute the same body
                     // without duplicating code.
                     //
-                    // Since `switch_cases` is an indexmap the order of insertion is preserved
+                    // Since `switch_cases` is an indexmap the order of insertation is preserved
                     // this is needed because spir-v defines falltrough order in the switch
                     // instruction.
                     let mut cases = Vec::with_capacity((inst.wc as usize - 3) / 2);
@@ -4205,15 +4200,19 @@ impl<I: Iterator<Item = u32>> Parser<I> {
             } = *inner
             {
                 if let Some(stride) = decor.matrix_stride {
-                    let aligned_rows = if rows > crate::VectorSize::Bi { 4 } else { 2 };
-                    let expected_stride = aligned_rows * width as u32;
-                    if stride.get() != expected_stride {
-                        return Err(Error::UnsupportedMatrixStride {
-                            stride: stride.get(),
-                            columns: columns as u8,
-                            rows: rows as u8,
+                    let rounded_rows = if rows > crate::VectorSize::Bi {
+                        4
+                    } else {
+                        rows as u32
+                    };
+                    if stride.get() != rounded_rows * (width as u32) {
+                        log::warn!(
+                            "Unexpected matrix stride {} for an {}x{} matrix with scalar width={}",
+                            stride.get(),
+                            columns as u8,
+                            rows as u8,
                             width,
-                        });
+                        );
                     }
                 }
             }

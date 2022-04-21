@@ -10,76 +10,45 @@ use crate::{
 };
 
 impl<'source> ParsingContext<'source> {
-    /// Parses an optional array_specifier returning wether or not it's present
-    /// and modifying the type handle if it exists
+    /// Parses an optional array_specifier returning `Ok(None)` if there is no
+    /// LeftBracket
     pub fn parse_array_specifier(
         &mut self,
         parser: &mut Parser,
-        span: &mut Span,
-        ty: &mut Handle<Type>,
-    ) -> Result<()> {
-        while self.parse_array_specifier_single(parser, span, ty)? {}
-        Ok(())
-    }
+    ) -> Result<Option<(ArraySize, Span)>> {
+        if let Some(Token { mut meta, .. }) = self.bump_if(parser, TokenValue::LeftBracket) {
+            if let Some(Token { meta: end_meta, .. }) =
+                self.bump_if(parser, TokenValue::RightBracket)
+            {
+                meta.subsume(end_meta);
+                return Ok(Some((ArraySize::Dynamic, meta)));
+            }
 
-    /// Implementation of [`Self::parse_array_specifier`] for a single array_specifier
-    fn parse_array_specifier_single(
-        &mut self,
-        parser: &mut Parser,
-        span: &mut Span,
-        ty: &mut Handle<Type>,
-    ) -> Result<bool> {
-        if self.bump_if(parser, TokenValue::LeftBracket).is_some() {
-            let size =
-                if let Some(Token { meta, .. }) = self.bump_if(parser, TokenValue::RightBracket) {
-                    span.subsume(meta);
-                    ArraySize::Dynamic
-                } else {
-                    let (value, constant_span) = self.parse_uint_constant(parser)?;
-                    let constant = parser.module.constants.fetch_or_append(
-                        crate::Constant {
-                            name: None,
-                            specialization: None,
-                            inner: crate::ConstantInner::Scalar {
-                                width: 4,
-                                value: crate::ScalarValue::Uint(value as u64),
-                            },
-                        },
-                        constant_span,
-                    );
-                    let end_span = self.expect(parser, TokenValue::RightBracket)?.meta;
-                    span.subsume(end_span);
-                    ArraySize::Constant(constant)
-                };
-
-            parser
-                .layouter
-                .update(&parser.module.types, &parser.module.constants)
-                .unwrap();
-            let stride = parser.layouter[*ty].to_stride();
-            *ty = parser.module.types.insert(
-                Type {
+            let (value, span) = self.parse_uint_constant(parser)?;
+            let constant = parser.module.constants.fetch_or_append(
+                crate::Constant {
                     name: None,
-                    inner: TypeInner::Array {
-                        base: *ty,
-                        size,
-                        stride,
+                    specialization: None,
+                    inner: crate::ConstantInner::Scalar {
+                        width: 4,
+                        value: crate::ScalarValue::Uint(value as u64),
                     },
                 },
-                *span,
+                span,
             );
-
-            Ok(true)
+            let end_meta = self.expect(parser, TokenValue::RightBracket)?.meta;
+            meta.subsume(end_meta);
+            Ok(Some((ArraySize::Constant(constant), meta)))
         } else {
-            Ok(false)
+            Ok(None)
         }
     }
 
     pub fn parse_type(&mut self, parser: &mut Parser) -> Result<(Option<Handle<Type>>, Span)> {
         let token = self.bump(parser)?;
-        let mut handle = match token.value {
-            TokenValue::Void => return Ok((None, token.meta)),
-            TokenValue::TypeName(ty) => parser.module.types.insert(ty, token.meta),
+        let handle = match token.value {
+            TokenValue::Void => None,
+            TokenValue::TypeName(ty) => Some(parser.module.types.insert(ty, token.meta)),
             TokenValue::Struct => {
                 let mut meta = token.meta;
                 let ty_name = self.expect_ident(parser)?.0;
@@ -97,10 +66,10 @@ impl<'source> ParsingContext<'source> {
                     meta,
                 );
                 parser.lookup_type.insert(ty_name, ty);
-                ty
+                Some(ty)
             }
             TokenValue::Identifier(ident) => match parser.lookup_type.get(&ident) {
-                Some(ty) => *ty,
+                Some(ty) => Some(*ty),
                 None => {
                     return Err(Error {
                         kind: ErrorKind::UnknownType(ident),
@@ -123,9 +92,12 @@ impl<'source> ParsingContext<'source> {
             }
         };
 
-        let mut span = token.meta;
-        self.parse_array_specifier(parser, &mut span, &mut handle)?;
-        Ok((Some(handle), span))
+        let token_meta = token.meta;
+        let array_specifier = self.parse_array_specifier(parser)?;
+        let handle = handle.map(|ty| parser.maybe_array(ty, token_meta, array_specifier));
+        let mut meta = array_specifier.map_or(token_meta, |(_, meta)| meta);
+        meta.subsume(token_meta);
+        Ok((handle, meta))
     }
 
     pub fn parse_type_non_void(&mut self, parser: &mut Parser) -> Result<(Handle<Type>, Span)> {
@@ -140,8 +112,7 @@ impl<'source> ParsingContext<'source> {
 
     pub fn peek_type_qualifier(&mut self, parser: &mut Parser) -> bool {
         self.peek(parser).map_or(false, |t| match t.value {
-            TokenValue::Invariant
-            | TokenValue::Interpolation(_)
+            TokenValue::Interpolation(_)
             | TokenValue::Sampling(_)
             | TokenValue::PrecisionQualifier(_)
             | TokenValue::Const
@@ -151,7 +122,7 @@ impl<'source> ParsingContext<'source> {
             | TokenValue::Shared
             | TokenValue::Buffer
             | TokenValue::Restrict
-            | TokenValue::MemoryQualifier(_)
+            | TokenValue::StorageAccess(_)
             | TokenValue::Layout => true,
             _ => false,
         })
@@ -172,19 +143,6 @@ impl<'source> ParsingContext<'source> {
             qualifiers.span.subsume(token.meta);
 
             match token.value {
-                TokenValue::Invariant => {
-                    if qualifiers.invariant.is_some() {
-                        parser.errors.push(Error {
-                            kind: ErrorKind::SemanticError(
-                                "Cannot use more than one invariant qualifier per declaration"
-                                    .into(),
-                            ),
-                            meta: token.meta,
-                        })
-                    }
-
-                    qualifiers.invariant = Some(token.meta);
-                }
                 TokenValue::Interpolation(i) => {
                     if qualifiers.interpolation.is_some() {
                         parser.errors.push(Error {
@@ -249,7 +207,7 @@ impl<'source> ParsingContext<'source> {
                     qualifiers.sampling = Some((s, token.meta));
                 }
                 TokenValue::PrecisionQualifier(p) => {
-                    if qualifiers.precision.is_some() {
+                    if qualifiers.interpolation.is_some() {
                         parser.errors.push(Error {
                             kind: ErrorKind::SemanticError(
                                 "Cannot use more than one precision qualifier per declaration"
@@ -261,11 +219,11 @@ impl<'source> ParsingContext<'source> {
 
                     qualifiers.precision = Some((p, token.meta));
                 }
-                TokenValue::MemoryQualifier(access) => {
+                TokenValue::StorageAccess(access) => {
                     let storage_access = qualifiers
-                        .storage_access
-                        .get_or_insert((crate::StorageAccess::all(), Span::default()));
-                    if !storage_access.0.contains(!access) {
+                        .storage_acess
+                        .get_or_insert((crate::StorageAccess::empty(), Span::default()));
+                    if storage_access.0.contains(access) {
                         parser.errors.push(Error {
                             kind: ErrorKind::SemanticError(
                                 "The same memory qualifier can only be used once".into(),
@@ -274,7 +232,7 @@ impl<'source> ParsingContext<'source> {
                         })
                     }
 
-                    storage_access.0 &= access;
+                    storage_access.0 |= access;
                     storage_access.1.subsume(token.meta);
                 }
                 TokenValue::Restrict => continue,

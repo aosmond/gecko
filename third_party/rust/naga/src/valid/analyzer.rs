@@ -50,7 +50,7 @@ pub struct Uniformity {
 }
 
 impl Uniformity {
-    const fn new() -> Self {
+    fn new() -> Self {
         Uniformity {
             non_uniform_result: None,
             requirements: UniformityRequirements::empty(),
@@ -94,7 +94,7 @@ impl ops::BitOr for FunctionUniformity {
 }
 
 impl FunctionUniformity {
-    const fn new() -> Self {
+    fn new() -> Self {
         FunctionUniformity {
             result: Uniformity::new(),
             exit: ExitFlags::empty(),
@@ -102,7 +102,7 @@ impl FunctionUniformity {
     }
 
     /// Returns a disruptor based on the stored exit flags, if any.
-    const fn exit_disruptor(&self) -> Option<UniformityDisruptor> {
+    fn exit_disruptor(&self) -> Option<UniformityDisruptor> {
         if self.exit.contains(ExitFlags::MAY_RETURN) {
             Some(UniformityDisruptor::Return)
         } else if self.exit.contains(ExitFlags::MAY_KILL) {
@@ -146,7 +146,7 @@ pub struct ExpressionInfo {
 }
 
 impl ExpressionInfo {
-    const fn new() -> Self {
+    fn new() -> Self {
         ExpressionInfo {
             uniformity: Uniformity::new(),
             ref_count: 0,
@@ -169,7 +169,7 @@ enum GlobalOrArgument {
 }
 
 impl crate::Expression {
-    const fn to_global_or_argument(&self) -> Result<GlobalOrArgument, ExpressionError> {
+    fn to_global_or_argument(&self) -> Result<GlobalOrArgument, ExpressionError> {
         Ok(match *self {
             crate::Expression::GlobalVariable(var) => GlobalOrArgument::Global(var),
             crate::Expression::FunctionArgument(i) => GlobalOrArgument::Argument(i),
@@ -219,7 +219,7 @@ pub struct FunctionInfo {
     /// How this function and its callees use this module's globals.
     ///
     /// This is indexed by `Handle<GlobalVariable>` indices. However,
-    /// `FunctionInfo` implements `std::ops::Index<Handle<GlobalVariable>>`,
+    /// `FunctionInfo` implements `std::ops::Index<Handle<Globalvariable>>`,
     /// so you can simply index this struct with a global handle to retrieve
     /// its usage information.
     global_uses: Box<[GlobalUse]>,
@@ -248,10 +248,10 @@ pub struct FunctionInfo {
 }
 
 impl FunctionInfo {
-    pub const fn global_variable_count(&self) -> usize {
+    pub fn global_variable_count(&self) -> usize {
         self.global_uses.len()
     }
-    pub const fn expression_count(&self) -> usize {
+    pub fn expression_count(&self) -> usize {
         self.expressions.len()
     }
     pub fn dominates_global_use(&self, other: &Self) -> bool {

@@ -507,7 +507,7 @@ impl<'source> ParsingContext<'source> {
     }
 }
 
-const fn binding_power(value: &TokenValue) -> Option<(u8, u8)> {
+fn binding_power(value: &TokenValue) -> Option<(u8, u8)> {
     Some(match *value {
         TokenValue::LogicalOr => (1, 2),
         TokenValue::LogicalXor => (3, 4),

@@ -2,15 +2,13 @@
 
 ## v0.9 (TBD)
   - WGSL:
-    - semicolon after struct declaration are now optional
-    - commas are used to separate struct members instead of semicolons
+    - commas are used to separate struct members intead of semicolons
     - attributes are declared with `@attrib` instead of `[[attrib]]`
     - `stride` attribute is removed
     - block comments are supported
     - renames:
       - `findLsb` -> `firstTrailingBit`
       - `findMsb` -> `firstLeadingBit`
-      - `smoothStep` -> `smoothstep`
 
 ## v0.8 (2021-12-18)
   - development release for wgpu-0.12
@@ -57,7 +55,7 @@
   - development release for wgpu-0.11
   - API:
     - bit extraction and packing functions
-    - hyperbolic trigonometry functions
+    - hyperbolic trigonometry functionss
     - validation is gated by a cargo feature
     - `view_index` builtin
     - separate bounds checking policies for locals/buffers/textures

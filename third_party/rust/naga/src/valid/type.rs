@@ -4,8 +4,6 @@ use crate::{
     proc::Alignment,
 };
 
-const UNIFORM_MIN_ALIGNMENT: Alignment = unsafe { Alignment::new_unchecked(16) };
-
 bitflags::bitflags! {
     /// Flags associated with [`Type`]s by [`Validator`].
     ///
@@ -66,12 +64,6 @@ pub enum Disalignment {
         offset: u32,
         alignment: u32,
     },
-    #[error("The struct member[{index}] offset {offset} must be at least {expected}")]
-    MemberOffsetAfterStruct {
-        index: u32,
-        offset: u32,
-        expected: u32,
-    },
     #[error("The struct member[{index}] is not statically sized")]
     UnsizedMember { index: u32 },
     #[error("The type is not host-shareable")]
@@ -120,8 +112,6 @@ pub enum TypeError {
         size: u32,
         span: u32,
     },
-    #[error("Structure types must have at least one member")]
-    EmptyStruct,
 }
 
 // Only makes sense if `flags.contains(HOST_SHARED)`
@@ -163,7 +153,7 @@ pub(super) struct TypeInfo {
 }
 
 impl TypeInfo {
-    const fn dummy() -> Self {
+    fn dummy() -> Self {
         TypeInfo {
             flags: TypeFlags::empty(),
             uniform_layout: Ok(None),
@@ -171,7 +161,7 @@ impl TypeInfo {
         }
     }
 
-    const fn new(flags: TypeFlags, align: u32) -> Self {
+    fn new(flags: TypeFlags, align: u32) -> Self {
         let alignment = Alignment::new(align);
         TypeInfo {
             flags,
@@ -182,7 +172,7 @@ impl TypeInfo {
 }
 
 impl super::Validator {
-    pub(super) const fn check_width(&self, kind: crate::ScalarKind, width: crate::Bytes) -> bool {
+    pub(super) fn check_width(&self, kind: crate::ScalarKind, width: crate::Bytes) -> bool {
         match kind {
             crate::ScalarKind::Bool => width == crate::BOOL_WIDTH,
             crate::ScalarKind::Float => {
@@ -351,11 +341,7 @@ impl super::Validator {
                 let uniform_layout = match base_info.uniform_layout {
                     Ok(base_alignment) => {
                         // combine the alignment requirements
-                        let align = base_alignment
-                            .unwrap()
-                            .get()
-                            .max(general_alignment)
-                            .max(UNIFORM_MIN_ALIGNMENT.get());
+                        let align = base_alignment.unwrap().get().max(general_alignment);
                         if stride % align != 0 {
                             Err((
                                 handle,
@@ -453,10 +439,6 @@ impl super::Validator {
                 }
             }
             Ti::Struct { ref members, span } => {
-                if members.is_empty() {
-                    return Err(TypeError::EmptyStruct);
-                }
-
                 let mut ti = TypeInfo::new(
                     TypeFlags::DATA
                         | TypeFlags::SIZED
@@ -466,11 +448,7 @@ impl super::Validator {
                         | TypeFlags::ARGUMENT,
                     1,
                 );
-                ti.uniform_layout = Ok(Some(UNIFORM_MIN_ALIGNMENT));
-
                 let mut min_offset = 0;
-
-                let mut prev_struct_data: Option<(u32, u32)> = None;
 
                 for (i, member) in members.iter().enumerate() {
                     if member.ty >= handle {
@@ -530,29 +508,6 @@ impl super::Validator {
                         base_info.storage_layout,
                         handle,
                     );
-
-                    // Validate rule: If a structure member itself has a structure type S,
-                    // then the number of bytes between the start of that member and
-                    // the start of any following member must be at least roundUp(16, SizeOf(S)).
-                    if let Some((span, offset)) = prev_struct_data {
-                        let diff = member.offset - offset;
-                        let min = crate::valid::Layouter::round_up(UNIFORM_MIN_ALIGNMENT, span);
-                        if diff < min {
-                            ti.uniform_layout = Err((
-                                handle,
-                                Disalignment::MemberOffsetAfterStruct {
-                                    index: i as u32,
-                                    offset: member.offset,
-                                    expected: offset + min,
-                                },
-                            ));
-                        }
-                    };
-
-                    prev_struct_data = match types[member.ty].inner {
-                        crate::TypeInner::Struct { span, .. } => Some((span, member.offset)),
-                        _ => None,
-                    };
 
                     // The last field may be an unsized array.
                     if !base_info.flags.contains(TypeFlags::SIZED) {

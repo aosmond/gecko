@@ -120,7 +120,7 @@ impl<'source> ParsingContext<'source> {
     pub fn parse_init_declarator_list(
         &mut self,
         parser: &mut Parser,
-        mut ty: Handle<Type>,
+        ty: Handle<Type>,
         ctx: &mut DeclarationContext,
     ) -> Result<()> {
         // init_declarator_list:
@@ -169,7 +169,8 @@ impl<'source> ParsingContext<'source> {
             // parse an array specifier if it exists
             // NOTE: unlike other parse methods this one doesn't expect an array specifier and
             // returns Ok(None) rather than an error if there is not one
-            self.parse_array_specifier(parser, &mut meta, &mut ty)?;
+            let array_specifier = self.parse_array_specifier(parser)?;
+            let ty = parser.maybe_array(ty, meta, array_specifier);
 
             let init = self
                 .bump_if(parser, TokenValue::Assign)
@@ -189,23 +190,11 @@ impl<'source> ParsingContext<'source> {
                 })
                 .transpose()?;
 
-            // If the declaration has an initializer try to make a constant out of it,
-            // this is only strictly needed for global constant declarations (and if the
-            // initializer can't be made a constant it should throw an error) but we also
-            // try to do it for all other types of declarations.
-            let maybe_constant = if let Some((root, meta)) = init {
-                let is_const = ctx.qualifiers.storage.0 == StorageQualifier::Const;
-
-                match parser.solve_constant(ctx.ctx, root, meta) {
-                    Ok(res) => Some(res),
-                    // If the declaration is external (global scope) and is constant qualified
-                    // then the initializer must be a constant expression
-                    Err(err) if ctx.external && is_const => return Err(err),
-                    _ => None,
-                }
-            } else {
-                None
-            };
+            // TODO: Should we try to make constants here?
+            // This is mostly a hack because we don't yet support adding
+            // bodies to entry points for variable initialization
+            let maybe_constant =
+                init.and_then(|(root, meta)| parser.solve_constant(ctx.ctx, root, meta).ok());
 
             let pointer = ctx.add_var(parser, ty, name, maybe_constant, meta)?;
 
@@ -323,13 +312,13 @@ impl<'source> ParsingContext<'source> {
                                 }),
                             };
                         }
-                        // Pass the token to the init_declarator_list parser
+                        // Pass the token to the init_declator_list parser
                         _ => Token {
                             value: TokenValue::Identifier(name),
                             meta: token.meta,
                         },
                     },
-                    // Pass the token to the init_declarator_list parser
+                    // Pass the token to the init_declator_list parser
                     _ => token,
                 };
 
@@ -373,14 +362,6 @@ impl<'source> ParsingContext<'source> {
                             )
                             .map(Some)
                         } else {
-                            if qualifiers.invariant.take().is_some() {
-                                parser.make_variable_invariant(ctx, body, &ty_name, token.meta);
-
-                                qualifiers.unused_errors(&mut parser.errors);
-                                self.expect(parser, TokenValue::Semicolon)?;
-                                return Ok(Some(qualifiers.span));
-                            }
-
                             //TODO: declaration
                             // type_qualifier IDENTIFIER SEMICOLON
                             // type_qualifier IDENTIFIER identifier_list SEMICOLON
@@ -451,7 +432,11 @@ impl<'source> ParsingContext<'source> {
 
                     match parser.module.types[ty].inner {
                         TypeInner::Scalar {
-                            kind: ScalarKind::Float | ScalarKind::Sint,
+                            kind: ScalarKind::Float,
+                            ..
+                        }
+                        | TypeInner::Scalar {
+                            kind: ScalarKind::Sint,
                             ..
                         } => {}
                         _ => parser.errors.push(Error {
@@ -478,7 +463,7 @@ impl<'source> ParsingContext<'source> {
         body: &mut Block,
         qualifiers: &mut TypeQualifiers,
         ty_name: String,
-        mut meta: Span,
+        meta: Span,
     ) -> Result<Span> {
         let layout = match qualifiers.layout_qualifiers.remove(&QualifierKey::Layout) {
             Some((QualifierValue::Layout(l), _)) => l,
@@ -513,7 +498,8 @@ impl<'source> ParsingContext<'source> {
         let name = match token.value {
             TokenValue::Semicolon => None,
             TokenValue::Identifier(name) => {
-                self.parse_array_specifier(parser, &mut meta, &mut ty)?;
+                let array_specifier = self.parse_array_specifier(parser)?;
+                ty = parser.maybe_array(ty, token.meta, array_specifier);
 
                 self.expect(parser, TokenValue::Semicolon)?;
 
@@ -575,12 +561,13 @@ impl<'source> ParsingContext<'source> {
         loop {
             // TODO: type_qualifier
 
-            let (mut ty, mut meta) = self.parse_type_non_void(parser)?;
+            let (ty, mut meta) = self.parse_type_non_void(parser)?;
             let (name, end_meta) = self.expect_ident(parser)?;
 
             meta.subsume(end_meta);
 
-            self.parse_array_specifier(parser, &mut meta, &mut ty)?;
+            let array_specifier = self.parse_array_specifier(parser)?;
+            let ty = parser.maybe_array(ty, meta, array_specifier);
 
             self.expect(parser, TokenValue::Semicolon)?;
 

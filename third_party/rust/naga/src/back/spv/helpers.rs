@@ -20,7 +20,7 @@ pub(super) fn string_to_words(input: &str) -> Vec<Word> {
     words
 }
 
-pub(super) const fn map_storage_class(space: crate::AddressSpace) -> spirv::StorageClass {
+pub(super) fn map_storage_class(space: crate::AddressSpace) -> spirv::StorageClass {
     match space {
         crate::AddressSpace::Handle => spirv::StorageClass::UniformConstant,
         crate::AddressSpace::Function => spirv::StorageClass::Function,
@@ -50,9 +50,7 @@ pub(super) fn contains_builtin(
 }
 
 impl crate::AddressSpace {
-    pub(super) const fn to_spirv_semantics_and_scope(
-        self,
-    ) -> (spirv::MemorySemantics, spirv::Scope) {
+    pub(super) fn to_spirv_semantics_and_scope(self) -> (spirv::MemorySemantics, spirv::Scope) {
         match self {
             Self::Storage { .. } => (spirv::MemorySemantics::UNIFORM_MEMORY, spirv::Scope::Device),
             Self::WorkGroup => (
@@ -64,21 +62,7 @@ impl crate::AddressSpace {
     }
 }
 
-/// Return true if the global requires a type decorated with `Block`.
-///
-/// Vulkan spec v1.3 §15.6.2, "Descriptor Set Interface", says:
-///
-/// > Variables identified with the `Uniform` storage class are used to
-/// > access transparent buffer backed resources. Such variables must
-/// > be:
-/// >
-/// > -   typed as `OpTypeStruct`, or an array of this type,
-/// >
-/// > -   identified with a `Block` or `BufferBlock` decoration, and
-/// >
-/// > -   laid out explicitly using the `Offset`, `ArrayStride`, and
-/// >     `MatrixStride` decorations as specified in §15.6.4, "Offset
-/// >     and Stride Assignment."
+/// Return true if the global requires a type decorated with "Block".
 // See `back::spv::GlobalVariable::access_id` for details.
 pub fn global_needs_wrapper(ir_module: &crate::Module, var: &crate::GlobalVariable) -> bool {
     match var.space {

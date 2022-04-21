@@ -104,7 +104,7 @@ struct TerminatedBlock {
 }
 
 impl Block {
-    const fn new(label_id: Word) -> Self {
+    fn new(label_id: Word) -> Self {
         Block {
             label_id,
             body: Vec::new(),
@@ -467,7 +467,7 @@ struct GlobalVariable {
 }
 
 impl GlobalVariable {
-    const fn dummy() -> Self {
+    fn dummy() -> Self {
         Self {
             var_id: 0,
             handle_id: 0,
@@ -475,7 +475,7 @@ impl GlobalVariable {
         }
     }
 
-    const fn new(id: Word) -> Self {
+    fn new(id: Word) -> Self {
         Self {
             var_id: id,
             handle_id: 0,

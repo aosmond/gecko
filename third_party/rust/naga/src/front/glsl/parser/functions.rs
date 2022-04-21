@@ -575,7 +575,7 @@ impl<'source> ParsingContext<'source> {
         loop {
             if self.peek_type_name(parser) || self.peek_parameter_qualifier(parser) {
                 let qualifier = self.parse_parameter_qualifier(parser);
-                let mut ty = self.parse_type_non_void(parser)?.0;
+                let ty = self.parse_type_non_void(parser)?.0;
 
                 match self.expect_peek(parser)?.value {
                     TokenValue::Comma => {
@@ -584,10 +584,12 @@ impl<'source> ParsingContext<'source> {
                         continue;
                     }
                     TokenValue::Identifier(_) => {
-                        let mut name = self.expect_ident(parser)?;
-                        self.parse_array_specifier(parser, &mut name.1, &mut ty)?;
+                        let name_meta = self.expect_ident(parser)?;
 
-                        context.add_function_arg(parser, body, Some(name), ty, qualifier);
+                        let array_specifier = self.parse_array_specifier(parser)?;
+                        let ty = parser.maybe_array(ty, name_meta.1, array_specifier);
+
+                        context.add_function_arg(parser, body, Some(name_meta), ty, qualifier);
 
                         if self.bump_if(parser, TokenValue::Comma).is_some() {
                             continue;

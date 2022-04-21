@@ -33,7 +33,7 @@ pub struct ParameterInfo {
 pub enum FunctionKind {
     /// The function is user defined
     Call(Handle<Function>),
-    /// The function is a builtin
+    /// The function is a buitin
     Macro(MacroCall),
 }
 
@@ -53,19 +53,19 @@ pub struct Overload {
     pub parameters_info: Vec<ParameterInfo>,
     /// How the function is implemented
     pub kind: FunctionKind,
-    /// Whether this function was already defined or is just a prototype
+    /// Wheter this function was already defined or is just a prototype
     pub defined: bool,
-    /// Whether this overload is the one provided by the language or has
+    /// Wheter this overload is the one provided by the language or has
     /// been redeclared by the user (builtins only)
     pub internal: bool,
-    /// Whether or not this function returns void (nothing)
+    /// Wheter or not this function returns void (nothing)
     pub void: bool,
 }
 
 bitflags::bitflags! {
     /// Tracks the variations of the builtin already generated, this is needed because some
     /// builtins overloads can't be generated unless explicitly used, since they might cause
-    /// unneeded capabilities to be requested
+    /// uneeded capabilities to be requested
     #[derive(Default)]
     pub struct BuiltinVariations: u32 {
         /// Request the standard overloads
@@ -97,9 +97,7 @@ pub struct EntryArg {
 #[derive(Debug, Clone)]
 pub struct VariableReference {
     pub expr: Handle<Expression>,
-    /// Wether the variable is of a pointer type (and needs loading) or not
     pub load: bool,
-    /// Wether the value of the variable can be changed or not
     pub mutable: bool,
     pub constant: Option<(Handle<Constant>, Handle<Type>)>,
     pub entry_arg: Option<usize>,
@@ -174,28 +172,16 @@ pub enum QualifierValue {
 pub struct TypeQualifiers<'a> {
     pub span: Span,
     pub storage: (StorageQualifier, Span),
-    pub invariant: Option<Span>,
     pub interpolation: Option<(Interpolation, Span)>,
     pub precision: Option<(Precision, Span)>,
     pub sampling: Option<(Sampling, Span)>,
-    /// Memory qualifiers used in the declaration to set the storage access to be used
-    /// in declarations that support it (storage images and buffers)
-    pub storage_access: Option<(StorageAccess, Span)>,
+    pub storage_acess: Option<(StorageAccess, Span)>,
     pub layout_qualifiers: crate::FastHashMap<QualifierKey<'a>, (QualifierValue, Span)>,
 }
 
 impl<'a> TypeQualifiers<'a> {
     /// Appends `errors` with errors for all unused qualifiers
     pub fn unused_errors(&self, errors: &mut Vec<super::Error>) {
-        if let Some(meta) = self.invariant {
-            errors.push(super::Error {
-                kind: super::ErrorKind::SemanticError(
-                    "Invariant qualifier can only be used in in/out variables".into(),
-                ),
-                meta,
-            });
-        }
-
         if let Some((_, meta)) = self.interpolation {
             errors.push(super::Error {
                 kind: super::ErrorKind::SemanticError(
@@ -214,7 +200,7 @@ impl<'a> TypeQualifiers<'a> {
             });
         }
 
-        if let Some((_, meta)) = self.storage_access {
+        if let Some((_, meta)) = self.storage_acess {
             errors.push(super::Error {
                 kind: super::ErrorKind::SemanticError(
                     "Memory qualifiers can only be used in storage variables".into(),
@@ -352,7 +338,7 @@ pub enum ParameterQualifier {
 
 impl ParameterQualifier {
     /// Returns true if the argument should be passed as a lhs expression
-    pub const fn is_lhs(&self) -> bool {
+    pub fn is_lhs(&self) -> bool {
         match *self {
             ParameterQualifier::Out | ParameterQualifier::InOut => true,
             _ => false,
@@ -360,7 +346,7 @@ impl ParameterQualifier {
     }
 
     /// Converts from a parameter qualifier into a [`ExprPos`](ExprPos)
-    pub const fn as_pos(&self) -> ExprPos {
+    pub fn as_pos(&self) -> ExprPos {
         match *self {
             ParameterQualifier::Out | ParameterQualifier::InOut => ExprPos::Lhs,
             _ => ExprPos::Rhs,
