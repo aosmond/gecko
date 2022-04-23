@@ -272,6 +272,7 @@ class WebGLImageConverter {
       WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::RGBA8)
       WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::RGBA16F)
       WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::RGBA32F)
+      WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::BGRA8)
 
       default:
         MOZ_ASSERT(false, "unhandled case. Coding mistake?");
@@ -390,10 +391,12 @@ bool ConvertImage(size_t width, size_t height, const void* srcBegin,
 
     // We ignore canSkipPremult for this perf trap, since it's an avoidable perf
     // cliff under the WebGL API user's control.
-    MOZ_ASSERT(
-        (srcPremultiplied != dstPremultiplied || shouldYFlip ||
-         srcStride != dstStride),
-        "Performance trap -- should handle this case earlier to avoid memcpy");
+    if (srcPremultiplied != dstPremultiplied || shouldYFlip ||
+        srcStride != dstStride) {
+      NS_WARNING(
+          "Performance trap -- should handle this case earlier to avoid "
+          "memcpy");
+    }
 
     const auto bytesPerPixel = TexelBytesForFormat(srcFormat);
     const size_t bytesPerRow = bytesPerPixel * width;

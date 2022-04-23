@@ -95,6 +95,7 @@ class Event;
 class HTMLImageElement;
 class HTMLCanvasElement;
 class HTMLVideoElement;
+class ImageBitmap;
 class InspectorFontFace;
 class OffscreenCanvas;
 class Selection;
@@ -2220,6 +2221,8 @@ class nsLayoutUtils {
     RefPtr<DrawTarget> target = nullptr;
     return SurfaceFromOffscreenCanvas(aOffscreenCanvas, aSurfaceFlags, target);
   }
+  static mozilla::SurfaceFromElementResult SurfaceFromImageBitmap(
+      mozilla::dom::ImageBitmap* aImageBitmap, uint32_t aSurfaceFlags);
 
   static mozilla::SurfaceFromElementResult SurfaceFromElement(
       mozilla::dom::Element* aElement, uint32_t aSurfaceFlags,
@@ -2244,6 +2247,11 @@ class nsLayoutUtils {
   static mozilla::SurfaceFromElementResult SurfaceFromElement(
       mozilla::dom::HTMLCanvasElement* aElement, uint32_t aSurfaceFlags,
       RefPtr<DrawTarget>& aTarget);
+  static mozilla::SurfaceFromElementResult SurfaceFromElement(
+      mozilla::dom::HTMLCanvasElement* aElement, uint32_t aSurfaceFlags) {
+    RefPtr<DrawTarget> target = nullptr;
+    return SurfaceFromElement(aElement, aSurfaceFlags, target);
+  }
   static mozilla::SurfaceFromElementResult SurfaceFromElement(
       mozilla::dom::HTMLVideoElement* aElement, uint32_t aSurfaceFlags,
       RefPtr<DrawTarget>& aTarget);
