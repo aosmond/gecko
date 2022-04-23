@@ -272,6 +272,7 @@ class WebGLImageConverter {
       WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::RGBA8)
       WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::RGBA16F)
       WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::RGBA32F)
+      WEBGLIMAGECONVERTER_CASE_DSTFORMAT(WebGLTexelFormat::BGRA8)
 
       default:
         MOZ_ASSERT(false, "unhandled case. Coding mistake?");
