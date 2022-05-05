@@ -17,6 +17,7 @@
 #include "nsWrapperCache.h"
 
 class gfxFontFaceBufferSource;
+class nsIGlobalObject;
 struct RawServoFontFaceRule;
 
 namespace mozilla {
@@ -75,11 +76,11 @@ class FontFace final : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(FontFace)
 
-  nsISupports* GetParentObject() const { return mParent; }
+  nsIGlobalObject* GetParentObject() const { return mGlobal; }
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
 
-  static already_AddRefed<FontFace> CreateForRule(nsISupports* aGlobal,
+  static already_AddRefed<FontFace> CreateForRule(nsIGlobalObject* aGlobal,
                                                   FontFaceSet* aFontFaceSet,
                                                   RawServoFontFaceRule* aRule);
 
@@ -192,7 +193,7 @@ class FontFace final : public nsISupports, public nsWrapperCache {
   Promise* GetLoaded(ErrorResult& aRv);
 
  private:
-  FontFace(nsISupports* aParent, FontFaceSet* aFontFaceSet);
+  FontFace(nsIGlobalObject* aGlobal, FontFaceSet* aFontFaceSet);
   ~FontFace();
 
   void InitializeSource(const UTF8StringOrArrayBufferOrArrayBufferView&);
@@ -249,7 +250,7 @@ class FontFace final : public nsISupports, public nsWrapperCache {
   void DoResolve();
   void DoReject(nsresult aResult);
 
-  nsCOMPtr<nsISupports> mParent;
+  nsCOMPtr<nsIGlobalObject> mGlobal;
 
   // A Promise that is fulfilled once the font represented by this FontFace is
   // loaded, and is rejected if the load fails. This promise is created lazily

@@ -72,14 +72,14 @@ static void GetDataFrom(const T& aObject, uint8_t*& aBuffer,
 NS_IMPL_CYCLE_COLLECTION_CLASS(FontFace)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(FontFace)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mParent)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGlobal)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLoaded)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFontFaceSet)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOtherFontFaceSets)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(FontFace)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mParent)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mGlobal)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLoaded)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFontFaceSet)
   tmp->mInFontFaceSet = false;
@@ -100,8 +100,8 @@ NS_INTERFACE_MAP_END
 NS_IMPL_CYCLE_COLLECTING_ADDREF(FontFace)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(FontFace)
 
-FontFace::FontFace(nsISupports* aParent, FontFaceSet* aFontFaceSet)
-    : mParent(aParent),
+FontFace::FontFace(nsIGlobalObject* aGlobal, FontFaceSet* aFontFaceSet)
+    : mGlobal(aGlobal),
       mLoadedRejection(NS_OK),
       mStatus(FontFaceLoadStatus::Unloaded),
       mSourceType(SourceType(0)),
@@ -146,7 +146,7 @@ static FontFaceLoadStatus LoadStateToStatus(
 }
 
 already_AddRefed<FontFace> FontFace::CreateForRule(
-    nsISupports* aGlobal, FontFaceSet* aFontFaceSet,
+    nsIGlobalObject* aGlobal, FontFaceSet* aFontFaceSet,
     RawServoFontFaceRule* aRule) {
   RefPtr<FontFace> obj = new FontFace(aGlobal, aFontFaceSet);
   obj->mRule = aRule;
@@ -159,7 +159,12 @@ already_AddRefed<FontFace> FontFace::Constructor(
     const GlobalObject& aGlobal, const nsACString& aFamily,
     const UTF8StringOrArrayBufferOrArrayBufferView& aSource,
     const FontFaceDescriptors& aDescriptors, ErrorResult& aRv) {
-  nsISupports* global = aGlobal.GetAsSupports();
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+  if (!global) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
   nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(global);
   if (!window) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -503,10 +508,9 @@ void FontFace::DoReject(nsresult aResult) {
 }
 
 already_AddRefed<URLExtraData> FontFace::GetURLExtraData() const {
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
-  nsCOMPtr<nsIPrincipal> principal = global->PrincipalOrNull();
+  nsCOMPtr<nsIPrincipal> principal = mGlobal->PrincipalOrNull();
 
-  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(mParent);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(mGlobal);
   nsCOMPtr<nsIURI> docURI = window->GetDocumentURI();
   nsCOMPtr<nsIURI> base = window->GetDocBaseURI();
 
@@ -822,14 +826,12 @@ void FontFace::EnsurePromise() {
     return;
   }
 
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
-
   // If the pref is not set, don't create the Promise (which the page wouldn't
   // be able to get to anyway) as it causes the window.FontFace constructor
   // to be created.
-  if (global && FontFaceSet::PrefEnabled()) {
+  if (FontFaceSet::PrefEnabled()) {
     ErrorResult rv;
-    mLoaded = Promise::Create(global, rv);
+    mLoaded = Promise::Create(mGlobal, rv);
 
     if (mStatus == FontFaceLoadStatus::Loaded) {
       mLoaded->MaybeResolve(this);
