@@ -29,10 +29,8 @@ dictionary FontFaceDescriptors {
 
 enum FontFaceLoadStatus { "unloaded", "loading", "loaded", "error" };
 
-// Bug 1072107 is for exposing this in workers.
-// [Exposed=(Window,Worker)]
 [Pref="layout.css.font-loading-api.enabled",
- Exposed=Window]
+ Exposed=(Worker,Window)]
 interface FontFace {
   [Throws]
   constructor(UTF8String family,
