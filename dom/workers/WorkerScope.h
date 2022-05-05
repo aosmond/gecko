@@ -119,6 +119,8 @@ class WorkerGlobalScopeBase : public DOMEventTargetHelper,
 
   uint32_t GetPrincipalHashValue() const final;
 
+  FontFaceSet* Fonts() const final;
+
   OriginTrials Trials() const final;
 
   StorageAccess GetStorageAccess() final;

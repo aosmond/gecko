@@ -277,6 +277,11 @@ uint32_t WorkerGlobalScopeBase::GetPrincipalHashValue() const {
   return mWorkerPrivate->GetPrincipalHashValue();
 }
 
+FontFaceSet* WorkerGlobalScopeBase::Fonts() const {
+  AssertIsOnWorkerThread();
+  return nullptr;
+}
+
 OriginTrials WorkerGlobalScopeBase::Trials() const {
   AssertIsOnWorkerThread();
   return mWorkerPrivate->Trials();

@@ -165,19 +165,13 @@ already_AddRefed<FontFace> FontFace::Constructor(
     return nullptr;
   }
 
-  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(global);
-  if (!window) {
+  FontFaceSet* fonts = global->Fonts();
+  if (!fonts) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
   }
 
-  Document* doc = window->GetDoc();
-  if (!doc) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
-  }
-
-  RefPtr<FontFace> obj = new FontFace(global, doc->Fonts());
+  RefPtr<FontFace> obj = new FontFace(global, fonts);
   if (!obj->SetDescriptors(aFamily, aDescriptors)) {
     return obj.forget();
   }

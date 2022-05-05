@@ -1679,6 +1679,13 @@ uint32_t nsGlobalWindowOuter::GetPrincipalHashValue() const {
   return 0;
 }
 
+mozilla::dom::FontFaceSet* nsGlobalWindowOuter::Fonts() const {
+  if (mDoc) {
+    return mDoc->Fonts();
+  }
+  return nullptr;
+}
+
 OriginTrials nsGlobalWindowOuter::Trials() const {
   return mInnerWindow ? nsGlobalWindowInner::Cast(mInnerWindow)->Trials()
                       : OriginTrials();

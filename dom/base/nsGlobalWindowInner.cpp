@@ -1650,6 +1650,13 @@ uint32_t nsGlobalWindowInner::GetPrincipalHashValue() const {
   return 0;
 }
 
+mozilla::dom::FontFaceSet* nsGlobalWindowInner::Fonts() const {
+  if (mDoc) {
+    return mDoc->Fonts();
+  }
+  return nullptr;
+}
+
 nsresult nsGlobalWindowInner::EnsureScriptEnvironment() {
   // NOTE: We can't use FORWARD_TO_OUTER here because we don't want to fail if
   // we're called on an inactive inner window.
