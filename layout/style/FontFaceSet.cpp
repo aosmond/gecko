@@ -107,8 +107,8 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(FontFaceSet)
   NS_INTERFACE_MAP_ENTRY(nsICSSLoaderObserver)
 NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 
-FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow, dom::Document* aDocument)
-    : DOMEventTargetHelper(aWindow),
+FontFaceSet::FontFaceSet(nsIGlobalObject* aGlobal, dom::Document* aDocument)
+    : DOMEventTargetHelper(aGlobal),
       mDocument(aDocument),
       mStandardFontLoadPrincipal(new gfxFontSrcPrincipal(
           mDocument->NodePrincipal(), mDocument->PartitionedPrincipal())),
