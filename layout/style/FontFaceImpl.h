@@ -151,32 +151,19 @@ class FontFaceImpl {
    */
   gfxCharacterMap* GetUnicodeRangeAsCharacterMap();
 
-  void GetFamily(nsACString& aResult);
-  void SetFamily(const nsACString& aValue, ErrorResult& aRv);
-  void GetStyle(nsACString& aResult);
-  void SetStyle(const nsACString& aValue, ErrorResult& aRv);
-  void GetWeight(nsACString& aResult);
-  void SetWeight(const nsACString& aValue, ErrorResult& aRv);
-  void GetStretch(nsACString& aResult);
-  void SetStretch(const nsACString& aValue, ErrorResult& aRv);
-  void GetUnicodeRange(nsACString& aResult);
-  void SetUnicodeRange(const nsACString& aValue, ErrorResult& aRv);
-  void GetVariant(nsACString& aResult);
-  void SetVariant(const nsACString& aValue, ErrorResult& aRv);
-  void GetFeatureSettings(nsACString& aResult);
-  void SetFeatureSettings(const nsACString& aValue, ErrorResult& aRv);
-  void GetVariationSettings(nsACString& aResult);
-  void SetVariationSettings(const nsACString& aValue, ErrorResult& aRv);
-  void GetDisplay(nsACString& aResult);
-  void SetDisplay(const nsACString& aValue, ErrorResult& aRv);
-  void GetAscentOverride(nsACString& aResult);
-  void SetAscentOverride(const nsACString& aValue, ErrorResult& aRv);
-  void GetDescentOverride(nsACString& aResult);
-  void SetDescentOverride(const nsACString& aValue, ErrorResult& aRv);
-  void GetLineGapOverride(nsACString& aResult);
-  void SetLineGapOverride(const nsACString& aValue, ErrorResult& aRv);
-  void GetSizeAdjust(nsACString& aResult);
-  void SetSizeAdjust(const nsACString& aValue, ErrorResult& aRv);
+  // Helper function for the descriptor setter methods.
+  // Returns true if the descriptor was modified, false if descriptor is
+  // unchanged (which may not be an error: check aRv for actual failure).
+  bool SetDescriptor(nsCSSFontDesc aFontDesc, const nsACString& aValue,
+                     ErrorResult& aRv);
+
+  void GetDesc(nsCSSFontDesc aDescID, nsACString& aResult) const;
+
+  /**
+   * Called when a descriptor has been modified, so font-face sets can
+   * be told to refresh.
+   */
+  void DescriptorUpdated();
 
   FontFaceLoadStatus Status();
   Promise* Load(ErrorResult& aRv);
@@ -194,12 +181,6 @@ class FontFaceImpl {
   // Helper function for Load.
   void DoLoad();
 
-  // Helper function for the descriptor setter methods.
-  // Returns true if the descriptor was modified, false if descriptor is
-  // unchanged (which may not be an error: check aRv for actual failure).
-  bool SetDescriptor(nsCSSFontDesc aFontDesc, const nsACString& aValue,
-                     ErrorResult& aRv);
-
   /**
    * Sets all of the descriptor values in mDescriptors using values passed
    * to the JS constructor.
@@ -209,17 +190,9 @@ class FontFaceImpl {
                       const FontFaceDescriptors& aDescriptors);
 
   /**
-   * Called when a descriptor has been modified, so font-face sets can
-   * be told to refresh.
-   */
-  void DescriptorUpdated();
-
-  /**
    * Sets the current loading status.
    */
   void SetStatus(FontFaceLoadStatus aStatus);
-
-  void GetDesc(nsCSSFontDesc aDescID, nsACString& aResult) const;
 
   already_AddRefed<URLExtraData> GetURLExtraData() const;
 
@@ -235,10 +208,6 @@ class FontFaceImpl {
   // Acts like mLoaded->MaybeReject(aResult), except it doesn't create mLoaded
   // if it doesn't already exist.
   void Reject(nsresult aResult);
-
-  // Creates mLoaded if it doesn't already exist. It may immediately resolve or
-  // reject mLoaded based on mStatus and mLoadedRejection.
-  void EnsurePromise();
 
   void DoResolve();
   void DoReject(nsresult aResult);

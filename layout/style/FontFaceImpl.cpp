@@ -124,148 +124,6 @@ void FontFaceImpl::InitializeSource(UniquePtr<uint8_t[]>&& aSourceBuffer) {
   DoLoad();
 }
 
-void FontFaceImpl::GetFamily(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_Family, aResult);
-}
-
-void FontFaceImpl::SetFamily(const nsACString& aValue, ErrorResult& aRv) {
-  mFontFaceSet->FlushUserFontSet();
-  if (SetDescriptor(eCSSFontDesc_Family, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetStyle(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_Style, aResult);
-}
-
-void FontFaceImpl::SetStyle(const nsACString& aValue, ErrorResult& aRv) {
-  if (SetDescriptor(eCSSFontDesc_Style, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetWeight(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_Weight, aResult);
-}
-
-void FontFaceImpl::SetWeight(const nsACString& aValue, ErrorResult& aRv) {
-  mFontFaceSet->FlushUserFontSet();
-  if (SetDescriptor(eCSSFontDesc_Weight, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetStretch(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_Stretch, aResult);
-}
-
-void FontFaceImpl::SetStretch(const nsACString& aValue, ErrorResult& aRv) {
-  mFontFaceSet->FlushUserFontSet();
-  if (SetDescriptor(eCSSFontDesc_Stretch, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetUnicodeRange(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_UnicodeRange, aResult);
-}
-
-void FontFaceImpl::SetUnicodeRange(const nsACString& aValue, ErrorResult& aRv) {
-  mFontFaceSet->FlushUserFontSet();
-  if (SetDescriptor(eCSSFontDesc_UnicodeRange, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetVariant(nsACString& aResult) {
-  // XXX Just expose the font-variant descriptor as "normal" until we
-  // support it properly (bug 1055385).
-  aResult.AssignLiteral("normal");
-}
-
-void FontFaceImpl::SetVariant(const nsACString& aValue, ErrorResult& aRv) {
-  // XXX Ignore assignments to variant until we support font-variant
-  // descriptors (bug 1055385).
-}
-
-void FontFaceImpl::GetFeatureSettings(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_FontFeatureSettings, aResult);
-}
-
-void FontFaceImpl::SetFeatureSettings(const nsACString& aValue,
-                                      ErrorResult& aRv) {
-  mFontFaceSet->FlushUserFontSet();
-  if (SetDescriptor(eCSSFontDesc_FontFeatureSettings, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetVariationSettings(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_FontVariationSettings, aResult);
-}
-
-void FontFaceImpl::SetVariationSettings(const nsACString& aValue,
-                                        ErrorResult& aRv) {
-  mFontFaceSet->FlushUserFontSet();
-  if (SetDescriptor(eCSSFontDesc_FontVariationSettings, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetDisplay(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_Display, aResult);
-}
-
-void FontFaceImpl::SetDisplay(const nsACString& aValue, ErrorResult& aRv) {
-  if (SetDescriptor(eCSSFontDesc_Display, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetAscentOverride(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_AscentOverride, aResult);
-}
-
-void FontFaceImpl::SetAscentOverride(const nsACString& aValue,
-                                     ErrorResult& aRv) {
-  if (SetDescriptor(eCSSFontDesc_AscentOverride, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetDescentOverride(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_DescentOverride, aResult);
-}
-
-void FontFaceImpl::SetDescentOverride(const nsACString& aValue,
-                                      ErrorResult& aRv) {
-  if (SetDescriptor(eCSSFontDesc_DescentOverride, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetLineGapOverride(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_LineGapOverride, aResult);
-}
-
-void FontFaceImpl::SetLineGapOverride(const nsACString& aValue,
-                                      ErrorResult& aRv) {
-  if (SetDescriptor(eCSSFontDesc_LineGapOverride, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
-void FontFaceImpl::GetSizeAdjust(nsACString& aResult) {
-  GetDesc(eCSSFontDesc_SizeAdjust, aResult);
-}
-
-void FontFaceImpl::SetSizeAdjust(const nsACString& aValue, ErrorResult& aRv) {
-  if (SetDescriptor(eCSSFontDesc_SizeAdjust, aValue, aRv)) {
-    DescriptorUpdated();
-  }
-}
-
 void FontFaceImpl::DescriptorUpdated() {
   // If we haven't yet initialized mUserFontEntry, no need to do anything here;
   // we'll respect the updated descriptor when the time comes to create it.
@@ -289,17 +147,10 @@ void FontFaceImpl::DescriptorUpdated() {
 
 FontFaceLoadStatus FontFaceImpl::Status() { return mStatus; }
 
-Promise* FontFaceImpl::Load(ErrorResult& aRv) {
+void FontFaceImpl::Load(ErrorResult& aRv) {
   MOZ_ASSERT(NS_IsMainThread());
 
   mFontFaceSet->FlushUserFontSet();
-
-  EnsurePromise();
-
-  if (!mLoaded) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
-  }
 
   // Calling Load on a FontFace constructed with an ArrayBuffer data source,
   // or on one that is already loading (or has finished loading), has no
@@ -342,19 +193,6 @@ void FontFaceImpl::DoLoad() {
   mUserFontEntry->Load();
 }
 
-Promise* FontFaceImpl::GetLoaded(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-
-  EnsurePromise();
-
-  if (!mLoaded) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return nullptr;
-  }
-
-  return mLoaded;
-}
-
 void FontFaceImpl::SetStatus(FontFaceLoadStatus aStatus) {
   AssertIsMainThreadOrServoFontMetricsLocked();
 
@@ -395,6 +233,8 @@ void FontFaceImpl::SetStatus(FontFaceLoadStatus aStatus) {
 }
 
 void FontFaceImpl::DoResolve() {
+  // FIXME
+#if 0
   AssertIsMainThreadOrServoFontMetricsLocked();
 
   if (ServoStyleSet* ss = ServoStyleSet::Current()) {
@@ -404,9 +244,12 @@ void FontFaceImpl::DoResolve() {
   }
 
   mLoaded->MaybeResolve(this);
+#endif
 }
 
 void FontFaceImpl::DoReject(nsresult aResult) {
+  // FIXME
+#if 0
   AssertIsMainThreadOrServoFontMetricsLocked();
 
   if (ServoStyleSet* ss = ServoStyleSet::Current()) {
@@ -417,6 +260,7 @@ void FontFaceImpl::DoReject(nsresult aResult) {
   }
 
   mLoaded->MaybeReject(aResult);
+#endif
 }
 
 already_AddRefed<URLExtraData> FontFaceImpl::GetURLExtraData() const {
@@ -730,30 +574,6 @@ void FontFaceImpl::Reject(nsresult aResult) {
     DoReject(aResult);
   } else if (mLoadedRejection == NS_OK) {
     mLoadedRejection = aResult;
-  }
-}
-
-void FontFaceImpl::EnsurePromise() {
-  MOZ_ASSERT(NS_IsMainThread());
-
-  if (mLoaded) {
-    return;
-  }
-
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
-
-  // If the pref is not set, don't create the Promise (which the page wouldn't
-  // be able to get to anyway) as it causes the window.FontFace constructor
-  // to be created.
-  if (global && FontFaceSet::PrefEnabled()) {
-    ErrorResult rv;
-    mLoaded = Promise::Create(global, rv);
-
-    if (mStatus == FontFaceLoadStatus::Loaded) {
-      mLoaded->MaybeResolve(this);
-    } else if (mLoadedRejection != NS_OK) {
-      mLoaded->MaybeReject(mLoadedRejection);
-    }
   }
 }
 
