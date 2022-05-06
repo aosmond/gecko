@@ -128,7 +128,7 @@ JSObject* FontFace::WrapObject(JSContext* aCx,
   return FontFace_Binding::Wrap(aCx, this, aGivenProto);
 }
 
-static FontFaceLoadStatus LoadStateToStatus(
+static FontFaceLoadStatus LoadStateToStatusDeleteMe(
     gfxUserFontEntry::UserFontLoadState aLoadState) {
   switch (aLoadState) {
     case gfxUserFontEntry::UserFontLoadState::STATUS_NOT_LOADED:
@@ -645,7 +645,7 @@ void FontFace::SetUserFontEntry(gfxUserFontEntry* aEntry) {
     // DoLoad call) comes after the author's call to load(), which set mStatus
     // to Loading.
     FontFaceLoadStatus newStatus =
-        LoadStateToStatus(mUserFontEntry->LoadState());
+        LoadStateToStatusDeleteMe(mUserFontEntry->LoadState());
     if (newStatus > mStatus) {
       SetStatus(newStatus);
     }
@@ -877,7 +877,7 @@ void FontFace::Entry::SetLoadState(UserFontLoadState aLoadState) {
   gfxUserFontEntry::SetLoadState(aLoadState);
 
   for (size_t i = 0; i < mFontFaces.Length(); i++) {
-    mFontFaces[i]->SetStatus(LoadStateToStatus(aLoadState));
+    mFontFaces[i]->SetStatus(LoadStateToStatusDeleteMe(aLoadState));
   }
 }
 
