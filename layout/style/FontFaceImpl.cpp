@@ -54,8 +54,8 @@ void FontFaceImplBufferSource::TakeBuffer(uint8_t*& aBuffer,
 
 // -- FontFaceImpl -----------------------------------------------------------
 
-FontFaceImpl::FontFaceImpl(nsISupports* aParent, FontFaceSet* aFontFaceSet)
-    : mParent(aParent),
+FontFaceImpl::FontFaceImpl(FontFace* aOwner, FontFaceSet* aFontFaceSet)
+    : mOwner(aOwner),
       mLoadedRejection(NS_OK),
       mStatus(FontFaceLoadStatus::Unloaded),
       mSourceType(SourceType(0)),
@@ -74,6 +74,7 @@ FontFaceImpl::~FontFaceImpl() {
 
 void FontFaceImpl::Destroy() {
   // TODO(aosmond): Implement
+  mOwner = nullptr;
 }
 
 static FontFaceLoadStatus LoadStateToStatus(
@@ -264,10 +265,16 @@ void FontFaceImpl::DoReject(nsresult aResult) {
 }
 
 already_AddRefed<URLExtraData> FontFaceImpl::GetURLExtraData() const {
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (!mOwner) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsIGlobalObject> global = mOwner->GetParentObject();
   nsCOMPtr<nsIPrincipal> principal = global->PrincipalOrNull();
 
-  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(mParent);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(global);
   nsCOMPtr<nsIURI> docURI = window->GetDocumentURI();
   nsCOMPtr<nsIURI> base = window->GetDocBaseURI();
 

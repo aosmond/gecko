@@ -166,13 +166,12 @@ class FontFaceImpl {
   void DescriptorUpdated();
 
   FontFaceLoadStatus Status();
-  Promise* Load(ErrorResult& aRv);
-  Promise* GetLoaded(ErrorResult& aRv);
+  void Load(ErrorResult& aRv);
 
   void Destroy();
 
  private:
-  FontFaceImpl(nsISupports* aParent, FontFaceSet* aFontFaceSet);
+  FontFaceImpl(FontFace* aOwner, FontFaceSet* aFontFaceSet);
   virtual ~FontFaceImpl();
 
   void InitializeSource(const nsCString& aSourceBuffer);
@@ -193,6 +192,8 @@ class FontFaceImpl {
    * Sets the current loading status.
    */
   void SetStatus(FontFaceLoadStatus aStatus);
+
+  FontFaceLoadStatus GetStatus() const { return mStatus; }
 
   already_AddRefed<URLExtraData> GetURLExtraData() const;
 
