@@ -254,11 +254,11 @@ gfxUserFontFamily::~gfxUserFontFamily() {
   MOZ_ASSERT(NS_IsMainThread());
 }
 
-gfxFontSrcPrincipal* gfxFontFaceSrc::LoadPrincipal(
+already_AddRefed<gfxFontSrcPrincipal> gfxFontFaceSrc::LoadPrincipal(
     const gfxUserFontSet& aFontSet) const {
   MOZ_ASSERT(mSourceType == eSourceType_URL);
   if (mUseOriginPrincipal && mOriginPrincipal) {
-    return mOriginPrincipal;
+    return RefPtr{mOriginPrincipal}.forget();
   }
   return aFontSet.GetStandardFontLoadPrincipal();
 }
@@ -1252,7 +1252,7 @@ gfxFontEntry* gfxUserFontSet::UserFontCache::GetFont(
   }
 
   // Ignore principal when looking up a data: URI.
-  gfxFontSrcPrincipal* principal =
+  RefPtr<gfxFontSrcPrincipal> principal =
       IgnorePrincipal(aSrc.mURI) ? nullptr
                                  : aSrc.LoadPrincipal(*aUserFontEntry.mFontSet);
 

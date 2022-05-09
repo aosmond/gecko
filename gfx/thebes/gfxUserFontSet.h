@@ -92,7 +92,8 @@ struct gfxFontFaceSrc {
 
   // The principal that should be used for the load. Should only be used for
   // URL sources.
-  gfxFontSrcPrincipal* LoadPrincipal(const gfxUserFontSet&) const;
+  already_AddRefed<gfxFontSrcPrincipal> LoadPrincipal(
+      const gfxUserFontSet&) const;
 };
 
 inline bool operator==(const gfxFontFaceSrc& a, const gfxFontFaceSrc& b) {
@@ -226,7 +227,7 @@ class gfxUserFontSet {
   typedef mozilla::WeightRange WeightRange;
   typedef gfxFontEntry::RangeFlags RangeFlags;
 
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(gfxUserFontSet)
+  NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
   gfxUserFontSet();
 
@@ -301,7 +302,8 @@ class gfxUserFontSet {
   // the given name
   gfxUserFontFamily* LookupFamily(const nsACString& aName) const;
 
-  virtual gfxFontSrcPrincipal* GetStandardFontLoadPrincipal() const = 0;
+  virtual already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+      const = 0;
   virtual nsPresContext* GetPresContext() const = 0;
 
   // check whether content policies allow the given URI to load.

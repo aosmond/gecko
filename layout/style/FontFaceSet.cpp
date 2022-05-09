@@ -1340,9 +1340,9 @@ bool FontFaceSet::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
     return true;
   }
 
-  gfxFontSrcPrincipal* gfxPrincipal = aSrc.mURI->InheritsSecurityContext()
-                                          ? nullptr
-                                          : aSrc.LoadPrincipal(*mUserFontSet);
+  RefPtr<gfxFontSrcPrincipal> gfxPrincipal =
+      aSrc.mURI->InheritsSecurityContext() ? nullptr
+                                           : aSrc.LoadPrincipal(*mUserFontSet);
 
   nsIPrincipal* principal =
       gfxPrincipal ? gfxPrincipal->NodePrincipal() : nullptr;
