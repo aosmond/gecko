@@ -5,6 +5,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/FontFaceSetMainImpl.h"
+#include "mozilla/dom/Document.h"
+#include "mozilla/PresShell.h"
+#include "mozilla/PresShellInlines.h"
+#include "nsContentUtils.h"
+#include "nsILoadContext.h"
 
 namespace mozilla {
 namespace dom {
@@ -12,12 +17,62 @@ namespace dom {
 NS_IMPL_ISUPPORTS_INHERITED(FontFaceSetMainImpl, FontFaceSetImpl,
                             nsIDOMEventListener, nsICSSLoaderObserver)
 
-FontFaceSetMainImpl::FontFaceSetMainImpl(FontFaceSet* aOwner)
-    : FontFaceSetImpl(aOwner) {}
+FontFaceSetMainImpl::FontFaceSetMainImpl(FontFaceSet* aOwner,
+                                         Document* aDocument)
+    : FontFaceSetImpl(aOwner), mDocument(aDocument) {
+  // Record the state of the "bypass cache" flags from the docshell now,
+  // since we want to look at them from style worker threads, and we can
+  // only get to the docshell through a weak pointer (which is only
+  // possible on the main thread).
+  //
+  // In theory the load type of a docshell could change after the document
+  // is loaded, but handling that doesn't seem too important.
+  mBypassCache = nsContentUtils::ShouldBypassCache(mDocument);
+
+  // Same for the "private browsing" flag.
+  if (nsCOMPtr<nsILoadContext> loadContext = mDocument->GetLoadContext()) {
+    mPrivateBrowsing = loadContext->UsePrivateBrowsing();
+  }
+}
 
 FontFaceSetMainImpl::~FontFaceSetMainImpl() = default;
 
-void FontFaceSetMainImpl::Destroy() { FontFaceSetImpl::Destroy(); }
+void FontFaceSetMainImpl::Destroy() {
+  FontFaceSetImpl::Destroy();
+  mDocument = nullptr;
+  mFontPrincipal = nullptr;
+}
+
+void FontFaceSetMainImpl::CreateFontPrincipal() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mFontPrincipal || !mDocument) {
+    return;
+  }
+
+  mFontPrincipal = new gfxFontSrcPrincipal(mDocument->NodePrincipal(),
+                                           mDocument->PartitionedPrincipal());
+}
+
+// gfxUserFontSet
+
+nsPresContext* FontFaceSetMainImpl::GetPresContext() const {
+  if (mDocument) {
+    return mDocument->GetPresContext();
+  }
+  return nullptr;
+}
+
+void FontFaceSetMainImpl::DoRebuildUserFontSet() {
+  if (mDocument) {
+    // Ensure we trigger at least a style flush, that will eventually flush the
+    // user font set. Otherwise the font loads that that flush may cause could
+    // never be triggered.
+    if (PresShell* presShell = mDocument->GetPresShell()) {
+      presShell->EnsureStyleFlush();
+    }
+    mDocument->MarkUserFontSetDirty();
+  }
+}
 
 // nsIDOMEventListener
 

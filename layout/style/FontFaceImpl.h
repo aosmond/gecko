@@ -14,6 +14,7 @@ namespace mozilla {
 namespace dom {
 
 class FontFace;
+class FontFaceSetImpl;
 
 class FontFaceImpl {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(FontFaceImpl)
@@ -21,12 +22,16 @@ class FontFaceImpl {
  public:
   explicit FontFaceImpl(FontFace* aOwner);
 
-  void Destroy();
+  virtual void Destroy();
+
+  virtual RefPtr<FontFaceSetImpl> GetPrimaryFontFaceSet() const {
+    return nullptr;
+  }
 
   FontFace* GetOwner() const { return mOwner; }
 
- private:
-  ~FontFaceImpl();
+ protected:
+  virtual ~FontFaceImpl();
 
   FontFace* MOZ_NON_OWNING_REF mOwner;
 };

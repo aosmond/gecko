@@ -14,6 +14,8 @@
 namespace mozilla {
 namespace dom {
 
+class Document;
+
 /**
  * Subclass of FontFaceSetImpl designed to be used from the main thread in
  * conjunction with an owning Document.
@@ -25,16 +27,36 @@ class FontFaceSetMainImpl final : public FontFaceSetImpl,
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIDOMEVENTLISTENER
 
-  explicit FontFaceSetMainImpl(FontFaceSet* aOwner);
+  explicit FontFaceSetMainImpl(FontFaceSet* aOwner, Document* aDocument);
 
   void Destroy() override;
+
+  bool IsOnOwningThread() const override { return NS_IsMainThread(); }
+
+  // gfxUserFontSet
+
+  already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+      const override {
+    MOZ_ASSERT(NS_IsMainThread());
+    return RefPtr{mFontPrincipal}.forget();
+  }
+
+  nsPresContext* GetPresContext() const override;
 
   // nsICSSLoaderObserver
   NS_IMETHOD StyleSheetLoaded(StyleSheet* aSheet, bool aWasDeferred,
                               nsresult aStatus) override;
 
- private:
+ protected:
+  // gfxUserFontSet
+  void DoRebuildUserFontSet() override;
+
   ~FontFaceSetMainImpl() override;
+
+  void CreateFontPrincipal();
+
+  RefPtr<Document> mDocument;
+  RefPtr<gfxFontSrcPrincipal> mFontPrincipal;
 };
 
 }  // namespace dom
