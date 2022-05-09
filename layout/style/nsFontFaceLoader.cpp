@@ -184,17 +184,15 @@ void nsFontFaceLoader::LoadTimerCallback(nsITimer* aTimer, void* aClosure) {
   // before, we mark this entry as "loading slowly", so the fallback
   // font will be used in the meantime, and tell the context to refresh.
   if (updateUserFontSet) {
-    nsTArray<gfxUserFontSet*> fontSets;
-    ufe->GetUserFontSets(fontSets);
-    for (gfxUserFontSet* fontSet : fontSets) {
-      nsPresContext* ctx = FontFaceSet::GetPresContextFor(fontSet);
+    ufe->IterateUserFontSets([&](gfxUserFontSet* aFontSet) {
+      nsPresContext* ctx = FontFaceSet::GetPresContextFor(aFontSet);
       if (ctx) {
-        fontSet->IncrementGeneration();
+        aFontSet->IncrementGeneration();
         ctx->UserFontSetUpdated(ufe);
         LOG(("userfonts (%p) timeout reflow for pres context %p display %d\n",
              loader, ctx, static_cast<int>(fontDisplay)));
       }
-    }
+    });
   }
 }
 
@@ -296,17 +294,15 @@ nsresult nsFontFaceLoader::FontLoadComplete() {
   }
 
   // when new font loaded, need to reflow
-  nsTArray<gfxUserFontSet*> fontSets;
-  mUserFontEntry->GetUserFontSets(fontSets);
-  for (gfxUserFontSet* fontSet : fontSets) {
-    nsPresContext* ctx = FontFaceSet::GetPresContextFor(fontSet);
+  mUserFontEntry->IterateUserFontSets([&](gfxUserFontSet* aFontSet) {
+    nsPresContext* ctx = FontFaceSet::GetPresContextFor(aFontSet);
     if (ctx) {
       // Update layout for the presence of the new font.  Since this is
       // asynchronous, reflows will coalesce.
       ctx->UserFontSetUpdated(mUserFontEntry);
       LOG(("userfonts (%p) reflow for pres context %p\n", this, ctx));
     }
-  }
+  });
 
   MOZ_DIAGNOSTIC_ASSERT(mFontFaceSet);
   mFontFaceSet->RemoveLoader(this);

@@ -428,13 +428,11 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aForceAsync) {
         // Note that we've attempted a local lookup, even if it failed,
         // as this means we are dependent on any updates to the font list.
         mSeenLocalSource = true;
-        nsTArray<gfxUserFontSet*> fontSets;
-        GetUserFontSets(fontSets);
-        for (gfxUserFontSet* fontSet : fontSets) {
+        IterateUserFontSets([](gfxUserFontSet* aFontSet) {
           // We need to note on each gfxUserFontSet that contains the user
           // font entry that we used a local() rule.
-          fontSet->SetLocalRulesUsed();
-        }
+          aFontSet->SetLocalRulesUsed();
+        });
       }
       if (fe) {
         LOG(("userfonts (%p) [src %d] loaded local: (%s) for (%s) gen: %8.8x\n",
@@ -791,11 +789,8 @@ void gfxUserFontEntry::Load() {
 }
 
 void gfxUserFontEntry::IncrementGeneration() {
-  nsTArray<gfxUserFontSet*> fontSets;
-  GetUserFontSets(fontSets);
-  for (gfxUserFontSet* fontSet : fontSets) {
-    fontSet->IncrementGeneration();
-  }
+  IterateUserFontSets(
+      [](gfxUserFontSet* aFontSet) { aFontSet->IncrementGeneration(); });
 }
 
 // This is called when a font download finishes.
@@ -914,9 +909,9 @@ void gfxUserFontEntry::FontLoadFailed(nsIFontLoadCompleteCallback* aCallback) {
   aCallback->FontLoadComplete();
 }
 
-void gfxUserFontEntry::GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult) {
-  aResult.Clear();
-  aResult.AppendElement(mFontSet);
+void gfxUserFontEntry::IterateUserFontSets(
+    const std::function<void(gfxUserFontSet*)>& aCallback) {
+  aCallback(mFontSet);
 }
 
 gfxUserFontSet::gfxUserFontSet()
