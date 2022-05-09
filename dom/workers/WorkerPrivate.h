@@ -881,6 +881,10 @@ class WorkerPrivate final
     return mLoadInfo.mIsThirdPartyContextToTopWindow;
   }
 
+  bool ShouldBypassCache() const { return mLoadInfo.mShouldBypassCache; }
+
+  bool UsePrivateBrowsing() const { return mLoadInfo.mUsePrivateBrowsing; }
+
   bool IsWatchedByDevTools() const { return mLoadInfo.mWatchedByDevTools; }
 
   // Determine if the worker is currently loading its top level script.

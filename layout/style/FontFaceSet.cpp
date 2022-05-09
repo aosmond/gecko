@@ -129,16 +129,7 @@ FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow, dom::Document* aDocument)
   //
   // In theory the load type of a docshell could change after the document
   // is loaded, but handling that doesn't seem too important.
-  if (nsCOMPtr<nsIDocShell> docShell = mDocument->GetDocShell()) {
-    uint32_t loadType;
-    uint32_t flags;
-    if ((NS_SUCCEEDED(docShell->GetLoadType(&loadType)) &&
-         ((loadType >> 16) & nsIWebNavigation::LOAD_FLAGS_BYPASS_CACHE)) ||
-        (NS_SUCCEEDED(docShell->GetDefaultLoadFlags(&flags)) &&
-         (flags & nsIRequest::LOAD_BYPASS_CACHE))) {
-      mBypassCache = true;
-    }
-  }
+  mBypassCache = nsContentUtils::ShouldBypassCache(mDocument);
 
   // Same for the "private browsing" flag.
   if (nsCOMPtr<nsILoadContext> loadContext = mDocument->GetLoadContext()) {
