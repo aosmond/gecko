@@ -28,6 +28,7 @@
 
 // Only needed for function bodies.
 #include <utility>                // for move, forward
+#include <functional>             // for function
 #include "MainThreadUtils.h"      // for NS_IsMainThread
 #include "gfxFontFeatures.h"      // for gfxFontFeature
 #include "gfxFontSrcPrincipal.h"  // for gfxFontSrcPrincipal
@@ -769,10 +770,11 @@ class gfxUserFontEntry : public gfxFontEntry {
                          FallibleTArray<uint8_t>* aMetadata,
                          uint32_t aMetaOrigLen, uint8_t aCompression);
 
-  // Clears and then adds to aResult all of the user font sets that this user
-  // font entry has been added to.  This will at least include mFontSet, the
-  // owner of this user font entry.
-  virtual void GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult);
+  // Calls the given callback for each user font set that this user font entry
+  // has been added to. This will at least include mFontSet, the owner of this
+  // user font entry.
+  virtual void IterateUserFontSets(
+      const std::function<void(gfxUserFontSet*)>& aCallback);
 
   // Calls IncrementGeneration() on all user font sets that contain this
   // user font entry.

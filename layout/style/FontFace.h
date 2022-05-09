@@ -61,7 +61,8 @@ class FontFace final : public nsISupports, public nsWrapperCache {
                            aLineGapOverride, aSizeAdjust) {}
 
     virtual void SetLoadState(UserFontLoadState aLoadState) override;
-    virtual void GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult) override;
+    void IterateUserFontSets(
+        const std::function<void(gfxUserFontSet*)>& aCallback) override;
     const AutoTArray<FontFace*, 1>& GetFontFaces() { return mFontFaces; }
 
    protected:
