@@ -39,12 +39,16 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   nsPresContext* GetPresContext() const override { return nullptr; }
 
  protected:
+  bool GetPrivateBrowsing() final { return mPrivateBrowsing; }
+  bool BypassCache() final { return mBypassCache; }
+
   explicit FontFaceSetImpl(FontFaceSet* aOwner);
   virtual ~FontFaceSetImpl();
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
-
   RefPtr<gfxFontSrcPrincipal> mFontPrincipal;
+  bool mPrivateBrowsing = false;
+  bool mBypassCache = false;
 };
 
 }  // namespace dom

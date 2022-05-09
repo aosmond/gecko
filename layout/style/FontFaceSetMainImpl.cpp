@@ -5,6 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/FontFaceSetMainImpl.h"
+#include "mozilla/dom/Document.h"
+#include "nsContentUtils.h"
+#include "nsILoadContext.h"
 
 namespace mozilla {
 namespace dom {
@@ -14,7 +17,21 @@ NS_IMPL_ISUPPORTS_INHERITED(FontFaceSetMainImpl, FontFaceSetImpl,
 
 FontFaceSetMainImpl::FontFaceSetMainImpl(FontFaceSet* aOwner,
                                          Document* aDocument)
-    : FontFaceSetImpl(aOwner), mDocument(aDocument) {}
+    : FontFaceSetImpl(aOwner), mDocument(aDocument) {
+  // Record the state of the "bypass cache" flags from the docshell now,
+  // since we want to look at them from style worker threads, and we can
+  // only get to the docshell through a weak pointer (which is only
+  // possible on the main thread).
+  //
+  // In theory the load type of a docshell could change after the document
+  // is loaded, but handling that doesn't seem too important.
+  mBypassCache = nsContentUtils::ShouldBypassCache(mDocument);
+
+  // Same for the "private browsing" flag.
+  if (nsCOMPtr<nsILoadContext> loadContext = mDocument->GetLoadContext()) {
+    mPrivateBrowsing = loadContext->UsePrivateBrowsing();
+  }
+}
 
 FontFaceSetMainImpl::~FontFaceSetMainImpl() = default;
 
