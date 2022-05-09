@@ -33,6 +33,15 @@ void FontFaceSetMainImpl::CreateFontPrincipal() {
                                            mDocument->PartitionedPrincipal());
 }
 
+// gfxUserFontSet
+
+nsPresContext* FontFaceSetMainImpl::GetPresContext() const {
+  if (mDocument) {
+    return mDocument->GetPresContext();
+  }
+  return nullptr;
+}
+
 // nsIDOMEventListener
 
 NS_IMETHODIMP FontFaceSetMainImpl::HandleEvent(Event* aEvent) { return NS_OK; }

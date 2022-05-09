@@ -31,6 +31,10 @@ class FontFaceSetMainImpl final : public FontFaceSetImpl,
 
   void Destroy() override;
 
+  // gfxUserFontSet
+
+  nsPresContext* GetPresContext() const override;
+
   // nsICSSLoaderObserver
   NS_IMETHOD StyleSheetLoaded(StyleSheet* aSheet, bool aWasDeferred,
                               nsresult aStatus) override;

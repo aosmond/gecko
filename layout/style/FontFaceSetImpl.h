@@ -8,6 +8,7 @@
 #define mozilla_dom_FontFaceSetImpl_h
 
 #include "gfxUserFontSet.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "nsISupportsImpl.h"
 
@@ -28,9 +29,14 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   FontFaceSet* GetOwner() const { return mOwner; }
 
+  // gfxUserFontSet
+
   gfxFontSrcPrincipal* GetStandardFontLoadPrincipal() const final {
+    MOZ_ASSERT(NS_IsMainThread());
     return mFontPrincipal;
   }
+
+  nsPresContext* GetPresContext() const override { return nullptr; }
 
  protected:
   explicit FontFaceSetImpl(FontFaceSet* aOwner);
