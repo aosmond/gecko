@@ -22,6 +22,7 @@
 #include "mozilla/StaticPrefs_layout.h"
 #include "mozilla/dom/Document.h"
 #include "nsStyleUtil.h"
+#include "nsTHashSet.h"
 
 namespace mozilla {
 namespace dom {
@@ -880,22 +881,23 @@ void FontFace::Entry::SetLoadState(UserFontLoadState aLoadState) {
 }
 
 /* virtual */
-void FontFace::Entry::GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult) {
-  aResult.Clear();
-
+void FontFace::Entry::IterateUserFontSets(
+    const std::function<void(gfxUserFontSet*)>& aCallback) {
+  nsTHashSet<gfxUserFontSet*> used(mFontFaces.Length());
   for (FontFace* f : mFontFaces) {
     if (f->mInFontFaceSet) {
-      aResult.AppendElement(f->mFontFaceSet->GetUserFontSet());
+      gfxUserFontSet* fontSet = f->mFontFaceSet->GetUserFontSet();
+      if (used.EnsureInserted(fontSet)) {
+        aCallback(fontSet);
+      }
     }
     for (FontFaceSet* s : f->mOtherFontFaceSets) {
-      aResult.AppendElement(s->GetUserFontSet());
+      gfxUserFontSet* fontSet = s->GetUserFontSet();
+      if (used.EnsureInserted(fontSet)) {
+        aCallback(fontSet);
+      }
     }
   }
-
-  // Remove duplicates.
-  aResult.Sort();
-  auto it = std::unique(aResult.begin(), aResult.end());
-  aResult.TruncateLength(it - aResult.begin());
 }
 
 }  // namespace dom
