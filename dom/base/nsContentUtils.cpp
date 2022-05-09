@@ -2321,6 +2321,27 @@ bool nsContentUtils::ShouldResistFingerprinting(
   return !isExemptDomain;
 }
 
+/* static */ bool nsContentUtils::ShouldBypassCache(nsIDocShell* aDocShell) {
+  if (!aDocShell) {
+    return false;
+  }
+
+  uint32_t loadType;
+  uint32_t flags;
+  return ((NS_SUCCEEDED(aDocShell->GetLoadType(&loadType)) &&
+           ((loadType >> 16) & nsIWebNavigation::LOAD_FLAGS_BYPASS_CACHE)) ||
+          (NS_SUCCEEDED(aDocShell->GetDefaultLoadFlags(&flags)) &&
+           (flags & nsIRequest::LOAD_BYPASS_CACHE)));
+}
+
+/* static */ bool nsContentUtils::ShouldBypassCache(const Document* aDoc) {
+  if (!aDoc) {
+    return false;
+  }
+
+  return ShouldBypassCache(aDoc->GetDocShell());
+}
+
 /* static */
 void nsContentUtils::CalcRoundedWindowSizeForResistingFingerprinting(
     int32_t aChromeWidth, int32_t aChromeHeight, int32_t aScreenWidth,
