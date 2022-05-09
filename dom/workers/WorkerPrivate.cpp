@@ -69,6 +69,7 @@
 #include "nsIDUtils.h"
 #include "nsNetUtil.h"
 #include "nsIFile.h"
+#include "nsILoadContext.h"
 #include "nsIMemoryReporter.h"
 #include "nsIPermissionManager.h"
 #include "nsIProtocolHandler.h"
@@ -2667,6 +2668,8 @@ nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
         aParent->ShouldResistFingerprinting();
     loadInfo.mIsThirdPartyContextToTopWindow =
         aParent->IsThirdPartyContextToTopWindow();
+    loadInfo.mShouldBypassCache = aParent->ShouldBypassCache();
+    loadInfo.mUsePrivateBrowsing = aParent->UsePrivateBrowsing();
     loadInfo.mParentController = aParent->GlobalScope()->GetController();
     loadInfo.mWatchedByDevTools = aParent->IsWatchedByDevTools();
   } else {
@@ -2799,6 +2802,10 @@ nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
       loadInfo.mWatchedByDevTools =
           browsingContext && browsingContext->WatchedByDevTools();
 
+      if (nsCOMPtr<nsILoadContext> loadContext = document->GetLoadContext()) {
+        loadInfo.mUsePrivateBrowsing = loadContext->UsePrivateBrowsing();
+      }
+
       loadInfo.mReferrerInfo =
           ReferrerInfo::CreateForFetch(loadInfo.mLoadingPrincipal, document);
       loadInfo.mFromWindow = true;
@@ -2809,6 +2816,7 @@ nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
           document->HasStorageAccessPermissionGranted();
       loadInfo.mShouldResistFingerprinting =
           nsContentUtils::ShouldResistFingerprinting(document);
+      loadInfo.mShouldBypassCache = nsContentUtils::ShouldBypassCache(document);
 
       // This is an hack to deny the storage-access-permission for workers of
       // sub-iframes.
