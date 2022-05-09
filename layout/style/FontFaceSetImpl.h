@@ -7,6 +7,8 @@
 #ifndef mozilla_dom_FontFaceSetImpl_h
 #define mozilla_dom_FontFaceSetImpl_h
 
+#include "gfxUserFontSet.h"
+#include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "nsISupportsImpl.h"
 
@@ -19,19 +21,27 @@ class FontFaceSet;
  * Base class providing basic functionality for FontFaceSet which is subclassed
  * for the document on the main thread, and for workers.
  */
-class FontFaceSetImpl : public nsISupports {
+class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   NS_DECL_THREADSAFE_ISUPPORTS
 
  public:
   virtual void Destroy();
 
+  virtual bool IsOnOwningThread() const = 0;
+
   FontFaceSet* GetOwner() const { return mOwner; }
 
  protected:
+  // gfxUserFontSet
+  bool GetPrivateBrowsing() final { return mPrivateBrowsing; }
+  bool BypassCache() final { return mBypassCache; }
+
   explicit FontFaceSetImpl(FontFaceSet* aOwner);
   virtual ~FontFaceSetImpl();
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
+  bool mPrivateBrowsing = false;
+  bool mBypassCache = false;
 };
 
 }  // namespace dom
