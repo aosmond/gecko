@@ -1342,9 +1342,9 @@ bool FontFaceSet::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
     return true;
   }
 
-  gfxFontSrcPrincipal* gfxPrincipal = aSrc.mURI->InheritsSecurityContext()
-                                          ? nullptr
-                                          : aSrc.LoadPrincipal(*mUserFontSet);
+  RefPtr<gfxFontSrcPrincipal> gfxPrincipal =
+      aSrc.mURI->InheritsSecurityContext() ? nullptr
+                                           : aSrc.LoadPrincipal(*mUserFontSet);
 
   nsIPrincipal* principal =
       gfxPrincipal ? gfxPrincipal->NodePrincipal() : nullptr;
@@ -1362,21 +1362,6 @@ bool FontFaceSet::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
                                           nsContentUtils::GetContentPolicy());
 
   return NS_SUCCEEDED(rv) && NS_CP_ACCEPTED(shouldLoad);
-}
-
-void FontFaceSet::DispatchFontLoadViolations(
-    nsTArray<nsCOMPtr<nsIRunnable>>& aViolations) {
-  if (XRE_IsContentProcess()) {
-    nsCOMPtr<nsIEventTarget> eventTarget =
-        mDocument->EventTargetFor(TaskCategory::Other);
-    for (nsIRunnable* runnable : aViolations) {
-      eventTarget->Dispatch(do_AddRef(runnable), NS_DISPATCH_NORMAL);
-    }
-  } else {
-    for (nsIRunnable* runnable : aViolations) {
-      NS_DispatchToMainThread(do_AddRef(runnable));
-    }
-  }
 }
 
 nsresult FontFaceSet::SyncLoadFontData(gfxUserFontEntry* aFontToLoad,
@@ -1775,14 +1760,6 @@ void FontFaceSet::CopyNonRuleFacesTo(FontFaceSet* aFontFaceSet) const {
 /* virtual */
 bool FontFaceSet::UserFontSet::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
   return mFontFaceSet && mFontFaceSet->IsFontLoadAllowed(aSrc);
-}
-
-/* virtual */
-void FontFaceSet::UserFontSet::DispatchFontLoadViolations(
-    nsTArray<nsCOMPtr<nsIRunnable>>& aViolations) {
-  if (mFontFaceSet) {
-    mFontFaceSet->DispatchFontLoadViolations(aViolations);
-  }
 }
 
 /* virtual */

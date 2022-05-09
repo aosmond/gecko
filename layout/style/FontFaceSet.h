@@ -54,15 +54,19 @@ class FontFaceSet final : public DOMEventTargetHelper,
   class UserFontSet final : public gfxUserFontSet {
     friend class FontFaceSet;
 
+    NS_INLINE_DECL_THREADSAFE_REFCOUNTING(UserFontSet, final)
+
    public:
     explicit UserFontSet(FontFaceSet* aFontFaceSet)
         : mFontFaceSet(aFontFaceSet) {}
 
     FontFaceSet* GetFontFaceSet() { return mFontFaceSet; }
 
-    gfxFontSrcPrincipal* GetStandardFontLoadPrincipal() const final {
-      return mFontFaceSet ? mFontFaceSet->mStandardFontLoadPrincipal.get()
-                          : nullptr;
+    already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+        const final {
+      return mFontFaceSet
+                 ? RefPtr{mFontFaceSet->mStandardFontLoadPrincipal}.forget()
+                 : nullptr;
     }
 
     nsPresContext* GetPresContext() const final {
@@ -70,9 +74,6 @@ class FontFaceSet final : public DOMEventTargetHelper,
     }
 
     bool IsFontLoadAllowed(const gfxFontFaceSrc&) final;
-
-    void DispatchFontLoadViolations(
-        nsTArray<nsCOMPtr<nsIRunnable>>& aViolations) override;
 
     virtual nsresult StartLoad(gfxUserFontEntry* aUserFontEntry,
                                uint32_t aSrcIndex) override;
@@ -105,6 +106,8 @@ class FontFaceSet final : public DOMEventTargetHelper,
         float aSizeAdjust) override;
 
    private:
+    ~UserFontSet() = default;
+
     RefPtr<FontFaceSet> mFontFaceSet;
   };
 
@@ -285,12 +288,10 @@ class FontFaceSet final : public DOMEventTargetHelper,
       gfxUserFontEntry* aUserFontEntry);
 
   nsresult StartLoad(gfxUserFontEntry* aUserFontEntry, uint32_t aSrcIndex);
-  gfxFontSrcPrincipal* GetStandardFontLoadPrincipal();
   nsresult CheckFontLoad(const gfxFontFaceSrc* aFontFaceSrc,
                          gfxFontSrcPrincipal** aPrincipal, bool* aBypassCache);
   bool IsFontLoadAllowed(const gfxFontFaceSrc& aSrc);
 
-  void DispatchFontLoadViolations(nsTArray<nsCOMPtr<nsIRunnable>>& aViolations);
   nsresult SyncLoadFontData(gfxUserFontEntry* aFontToLoad,
                             const gfxFontFaceSrc* aFontFaceSrc,
                             uint8_t*& aBuffer, uint32_t& aBufferLength);
