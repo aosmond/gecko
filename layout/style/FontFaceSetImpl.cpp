@@ -15,7 +15,10 @@ FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner) : mOwner(aOwner) {}
 
 FontFaceSetImpl::~FontFaceSetImpl() = default;
 
-void FontFaceSetImpl::Destroy() { mOwner = nullptr; }
+void FontFaceSetImpl::Destroy() {
+  mOwner = nullptr;
+  mFontPrincipal = nullptr;
+}
 
 }  // namespace dom
 }  // namespace mozilla

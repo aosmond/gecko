@@ -12,12 +12,26 @@ namespace dom {
 NS_IMPL_ISUPPORTS_INHERITED(FontFaceSetMainImpl, FontFaceSetImpl,
                             nsIDOMEventListener, nsICSSLoaderObserver)
 
-FontFaceSetMainImpl::FontFaceSetMainImpl(FontFaceSet* aOwner)
-    : FontFaceSetImpl(aOwner) {}
+FontFaceSetMainImpl::FontFaceSetMainImpl(FontFaceSet* aOwner,
+                                         Document* aDocument)
+    : FontFaceSetImpl(aOwner), mDocument(aDocument) {}
 
 FontFaceSetMainImpl::~FontFaceSetMainImpl() = default;
 
-void FontFaceSetMainImpl::Destroy() { FontFaceSetImpl::Destroy(); }
+void FontFaceSetMainImpl::Destroy() {
+  FontFaceSetImpl::Destroy();
+  mDocument = nullptr;
+}
+
+void FontFaceSetMainImpl::CreateFontPrincipal() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (mFontPrincipal || !mDocument) {
+    return;
+  }
+
+  mFontPrincipal = new gfxFontSrcPrincipal(mDocument->NodePrincipal(),
+                                           mDocument->PartitionedPrincipal());
+}
 
 // nsIDOMEventListener
 
