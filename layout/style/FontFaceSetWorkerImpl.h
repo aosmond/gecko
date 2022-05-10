@@ -26,13 +26,25 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
 
   void Destroy() override;
 
+  // gfxUserFontSet
+
+  already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+      const override {
+    MOZ_ASSERT(NS_IsMainThread());
+    MutexAutoLock lock(mMutex);
+    return RefPtr{mFontPrincipal}.forget();
+  }
+
+  nsPresContext* GetPresContext() const override { return nullptr; }
+
  private:
   ~FontFaceSetWorkerImpl() override;
 
   void CreateFontPrincipal();
 
-  Mutex mMutex;
+  mutable Mutex mMutex;
   RefPtr<ThreadSafeWorkerRef> mWorkerRef GUARDED_BY(mMutex);
+  RefPtr<gfxFontSrcPrincipal> mFontPrincipal GUARDED_BY(mMutex);
 };
 
 }  // namespace dom

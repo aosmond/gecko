@@ -33,7 +33,7 @@ already_AddRefed<FontFaceSetWorkerImpl> FontFaceSetWorkerImpl::Create(
 }
 
 FontFaceSetWorkerImpl::FontFaceSetWorkerImpl(FontFaceSet* aOwner)
-    : FontFaceSetImpl(aOwner) {}
+    : FontFaceSetImpl(aOwner), mMutex("FontFaceSetWorkerImpl") {}
 
 FontFaceSetWorkerImpl::~FontFaceSetWorkerImpl() = default;
 
