@@ -7,6 +7,7 @@
 #include "RenderCompositorSWGL.h"
 
 #include "mozilla/gfx/Logging.h"
+#include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/widget/CompositorWidget.h"
 
 #ifdef MOZ_WIDGET_GTK
@@ -254,12 +255,7 @@ RenderedFrameId RenderCompositorSWGL::EndFrame(
 }
 
 bool RenderCompositorSWGL::RequestFullRender() {
-#ifdef MOZ_WIDGET_ANDROID
-  // XXX Add partial present support.
-  return true;
-#else
-  return false;
-#endif
+  return StaticPrefs::gfx_webrender_software_request_full_render();
 }
 
 void RenderCompositorSWGL::Pause() {}

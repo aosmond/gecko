@@ -6049,6 +6049,11 @@
   value: 4
   mirror: always
 
+- name: gfx.webrender.software.request-full-render
+  type: RelaxedAtomicBool
+  value: true
+  mirror: always
+
 # Whether to force widgets to don't support acceleration to use WebRender
 # despite that
 - name: gfx.webrender.unaccelerated-widget.force
