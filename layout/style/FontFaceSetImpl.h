@@ -31,9 +31,10 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   // gfxUserFontSet
 
-  gfxFontSrcPrincipal* GetStandardFontLoadPrincipal() const final {
+  already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+      const final {
     MOZ_ASSERT(NS_IsMainThread());
-    return mFontPrincipal;
+    return RefPtr{mFontPrincipal}.forget();
   }
 
   nsPresContext* GetPresContext() const override { return nullptr; }
