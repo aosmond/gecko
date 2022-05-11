@@ -5852,6 +5852,11 @@
   value: false
   mirror: once
 
+- name: gfx.webrender.force-full-render
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 - name: gfx.webrender.enable-gpu-markers
   type: bool
 #ifdef DEBUG

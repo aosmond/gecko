@@ -8,6 +8,7 @@
 
 #include "base/task.h"
 #include "GLContext.h"
+#include "mozilla/StaticPrefs_gfx"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/Types.h"
@@ -171,7 +172,9 @@ RenderedFrameId RendererOGL::UpdateAndRender(
 
   wr_renderer_update(mRenderer);
 
-  bool fullRender = mCompositor->RequestFullRender();
+  bool fullRender = StaticPrefs::gfx_webrender_force_full_render()
+                        ? true
+                        : mCompositor->RequestFullRender();
   // When we're rendering to an external target, we want to render everything.
   if (mCompositor->UsePartialPresent() &&
       (aReadbackBuffer.isSome() || layers::ProfilerScreenshots::IsEnabled())) {
