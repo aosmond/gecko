@@ -99,6 +99,7 @@ class WebGPUParent final : public PWebGPUParent {
  private:
   virtual ~WebGPUParent();
   void MaintainDevices();
+  void ForwardError(RawId aDeviceID, const nsCString& aError);
   bool ForwardError(RawId aDeviceID, ErrorBuffer& aError);
 
   UniquePtr<ffi::WGPUGlobal> mContext;
