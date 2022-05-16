@@ -256,6 +256,11 @@ class GPUProcessManager final : public GPUProcessHost::Listener {
   // process, but only if aAllowRestart is also true.
   bool MaybeDisableGPUProcess(const char* aMessage, bool aAllowRestart);
 
+  void ResetProcessStable();
+
+  // Returns true if the composting pocess is currently considered to be stable.
+  bool IsProcessStable(const TimeStamp& aNow);
+
   // Shutdown the GPU process.
   void CleanShutdown();
   // Destroy the process and clean up resources.

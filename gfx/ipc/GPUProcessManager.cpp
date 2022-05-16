@@ -176,6 +176,22 @@ void GPUProcessManager::OnPreferenceChange(const char16_t* aData) {
   }
 }
 
+void GPUProcessManager::ResetProcessStable() {
+  mTotalProcessAttempts++;
+  mProcessStable = false;
+  mProcessAttemptLastTime = TimeStamp::Now();
+}
+
+bool GPUProcessManager::IsProcessStable(const TimeStamp& aNow) {
+  if (mTotalProcessAttempts > 0) {
+    auto delta = (int32_t)(aNow - mProcessAttemptLastTime).ToMilliseconds();
+    if (delta < StaticPrefs::layers_gpu_process_stable_min_uptime_ms()) {
+      return false;
+    }
+  }
+  return mProcessStable;
+}
+
 bool GPUProcessManager::LaunchGPUProcess() {
   if (mProcess) {
     return true;
@@ -204,18 +220,11 @@ bool GPUProcessManager::LaunchGPUProcess() {
   // If the process didn't live long enough, reset the stable flag so that we
   // don't end up in a restart loop.
   auto newTime = TimeStamp::Now();
-  if (mTotalProcessAttempts > 0) {
-    auto delta = (int32_t)(newTime - mProcessAttemptLastTime).ToMilliseconds();
-    if (delta < StaticPrefs::layers_gpu_process_stable_min_uptime_ms()) {
-      mProcessStable = false;
-    }
-  }
-  mProcessAttemptLastTime = newTime;
-
-  if (!mProcessStable) {
+  if (IsProcessStable(newTime)) {
     mUnstableProcessAttempts++;
   }
   mTotalProcessAttempts++;
+  mProcessAttemptLastTime = newTime;
   mProcessStable = false;
 
   std::vector<std::string> extraArgs;
@@ -272,6 +281,9 @@ bool GPUProcessManager::MaybeDisableGPUProcess(const char* aMessage,
   DestroyProcess();
   ShutdownVsyncIOThread();
 
+  // Now the stability state is based upon the in process compositor session.
+  ResetProcessStable();
+
   // We may have been in the middle of guaranteeing our various services are
   // available when one failed. Some callers may fallback to using the same
   // process equivalent, and we need to make sure those services are setup
@@ -318,6 +330,10 @@ bool GPUProcessManager::EnsureGPUReady() {
     DisableGPUProcess("Failed to initialize GPU process");
   }
 
+  // This is the first time we are trying to use the in-process compositor.
+  if (mTotalProcessAttempts == 0) {
+    ResetProcessStable();
+  }
   return false;
 }
 
@@ -542,6 +558,19 @@ bool GPUProcessManager::DisableWebRenderConfig(wr::WebRenderError aError,
         gfx::FeatureStatus::Unavailable, "Failed to render WebRender",
         "FEATURE_FAILURE_WEBRENDER_RENDER"_ns);
   } else if (aError == wr::WebRenderError::NEW_SURFACE) {
+    // If we have a stable compositor process, this may just be due to an OOM or
+    // bad driver state. In that case, we should consider restarting the GPU
+    // process, or simulating a device reset to teardown the compositors to
+    // hopefully alleviate the situation.
+    if (IsProcessStable(TimeStamp::Now())) {
+      if (mProcess) {
+        mProcess->KillProcess();
+      } else {
+        SimulateDeviceReset();
+      }
+      return false;
+    }
+
     // If we cannot create a new Surface even in the final fallback
     // configuration then force a crash.
     wantRestart = gfxPlatform::FallbackFromAcceleration(
@@ -837,6 +866,11 @@ void GPUProcessManager::DestroyInProcessCompositorSessions() {
   for (const auto& session : sessions) {
     session->NotifySessionLost();
   }
+
+  // Ensure our stablility state is reset so that we don't necessarily crash
+  // right away on some WebRender errors.
+  CompositorBridgeParent::ResetStable();
+  ResetProcessStable();
 }
 
 void GPUProcessManager::NotifyRemoteActorDestroyed(
