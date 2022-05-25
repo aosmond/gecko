@@ -27,7 +27,6 @@ class FontFaceWorkerImpl : public FontFaceImpl {
   ~FontFaceWorkerImpl() override;
 
   mutable Mutex mMutex;
-  RefPtr<FontFaceSetWorkerImpl> mPrimarySet;
 };
 
 }  // namespace mozilla::dom

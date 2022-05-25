@@ -11,16 +11,13 @@ namespace mozilla::dom {
 
 FontFaceWorkerImpl::FontFaceWorkerImpl(FontFace* aOwner,
                                        FontFaceSetWorkerImpl* aPrimarySet)
-    : FontFaceImpl(aOwner),
-      mMutex("FontFaceWorkerImpl"),
-      mPrimarySet(aPrimarySet) {}
+    : FontFaceImpl(aOwner, aPrimarySet), mMutex("FontFaceWorkerImpl") {}
 
 FontFaceWorkerImpl::~FontFaceWorkerImpl() = default;
 
 void FontFaceWorkerImpl::Destroy() {
   MutexAutoLock lock(mMutex);
   FontFaceImpl::Destroy();
-  mPrimarySet = nullptr;
 }
 
 RefPtr<FontFaceSetImpl> FontFaceWorkerImpl::GetPrimaryFontFaceSet() const {
