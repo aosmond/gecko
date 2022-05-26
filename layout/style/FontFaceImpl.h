@@ -22,10 +22,13 @@ namespace dom {
 class FontFace;
 class FontFaceSetImpl;
 
+class DummyFontFace {};
+
 class FontFaceImpl {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(FontFaceImpl)
 
  public:
+  using FontFace = DummyFontFace;
   explicit FontFaceImpl(FontFace* aOwner, FontFaceSetImpl* aPrimarySet);
 
   virtual void InitializeSourceBuffer(uint8_t* aBuffer, uint32_t aLength);
@@ -52,10 +55,24 @@ class FontFaceImpl {
 
   class BufferSource;
 
+  // Represents where a FontFace's data is coming from.
+  enum SourceType {
+    eSourceType_FontFaceRule = 1,
+    eSourceType_URLs,
+    eSourceType_Buffer
+  };
+
   FontFace* MOZ_NON_OWNING_REF mOwner;
   RefPtr<FontFaceSetImpl> mPrimarySet;
   RefPtr<BufferSource> mBufferSource;
+  RefPtr<RawServoFontFaceRule> mRule;
+
+  // Saves the rejection code for mLoaded if mLoaded hasn't been created yet.
+  nsresult mLoadedRejection = NS_OK;
+
+  SourceType mSourceType = eSourceType_Buffer;
   FontFaceLoadStatus mStatus = FontFaceLoadStatus::Unloaded;
+  bool mUnicodeRangeDirty = false;
 };
 
 }  // namespace dom

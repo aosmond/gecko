@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/FontFaceSetImpl.h"
+#include "mozilla/URLExtraData.h"
 
 namespace mozilla {
 namespace dom {
@@ -15,7 +16,14 @@ FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner) : mOwner(aOwner) {}
 
 FontFaceSetImpl::~FontFaceSetImpl() = default;
 
-void FontFaceSetImpl::Destroy() { mOwner = nullptr; }
+RefPtr<URLExtraData> FontFaceSetImpl::GetURLExtraData() const {
+  return RefPtr{mURLExtraData};
+}
+
+void FontFaceSetImpl::Destroy() {
+  mOwner = nullptr;
+  mURLExtraData = nullptr;
+}
 
 }  // namespace dom
 }  // namespace mozilla

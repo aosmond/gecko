@@ -13,8 +13,9 @@
 #include "nsISupportsImpl.h"
 
 namespace mozilla {
-namespace dom {
+struct URLExtraData;
 
+namespace dom {
 class FontFaceSet;
 
 /**
@@ -29,6 +30,8 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   virtual bool IsOnOwningThread() const = 0;
 
+  virtual RefPtr<URLExtraData> GetURLExtraData() const;
+
   FontFaceSet* GetOwner() const { return mOwner; }
 
  protected:
@@ -40,6 +43,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   virtual ~FontFaceSetImpl();
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
+  RefPtr<URLExtraData> mURLExtraData;
   bool mPrivateBrowsing = false;
   bool mBypassCache = false;
 };
