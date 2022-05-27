@@ -879,7 +879,7 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
     }
 
     face->mSourceType = gfxFontFaceSrc::eSourceType_Buffer;
-    face->mBuffer = aFontFace->CreateBufferSource();
+    face->mBuffer = aFontFace->TakeBufferSource();
   } else {
     AutoTArray<StyleFontFaceSourceListComponent, 8> sourceListComponents;
     aFontFace->GetSources(sourceListComponents);
