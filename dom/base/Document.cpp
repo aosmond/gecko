@@ -16106,7 +16106,7 @@ gfxUserFontSet* Document::GetUserFontSet() {
     return nullptr;
   }
 
-  return mFontFaceSet->GetUserFontSet();
+  return mFontFaceSet->GetImpl();
 }
 
 void Document::FlushUserFontSet() {
