@@ -15,6 +15,7 @@
 #include "mozilla/dom/DocumentInlines.h"
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/FontFaceSetBinding.h"
+#include "mozilla/dom/FontFaceSetDocumentImpl.h"
 #include "mozilla/dom/FontFaceSetIterator.h"
 #include "mozilla/dom/FontFaceSetLoadEvent.h"
 #include "mozilla/dom/FontFaceSetLoadEventBinding.h"
@@ -95,11 +96,8 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(FontFaceSet)
 NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 
 FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow, dom::Document* aDocument)
-    : DOMEventTargetHelper(aWindow),
-      mDocument(aDocument),
-      mImpl(new FontFaceSetImpl(this, aDocument)) {
+    : DOMEventTargetHelper(aWindow), mDocument(aDocument) {
   MOZ_ASSERT(mDocument, "We should get a valid document from the caller!");
-  mImpl->Initialize();
 }
 
 FontFaceSet::~FontFaceSet() {
@@ -108,6 +106,14 @@ FontFaceSet::~FontFaceSet() {
   MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
 
   Destroy();
+}
+
+/* static */ already_AddRefed<FontFaceSet> FontFaceSet::CreateForDocument(
+    nsPIDOMWindowInner* aWindow, dom::Document* aDocument) {
+  RefPtr<FontFaceSet> set = new FontFaceSet(aWindow, aDocument);
+  set->mImpl = new FontFaceSetDocumentImpl(set, aDocument);
+  set->mImpl->Initialize();
+  return set.forget();
 }
 
 JSObject* FontFaceSet::WrapObject(JSContext* aContext,
