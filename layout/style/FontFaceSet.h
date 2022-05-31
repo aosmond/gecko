@@ -39,7 +39,8 @@ class FontFaceSet final : public DOMEventTargetHelper {
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(FontFaceSet, DOMEventTargetHelper)
 
-  FontFaceSet(nsPIDOMWindowInner* aWindow, dom::Document* aDocument);
+  static already_AddRefed<FontFaceSet> CreateForDocument(
+      nsPIDOMWindowInner* aWindow, dom::Document* aDocument);
 
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
@@ -118,6 +119,7 @@ class FontFaceSet final : public DOMEventTargetHelper {
  private:
   friend mozilla::dom::FontFaceSetIterator;  // needs GetFontFaceAt()
 
+  explicit FontFaceSet(nsPIDOMWindowInner* aWindow);
   ~FontFaceSet();
 
   /**

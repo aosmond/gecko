@@ -16126,7 +16126,7 @@ void Document::FlushUserFontSet() {
 
     if (!mFontFaceSet && !rules.IsEmpty()) {
       nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetScopeObject());
-      mFontFaceSet = new FontFaceSet(window, this);
+      mFontFaceSet = FontFaceSet::CreateForDocument(window, this);
     }
 
     bool changed = false;
@@ -16159,7 +16159,7 @@ void Document::MarkUserFontSetDirty() {
 FontFaceSet* Document::Fonts() {
   if (!mFontFaceSet) {
     nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(GetScopeObject());
-    mFontFaceSet = new FontFaceSet(window, this);
+    mFontFaceSet = FontFaceSet::CreateForDocument(window, this);
     FlushUserFontSet();
   }
   return mFontFaceSet;
