@@ -79,6 +79,15 @@ void FontFaceSetDocumentImpl::Destroy() {
   FontFaceSetImpl::Destroy();
 }
 
+nsPresContext* FontFaceSetDocumentImpl::GetPresContext() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mDocument) {
+    return nullptr;
+  }
+
+  return mDocument->GetPresContext();
+}
+
 void FontFaceSetDocumentImpl::RemoveDOMContentLoadedListener() {
   if (mDocument) {
     mDocument->RemoveSystemEventListener(u"DOMContentLoaded"_ns, this, false);

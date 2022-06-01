@@ -26,6 +26,10 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
   void Initialize() override;
   void Destroy() override;
 
+  // gfxUserFontSet
+
+  nsPresContext* GetPresContext() const override;
+
   bool UpdateRules(const nsTArray<nsFontFaceRuleContainer>& aRules) override;
 
   RawServoFontFaceRule* FindRuleForEntry(gfxFontEntry* aFontEntry) override;

@@ -44,8 +44,6 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
     return RefPtr{mStandardFontLoadPrincipal}.forget();
   }
 
-  nsPresContext* GetPresContext() const override;
-
   bool IsFontLoadAllowed(const gfxFontFaceSrc&) override;
 
   nsresult StartLoad(gfxUserFontEntry* aUserFontEntry,

@@ -1033,15 +1033,6 @@ bool FontFaceSetImpl::PrefEnabled() {
   return StaticPrefs::layout_css_font_loading_api_enabled();
 }
 
-nsPresContext* FontFaceSetImpl::GetPresContext() const {
-  MOZ_ASSERT(NS_IsMainThread());
-  if (!mDocument) {
-    return nullptr;
-  }
-
-  return mDocument->GetPresContext();
-}
-
 void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
   MOZ_ASSERT(NS_IsMainThread());
   mStandardFontLoadPrincipal = new gfxFontSrcPrincipal(
