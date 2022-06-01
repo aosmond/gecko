@@ -85,6 +85,8 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
   bool HasRuleFontFace(FontFaceImpl* aFontFace);
 #endif
 
+  TimeStamp GetNavigationStartTimeStamp() override;
+
   // The @font-face rule backed FontFace objects in the FontFaceSet.
   nsTArray<FontFaceRecord> mRuleFaces;
 };

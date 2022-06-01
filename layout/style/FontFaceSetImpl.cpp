@@ -220,15 +220,6 @@ void FontFaceSetImpl::FindMatchingFontFaces(
   }
 }
 
-TimeStamp FontFaceSetImpl::GetNavigationStartTimeStamp() {
-  TimeStamp navStart;
-  RefPtr<nsDOMNavigationTiming> timing(mDocument->GetNavigationTiming());
-  if (timing) {
-    navStart = timing->GetNavigationStartTimeStamp();
-  }
-  return navStart;
-}
-
 bool FontFaceSetImpl::ReadyPromiseIsPending() const {
   return mOwner ? mOwner->ReadyPromiseIsPending() : false;
 }

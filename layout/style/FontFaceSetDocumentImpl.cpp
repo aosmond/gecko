@@ -106,6 +106,15 @@ void FontFaceSetDocumentImpl::FindMatchingFontFaces(
   }
 }
 
+TimeStamp FontFaceSetDocumentImpl::GetNavigationStartTimeStamp() {
+  TimeStamp navStart;
+  RefPtr<nsDOMNavigationTiming> timing(mDocument->GetNavigationTiming());
+  if (timing) {
+    navStart = timing->GetNavigationStartTimeStamp();
+  }
+  return navStart;
+}
+
 void FontFaceSetDocumentImpl::EnsureReady() {
   MOZ_ASSERT(NS_IsMainThread());
 

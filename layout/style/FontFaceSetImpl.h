@@ -230,7 +230,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
                                      FontWeight& aWeight, FontStretch& aStretch,
                                      FontSlantStyle& aStyle, ErrorResult& aRv);
 
-  TimeStamp GetNavigationStartTimeStamp();
+  virtual TimeStamp GetNavigationStartTimeStamp() = 0;
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
 
