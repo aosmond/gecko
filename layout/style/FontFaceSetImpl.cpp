@@ -69,8 +69,6 @@ NS_IMPL_ISUPPORTS0(FontFaceSetImpl)
 FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner, dom::Document* aDocument)
     : mOwner(aOwner),
       mDocument(aDocument),
-      mStandardFontLoadPrincipal(new gfxFontSrcPrincipal(
-          mDocument->NodePrincipal(), mDocument->PartitionedPrincipal())),
       mStatus(FontFaceSetLoadStatus::Loaded),
       mNonRuleFacesDirty(false),
       mHasLoadingFontFaces(false),
@@ -1025,9 +1023,7 @@ bool FontFaceSetImpl::PrefEnabled() {
 }
 
 void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
-  MOZ_ASSERT(NS_IsMainThread());
-  mStandardFontLoadPrincipal = new gfxFontSrcPrincipal(
-      mDocument->NodePrincipal(), mDocument->PartitionedPrincipal());
+  mStandardFontLoadPrincipal = CreateStandardFontLoadPrincipal();
   mAllowedFontLoads.Clear();
   IncrementGeneration(false);
 }

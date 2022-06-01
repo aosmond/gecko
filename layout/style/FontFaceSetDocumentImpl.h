@@ -85,6 +85,9 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
   bool HasRuleFontFace(FontFaceImpl* aFontFace);
 #endif
 
+  already_AddRefed<gfxFontSrcPrincipal> CreateStandardFontLoadPrincipal()
+      const override;
+
   TimeStamp GetNavigationStartTimeStamp() override;
 
   // The @font-face rule backed FontFace objects in the FontFaceSet.

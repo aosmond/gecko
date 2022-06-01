@@ -41,6 +41,11 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
       const override {
+    if (!mStandardFontLoadPrincipal) {
+      auto self = const_cast<FontFaceSetImpl*>(this);
+      self->mStandardFontLoadPrincipal =
+          self->CreateStandardFontLoadPrincipal();
+    }
     return RefPtr{mStandardFontLoadPrincipal}.forget();
   }
 
@@ -231,6 +236,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
                                      FontSlantStyle& aStyle, ErrorResult& aRv);
 
   virtual TimeStamp GetNavigationStartTimeStamp() = 0;
+
+  virtual already_AddRefed<gfxFontSrcPrincipal>
+  CreateStandardFontLoadPrincipal() const = 0;
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
 

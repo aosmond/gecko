@@ -88,6 +88,13 @@ nsPresContext* FontFaceSetDocumentImpl::GetPresContext() const {
   return mDocument->GetPresContext();
 }
 
+already_AddRefed<gfxFontSrcPrincipal>
+FontFaceSetDocumentImpl::CreateStandardFontLoadPrincipal() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  return MakeAndAddRef<gfxFontSrcPrincipal>(mDocument->NodePrincipal(),
+                                            mDocument->PartitionedPrincipal());
+}
+
 void FontFaceSetDocumentImpl::RemoveDOMContentLoadedListener() {
   if (mDocument) {
     mDocument->RemoveSystemEventListener(u"DOMContentLoaded"_ns, this, false);
