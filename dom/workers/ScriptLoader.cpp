@@ -343,6 +343,8 @@ class ChannelGetterRunnable final : public WorkerMainThreadRunnable {
     mLoadInfo.mReferrerInfo =
         static_cast<ReferrerInfo*>(referrerInfo.get())
             ->CloneWithNewPolicy(mWorkerPrivate->GetReferrerPolicy());
+    mLoadInfo.mURLExtraData = new URLExtraData(baseURI, mLoadInfo.mReferrerInfo,
+                                               mLoadInfo.mPrincipal);
 
     mResult = workerinternals::ChannelFromScriptURLMainThread(
         mLoadInfo.mLoadingPrincipal, parentDoc, mLoadInfo.mLoadGroup, url,
