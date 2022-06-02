@@ -34,6 +34,7 @@ class nsPIDOMWindowInner;
 
 namespace mozilla {
 class DOMEventTargetHelper;
+struct URLExtraData;
 enum class StorageAccess;
 namespace dom {
 class VoidFunction;
@@ -251,6 +252,8 @@ class nsIGlobalObject : public nsISupports,
   virtual JS::loader::ModuleLoaderBase* GetModuleLoader(JSContext* aCx) {
     return nullptr;
   }
+
+  virtual mozilla::URLExtraData* GetURLExtraData() { return nullptr; }
 
  protected:
   virtual ~nsIGlobalObject();

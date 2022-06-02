@@ -1685,6 +1685,13 @@ OriginTrials nsGlobalWindowOuter::Trials() const {
                       : OriginTrials();
 }
 
+URLExtraData* nsGlobalWindowOuter::GetURLExtraData() {
+  if (mDoc) {
+    return mDoc->DefaultStyleAttrURLData();
+  }
+  return nullptr;
+}
+
 nsresult nsGlobalWindowOuter::EnsureScriptEnvironment() {
   if (GetWrapperPreserveColor()) {
     return NS_OK;
