@@ -148,6 +148,8 @@ struct WorkerLoadInfoData {
   bool mShouldResistFingerprinting;
   OriginAttributes mOriginAttributes;
   bool mIsThirdPartyContextToTopWindow;
+  bool mShouldBypassCache;
+  bool mUsePrivateBrowsing;
 
   enum {
     eNotSet,
