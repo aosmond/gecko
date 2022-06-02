@@ -103,6 +103,8 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
 
   TimeStamp GetNavigationStartTimeStamp() override;
 
+  already_AddRefed<URLExtraData> GetURLExtraData() override;
+
   // The document this is a FontFaceSet for.
   RefPtr<dom::Document> mDocument;
 

@@ -822,6 +822,8 @@ class WorkerPrivate final
     mLoadInfo.mReferrerInfo = aReferrerInfo;
   }
 
+  URLExtraData* GetURLExtraData() const { return mLoadInfo.mURLExtraData; }
+
   bool IsEvalAllowed() const { return mLoadInfo.mEvalAllowed; }
 
   void SetEvalAllowed(bool aAllowed) { mLoadInfo.mEvalAllowed = aAllowed; }
