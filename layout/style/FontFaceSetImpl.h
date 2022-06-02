@@ -233,6 +233,8 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   virtual already_AddRefed<gfxFontSrcPrincipal>
   CreateStandardFontLoadPrincipal() const = 0;
 
+  virtual already_AddRefed<URLExtraData> GetURLExtraData() = 0;
+
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
 
   // The document's node principal, which is the principal font loads for

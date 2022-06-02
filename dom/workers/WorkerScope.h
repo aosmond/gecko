@@ -121,6 +121,8 @@ class WorkerGlobalScopeBase : public DOMEventTargetHelper,
 
   OriginTrials Trials() const final;
 
+  URLExtraData* GetURLExtraData() final;
+
   StorageAccess GetStorageAccess() final;
 
   Maybe<ClientInfo> GetClientInfo() const final;

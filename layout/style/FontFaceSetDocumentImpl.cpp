@@ -129,6 +129,14 @@ TimeStamp FontFaceSetDocumentImpl::GetNavigationStartTimeStamp() {
   return navStart;
 }
 
+already_AddRefed<URLExtraData> FontFaceSetDocumentImpl::GetURLExtraData() {
+  if (!mDocument) {
+    return nullptr;
+  }
+
+  return RefPtr{mDocument->DefaultStyleAttrURLData()}.forget();
+}
+
 void FontFaceSetDocumentImpl::EnsureReady() {
   MOZ_ASSERT(NS_IsMainThread());
 
