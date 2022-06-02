@@ -2908,6 +2908,10 @@ nsresult WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
     MOZ_ASSERT(loadInfo.mLoadingPrincipal);
     MOZ_ASSERT(isChrome || !loadInfo.mDomain.IsEmpty());
 
+    loadInfo.mURLExtraData = new URLExtraData(
+        loadInfo.mBaseURI, loadInfo.mReferrerInfo,
+        loadInfo.mPrincipal ? loadInfo.mPrincipal : loadInfo.mLoadingPrincipal);
+
     if (!loadInfo.mLoadGroup || aLoadGroupBehavior == OverrideLoadGroup) {
       OverrideLoadInfoLoadGroup(loadInfo, loadInfo.mLoadingPrincipal);
     }
