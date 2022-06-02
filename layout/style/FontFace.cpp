@@ -20,7 +20,6 @@
 #include "mozilla/ServoStyleSet.h"
 #include "mozilla/ServoUtils.h"
 #include "mozilla/StaticPrefs_layout.h"
-#include "mozilla/dom/Document.h"
 #include "nsStyleUtil.h"
 
 namespace mozilla {
@@ -105,20 +104,18 @@ already_AddRefed<FontFace> FontFace::Constructor(
     const UTF8StringOrArrayBufferOrArrayBufferView& aSource,
     const FontFaceDescriptors& aDescriptors, ErrorResult& aRv) {
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
-  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(global);
-  if (!window) {
+
+  FontFaceSet* set = global->GetFontFaceSet();
+  if (!set) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
   }
 
-  Document* doc = window->GetDoc();
-  if (!doc) {
+  FontFaceSetImpl* setImpl = set->GetImpl();
+  if (!setImpl) {
     aRv.Throw(NS_ERROR_FAILURE);
     return nullptr;
   }
-
-  FontFaceSetImpl* setImpl = doc->Fonts()->GetImpl();
-  MOZ_ASSERT(setImpl);
 
   RefPtr<FontFace> obj = new FontFace(global);
   obj->mImpl = new FontFaceImpl(obj, setImpl);
