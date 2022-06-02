@@ -1641,6 +1641,13 @@ URLExtraData* nsGlobalWindowInner::GetURLExtraData() {
   return nullptr;
 }
 
+FontFaceSet* nsGlobalWindowInner::GetFontFaceSet() {
+  if (mDoc) {
+    return mDoc->Fonts();
+  }
+  return nullptr;
+}
+
 uint32_t nsGlobalWindowInner::GetPrincipalHashValue() const {
   if (mDoc) {
     return mDoc->NodePrincipal()->GetHashValue();
