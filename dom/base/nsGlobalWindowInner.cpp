@@ -1634,6 +1634,13 @@ OriginTrials nsGlobalWindowInner::Trials() const {
   return OriginTrials::FromWindow(this);
 }
 
+URLExtraData* nsGlobalWindowInner::GetURLExtraData() {
+  if (mDoc) {
+    return mDoc->DefaultStyleAttrURLData();
+  }
+  return nullptr;
+}
+
 uint32_t nsGlobalWindowInner::GetPrincipalHashValue() const {
   if (mDoc) {
     return mDoc->NodePrincipal()->GetHashValue();

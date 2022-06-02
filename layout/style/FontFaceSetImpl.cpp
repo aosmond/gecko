@@ -107,7 +107,7 @@ void FontFaceSetImpl::ParseFontShorthandForMatching(
   float stretch;
   float weight;
 
-  RefPtr<URLExtraData> url = ServoCSSParser::GetURLExtraData(mDocument);
+  RefPtr<URLExtraData> url = mDocument->DefaultStyleAttrURLData();
   if (!ServoCSSParser::ParseFontShorthandForMatching(aFont, url, aFamilyList,
                                                      style, stretch, weight)) {
     aRv.ThrowSyntaxError("Invalid font shorthand");

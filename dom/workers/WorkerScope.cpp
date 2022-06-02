@@ -282,6 +282,11 @@ OriginTrials WorkerGlobalScopeBase::Trials() const {
   return mWorkerPrivate->Trials();
 }
 
+URLExtraData* WorkerGlobalScopeBase::GetURLExtraData() {
+  AssertIsOnWorkerThread();
+  return mWorkerPrivate->GetURLExtraData();
+}
+
 StorageAccess WorkerGlobalScopeBase::GetStorageAccess() {
   AssertIsOnWorkerThread();
   return mWorkerPrivate->StorageAccess();

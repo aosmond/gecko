@@ -11,6 +11,7 @@
 #include "mozilla/StorageAccess.h"
 #include "mozilla/OriginTrials.h"
 #include "mozilla/UniquePtr.h"
+#include "mozilla/URLExtraData.h"
 #include "mozilla/dom/ChannelInfo.h"
 #include "mozilla/dom/ServiceWorkerRegistrationDescriptor.h"
 #include "mozilla/dom/WorkerCommon.h"
@@ -105,6 +106,8 @@ struct WorkerLoadInfoData {
 
   // Only set if we have a custom overriden load group
   RefPtr<InterfaceRequestor> mInterfaceRequestor;
+
+  RefPtr<URLExtraData> mURLExtraData;
 
   UniquePtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
   UniquePtr<mozilla::ipc::PrincipalInfo> mPartitionedPrincipalInfo;

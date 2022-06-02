@@ -72,7 +72,7 @@ NS_INTERFACE_MAP_END
 NS_IMPL_CYCLE_COLLECTING_ADDREF(FontFace)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(FontFace)
 
-FontFace::FontFace(nsISupports* aParent)
+FontFace::FontFace(nsIGlobalObject* aParent)
     : mParent(aParent), mLoadedRejection(NS_OK) {}
 
 FontFace::~FontFace() {
@@ -90,7 +90,7 @@ JSObject* FontFace::WrapObject(JSContext* aCx,
 }
 
 already_AddRefed<FontFace> FontFace::CreateForRule(
-    nsISupports* aGlobal, FontFaceSet* aFontFaceSet,
+    nsIGlobalObject* aGlobal, FontFaceSet* aFontFaceSet,
     RawServoFontFaceRule* aRule) {
   FontFaceSetImpl* setImpl = aFontFaceSet->GetImpl();
   MOZ_ASSERT(setImpl);
@@ -104,7 +104,7 @@ already_AddRefed<FontFace> FontFace::Constructor(
     const GlobalObject& aGlobal, const nsACString& aFamily,
     const UTF8StringOrArrayBufferOrArrayBufferView& aSource,
     const FontFaceDescriptors& aDescriptors, ErrorResult& aRv) {
-  nsISupports* global = aGlobal.GetAsSupports();
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
   nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(global);
   if (!window) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -299,20 +299,7 @@ void FontFace::MaybeReject(nsresult aResult) {
 }
 
 already_AddRefed<URLExtraData> FontFace::GetURLExtraData() const {
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
-  nsCOMPtr<nsIPrincipal> principal = global->PrincipalOrNull();
-
-  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(mParent);
-  nsCOMPtr<nsIURI> docURI = window->GetDocumentURI();
-  nsCOMPtr<nsIURI> base = window->GetDocBaseURI();
-
-  // We pass RP_Unset when creating ReferrerInfo object here because it's not
-  // going to result to change referer policy in a resource request.
-  nsCOMPtr<nsIReferrerInfo> referrerInfo =
-      new ReferrerInfo(docURI, ReferrerPolicy::_empty);
-
-  RefPtr<URLExtraData> url = new URLExtraData(base, referrerInfo, principal);
-  return url.forget();
+  return RefPtr{mParent->GetURLExtraData()}.forget();
 }
 
 void FontFace::EnsurePromise() {
@@ -322,14 +309,12 @@ void FontFace::EnsurePromise() {
     return;
   }
 
-  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mParent);
-
   // If the pref is not set, don't create the Promise (which the page wouldn't
   // be able to get to anyway) as it causes the window.FontFace constructor
   // to be created.
-  if (global && FontFaceSet::PrefEnabled()) {
+  if (FontFaceSet::PrefEnabled()) {
     ErrorResult rv;
-    mLoaded = Promise::Create(global, rv);
+    mLoaded = Promise::Create(mParent, rv);
 
     if (mImpl->Status() == FontFaceLoadStatus::Loaded) {
       mLoaded->MaybeResolve(this);
