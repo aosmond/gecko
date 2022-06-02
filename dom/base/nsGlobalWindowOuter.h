@@ -236,6 +236,7 @@ class nsGlobalWindowOuter final : public mozilla::dom::EventTarget,
   uint32_t GetPrincipalHashValue() const final;
   mozilla::OriginTrials Trials() const final;
   mozilla::URLExtraData* GetURLExtraData() final;
+  mozilla::dom::FontFaceSet* GetFontFaceSet() final;
 
   // nsIGlobalJSObjectHolder
   JSObject* GetGlobalJSObject() final { return GetWrapper(); }
