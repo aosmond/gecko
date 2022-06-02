@@ -39,6 +39,7 @@ enum class StorageAccess;
 namespace dom {
 class VoidFunction;
 class DebuggerNotificationManager;
+class FontFaceSet;
 class Function;
 class Report;
 class ReportBody;
@@ -254,6 +255,8 @@ class nsIGlobalObject : public nsISupports,
   }
 
   virtual mozilla::URLExtraData* GetURLExtraData() { return nullptr; }
+
+  virtual mozilla::dom::FontFaceSet* GetFontFaceSet() { return nullptr; }
 
  protected:
   virtual ~nsIGlobalObject();
