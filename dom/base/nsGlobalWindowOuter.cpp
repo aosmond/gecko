@@ -1692,6 +1692,13 @@ URLExtraData* nsGlobalWindowOuter::GetURLExtraData() {
   return nullptr;
 }
 
+FontFaceSet* nsGlobalWindowOuter::GetFontFaceSet() {
+  if (mDoc) {
+    return mDoc->Fonts();
+  }
+  return nullptr;
+}
+
 nsresult nsGlobalWindowOuter::EnsureScriptEnvironment() {
   if (GetWrapperPreserveColor()) {
     return NS_OK;
