@@ -84,7 +84,6 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   FontFaceSetImpl(FontFaceSet* aOwner, dom::Document* aDocument);
 
  public:
-  virtual void Initialize() = 0;
   virtual void Destroy();
 
   // Called by nsFontFaceLoader when the loader has completed normally.

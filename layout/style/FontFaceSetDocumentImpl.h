@@ -23,7 +23,7 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
 
   FontFaceSetDocumentImpl(FontFaceSet* aOwner, dom::Document* aDocument);
 
-  void Initialize() override;
+  void Initialize();
   void Destroy() override;
 
   // gfxUserFontSet
