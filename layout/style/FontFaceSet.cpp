@@ -16,6 +16,7 @@
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/FontFaceSetBinding.h"
 #include "mozilla/dom/FontFaceSetDocumentImpl.h"
+#include "mozilla/dom/FontFaceSetWorkerImpl.h"
 #include "mozilla/dom/FontFaceSetIterator.h"
 #include "mozilla/dom/FontFaceSetLoadEvent.h"
 #include "mozilla/dom/FontFaceSetLoadEventBinding.h"
@@ -93,8 +94,8 @@ NS_IMPL_RELEASE_INHERITED(FontFaceSet, DOMEventTargetHelper)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(FontFaceSet)
 NS_INTERFACE_MAP_END_INHERITING(DOMEventTargetHelper)
 
-FontFaceSet::FontFaceSet(nsPIDOMWindowInner* aWindow)
-    : DOMEventTargetHelper(aWindow) {}
+FontFaceSet::FontFaceSet(nsIGlobalObject* aParent)
+    : DOMEventTargetHelper(aParent) {}
 
 FontFaceSet::~FontFaceSet() {
   // Assert that we don't drop any FontFaceSet objects during a Servo traversal,
@@ -105,10 +106,23 @@ FontFaceSet::~FontFaceSet() {
 }
 
 /* static */ already_AddRefed<FontFaceSet> FontFaceSet::CreateForDocument(
-    nsPIDOMWindowInner* aWindow, dom::Document* aDocument) {
-  RefPtr<FontFaceSet> set = new FontFaceSet(aWindow);
-  set->mImpl = new FontFaceSetDocumentImpl(set, aDocument);
-  set->mImpl->Initialize();
+    nsIGlobalObject* aParent, dom::Document* aDocument) {
+  RefPtr<FontFaceSet> set = new FontFaceSet(aParent);
+  RefPtr<FontFaceSetDocumentImpl> impl =
+      new FontFaceSetDocumentImpl(set, aDocument);
+  impl->Initialize();
+  set->mImpl = std::move(impl);
+  return set.forget();
+}
+
+/* static */ already_AddRefed<FontFaceSet> FontFaceSet::CreateForWorker(
+    nsIGlobalObject* aParent, WorkerPrivate* aWorkerPrivate) {
+  RefPtr<FontFaceSet> set = new FontFaceSet(aParent);
+  RefPtr<FontFaceSetWorkerImpl> impl = new FontFaceSetWorkerImpl(set);
+  if (NS_WARN_IF(!impl->Initialize(aWorkerPrivate))) {
+    return nullptr;
+  }
+  set->mImpl = std::move(impl);
   return set.forget();
 }
 
