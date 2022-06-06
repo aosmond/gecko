@@ -7592,7 +7592,7 @@
 
 # Is support for document.fonts enabled?
 - name: layout.css.font-loading-api.enabled
-  type: bool
+  type: RelaxedAtomicBool
   value: true
   mirror: always
 
