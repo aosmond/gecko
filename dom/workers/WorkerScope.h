@@ -57,6 +57,7 @@ class DOMString;
 class DebuggerNotificationManager;
 enum class EventCallbackDebuggerNotificationType : uint8_t;
 class EventHandlerNonNull;
+class FontFaceSet;
 class Function;
 class IDBFactory;
 class OnErrorEventHandlerNonNull;
@@ -227,6 +228,8 @@ class WorkerGlobalScope : public WorkerGlobalScopeBase {
   Maybe<EventCallbackDebuggerNotificationType> GetDebuggerNotificationType()
       const final;
 
+  FontFaceSet* GetFontFaceSet() final;
+
   // WorkerGlobalScope WebIDL implementation
   WorkerGlobalScope* Self() { return this; }
 
@@ -235,6 +238,8 @@ class WorkerGlobalScope : public WorkerGlobalScopeBase {
   already_AddRefed<WorkerNavigator> Navigator();
 
   already_AddRefed<WorkerNavigator> GetExistingNavigator() const;
+
+  already_AddRefed<FontFaceSet> Fonts();
 
   void ImportScripts(JSContext* aCx, const Sequence<nsString>& aScriptURLs,
                      ErrorResult& aRv);
@@ -349,6 +354,7 @@ class WorkerGlobalScope : public WorkerGlobalScopeBase {
   RefPtr<Crypto> mCrypto;
   RefPtr<WorkerLocation> mLocation;
   RefPtr<WorkerNavigator> mNavigator;
+  RefPtr<FontFaceSet> mFontFaceSet;
   RefPtr<Performance> mPerformance;
   RefPtr<IDBFactory> mIndexedDB;
   RefPtr<cache::CacheStorage> mCacheStorage;

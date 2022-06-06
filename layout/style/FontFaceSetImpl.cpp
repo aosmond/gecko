@@ -916,11 +916,6 @@ void FontFaceSetImpl::CheckLoadingFinished() {
       });
 }
 
-/* static */
-bool FontFaceSetImpl::PrefEnabled() {
-  return StaticPrefs::layout_css_font_loading_api_enabled();
-}
-
 void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
   RecursiveMutexAutoLock lock(mMutex);
   mStandardFontLoadPrincipal = CreateStandardFontLoadPrincipal();
