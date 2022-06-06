@@ -106,6 +106,13 @@ FontFaceSet::~FontFaceSet() {
   Destroy();
 }
 
+/* static */ bool FontFaceSet::IsEnabled() {
+  if (NS_IsMainThread()) {
+    return StaticPrefs::layout_css_font_loading_api_enabled();
+  };
+  return StaticPrefs::layout_css_font_loading_api_workers_enabled();
+}
+
 /* static */ already_AddRefed<FontFaceSet> FontFaceSet::CreateForDocument(
     nsIGlobalObject* aParent, dom::Document* aDocument) {
   RefPtr<FontFaceSet> set = new FontFaceSet(aParent);
@@ -388,7 +395,7 @@ void FontFaceSet::DispatchLoadingEventAndReplaceReadyPromise() {
   (new AsyncEventDispatcher(this, u"loading"_ns, CanBubble::eNo))
       ->PostDOMEvent();
 
-  if (PrefEnabled()) {
+  if (IsEnabled(nullptr, nullptr)) {
     if (mReady && mReady->State() != Promise::PromiseState::Pending) {
       if (GetParentObject()) {
         ErrorResult rv;
@@ -460,11 +467,6 @@ void FontFaceSet::DispatchLoadingFinishedEvent(
   RefPtr<FontFaceSetLoadEvent> event =
       FontFaceSetLoadEvent::Constructor(this, aType, init);
   (new AsyncEventDispatcher(this, event))->PostDOMEvent();
-}
-
-/* static */
-bool FontFaceSet::PrefEnabled() {
-  return StaticPrefs::layout_css_font_loading_api_enabled();
 }
 
 void FontFaceSet::FlushUserFontSet() { mImpl->FlushUserFontSet(); }
