@@ -305,7 +305,7 @@ void FontFace::EnsurePromise() {
   // If the pref is not set, don't create the Promise (which the page wouldn't
   // be able to get to anyway) as it causes the window.FontFace constructor
   // to be created.
-  if (global && FontFaceSet::PrefEnabled()) {
+  if (global && FontFaceSet::IsEnabled()) {
     ErrorResult rv;
     mLoaded = Promise::Create(global, rv);
 

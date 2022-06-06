@@ -886,11 +886,6 @@ void FontFaceSetImpl::OnLoadingFinished() {
   }
 }
 
-/* static */
-bool FontFaceSetImpl::PrefEnabled() {
-  return StaticPrefs::layout_css_font_loading_api_enabled();
-}
-
 void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
   mAllowedFontLoads.Clear();
   IncrementGeneration(false);
