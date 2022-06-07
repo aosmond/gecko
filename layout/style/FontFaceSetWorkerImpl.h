@@ -17,7 +17,7 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
   NS_DECL_ISUPPORTS_INHERITED
 
  public:
-  FontFaceSetWorkerImpl(FontFaceSet* aOwner);
+  explicit FontFaceSetWorkerImpl(FontFaceSet* aOwner);
 
   bool Initialize(WorkerPrivate* aWorkerPrivate);
   void Destroy() override;
