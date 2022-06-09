@@ -77,5 +77,13 @@ TimeStamp FontFaceSetWorkerImpl::GetNavigationStartTimeStamp() {
   return mWorkerRef->Private()->CreationTimeStamp();
 }
 
+already_AddRefed<URLExtraData> FontFaceSetWorkerImpl::GetURLExtraData() {
+  if (!mWorkerRef) {
+    return nullptr;
+  }
+
+  return RefPtr{mWorkerRef->Private()->GetURLExtraData()}.forget();
+}
+
 #undef LOG_ENABLED
 #undef LOG
