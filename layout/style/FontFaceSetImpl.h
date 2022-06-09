@@ -15,6 +15,8 @@
 #include "nsICSSLoaderObserver.h"
 #include "nsIDOMEventListener.h"
 
+#include <functional>
+
 struct gfxFontFaceSrc;
 class gfxFontSrcPrincipal;
 class gfxUserFontEntry;
@@ -26,6 +28,7 @@ struct RawServoFontFaceRule;
 
 namespace mozilla {
 class PostTraversalTask;
+class Runnable;
 class SharedFontList;
 namespace dom {
 class FontFace;
@@ -78,6 +81,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
  public:
   virtual void Destroy();
+  virtual bool IsOnOwningThread() = 0;
+  virtual void DispatchToOwningThread(const char* aName,
+                                      std::function<void()>&& aFunc) = 0;
 
   // Called by nsFontFaceLoader when the loader has completed normally.
   // It's removed from the mLoaders set.
@@ -184,6 +190,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
    * event loop.  See OnFontFaceStatusChanged.
    */
   void CheckLoadingFinishedAfterDelay();
+
+  void OnLoadingStarted();
+  void OnLoadingFinished();
 
   // Note: if you add new cycle collected objects to FontFaceRecord,
   // make sure to update FontFaceSet's cycle collection macros

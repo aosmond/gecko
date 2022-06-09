@@ -9,6 +9,7 @@
 #include "gfxFontConstants.h"
 #include "gfxFontSrcPrincipal.h"
 #include "gfxFontSrcURI.h"
+#include "gfxFontUtils.h"
 #include "mozilla/css/Loader.h"
 #include "mozilla/dom/CSSFontFaceRule.h"
 #include "mozilla/dom/DocumentInlines.h"
@@ -17,6 +18,7 @@
 #include "mozilla/dom/FontFaceSetLoadEvent.h"
 #include "mozilla/dom/FontFaceSetLoadEventBinding.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/FontPropertyTypes.h"
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/BasePrincipal.h"
@@ -75,7 +77,7 @@ FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner)
 FontFaceSetImpl::~FontFaceSetImpl() {
   // Assert that we don't drop any FontFaceSet objects during a Servo traversal,
   // since PostTraversalTask objects can hold raw pointers to FontFaceSets.
-  MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
+  MOZ_ASSERT(!gfxFontUtils::IsInServoTraversal());
 
   Destroy();
 }
@@ -645,7 +647,7 @@ nsresult FontFaceSetImpl::LogMessage(gfxUserFontEntry* aUserFontEntry,
 
   LOG(("userfonts (%p) %s", this, message.get()));
 
-  if (!NS_IsMainThread() && !ServoStyleSet::IsCurrentThreadInServoTraversal()) {
+  if (GetCurrentThreadWorkerPrivate()) {
     // TODO(aosmond): Log to the console for workers.
     return NS_OK;
   }
@@ -762,8 +764,7 @@ nsresult FontFaceSetImpl::SyncLoadFontData(gfxUserFontEntry* aFontToLoad,
 }
 
 void FontFaceSetImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
+  gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
   MOZ_ASSERT(HasAvailableFontFace(aFontFace));
 
   mHasLoadingFontFacesIsDirty = true;
@@ -788,9 +789,9 @@ void FontFaceSetImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
 }
 
 void FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay() {
-  AssertIsMainThreadOrServoFontMetricsLocked();
+  gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
 
-  if (ServoStyleSet* set = ServoStyleSet::Current()) {
+  if (ServoStyleSet* set = gfxFontUtils::CurrentServoStyleSet()) {
     // See comments in Gecko_GetFontMetrics.
     //
     // We can't just dispatch the runnable below if we're not on the main
@@ -803,10 +804,9 @@ void FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay() {
     return;
   }
 
-  nsCOMPtr<nsIRunnable> checkTask =
-      NewRunnableMethod("dom::FontFaceSetImpl::CheckLoadingFinishedAfterDelay",
-                        this, &FontFaceSetImpl::CheckLoadingFinishedAfterDelay);
-  mDocument->Dispatch(TaskCategory::Other, checkTask.forget());
+  DispatchToOwningThread(
+      "FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay",
+      [self = RefPtr{this}]() { self->CheckLoadingFinishedAfterDelay(); });
 }
 
 void FontFaceSetImpl::CheckLoadingFinishedAfterDelay() {
@@ -815,7 +815,7 @@ void FontFaceSetImpl::CheckLoadingFinishedAfterDelay() {
 }
 
 void FontFaceSetImpl::CheckLoadingStarted() {
-  AssertIsMainThreadOrServoFontMetricsLocked();
+  gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
 
   if (!HasLoadingFontFaces()) {
     return;
@@ -828,6 +828,17 @@ void FontFaceSetImpl::CheckLoadingStarted() {
   }
 
   mStatus = FontFaceSetLoadStatus::Loading;
+
+  if (IsOnOwningThread()) {
+    OnLoadingStarted();
+    return;
+  }
+
+  DispatchToOwningThread("FontFaceSetImpl::CheckLoadingStarted",
+                         [self = RefPtr{this}]() { self->OnLoadingStarted(); });
+}
+
+void FontFaceSetImpl::OnLoadingStarted() {
   if (mOwner) {
     mOwner->DispatchLoadingEventAndReplaceReadyPromise();
   }
@@ -857,8 +868,6 @@ bool FontFaceSetImpl::MightHavePendingFontLoads() {
 }
 
 void FontFaceSetImpl::CheckLoadingFinished() {
-  MOZ_ASSERT(NS_IsMainThread());
-
   if (mDelayedLoadCheck) {
     // Wait until the runnable posted in OnFontFaceStatusChanged calls us.
     return;
@@ -876,6 +885,18 @@ void FontFaceSetImpl::CheckLoadingFinished() {
   }
 
   mStatus = FontFaceSetLoadStatus::Loaded;
+
+  if (IsOnOwningThread()) {
+    OnLoadingFinished();
+    return;
+  }
+
+  DispatchToOwningThread(
+      "FontFaceSetImpl::CheckLoadingFinished",
+      [self = RefPtr{this}]() { self->OnLoadingFinished(); });
+}
+
+void FontFaceSetImpl::OnLoadingFinished() {
   if (mOwner) {
     mOwner->MaybeResolve();
   }
