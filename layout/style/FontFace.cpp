@@ -236,8 +236,6 @@ void FontFace::SetSizeAdjust(const nsACString& aValue, ErrorResult& aRv) {
 FontFaceLoadStatus FontFace::Status() { return mImpl->Status(); }
 
 Promise* FontFace::Load(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-
   EnsurePromise();
 
   if (!mLoaded) {
@@ -250,8 +248,6 @@ Promise* FontFace::Load(ErrorResult& aRv) {
 }
 
 Promise* FontFace::GetLoaded(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-
   EnsurePromise();
 
   if (!mLoaded) {
@@ -279,8 +275,6 @@ void FontFace::MaybeResolve() {
 }
 
 void FontFace::MaybeReject(nsresult aResult) {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   if (ServoStyleSet* ss = ServoStyleSet::Current()) {
     // See comments in Gecko_GetFontMetrics.
     ss->AppendTask(
@@ -300,8 +294,6 @@ already_AddRefed<URLExtraData> FontFace::GetURLExtraData() const {
 }
 
 void FontFace::EnsurePromise() {
-  MOZ_ASSERT(NS_IsMainThread());
-
   if (mLoaded || !mImpl) {
     return;
   }

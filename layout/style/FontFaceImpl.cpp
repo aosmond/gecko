@@ -69,7 +69,7 @@ FontFaceImpl::FontFaceImpl(FontFace* aOwner, FontFaceSetImpl* aFontFaceSet)
 FontFaceImpl::~FontFaceImpl() {
   // Assert that we don't drop any FontFace objects during a Servo traversal,
   // since PostTraversalTask objects can hold raw pointers to FontFaces.
-  MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
+  //MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
 
   SetUserFontEntry(nullptr);
 }
@@ -298,8 +298,6 @@ void FontFaceImpl::DescriptorUpdated() {
 FontFaceLoadStatus FontFaceImpl::Status() { return mStatus; }
 
 void FontFaceImpl::Load(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-
   mFontFaceSet->FlushUserFontSet();
 
   // Calling Load on a FontFace constructed with an ArrayBuffer data source,
@@ -348,8 +346,6 @@ void FontFaceImpl::DoLoad() {
 }
 
 void FontFaceImpl::SetStatus(FontFaceLoadStatus aStatus) {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   if (mStatus == aStatus) {
     return;
   }
