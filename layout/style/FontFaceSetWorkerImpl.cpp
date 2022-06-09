@@ -5,8 +5,11 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "FontFaceSetWorkerImpl.h"
+#include "FontPreloader.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
+#include "nsFontFaceLoader.h"
+#include "nsINetworkPredictor.h"
 
 using namespace mozilla;
 using namespace mozilla::css;
@@ -53,6 +56,55 @@ bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
 void FontFaceSetWorkerImpl::Destroy() {
   mWorkerRef = nullptr;
   FontFaceSetImpl::Destroy();
+}
+
+nsresult FontFaceSetWorkerImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
+                                          uint32_t aSrcIndex) {
+  nsresult rv;
+
+  nsCOMPtr<nsIStreamLoader> streamLoader;
+
+  const gfxFontFaceSrc& src = aUserFontEntry->SourceAt(aSrcIndex);
+
+  nsCOMPtr<nsILoadGroup> loadGroup(mWorkerRef->Private()->GetLoadGroup());
+  nsCOMPtr<nsIChannel> channel;
+  rv = FontPreloader::BuildChannel(
+      getter_AddRefs(channel), src.mURI->get(), CORS_ANONYMOUS,
+      dom::ReferrerPolicy::_empty /* not used */, aUserFontEntry, &src,
+      mWorkerRef->Private(), loadGroup, nullptr, false);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  RefPtr<nsFontFaceLoader> fontLoader =
+      new nsFontFaceLoader(aUserFontEntry, aSrcIndex, this, channel);
+
+  if (LOG_ENABLED()) {
+    nsCOMPtr<nsIURI> referrer =
+        src.mReferrerInfo ? src.mReferrerInfo->GetOriginalReferrer() : nullptr;
+    LOG(("userfonts (%p) download start - font uri: (%s) referrer uri: (%s)\n",
+         fontLoader.get(), src.mURI->GetSpecOrDefault().get(),
+         referrer ? referrer->GetSpecOrDefault().get() : ""));
+  }
+
+  rv = NS_NewStreamLoader(getter_AddRefs(streamLoader), fontLoader, fontLoader);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = channel->AsyncOpen(streamLoader);
+  if (NS_FAILED(rv)) {
+    fontLoader->DropChannel();  // explicitly need to break ref cycle
+  }
+
+  mLoaders.PutEntry(fontLoader);
+
+  net::PredictorLearn(src.mURI->get(), mWorkerRef->Private()->GetBaseURI(),
+                      nsINetworkPredictor::LEARN_LOAD_SUBRESOURCE, loadGroup);
+
+  if (NS_SUCCEEDED(rv)) {
+    fontLoader->StartedLoading(streamLoader);
+    // let the font entry remember the loader, in case we need to cancel it
+    aUserFontEntry->SetLoader(fontLoader);
+  }
+
+  return rv;
 }
 
 nsPresContext* FontFaceSetWorkerImpl::GetPresContext() const { return nullptr; }
