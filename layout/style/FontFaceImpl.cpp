@@ -335,6 +335,12 @@ gfxUserFontEntry* FontFaceImpl::CreateUserFontEntry() {
 }
 
 void FontFaceImpl::DoLoad() {
+  if (!NS_IsMainThread()) {
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "FontFaceImpl::DoLoad", [self = RefPtr{this}]() { self->DoLoad(); }));
+    return;
+  }
+
   if (!CreateUserFontEntry()) {
     return;
   }
