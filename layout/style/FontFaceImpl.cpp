@@ -373,7 +373,18 @@ void FontFaceImpl::SetStatus(FontFaceLoadStatus aStatus) {
     otherSet->OnFontFaceStatusChanged(this);
   }
 
+  UpdateOwnerPromise();
+}
+
+void FontFaceImpl::UpdateOwnerPromise() {
   if (NS_WARN_IF(!mOwner)) {
+    return;
+  }
+
+  if (!mFontFaceSet->IsOnOwningThread()) {
+    mFontFaceSet->DispatchToOwningThread(
+        "FontFaceImpl::UpdateOwnerPromise",
+        [self = RefPtr{this}] { self->UpdateOwnerPromise(); });
     return;
   }
 

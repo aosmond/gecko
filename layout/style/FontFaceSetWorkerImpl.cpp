@@ -8,6 +8,7 @@
 #include "FontPreloader.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
+#include "mozilla/dom/WorkerRunnable.h"
 #include "mozilla/LoadInfo.h"
 #include "nsContentPolicyUtils.h"
 #include "nsFontFaceLoader.h"
@@ -58,6 +59,40 @@ bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
 void FontFaceSetWorkerImpl::Destroy() {
   mWorkerRef = nullptr;
   FontFaceSetImpl::Destroy();
+}
+
+bool FontFaceSetWorkerImpl::IsOnOwningThread() {
+  if (!mWorkerRef) {
+    return false;
+  }
+
+  return mWorkerRef->Private()->IsOnCurrentThread();
+}
+
+void FontFaceSetWorkerImpl::DispatchToOwningThread(
+    const char* aName, std::function<void()>&& aFunc) {
+  if (!mWorkerRef) {
+    return;
+  }
+
+  class FontFaceSetWorkerRunnable final : public WorkerRunnable {
+   public:
+    FontFaceSetWorkerRunnable(WorkerPrivate* aWorkerPrivate,
+                              std::function<void()>&& aFunc)
+        : WorkerRunnable(aWorkerPrivate), mFunc(std::move(aFunc)) {}
+
+    bool WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override {
+      mFunc();
+      return true;
+    }
+
+   private:
+    std::function<void()> mFunc;
+  };
+
+  RefPtr<FontFaceSetWorkerRunnable> runnable =
+      new FontFaceSetWorkerRunnable(mWorkerRef->Private(), std::move(aFunc));
+  runnable->Dispatch();
 }
 
 nsresult FontFaceSetWorkerImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
