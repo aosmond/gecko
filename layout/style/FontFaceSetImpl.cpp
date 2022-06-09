@@ -9,7 +9,6 @@
 #include "gfxFontConstants.h"
 #include "gfxFontSrcPrincipal.h"
 #include "gfxFontSrcURI.h"
-#include "FontPreloader.h"
 #include "mozilla/css/Loader.h"
 #include "mozilla/dom/CSSFontFaceRule.h"
 #include "mozilla/dom/DocumentInlines.h"
@@ -43,7 +42,6 @@
 #include "nsIDocShell.h"
 #include "mozilla/dom/Document.h"
 #include "nsILoadContext.h"
-#include "nsINetworkPredictor.h"
 #include "nsIPrincipal.h"
 #include "nsIWebNavigation.h"
 #include "nsNetUtil.h"
@@ -313,83 +311,6 @@ bool FontFaceSetImpl::HasAvailableFontFace(FontFaceImpl* aFontFace) {
 
 void FontFaceSetImpl::RemoveLoader(nsFontFaceLoader* aLoader) {
   mLoaders.RemoveEntry(aLoader);
-}
-
-nsresult FontFaceSetImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
-                                    uint32_t aSrcIndex) {
-  nsresult rv;
-
-  nsCOMPtr<nsIStreamLoader> streamLoader;
-  RefPtr<nsFontFaceLoader> fontLoader;
-
-  const gfxFontFaceSrc& src = aUserFontEntry->SourceAt(aSrcIndex);
-
-  auto preloadKey =
-      PreloadHashKey::CreateAsFont(src.mURI->get(), CORS_ANONYMOUS);
-  RefPtr<PreloaderBase> preload =
-      mDocument->Preloads().LookupPreload(preloadKey);
-
-  if (preload) {
-    fontLoader = new nsFontFaceLoader(aUserFontEntry, aSrcIndex, this,
-                                      preload->Channel());
-
-    rv = NS_NewStreamLoader(getter_AddRefs(streamLoader), fontLoader,
-                            fontLoader);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    rv = preload->AsyncConsume(streamLoader);
-
-    // We don't want this to hang around regardless of the result, there will be
-    // no coalescing of later found <link preload> tags for fonts.
-    preload->RemoveSelf(mDocument);
-  } else {
-    // No preload found, open a channel.
-    rv = NS_ERROR_FAILURE;
-  }
-
-  nsCOMPtr<nsILoadGroup> loadGroup(mDocument->GetDocumentLoadGroup());
-  if (NS_FAILED(rv)) {
-    nsCOMPtr<nsIChannel> channel;
-    rv = FontPreloader::BuildChannel(
-        getter_AddRefs(channel), src.mURI->get(), CORS_ANONYMOUS,
-        dom::ReferrerPolicy::_empty /* not used */, aUserFontEntry, &src,
-        mDocument, loadGroup, nullptr, false);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    fontLoader = new nsFontFaceLoader(aUserFontEntry, aSrcIndex, this, channel);
-
-    if (LOG_ENABLED()) {
-      nsCOMPtr<nsIURI> referrer = src.mReferrerInfo
-                                      ? src.mReferrerInfo->GetOriginalReferrer()
-                                      : nullptr;
-      LOG((
-          "userfonts (%p) download start - font uri: (%s) referrer uri: (%s)\n",
-          fontLoader.get(), src.mURI->GetSpecOrDefault().get(),
-          referrer ? referrer->GetSpecOrDefault().get() : ""));
-    }
-
-    rv = NS_NewStreamLoader(getter_AddRefs(streamLoader), fontLoader,
-                            fontLoader);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    rv = channel->AsyncOpen(streamLoader);
-    if (NS_FAILED(rv)) {
-      fontLoader->DropChannel();  // explicitly need to break ref cycle
-    }
-  }
-
-  mLoaders.PutEntry(fontLoader);
-
-  net::PredictorLearn(src.mURI->get(), mDocument->GetDocumentURI(),
-                      nsINetworkPredictor::LEARN_LOAD_SUBRESOURCE, loadGroup);
-
-  if (NS_SUCCEEDED(rv)) {
-    fontLoader->StartedLoading(streamLoader);
-    // let the font entry remember the loader, in case we need to cancel it
-    aUserFontEntry->SetLoader(fontLoader);
-  }
-
-  return rv;
 }
 
 void FontFaceSetImpl::InsertNonRuleFontFace(FontFaceImpl* aFontFace,
