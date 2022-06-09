@@ -22,6 +22,10 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
   bool Initialize(WorkerPrivate* aWorkerPrivate);
   void Destroy() override;
 
+  bool IsOnOwningThread() override;
+  void DispatchToOwningThread(const char* aName,
+                              std::function<void()>&& aFunc) override;
+
   // gfxUserFontSet
 
   nsresult StartLoad(gfxUserFontEntry* aUserFontEntry,
