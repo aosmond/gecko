@@ -34,6 +34,8 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
 
   TimeStamp GetNavigationStartTimeStamp() override;
 
+  already_AddRefed<URLExtraData> GetURLExtraData() override;
+
   RefPtr<ThreadSafeWorkerRef> mWorkerRef;
 };
 

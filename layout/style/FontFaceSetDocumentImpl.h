@@ -90,6 +90,8 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
 
   TimeStamp GetNavigationStartTimeStamp() override;
 
+  already_AddRefed<URLExtraData> GetURLExtraData() override;
+
   // The @font-face rule backed FontFace objects in the FontFaceSet.
   nsTArray<FontFaceRecord> mRuleFaces;
 };
