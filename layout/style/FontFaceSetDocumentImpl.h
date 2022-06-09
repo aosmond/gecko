@@ -31,6 +31,8 @@ class FontFaceSetDocumentImpl final : public FontFaceSetImpl,
   nsresult StartLoad(gfxUserFontEntry* aUserFontEntry,
                      uint32_t aSrcIndex) override;
 
+  bool IsFontLoadAllowed(const gfxFontFaceSrc&) override;
+
   nsPresContext* GetPresContext() const override;
 
   bool UpdateRules(const nsTArray<nsFontFaceRuleContainer>& aRules) override;

@@ -49,8 +49,6 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
     return RefPtr{mStandardFontLoadPrincipal}.forget();
   }
 
-  bool IsFontLoadAllowed(const gfxFontFaceSrc&) override;
-
   void RecordFontLoadDone(uint32_t aFontSize, TimeStamp aDoneTime) override;
 
   bool BypassCache() final { return mBypassCache; }

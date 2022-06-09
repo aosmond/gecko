@@ -8,6 +8,8 @@
 #include "FontPreloader.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
+#include "mozilla/LoadInfo.h"
+#include "nsContentPolicyUtils.h"
 #include "nsFontFaceLoader.h"
 #include "nsINetworkPredictor.h"
 
@@ -105,6 +107,51 @@ nsresult FontFaceSetWorkerImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
   }
 
   return rv;
+}
+
+bool FontFaceSetWorkerImpl::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
+  MOZ_ASSERT(aSrc.mSourceType == gfxFontFaceSrc::eSourceType_URL);
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (aSrc.mUseOriginPrincipal) {
+    return true;
+  }
+
+  if (NS_WARN_IF(!mWorkerRef)) {
+    return false;
+  }
+
+  RefPtr<gfxFontSrcPrincipal> gfxPrincipal =
+      aSrc.mURI->InheritsSecurityContext() ? nullptr
+                                           : aSrc.LoadPrincipal(*this);
+
+  nsIPrincipal* principal =
+      gfxPrincipal ? gfxPrincipal->NodePrincipal() : nullptr;
+
+  nsGlobalWindowInner* window = nsGlobalWindowInner::GetInnerWindowWithId(
+      mWorkerRef->Private()->WindowID());
+  if (NS_WARN_IF(!window)) {
+    return false;
+  }
+
+  auto* doc = window->GetDocument();
+  if (NS_WARN_IF(!doc)) {
+    return false;
+  }
+
+  nsCOMPtr<nsILoadInfo> secCheckLoadInfo = new net::LoadInfo(
+      mWorkerRef->Private()->GetLoadingPrincipal(),  // loading principal
+      principal,                                     // triggering principal
+      doc, nsILoadInfo::SEC_ONLY_FOR_EXPLICIT_CONTENTSEC_CHECK,
+      nsIContentPolicy::TYPE_FONT);
+
+  int16_t shouldLoad = nsIContentPolicy::ACCEPT;
+  nsresult rv = NS_CheckContentLoadPolicy(aSrc.mURI->get(), secCheckLoadInfo,
+                                          ""_ns,  // mime type
+                                          &shouldLoad,
+                                          nsContentUtils::GetContentPolicy());
+
+  return NS_SUCCEEDED(rv) && NS_CP_ACCEPTED(shouldLoad);
 }
 
 nsPresContext* FontFaceSetWorkerImpl::GetPresContext() const { return nullptr; }
