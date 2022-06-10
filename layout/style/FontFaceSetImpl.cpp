@@ -783,8 +783,6 @@ nsresult FontFaceSetImpl::SyncLoadFontData(gfxUserFontEntry* aFontToLoad,
 }
 
 void FontFaceSetImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   MOZ_ASSERT(HasAvailableFontFace(aFontFace));
 
   mHasLoadingFontFacesIsDirty = true;
@@ -809,8 +807,6 @@ void FontFaceSetImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
 }
 
 void FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay() {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   if (ServoStyleSet* set = ServoStyleSet::Current()) {
     // See comments in Gecko_GetFontMetrics.
     //
@@ -824,10 +820,9 @@ void FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay() {
     return;
   }
 
-  nsCOMPtr<nsIRunnable> checkTask =
-      NewRunnableMethod("dom::FontFaceSetImpl::CheckLoadingFinishedAfterDelay",
-                        this, &FontFaceSetImpl::CheckLoadingFinishedAfterDelay);
-  mDocument->Dispatch(TaskCategory::Other, checkTask.forget());
+  DispatchToOwningThread(
+      "FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay",
+      [self = RefPtr{this}]() { self->CheckLoadingFinishedAfterDelay(); });
 }
 
 void FontFaceSetImpl::CheckLoadingFinishedAfterDelay() {
@@ -836,8 +831,6 @@ void FontFaceSetImpl::CheckLoadingFinishedAfterDelay() {
 }
 
 void FontFaceSetImpl::CheckLoadingStarted() {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   if (!HasLoadingFontFaces()) {
     return;
   }
@@ -849,9 +842,20 @@ void FontFaceSetImpl::CheckLoadingStarted() {
   }
 
   mStatus = FontFaceSetLoadStatus::Loading;
-  if (mOwner) {
-    mOwner->DispatchLoadingEventAndReplaceReadyPromise();
+
+  if (IsOnOwningThread()) {
+    if (mOwner) {
+      mOwner->DispatchLoadingEventAndReplaceReadyPromise();
+    }
+    return;
   }
+
+  DispatchToOwningThread(
+      "FontFaceSetImpl::CheckLoadingStarted", [self = RefPtr{this}]() {
+        if (self->mOwner) {
+          self->mOwner->DispatchLoadingEventAndReplaceReadyPromise();
+        }
+      });
 }
 
 void FontFaceSetImpl::UpdateHasLoadingFontFaces() {
