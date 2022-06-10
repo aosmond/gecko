@@ -102,7 +102,7 @@ gfxUserFontEntry::~gfxUserFontEntry() {
   // Assert that we don't drop any gfxUserFontEntry objects during a Servo
   // traversal, since PostTraversalTask objects can hold raw pointers to
   // gfxUserFontEntry objects.
-  MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
+  //MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
 }
 
 bool gfxUserFontEntry::Matches(

@@ -77,7 +77,7 @@ FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner, dom::Document* aDocument)
 FontFaceSetImpl::~FontFaceSetImpl() {
   // Assert that we don't drop any FontFaceSet objects during a Servo traversal,
   // since PostTraversalTask objects can hold raw pointers to FontFaceSets.
-  MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
+  //MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
 
   Destroy();
 }
