@@ -862,8 +862,6 @@ bool FontFaceSetImpl::MightHavePendingFontLoads() {
 }
 
 void FontFaceSetImpl::CheckLoadingFinished() {
-  MOZ_ASSERT(NS_IsMainThread());
-
   if (mDelayedLoadCheck) {
     // Wait until the runnable posted in OnFontFaceStatusChanged calls us.
     return;
@@ -881,9 +879,20 @@ void FontFaceSetImpl::CheckLoadingFinished() {
   }
 
   mStatus = FontFaceSetLoadStatus::Loaded;
-  if (mOwner) {
-    mOwner->MaybeResolve();
+
+  if (IsOnOwningThread()) {
+    if (mOwner) {
+      mOwner->MaybeResolve();
+    }
+    return;
   }
+
+  DispatchToOwningThread(
+      "FontFaceSetImpl::CheckLoadingFinished", [self = RefPtr{this}]() {
+        if (self->mOwner) {
+          self->mOwner->MaybeResolve();
+        }
+      });
 }
 
 /* static */
