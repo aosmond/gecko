@@ -186,8 +186,6 @@ bool FontFaceSet::ReadyPromiseIsPending() const {
 }
 
 Promise* FontFaceSet::GetReady(ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-
   mImpl->EnsureReady();
 
   if (!mReady) {
