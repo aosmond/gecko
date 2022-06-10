@@ -77,7 +77,7 @@ FontFace::FontFace(nsIGlobalObject* aParent)
 FontFace::~FontFace() {
   // Assert that we don't drop any FontFace objects during a Servo traversal,
   // since PostTraversalTask objects can hold raw pointers to FontFaces.
-  MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
+  //MOZ_ASSERT(!ServoStyleSet::IsInServoTraversal());
   Destroy();
 }
 
@@ -259,8 +259,6 @@ Promise* FontFace::GetLoaded(ErrorResult& aRv) {
 }
 
 void FontFace::MaybeResolve() {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   if (!mLoaded) {
     return;
   }
