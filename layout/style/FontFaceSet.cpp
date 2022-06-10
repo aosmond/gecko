@@ -371,8 +371,6 @@ void FontFaceSet::InsertRuleFontFace(FontFace* aFontFace, StyleOrigin aOrigin) {
 void FontFaceSet::DidRefresh() { mImpl->CheckLoadingFinished(); }
 
 void FontFaceSet::DispatchLoadingEventAndReplaceReadyPromise() {
-  AssertIsMainThreadOrServoFontMetricsLocked();
-
   if (ServoStyleSet* set = ServoStyleSet::Current()) {
     // See comments in Gecko_GetFontMetrics.
     //
