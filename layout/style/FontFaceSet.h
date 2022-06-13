@@ -27,6 +27,7 @@ namespace dom {
 class FontFace;
 class FontFaceSetImpl;
 class Promise;
+class WorkerPrivate;
 }  // namespace dom
 }  // namespace mozilla
 
@@ -41,6 +42,9 @@ class FontFaceSet final : public DOMEventTargetHelper {
 
   static already_AddRefed<FontFaceSet> CreateForDocument(
       nsIGlobalObject* aParent, dom::Document* aDocument);
+
+  static already_AddRefed<FontFaceSet> CreateForWorker(
+      nsIGlobalObject* aParent, WorkerPrivate* aWorkerPrivate);
 
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
