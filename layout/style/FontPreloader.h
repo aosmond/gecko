@@ -29,6 +29,13 @@ class FontPreloader final : public FetchPreloader {
       dom::Document* aDocument, nsILoadGroup* aLoadGroup,
       nsIInterfaceRequestor* aCallbacks, bool aIsPreload);
 
+  static nsresult BuildChannel(
+      nsIChannel** aChannel, nsIURI* aURI, const CORSMode aCORSMode,
+      const dom::ReferrerPolicy& aReferrerPolicy,
+      gfxUserFontEntry* aUserFontEntry, const gfxFontFaceSrc* aFontFaceSrc,
+      dom::WorkerPrivate* aWorkerPrivate, nsILoadGroup* aLoadGroup,
+      nsIInterfaceRequestor* aCallbacks, bool aIsPreload);
+
  protected:
   nsresult CreateChannel(nsIChannel** aChannel, nsIURI* aURI,
                          const CORSMode aCORSMode,
