@@ -11,6 +11,7 @@
 #include "mozilla/dom/FontFaceSetBinding.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/FontPropertyTypes.h"
+#include "mozilla/RecursiveMutex.h"
 #include "gfxUserFontSet.h"
 #include "nsICSSLoaderObserver.h"
 #include "nsIDOMEventListener.h"
@@ -235,7 +236,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   virtual already_AddRefed<URLExtraData> GetURLExtraData() = 0;
 
-  FontFaceSet* MOZ_NON_OWNING_REF mOwner;
+  mutable RecursiveMutex mMutex;
+
+  FontFaceSet* MOZ_NON_OWNING_REF mOwner GUARDED_BY(mMutex);
 
   // The document's node principal, which is the principal font loads for
   // this FontFaceSet will generally use.  (This principal is not used for
@@ -248,19 +251,20 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   //
   // Because mDocument's principal can change over time,
   // its value must be updated by a call to ResetStandardFontLoadPrincipal.
-  mutable RefPtr<gfxFontSrcPrincipal> mStandardFontLoadPrincipal;
+  mutable RefPtr<gfxFontSrcPrincipal> mStandardFontLoadPrincipal
+      GUARDED_BY(mMutex);
 
   // Set of all loaders pointing to us. These are not strong pointers,
   // but that's OK because nsFontFaceLoader always calls RemoveLoader on
   // us before it dies (unless we die first).
-  nsTHashtable<nsPtrHashKey<nsFontFaceLoader>> mLoaders;
+  nsTHashtable<nsPtrHashKey<nsFontFaceLoader>> mLoaders GUARDED_BY(mMutex);
 
   // The non rule backed FontFace objects that have been added to this
   // FontFaceSet.
-  nsTArray<FontFaceRecord> mNonRuleFaces;
+  nsTArray<FontFaceRecord> mNonRuleFaces GUARDED_BY(mMutex);
 
   // The overall status of the loading or loaded fonts in the FontFaceSet.
-  dom::FontFaceSetLoadStatus mStatus;
+  dom::FontFaceSetLoadStatus mStatus GUARDED_BY(mMutex);
 
   // A map from gfxFontFaceSrc pointer identity to whether the load is allowed
   // by CSP or other checks. We store this here because querying CSP off the
@@ -268,29 +272,30 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   //
   // We could use just the pointer and use this as a hash set, but then we'd
   // have no way to verify that we've checked all the loads we should.
-  nsTHashMap<nsPtrHashKey<const gfxFontFaceSrc>, bool> mAllowedFontLoads;
+  nsTHashMap<nsPtrHashKey<const gfxFontFaceSrc>, bool> mAllowedFontLoads
+      GUARDED_BY(mMutex);
 
   // Whether mNonRuleFaces has changed since last time UpdateRules ran.
-  bool mNonRuleFacesDirty;
+  bool mNonRuleFacesDirty GUARDED_BY(mMutex);
 
   // Whether any FontFace objects in mRuleFaces or mNonRuleFaces are
   // loading.  Only valid when mHasLoadingFontFacesIsDirty is false.  Don't use
   // this variable directly; call the HasLoadingFontFaces method instead.
-  bool mHasLoadingFontFaces;
+  bool mHasLoadingFontFaces GUARDED_BY(mMutex);
 
   // This variable is only valid when mLoadingDirty is false.
-  bool mHasLoadingFontFacesIsDirty;
+  bool mHasLoadingFontFacesIsDirty GUARDED_BY(mMutex);
 
   // Whether CheckLoadingFinished calls should be ignored.  See comment in
   // OnFontFaceStatusChanged.
-  bool mDelayedLoadCheck;
+  bool mDelayedLoadCheck GUARDED_BY(mMutex);
 
   // Whether the docshell for our document indicated that loads should
-  // bypass the cache.
+  // bypass the cache. Set once at initialization.
   bool mBypassCache;
 
   // Whether the docshell for our document indicates that we are in private
-  // browsing mode.
+  // browsing mode. Set once at initialization.
   bool mPrivateBrowsing;
 };
 
