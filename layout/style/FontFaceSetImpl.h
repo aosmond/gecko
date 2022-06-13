@@ -87,7 +87,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   // Called by nsFontFaceLoader when the loader has completed normally.
   // It's removed from the mLoaders set.
-  void RemoveLoader(nsFontFaceLoader* aLoader);
+  virtual void RemoveLoader(nsFontFaceLoader* aLoader);
 
   virtual bool UpdateRules(const nsTArray<nsFontFaceRuleContainer>& aRules) {
     MOZ_ASSERT_UNREACHABLE("Not implemented!");
@@ -111,7 +111,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
    * Notification method called by a FontFace to indicate that its loading
    * status has changed.
    */
-  void OnFontFaceStatusChanged(FontFaceImpl* aFontFace);
+  virtual void OnFontFaceStatusChanged(FontFaceImpl* aFontFace);
 
   /**
    * Notification method called by the nsPresContext to indicate that the
@@ -144,8 +144,8 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   dom::FontFaceSetLoadStatus Status();
 
   virtual bool Add(FontFaceImpl* aFontFace, ErrorResult& aRv);
-  void Clear();
-  bool Delete(FontFaceImpl* aFontFace);
+  virtual void Clear();
+  virtual bool Delete(FontFaceImpl* aFontFace);
 
   // For ServoStyleSet to know ahead of time whether a font is loadable.
   virtual void CacheFontLoadability() {
@@ -158,12 +158,14 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
    * Checks to see whether it is time to resolve mReady and dispatch any
    * "loadingdone" and "loadingerror" events.
    */
-  void CheckLoadingFinished();
+  virtual void CheckLoadingFinished();
 
-  void FindMatchingFontFaces(const nsACString& aFont, const nsAString& aText,
-                             nsTArray<FontFace*>& aFontFaces, ErrorResult& aRv);
+  virtual void FindMatchingFontFaces(const nsACString& aFont,
+                                     const nsAString& aText,
+                                     nsTArray<FontFace*>& aFontFaces,
+                                     ErrorResult& aRv);
 
-  void DispatchCheckLoadingFinishedAfterDelay();
+  virtual void DispatchCheckLoadingFinishedAfterDelay();
 
  protected:
   ~FontFaceSetImpl() override;
