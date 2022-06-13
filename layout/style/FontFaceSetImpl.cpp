@@ -63,7 +63,8 @@ using namespace mozilla::dom;
 NS_IMPL_ISUPPORTS0(FontFaceSetImpl)
 
 FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner)
-    : mOwner(aOwner),
+    : mMutex("mozilla::dom::FontFaceSetImpl"),
+      mOwner(aOwner),
       mStatus(FontFaceSetLoadStatus::Loaded),
       mNonRuleFacesDirty(false),
       mHasLoadingFontFaces(false),

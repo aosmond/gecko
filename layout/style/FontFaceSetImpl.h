@@ -11,6 +11,7 @@
 #include "mozilla/dom/FontFaceSetBinding.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/FontPropertyTypes.h"
+#include "mozilla/RecursiveMutex.h"
 #include "gfxUserFontSet.h"
 #include "nsICSSLoaderObserver.h"
 #include "nsIDOMEventListener.h"
@@ -242,6 +243,8 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   CreateStandardFontLoadPrincipal() const = 0;
 
   virtual already_AddRefed<URLExtraData> GetURLExtraData() = 0;
+
+  RecursiveMutex mMutex;
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
 
