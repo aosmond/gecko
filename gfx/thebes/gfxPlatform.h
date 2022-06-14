@@ -920,8 +920,6 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
   int8_t mGraphiteShapingEnabled;
   int8_t mOpenTypeSVGEnabled;
 
-  int8_t mBidiNumeralOption;
-
   // whether to always search font cmaps globally
   // when doing system font fallback
   int8_t mFallbackUsesCmaps;

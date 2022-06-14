@@ -24,6 +24,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/StaticPrefs_accessibility.h"
 #include "mozilla/StaticPrefs_apz.h"
+#include "mozilla/StaticPrefs_bidi.h"
 #include "mozilla/StaticPrefs_canvas.h"
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_layout.h"
@@ -408,13 +409,10 @@ void CrashStatsLogForwarder::CrashAction(LogReason aReason) {
 #  define GFX_PREF_CORETEXT_SHAPING "gfx.font_rendering.coretext.enabled"
 #endif
 
-#define BIDI_NUMERAL_PREF "bidi.numeral"
-
 #define FONT_VARIATIONS_PREF "layout.css.font-variations.enabled"
 
 static const char* kObservedPrefs[] = {"gfx.downloadable_fonts.",
-                                       "gfx.font_rendering.", BIDI_NUMERAL_PREF,
-                                       nullptr};
+                                       "gfx.font_rendering.", nullptr};
 
 static void FontPrefChanged(const char* aPref, void* aData) {
   MOZ_ASSERT(aPref);
@@ -453,7 +451,6 @@ gfxPlatform::gfxPlatform()
   mWordCacheMaxEntries = UNINITIALIZED_VALUE;
   mGraphiteShapingEnabled = UNINITIALIZED_VALUE;
   mOpenTypeSVGEnabled = UNINITIALIZED_VALUE;
-  mBidiNumeralOption = UNINITIALIZED_VALUE;
 
   InitBackendPrefs(GetBackendPrefs());
   VRManager::ManagerInit();
@@ -2208,10 +2205,7 @@ void gfxPlatform::ShutdownCMS() {
 }
 
 int32_t gfxPlatform::GetBidiNumeralOption() {
-  if (mBidiNumeralOption == UNINITIALIZED_VALUE) {
-    mBidiNumeralOption = Preferences::GetInt(BIDI_NUMERAL_PREF, 0);
-  }
-  return mBidiNumeralOption;
+  return StaticPrefs::bidi_numeral();
 }
 
 /* static */
@@ -2266,8 +2260,6 @@ void gfxPlatform::FontsPrefsChanged(const char* aPref) {
 #endif
       !strcmp("gfx.font_rendering.ahem_antialias_none", aPref)) {
     FlushFontAndWordCaches();
-  } else if (!strcmp(BIDI_NUMERAL_PREF, aPref)) {
-    mBidiNumeralOption = UNINITIALIZED_VALUE;
   } else if (!strcmp(GFX_PREF_OPENTYPE_SVG, aPref)) {
     mOpenTypeSVGEnabled = UNINITIALIZED_VALUE;
     gfxFontCache::GetCache()->AgeAllGenerations();
