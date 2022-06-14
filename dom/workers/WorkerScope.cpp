@@ -479,21 +479,15 @@ FontFaceSet* WorkerGlobalScope::GetFontFaceSet() {
   AssertIsOnWorkerThread();
 
   if (!mFontFaceSet) {
-    RefPtr<FontFaceSet> fonts = Fonts();
+    mFontFaceSet = FontFaceSet::CreateForWorker(this, mWorkerPrivate);
+    MOZ_ASSERT(mFontFaceSet);
   }
 
   return mFontFaceSet;
 }
 
 already_AddRefed<FontFaceSet> WorkerGlobalScope::Fonts() {
-  AssertIsOnWorkerThread();
-
-  if (!mFontFaceSet) {
-    mFontFaceSet = FontFaceSet::CreateForWorker(this, mWorkerPrivate);
-    MOZ_ASSERT(mFontFaceSet);
-  }
-
-  return RefPtr{mFontFaceSet}.forget();
+  return RefPtr{GetFontFaceSet()}.forget();
 }
 
 OnErrorEventHandlerNonNull* WorkerGlobalScope::GetOnerror() {
