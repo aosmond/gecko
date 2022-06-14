@@ -187,6 +187,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
    */
   void CheckLoadingFinishedAfterDelay();
 
+  void OnLoadingStarted();
+  void OnLoadingFinished();
+
   // Note: if you add new cycle collected objects to FontFaceRecord,
   // make sure to update FontFaceSet's cycle collection macros
   // accordingly.

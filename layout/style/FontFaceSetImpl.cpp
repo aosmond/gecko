@@ -853,18 +853,18 @@ void FontFaceSetImpl::CheckLoadingStarted() {
   mStatus = FontFaceSetLoadStatus::Loading;
 
   if (IsOnOwningThread()) {
-    if (mOwner) {
-      mOwner->DispatchLoadingEventAndReplaceReadyPromise();
-    }
+    OnLoadingStarted();
     return;
   }
 
-  DispatchToOwningThread(
-      "FontFaceSetImpl::CheckLoadingStarted", [self = RefPtr{this}]() {
-        if (self->mOwner) {
-          self->mOwner->DispatchLoadingEventAndReplaceReadyPromise();
-        }
-      });
+  DispatchToOwningThread("FontFaceSetImpl::CheckLoadingStarted",
+                         [self = RefPtr{this}]() { self->OnLoadingStarted(); });
+}
+
+void FontFaceSetImpl::OnLoadingStarted() {
+  if (mOwner) {
+    mOwner->DispatchLoadingEventAndReplaceReadyPromise();
+  }
 }
 
 void FontFaceSetImpl::UpdateHasLoadingFontFaces() {
@@ -910,18 +910,19 @@ void FontFaceSetImpl::CheckLoadingFinished() {
   mStatus = FontFaceSetLoadStatus::Loaded;
 
   if (IsOnOwningThread()) {
-    if (mOwner) {
-      mOwner->MaybeResolve();
-    }
+    OnLoadingFinished();
     return;
   }
 
   DispatchToOwningThread(
-      "FontFaceSetImpl::CheckLoadingFinished", [self = RefPtr{this}]() {
-        if (self->mOwner) {
-          self->mOwner->MaybeResolve();
-        }
-      });
+      "FontFaceSetImpl::CheckLoadingFinished",
+      [self = RefPtr{this}]() { self->OnLoadingFinished(); });
+}
+
+void FontFaceSetImpl::OnLoadingFinished() {
+  if (mOwner) {
+    mOwner->MaybeResolve();
+  }
 }
 
 void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
