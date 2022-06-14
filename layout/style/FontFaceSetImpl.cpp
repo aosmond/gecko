@@ -149,6 +149,8 @@ void FontFaceSetImpl::FindMatchingFontFaces(const nsACString& aFont,
                                             const nsAString& aText,
                                             nsTArray<FontFace*>& aFontFaces,
                                             ErrorResult& aRv) {
+  RecursiveMutexAutoLock lock(mMutex);
+
   StyleFontFamilyList familyList;
   FontWeight weight;
   FontStretch stretch;
@@ -208,6 +210,8 @@ void FontFaceSetImpl::FindMatchingFontFaces(const nsACString& aFont,
 void FontFaceSetImpl::FindMatchingFontFaces(
     const nsTHashSet<FontFace*>& aMatchingFaces,
     nsTArray<FontFace*>& aFontFaces) {
+  mMutex.AssertCurrentThreadIn();
+
   for (FontFaceRecord& record : mNonRuleFaces) {
     FontFace* owner = record.mFontFace->GetOwner();
     if (owner && aMatchingFaces.Contains(owner)) {
@@ -217,10 +221,12 @@ void FontFaceSetImpl::FindMatchingFontFaces(
 }
 
 bool FontFaceSetImpl::ReadyPromiseIsPending() const {
+  mMutex.AssertCurrentThreadIn();
   return mOwner ? mOwner->ReadyPromiseIsPending() : false;
 }
 
 FontFaceSetLoadStatus FontFaceSetImpl::Status() {
+  RecursiveMutexAutoLock lock(mMutex);
   FlushUserFontSet();
   return mStatus;
 }
@@ -825,12 +831,14 @@ void FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay() {
 }
 
 void FontFaceSetImpl::CheckLoadingFinishedAfterDelay() {
+  RecursiveMutexAutoLock lock(mMutex);
   mDelayedLoadCheck = false;
   CheckLoadingFinished();
 }
 
 void FontFaceSetImpl::CheckLoadingStarted() {
   gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
+  RecursiveMutexAutoLock lock(mMutex);
 
   if (!HasLoadingFontFaces()) {
     return;
