@@ -917,12 +917,6 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
   virtual bool CheckVariationFontSupport() = 0;
 
   int8_t mAllowDownloadableFonts;
-  int8_t mGraphiteShapingEnabled;
-  int8_t mOpenTypeSVGEnabled;
-
-  // whether to always search font cmaps globally
-  // when doing system font fallback
-  int8_t mFallbackUsesCmaps;
 
   // Whether the platform supports rendering OpenType font variations
   bool mHasVariationFontSupport;
@@ -930,12 +924,6 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
   // Whether the platform font APIs have native support for COLR fonts.
   // Set to true during initialization on platforms that implement this.
   bool mHasNativeColrFontSupport = false;
-
-  // max character limit for words in word cache
-  int32_t mWordCacheCharLimit;
-
-  // max number of entries in word cache
-  int32_t mWordCacheMaxEntries;
 
   // The global vsync dispatcher. Only non-null in the parent process.
   // Its underlying VsyncSource is either mGlobalHardwareVsyncSource

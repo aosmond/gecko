@@ -5556,6 +5556,12 @@
   value: true
   mirror: always
 
+# whether to always search all font cmaps during system font fallback
+- name: gfx.font_rendering.fallback.always_use_cmaps
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 #if defined(XP_WIN)
 # Whether the DirectWrite bold simulation should be used when a bold font-weight
 # is requested but no bold face available in the family. This renders poorly with
@@ -5570,6 +5576,23 @@
   value: 1
   mirror: always
 #endif
+
+- name: gfx.font_rendering.graphite.enabled
+  type: RelaxedAtomicBool
+  value: true
+  mirror: always
+
+# Cache shaped word results
+- name: gfx.font_rendering.wordcache.charlimit
+  type: RelaxedAtomicUint32
+  value: 32
+  mirror: always
+
+# Cache shaped word results
+- name: gfx.font_rendering.wordcache.maxentries
+  type: RelaxedAtomicUint32
+  value: 10000
+  mirror: always
 
 # The level of logging:
 # - 0: no logging;
