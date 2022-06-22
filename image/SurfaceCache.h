@@ -159,8 +159,10 @@ class AvailabilityState {
   bool IsAvailable() const { return mIsAvailable; }
   bool IsPlaceholder() const { return !mIsAvailable; }
   bool CannotSubstitute() const { return mCannotSubstitute; }
+  bool HasError() const { return mHasError; }
 
   void SetCannotSubstitute() { mCannotSubstitute = true; }
+  void SetHasError() { mHasError = true; }
 
  private:
   friend class SurfaceCacheImpl;
@@ -172,6 +174,7 @@ class AvailabilityState {
 
   bool mIsAvailable : 1;
   bool mCannotSubstitute : 1;
+  bool mHasError : 1;
 };
 
 enum class InsertOutcome : uint8_t {
@@ -241,6 +244,23 @@ struct SurfaceCache {
    */
   static LookupResult Lookup(const ImageKey aImageKey,
                              const SurfaceKey& aSurfaceKey, bool aMarkUsed);
+
+  /**
+   * Looks up the requested cache entry and returns a drawable reference to its
+   * associated surface.
+   *
+   * If the image associated with the cache entry is locked, then the entry will
+   * be locked before it is returned.
+   *
+   * @param aImageKey       Key data identifying which image the cache entry
+   *                        belongs to.
+   * @param aSurfaceKey     Key data which uniquely identifies the requested
+   *                        cache entry.
+   * @return                a LookupResult which will contain a DrawableSurface
+   *                        if the cache entry was found.
+   */
+  static LookupResult LookupSync(const ImageKey aImageKey,
+                                 const SurfaceKey& aSurfaceKey, bool aMarkUsed);
 
   /**
    * Looks up the best matching cache entry and returns a drawable reference to
@@ -320,6 +340,22 @@ struct SurfaceCache {
    * @param aProvider       The cache entry that now has a surface available.
    */
   static void SurfaceAvailable(NotNull<ISurfaceProvider*> aProvider);
+
+  /**
+   * Mark the cache entry @aProvider as having encountered an error. This is
+   * only useful if there is a blocked LookupSync call preventing the main
+   * thread from evicting the surfaces.
+   *
+   * If the cache entry containing @aProvider has already been evicted from the
+   * surface cache, this function has no effect.
+   *
+   * It's illegal to call this function if @aProvider is not a placeholder; by
+   * definition, non-placeholder ISurfaceProviders should have a surface
+   * available already.
+   *
+   * @param aProvider       The cache entry that will never have a surface.
+   */
+  static void SurfaceError(NotNull<ISurfaceProvider*> aProvider);
 
   /**
    * Checks if a surface of a given size could possibly be stored in the cache.

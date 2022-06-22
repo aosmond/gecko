@@ -445,11 +445,20 @@ RefreshResult FrameAnimator::RequestRefresh(AnimationState& aState,
 }
 
 LookupResult FrameAnimator::GetCompositedFrame(AnimationState& aState,
+                                               uint32_t aFlags,
                                                bool aMarkUsed) {
-  LookupResult result = SurfaceCache::Lookup(
-      ImageKey(mImage),
-      RasterSurfaceKey(mSize, DefaultSurfaceFlags(), PlaybackType::eAnimated),
-      aMarkUsed);
+  LookupResult result(MatchType::NOT_FOUND);
+  if (aFlags & imgIContainer::FLAG_SYNC_DECODE) {
+    result = SurfaceCache::LookupSync(
+        ImageKey(mImage),
+        RasterSurfaceKey(mSize, DefaultSurfaceFlags(), PlaybackType::eAnimated),
+        aMarkUsed);
+  } else {
+    result = SurfaceCache::Lookup(
+        ImageKey(mImage),
+        RasterSurfaceKey(mSize, DefaultSurfaceFlags(), PlaybackType::eAnimated),
+        aMarkUsed);
+  }
 
   if (result) {
     // If we are getting the frame directly (e.g. through tests or canvas), we

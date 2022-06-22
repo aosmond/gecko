@@ -179,6 +179,12 @@ void DecodedSurfaceProvider::FinishDecoding() {
   MOZ_ASSERT(mImage);
   MOZ_ASSERT(mDecoder);
 
+  // If we never got a surface, mark the entry as such, so that we know it will
+  // never get a surface.
+  if (!mSurface) {
+    SurfaceCache::SurfaceError(WrapNotNull(this));
+  }
+
   // Send notifications.
   NotifyDecodeComplete(WrapNotNull(mImage), WrapNotNull(mDecoder));
 

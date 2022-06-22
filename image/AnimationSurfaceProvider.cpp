@@ -465,6 +465,16 @@ void AnimationSurfaceProvider::FinishDecoding() {
   MOZ_ASSERT(mDecoder);
 
   if (mImage) {
+    bool framesEmpty;
+    {
+      MutexAutoLock lock(mFramesMutex);
+      framesEmpty = mFrames->Size() == 0;
+    }
+
+    if (framesEmpty) {
+      SurfaceCache::SurfaceError(WrapNotNull(this));
+    }
+
     // Send notifications.
     NotifyDecodeComplete(WrapNotNull(mImage), WrapNotNull(mDecoder));
   }

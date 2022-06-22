@@ -288,15 +288,25 @@ LookupResult RasterImage::LookupFrameInternal(const OrientedIntSize& aSize,
     MOZ_ASSERT(mFrameAnimator);
     MOZ_ASSERT(ToSurfaceFlags(aFlags) == DefaultSurfaceFlags(),
                "Can't composite frames with non-default surface flags");
-    return mFrameAnimator->GetCompositedFrame(*mAnimationState, aMarkUsed);
+    return mFrameAnimator->GetCompositedFrame(*mAnimationState, aFlags,
+                                              aMarkUsed);
   }
 
   SurfaceFlags surfaceFlags = ToSurfaceFlags(aFlags);
 
-  // We don't want any substitution for sync decodes, and substitution would be
-  // illegal when high quality downscaling is disabled, so we use
-  // SurfaceCache::Lookup in this case.
-  if ((aFlags & FLAG_SYNC_DECODE) || !(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
+  // We don't want any substitution for sync decodes and we want to block on any
+  // pending surfaces to produce a frame.
+  if ((aFlags & FLAG_SYNC_DECODE)) {
+    return SurfaceCache::LookupSync(
+        ImageKey(this),
+        RasterSurfaceKey(aSize.ToUnknownSize(), surfaceFlags,
+                         PlaybackType::eStatic),
+        aMarkUsed);
+  }
+
+  // Substitution would be illegal when high quality downscaling is disabled, so
+  // we use SurfaceCache::Lookup in this case.
+  if (!(aFlags & FLAG_HIGH_QUALITY_SCALING)) {
     return SurfaceCache::Lookup(
         ImageKey(this),
         RasterSurfaceKey(aSize.ToUnknownSize(), surfaceFlags,
@@ -331,6 +341,12 @@ LookupResult RasterImage::LookupFrame(const OrientedIntSize& aSize,
     return LookupResult(MatchType::NOT_FOUND);
   }
 
+  // If we want to sync decode, then fail if we don't have all the source data.
+  const bool syncDecode = aFlags & FLAG_SYNC_DECODE;
+  if (syncDecode && !LoadAllSourceData()) {
+    return LookupResult(MatchType::NOT_FOUND);
+  }
+
   LookupResult result =
       LookupFrameInternal(requestedSize, aFlags, aPlaybackType, aMarkUsed);
 
@@ -343,21 +359,12 @@ LookupResult RasterImage::LookupFrame(const OrientedIntSize& aSize,
   // 1) There is no pending decode
   // 2) There is no acceptable size decoded
   // 3) The pending decode has not produced a frame yet, a sync decode is
-  // requested, and we have all the source data. Without the source data, we
-  // will just trigger another async decode anyways.
-  //
-  // TODO(aosmond): We should better handle case 3. We should actually return
-  // TEMPORARY_ERROR or NOT_READY if we don't have all the source data and a
-  // sync decode is requested. If there is a pending decode and we have all the
-  // source data, we should always be able to block on the frame's monitor --
-  // perhaps this could be accomplished by preallocating the first frame buffer
-  // when we create the decoder.
-  const bool syncDecode = aFlags & FLAG_SYNC_DECODE;
+  // requested. We know we have all the source data as we enforce this above.
   const bool avoidRedecode = aFlags & FLAG_AVOID_REDECODE_FOR_SIZE;
   if (result.Type() == MatchType::NOT_FOUND ||
       (result.Type() == MatchType::SUBSTITUTE_BECAUSE_NOT_FOUND &&
        !avoidRedecode) ||
-      (syncDecode && !avoidRedecode && !result && LoadAllSourceData())) {
+      (syncDecode && !avoidRedecode && !result)) {
     // We don't have a copy of this frame, and there's no decoder working on
     // one. (Or we're sync decoding and the existing decoder hasn't even started
     // yet.) Trigger decoding so it'll be available next time.
@@ -394,7 +401,8 @@ LookupResult RasterImage::LookupFrame(const OrientedIntSize& aSize,
   // Sync decoding guarantees that we got the frame, but if it's owned by an
   // async decoder that's currently running, the contents of the frame may not
   // be available yet. Make sure we get everything.
-  if (LoadAllSourceData() && syncDecode) {
+  if (syncDecode) {
+    MOZ_ASSERT(LoadAllSourceData());
     result.Surface()->WaitUntilFinished();
   }
 
@@ -604,7 +612,7 @@ RasterImage::GetImageProvider(WindowRenderer* aRenderer,
     return ImgDrawResult::BAD_IMAGE;
   }
 
-  if (!LoadHasSize()) {
+  if (!LoadHasSize() || (aFlags & imgIContainer::FLAG_SYNC_DECODE)) {
     return ImgDrawResult::NOT_READY;
   }
 

@@ -298,7 +298,8 @@ class FrameAnimator {
    * not have required compositing). It may not be available because it hasn't
    * been decoded yet, in which case we return an empty LookupResult.
    */
-  LookupResult GetCompositedFrame(AnimationState& aState, bool aMarkUsed);
+  LookupResult GetCompositedFrame(AnimationState& aState, uint32_t aFlags,
+                                  bool aMarkUsed);
 
  private:  // methods
   /**
