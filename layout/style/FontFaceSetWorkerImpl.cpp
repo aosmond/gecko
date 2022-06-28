@@ -171,21 +171,10 @@ bool FontFaceSetWorkerImpl::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
   nsIPrincipal* principal =
       gfxPrincipal ? gfxPrincipal->NodePrincipal() : nullptr;
 
-  nsGlobalWindowInner* window = nsGlobalWindowInner::GetInnerWindowWithId(
-      mWorkerRef->Private()->WindowID());
-  if (NS_WARN_IF(!window)) {
-    return false;
-  }
-
-  auto* doc = window->GetDocument();
-  if (NS_WARN_IF(!doc)) {
-    return false;
-  }
-
   nsCOMPtr<nsILoadInfo> secCheckLoadInfo = new net::LoadInfo(
       mWorkerRef->Private()->GetLoadingPrincipal(),  // loading principal
       principal,                                     // triggering principal
-      doc, nsILoadInfo::SEC_ONLY_FOR_EXPLICIT_CONTENTSEC_CHECK,
+      nullptr, nsILoadInfo::SEC_ONLY_FOR_EXPLICIT_CONTENTSEC_CHECK,
       nsIContentPolicy::TYPE_FONT);
 
   int16_t shouldLoad = nsIContentPolicy::ACCEPT;
