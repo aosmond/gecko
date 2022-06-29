@@ -127,6 +127,13 @@ FontFaceSetDocumentImpl::CreateStandardFontLoadPrincipal() const {
                                             mDocument->PartitionedPrincipal());
 }
 
+already_AddRefed<URLExtraData> FontFaceSetDocumentImpl::GetURLExtraData() {
+  if (!mDocument) {
+    return nullptr;
+  }
+  return RefPtr{mDocument->DefaultStyleAttrURLData()}.forget();
+}
+
 void FontFaceSetDocumentImpl::RemoveDOMContentLoadedListener() {
   if (mDocument) {
     mDocument->RemoveSystemEventListener(u"DOMContentLoaded"_ns, this, false);
