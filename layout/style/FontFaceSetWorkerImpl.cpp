@@ -27,7 +27,7 @@ using namespace mozilla::dom;
 NS_IMPL_ISUPPORTS_INHERITED0(FontFaceSetWorkerImpl, FontFaceSetImpl);
 
 FontFaceSetWorkerImpl::FontFaceSetWorkerImpl(FontFaceSet* aOwner)
-    : FontFaceSetImpl(aOwner) {}
+    : FontFaceSetImpl(aOwner), mMutex("mozilla::dom::FontFaceSetWorkerImpl") {}
 
 FontFaceSetWorkerImpl::~FontFaceSetWorkerImpl() = default;
 
@@ -41,7 +41,10 @@ bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
     return false;
   }
 
-  mWorkerRef = new ThreadSafeWorkerRef(workerRef);
+  {
+    RecursiveMutexAutoLock lock(mMutex);
+    mWorkerRef = new ThreadSafeWorkerRef(workerRef);
+  }
 
   class InitRunnable final : public WorkerMainThreadRunnable {
    public:
@@ -73,6 +76,7 @@ bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
 
 void FontFaceSetWorkerImpl::InitializeOnMainThread() {
   MOZ_ASSERT(NS_IsMainThread());
+  RecursiveMutexAutoLock lock(mMutex);
 
   if (!mWorkerRef) {
     return;
@@ -132,11 +136,13 @@ void FontFaceSetWorkerImpl::InitializeOnMainThread() {
 }
 
 void FontFaceSetWorkerImpl::Destroy() {
+  RecursiveMutexAutoLock lock(mMutex);
   mWorkerRef = nullptr;
   FontFaceSetImpl::Destroy();
 }
 
 bool FontFaceSetWorkerImpl::IsOnOwningThread() {
+  RecursiveMutexAutoLock lock(mMutex);
   if (!mWorkerRef) {
     return false;
   }
@@ -146,6 +152,7 @@ bool FontFaceSetWorkerImpl::IsOnOwningThread() {
 
 void FontFaceSetWorkerImpl::DispatchToOwningThread(
     const char* aName, std::function<void()>&& aFunc) {
+  RecursiveMutexAutoLock lock(mMutex);
   if (!mWorkerRef) {
     return;
   }
@@ -171,6 +178,7 @@ void FontFaceSetWorkerImpl::DispatchToOwningThread(
 }
 
 uint64_t FontFaceSetWorkerImpl::GetInnerWindowID() {
+  RecursiveMutexAutoLock lock(mMutex);
   if (!mWorkerRef) {
     return 0;
   }
@@ -178,8 +186,24 @@ uint64_t FontFaceSetWorkerImpl::GetInnerWindowID() {
   return mWorkerRef->Private()->WindowID();
 }
 
+void FontFaceSetWorkerImpl::RemoveLoader(nsFontFaceLoader* aLoader) {
+  RecursiveMutexAutoLock lock(mMutex);
+  FontFaceSetImpl::RemoveLoader(aLoader);
+}
+
+void FontFaceSetWorkerImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
+  RecursiveMutexAutoLock lock(mMutex);
+  FontFaceSetImpl::OnFontFaceStatusChanged(aFontFace);
+}
+
 nsresult FontFaceSetWorkerImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
                                           uint32_t aSrcIndex) {
+  RecursiveMutexAutoLock lock(mMutex);
+
+  if (NS_WARN_IF(!mWorkerRef)) {
+    return NS_ERROR_FAILURE;
+  }
+
   nsresult rv;
 
   nsCOMPtr<nsIStreamLoader> streamLoader;
@@ -231,6 +255,8 @@ bool FontFaceSetWorkerImpl::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
   MOZ_ASSERT(aSrc.mSourceType == gfxFontFaceSrc::eSourceType_URL);
   MOZ_ASSERT(NS_IsMainThread());
 
+  RecursiveMutexAutoLock lock(mMutex);
+
   if (aSrc.mUseOriginPrincipal) {
     return true;
   }
@@ -264,6 +290,11 @@ bool FontFaceSetWorkerImpl::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
 nsresult FontFaceSetWorkerImpl::CreateChannelForSyncLoadFontData(
     nsIChannel** aOutChannel, gfxUserFontEntry* aFontToLoad,
     const gfxFontFaceSrc* aFontFaceSrc) {
+  RecursiveMutexAutoLock lock(mMutex);
+  if (NS_WARN_IF(!mWorkerRef)) {
+    return NS_ERROR_FAILURE;
+  }
+
   gfxFontSrcPrincipal* principal = aFontToLoad->GetPrincipal();
 
   // We only get here for data: loads, so it doesn't really matter whether we
@@ -281,6 +312,7 @@ nsresult FontFaceSetWorkerImpl::CreateChannelForSyncLoadFontData(
 nsPresContext* FontFaceSetWorkerImpl::GetPresContext() const { return nullptr; }
 
 TimeStamp FontFaceSetWorkerImpl::GetNavigationStartTimeStamp() {
+  RecursiveMutexAutoLock lock(mMutex);
   if (!mWorkerRef) {
     return TimeStamp();
   }
@@ -289,7 +321,46 @@ TimeStamp FontFaceSetWorkerImpl::GetNavigationStartTimeStamp() {
 }
 
 already_AddRefed<URLExtraData> FontFaceSetWorkerImpl::GetURLExtraData() {
+  RecursiveMutexAutoLock lock(mMutex);
   return RefPtr{mURLExtraData}.forget();
+}
+
+already_AddRefed<gfxFontSrcPrincipal>
+FontFaceSetWorkerImpl::GetStandardFontLoadPrincipal() const {
+  RecursiveMutexAutoLock lock(mMutex);
+  return RefPtr{mStandardFontLoadPrincipal}.forget();
+}
+
+bool FontFaceSetWorkerImpl::Add(FontFaceImpl* aFontFace, ErrorResult& aRv) {
+  RecursiveMutexAutoLock lock(mMutex);
+  return FontFaceSetImpl::Add(aFontFace, aRv);
+}
+
+void FontFaceSetWorkerImpl::Clear() {
+  RecursiveMutexAutoLock lock(mMutex);
+  FontFaceSetImpl::Clear();
+}
+
+bool FontFaceSetWorkerImpl::Delete(FontFaceImpl* aFontFace) {
+  RecursiveMutexAutoLock lock(mMutex);
+  return FontFaceSetImpl::Delete(aFontFace);
+}
+
+void FontFaceSetWorkerImpl::CheckLoadingFinished() {
+  RecursiveMutexAutoLock lock(mMutex);
+  FontFaceSetImpl::CheckLoadingFinished();
+}
+
+void FontFaceSetWorkerImpl::FindMatchingFontFaces(
+    const nsACString& aFont, const nsAString& aText,
+    nsTArray<FontFace*>& aFontFaces, ErrorResult& aRv) {
+  RecursiveMutexAutoLock lock(mMutex);
+  FontFaceSetImpl::FindMatchingFontFaces(aFont, aText, aFontFaces, aRv);
+}
+
+void FontFaceSetWorkerImpl::DispatchCheckLoadingFinishedAfterDelay() {
+  RecursiveMutexAutoLock lock(mMutex);
+  FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay();
 }
 
 #undef LOG_ENABLED

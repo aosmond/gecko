@@ -8,6 +8,7 @@
 #define mozilla_dom_FontFaceSetWorkerImpl_h
 
 #include "mozilla/dom/FontFaceSetImpl.h"
+#include "mozilla/RecursiveMutex.h"
 
 namespace mozilla::dom {
 class ThreadSafeWorkerRef;
@@ -26,9 +27,16 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
   void DispatchToOwningThread(const char* aName,
                               std::function<void()>&& aFunc) override;
 
+  void RemoveLoader(nsFontFaceLoader* aLoader) override;
+
+  void OnFontFaceStatusChanged(FontFaceImpl* aFontFace) override;
+
   already_AddRefed<URLExtraData> GetURLExtraData() override;
 
   // gfxUserFontSet
+
+  already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+      const override;
 
   nsresult StartLoad(gfxUserFontEntry* aUserFontEntry,
                      uint32_t aSrcIndex) override;
@@ -36,6 +44,18 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
   bool IsFontLoadAllowed(const gfxFontFaceSrc&) override;
 
   nsPresContext* GetPresContext() const override;
+
+  bool Add(FontFaceImpl* aFontFace, ErrorResult& aRv) override;
+  void Clear() override;
+  bool Delete(FontFaceImpl* aFontFace) override;
+
+  void CheckLoadingFinished() override;
+
+  void FindMatchingFontFaces(const nsACString& aFont, const nsAString& aText,
+                             nsTArray<FontFace*>& aFontFaces,
+                             ErrorResult& aRv) override;
+
+  void DispatchCheckLoadingFinishedAfterDelay() override;
 
  private:
   ~FontFaceSetWorkerImpl() override;
@@ -50,9 +70,11 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
 
   TimeStamp GetNavigationStartTimeStamp() override;
 
-  RefPtr<ThreadSafeWorkerRef> mWorkerRef;
+  mutable RecursiveMutex mMutex;
 
-  RefPtr<URLExtraData> mURLExtraData;
+  RefPtr<ThreadSafeWorkerRef> mWorkerRef GUARDED_BY(mMutex);
+
+  RefPtr<URLExtraData> mURLExtraData GUARDED_BY(mMutex);
 };
 
 }  // namespace mozilla::dom
