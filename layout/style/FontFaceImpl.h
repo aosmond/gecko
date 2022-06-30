@@ -10,6 +10,7 @@
 #include "mozilla/dom/FontFaceBinding.h"
 #include "mozilla/FontPropertyTypes.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/Mutex.h"
 #include "mozilla/ServoStyleConsts.h"
 #include "gfxUserFontSet.h"
 #include "nsCSSPropertyID.h"
@@ -218,6 +219,9 @@ class FontFaceImpl final {
    * Sets the current loading status.
    */
   void SetStatus(FontFaceLoadStatus aStatus);
+  bool SetStatusLocked(FontFaceLoadStatus aStatus,
+                       const MutexAutoLock& aProofOfLock);
+  void NotifyStatusChanged();
 
   void GetDesc(nsCSSFontDesc aDescID, nsACString& aResult) const;
 
@@ -229,6 +233,9 @@ class FontFaceImpl final {
    * Returns and takes ownership of the buffer storing the font data.
    */
   void TakeBuffer(uint8_t*& aBuffer, uint32_t& aLength);
+
+  // Protects fields that may be modified from multiple threads.
+  Mutex mMutex;
 
   FontFace* MOZ_NON_OWNING_REF mOwner;
 
@@ -244,7 +251,7 @@ class FontFaceImpl final {
   // Note that we can't just reflect the value of the gfxUserFontEntry's
   // status, since the spec sometimes requires us to go through the event
   // loop before updating the status, rather than doing it immediately.
-  FontFaceLoadStatus mStatus;
+  FontFaceLoadStatus mStatus GUARDED_BY(mMutex);
 
   // Represents where a FontFace's data is coming from.
   enum SourceType {

@@ -59,7 +59,8 @@ class FontFaceBufferSource : public gfxFontFaceBufferSource {
 // -- FontFaceImpl -----------------------------------------------------------
 
 FontFaceImpl::FontFaceImpl(FontFace* aOwner, FontFaceSetImpl* aFontFaceSet)
-    : mOwner(aOwner),
+    : mMutex("FontFaceImpl"),
+      mOwner(aOwner),
       mStatus(FontFaceLoadStatus::Unloaded),
       mSourceType(SourceType(0)),
       mFontFaceSet(aFontFaceSet),
@@ -295,23 +296,34 @@ void FontFaceImpl::DescriptorUpdated() {
   }
 }
 
-FontFaceLoadStatus FontFaceImpl::Status() { return mStatus; }
+FontFaceLoadStatus FontFaceImpl::Status() {
+  MutexAutoLock lock(mMutex);
+  return mStatus;
+}
 
 void FontFaceImpl::Load(ErrorResult& aRv) {
   mFontFaceSet->FlushUserFontSet();
 
-  // Calling Load on a FontFace constructed with an ArrayBuffer data source,
-  // or on one that is already loading (or has finished loading), has no
-  // effect.
-  if (mSourceType == eSourceType_Buffer ||
-      mStatus != FontFaceLoadStatus::Unloaded) {
-    return;
+  bool changed;
+  {
+    MutexAutoLock lock(mMutex);
+    // Calling Load on a FontFace constructed with an ArrayBuffer data source,
+    // or on one that is already loading (or has finished loading), has no
+    // effect.
+    if (mSourceType == eSourceType_Buffer ||
+        mStatus != FontFaceLoadStatus::Unloaded) {
+      return;
+    }
+
+    // Calling the user font entry's Load method will end up setting our
+    // status to Loading, but the spec requires us to set it to Loading
+    // here.
+    changed = SetStatusLocked(FontFaceLoadStatus::Loading, lock);
   }
 
-  // Calling the user font entry's Load method will end up setting our
-  // status to Loading, but the spec requires us to set it to Loading
-  // here.
-  SetStatus(FontFaceLoadStatus::Loading);
+  if (changed) {
+    NotifyStatusChanged();
+  }
 
   DoLoad();
 }
@@ -346,10 +358,24 @@ void FontFaceImpl::DoLoad() {
 }
 
 void FontFaceImpl::SetStatus(FontFaceLoadStatus aStatus) {
+  bool changed;
+  {
+    MutexAutoLock lock(mMutex);
+    changed = SetStatusLocked(aStatus, lock);
+  }
+
+  if (changed) {
+    NotifyStatusChanged();
+  }
+}
+
+bool FontFaceImpl::SetStatusLocked(FontFaceLoadStatus aStatus,
+                                   const MutexAutoLock& aProofOfLock) {
   gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
+  mMutex.AssertCurrentThreadOwns();
 
   if (mStatus == aStatus) {
-    return;
+    return false;
   }
 
   if (aStatus < mStatus) {
@@ -358,10 +384,15 @@ void FontFaceImpl::SetStatus(FontFaceLoadStatus aStatus) {
     // loaded, but then was given a new one by FontFaceSet::InsertRuleFontFace
     // if we used a local() rule.  For now, just ignore the request to
     // go backwards in status.
-    return;
+    return false;
   }
 
   mStatus = aStatus;
+  return true;
+}
+
+void FontFaceImpl::NotifyStatusChanged() {
+  gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
 
   if (mInFontFaceSet) {
     mFontFaceSet->OnFontFaceStatusChanged(this);
@@ -386,6 +417,7 @@ void FontFaceImpl::UpdateOwnerPromise() {
     return;
   }
 
+  MutexAutoLock lock(mMutex);
   if (mStatus == FontFaceLoadStatus::Loaded) {
     mOwner->MaybeResolve();
   } else if (mStatus == FontFaceLoadStatus::Error) {
@@ -510,20 +542,15 @@ void FontFaceImpl::SetUserFontEntry(gfxUserFontEntry* aEntry) {
                "as the FontFace");
 
     // Our newly assigned user font entry might be in the process of or
-    // finished loading, so set our status accordingly.  But only do so
-    // if we're not going "backwards" in status, which could otherwise
-    // happen in this case:
+    // finished loading, so set our status accordingly.  It may try to
+    // go "backwards" in status, which could otherwise happen in this case:
     //
     //   new FontFace("ABC", "url(x)").load();
     //
     // where the SetUserFontEntry call (from the after-initialization
     // DoLoad call) comes after the author's call to load(), which set mStatus
-    // to Loading.
-    FontFaceLoadStatus newStatus =
-        LoadStateToStatus(mUserFontEntry->LoadState());
-    if (newStatus > mStatus) {
-      SetStatus(newStatus);
-    }
+    // to Loading. But SetStatus filters that.
+    SetStatus(LoadStateToStatus(mUserFontEntry->LoadState()));
   }
 }
 
