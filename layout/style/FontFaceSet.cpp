@@ -412,8 +412,10 @@ void FontFaceSet::DispatchLoadingEventAndReplaceReadyPromise() {
 
 void FontFaceSet::MaybeResolve() {
   if (mReady) {
+    printf_stderr("[AO] [%p] FontFaceSet::MaybeResolve -- resolve\n", this);
     mReady->MaybeResolve(this);
   } else {
+    printf_stderr("[AO] [%p] FontFaceSet::MaybeResolve -- lazy resolve\n", this);
     mResolveLazilyCreatedReadyPromise = true;
   }
 

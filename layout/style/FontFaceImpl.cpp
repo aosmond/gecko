@@ -65,7 +65,9 @@ FontFaceImpl::FontFaceImpl(FontFace* aOwner, FontFaceSetImpl* aFontFaceSet)
       mSourceType(SourceType(0)),
       mFontFaceSet(aFontFaceSet),
       mUnicodeRangeDirty(true),
-      mInFontFaceSet(false) {}
+      mInFontFaceSet(false) {
+  printf_stderr("[AO] [%p] FontFaceImpl::FontFaceImpl -- setImpl %p\n", this, aFontFaceSet);
+}
 
 FontFaceImpl::~FontFaceImpl() {
   // Assert that we don't drop any FontFace objects during a Servo traversal,
@@ -109,6 +111,7 @@ already_AddRefed<FontFaceImpl> FontFaceImpl::CreateForRule(
 }
 
 void FontFaceImpl::InitializeSourceURL(const nsACString& aURL) {
+  printf_stderr("[AO] [%p] FontFaceImpl::InitializeSourceURL -- url '%s'\n", this, aURL.Data());
   MOZ_ASSERT(mOwner);
   mSourceType = eSourceType_URLs;
 
@@ -312,6 +315,7 @@ void FontFaceImpl::Load(ErrorResult& aRv) {
     // effect.
     if (mSourceType == eSourceType_Buffer ||
         mStatus != FontFaceLoadStatus::Unloaded) {
+      printf_stderr("[AO] [%p] FontFaceImpl::Load -- already loading\n", this);
       return;
     }
 
@@ -346,11 +350,13 @@ gfxUserFontEntry* FontFaceImpl::CreateUserFontEntry() {
 
 void FontFaceImpl::DoLoad() {
   if (!NS_IsMainThread()) {
+    printf_stderr("[AO] [%p] FontFaceImpl::DoLoad -- dispatch\n", this);
     NS_DispatchToMainThread(NS_NewRunnableFunction(
         "FontFaceImpl::DoLoad", [self = RefPtr{this}]() { self->DoLoad(); }));
     return;
   }
 
+  printf_stderr("[AO] [%p] FontFaceImpl::DoLoad -- loading\n", this);
   if (!CreateUserFontEntry()) {
     return;
   }
@@ -387,6 +393,7 @@ bool FontFaceImpl::SetStatusLocked(FontFaceLoadStatus aStatus,
     return false;
   }
 
+  printf_stderr("[AO] [%p] FontFaceImpl::SetStatus -- %d => %d\n", this, int(mStatus), int(aStatus));
   mStatus = aStatus;
   return true;
 }
@@ -407,6 +414,7 @@ void FontFaceImpl::NotifyStatusChanged() {
 
 void FontFaceImpl::UpdateOwnerPromise() {
   if (!mFontFaceSet->IsOnOwningThread()) {
+    printf_stderr("[AO] [%p] FontFaceImpl::UpdateOwnerPromise -- dispatch\n", this);
     mFontFaceSet->DispatchToOwningThread(
         "FontFaceImpl::UpdateOwnerPromise",
         [self = RefPtr{this}] { self->UpdateOwnerPromise(); });
@@ -414,18 +422,24 @@ void FontFaceImpl::UpdateOwnerPromise() {
   }
 
   if (NS_WARN_IF(!mOwner)) {
+    printf_stderr("[AO] [%p] FontFaceImpl::UpdateOwnerPromise -- no owner\n", this);
     return;
   }
 
   MutexAutoLock lock(mMutex);
   if (mStatus == FontFaceLoadStatus::Loaded) {
+    printf_stderr("[AO] [%p] FontFaceImpl::UpdateOwnerPromise -- resolve\n", this);
     mOwner->MaybeResolve();
   } else if (mStatus == FontFaceLoadStatus::Error) {
     if (mSourceType == eSourceType_Buffer) {
+      printf_stderr("[AO] [%p] FontFaceImpl::UpdateOwnerPromise -- buffer error\n", this);
       mOwner->MaybeReject(NS_ERROR_DOM_SYNTAX_ERR);
     } else {
+      printf_stderr("[AO] [%p] FontFaceImpl::UpdateOwnerPromise -- network error\n", this);
       mOwner->MaybeReject(NS_ERROR_DOM_NETWORK_ERR);
     }
+  } else {
+    printf_stderr("[AO] [%p] FontFaceImpl::UpdateOwnerPromise -- ignored status %d\n", this, int(mStatus));
   }
 }
 

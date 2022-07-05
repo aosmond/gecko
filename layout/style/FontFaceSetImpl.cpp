@@ -75,7 +75,9 @@ FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner)
       mHasLoadingFontFacesIsDirty(false),
       mDelayedLoadCheck(false),
       mBypassCache(false),
-      mPrivateBrowsing(false) {}
+      mPrivateBrowsing(false) {
+  printf_stderr("[AO] [%p] FontFaceSetImpl::Initialize -- owner %p\n", this, mOwner);
+}
 
 FontFaceSetImpl::~FontFaceSetImpl() {
   // Assert that we don't drop any FontFaceSet objects during a Servo traversal,
@@ -87,6 +89,7 @@ FontFaceSetImpl::~FontFaceSetImpl() {
 
 void FontFaceSetImpl::Destroy() {
   RecursiveMutexAutoLock lock(mMutex);
+  printf_stderr("[AO] [%p] FontFaceSetImpl::Destroy -- owner %p\n", this, mOwner);
 
   for (const auto& key : mLoaders.Keys()) {
     key->Cancel();
@@ -817,12 +820,14 @@ void FontFaceSetImpl::CheckLoadingStarted() {
   RecursiveMutexAutoLock lock(mMutex);
 
   if (!HasLoadingFontFaces()) {
+    printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingStarted -- no loading faces\n", this);
     return;
   }
 
   if (mStatus == FontFaceSetLoadStatus::Loading) {
     // We have already dispatched a loading event and replaced mReady
     // with a fresh, unresolved promise.
+    printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingStarted -- already loading\n", this);
     return;
   }
 
@@ -833,12 +838,15 @@ void FontFaceSetImpl::CheckLoadingStarted() {
     return;
   }
 
+  printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingStarted -- dispatching\n", this);
+
   DispatchToOwningThread("FontFaceSetImpl::CheckLoadingStarted",
                          [self = RefPtr{this}]() { self->OnLoadingStarted(); });
 }
 
 void FontFaceSetImpl::OnLoadingStarted() {
   RecursiveMutexAutoLock lock(mMutex);
+  printf_stderr("[AO] [%p] FontFaceSetImpl::OnLoadingStarted -- owner %p\n", this, mOwner);
   if (mOwner) {
     mOwner->DispatchLoadingEventAndReplaceReadyPromise();
   }
@@ -873,17 +881,20 @@ void FontFaceSetImpl::CheckLoadingFinished() {
   RecursiveMutexAutoLock lock(mMutex);
   if (mDelayedLoadCheck) {
     // Wait until the runnable posted in OnFontFaceStatusChanged calls us.
+    printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingFinished -- delayed load check\n", this);
     return;
   }
 
   if (!ReadyPromiseIsPending()) {
     // We've already resolved mReady (or set the flag to do that lazily) and
     // dispatched the loadingdone/loadingerror events.
+    printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingFinished -- already resolved\n", this);
     return;
   }
 
   if (MightHavePendingFontLoads()) {
     // We're not finished loading yet.
+    printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingFinished -- has pending loads\n", this);
     return;
   }
 
@@ -894,6 +905,7 @@ void FontFaceSetImpl::CheckLoadingFinished() {
     return;
   }
 
+  printf_stderr("[AO] [%p] FontFaceSetImpl::CheckLoadingFinished -- dispatching\n", this);
   DispatchToOwningThread(
       "FontFaceSetImpl::CheckLoadingFinished",
       [self = RefPtr{this}]() { self->OnLoadingFinished(); });
@@ -901,6 +913,7 @@ void FontFaceSetImpl::CheckLoadingFinished() {
 
 void FontFaceSetImpl::OnLoadingFinished() {
   RecursiveMutexAutoLock lock(mMutex);
+  printf_stderr("[AO] [%p] FontFaceSetImpl::OnLoadingFinished -- owner %p\n", this, mOwner);
   if (mOwner) {
     mOwner->MaybeResolve();
   }

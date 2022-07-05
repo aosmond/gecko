@@ -44,6 +44,7 @@ FontFaceSetDocumentImpl::~FontFaceSetDocumentImpl() = default;
 void FontFaceSetDocumentImpl::Initialize() {
   RecursiveMutexAutoLock lock(mMutex);
 
+  printf_stderr("[AO] [%p] FontFaceSetDocumentImpl::Initialize -- document %p\n", this, mDocument.get());
   MOZ_ASSERT(mDocument, "We should get a valid document from the caller!");
 
   // Record the state of the "bypass cache" flags from the docshell now,

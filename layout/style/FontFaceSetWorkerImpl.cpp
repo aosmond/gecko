@@ -34,6 +34,8 @@ FontFaceSetWorkerImpl::~FontFaceSetWorkerImpl() = default;
 bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
   MOZ_ASSERT(aWorkerPrivate);
 
+  printf_stderr("[AO] [%p] FontFaceSetWorkerImpl::Initialize -- workerPrivate %p\n", this, aWorkerPrivate);
+
   RefPtr<StrongWorkerRef> workerRef =
       StrongWorkerRef::Create(aWorkerPrivate, "FontFaceSetWorkerImpl",
                               [self = RefPtr{this}] { self->Destroy(); });
