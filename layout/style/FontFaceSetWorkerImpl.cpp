@@ -27,7 +27,7 @@ using namespace mozilla::dom;
 NS_IMPL_ISUPPORTS_INHERITED0(FontFaceSetWorkerImpl, FontFaceSetImpl);
 
 FontFaceSetWorkerImpl::FontFaceSetWorkerImpl(FontFaceSet* aOwner)
-    : FontFaceSetImpl(aOwner), mMutex("mozilla::dom::FontFaceSetWorkerImpl") {}
+    : FontFaceSetImpl(aOwner) {}
 
 FontFaceSetWorkerImpl::~FontFaceSetWorkerImpl() = default;
 
@@ -186,16 +186,6 @@ uint64_t FontFaceSetWorkerImpl::GetInnerWindowID() {
   return mWorkerRef->Private()->WindowID();
 }
 
-void FontFaceSetWorkerImpl::RemoveLoader(nsFontFaceLoader* aLoader) {
-  RecursiveMutexAutoLock lock(mMutex);
-  FontFaceSetImpl::RemoveLoader(aLoader);
-}
-
-void FontFaceSetWorkerImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
-  RecursiveMutexAutoLock lock(mMutex);
-  FontFaceSetImpl::OnFontFaceStatusChanged(aFontFace);
-}
-
 nsresult FontFaceSetWorkerImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
                                           uint32_t aSrcIndex) {
   RecursiveMutexAutoLock lock(mMutex);
@@ -323,44 +313,6 @@ TimeStamp FontFaceSetWorkerImpl::GetNavigationStartTimeStamp() {
 already_AddRefed<URLExtraData> FontFaceSetWorkerImpl::GetURLExtraData() {
   RecursiveMutexAutoLock lock(mMutex);
   return RefPtr{mURLExtraData}.forget();
-}
-
-already_AddRefed<gfxFontSrcPrincipal>
-FontFaceSetWorkerImpl::GetStandardFontLoadPrincipal() const {
-  RecursiveMutexAutoLock lock(mMutex);
-  return RefPtr{mStandardFontLoadPrincipal}.forget();
-}
-
-bool FontFaceSetWorkerImpl::Add(FontFaceImpl* aFontFace, ErrorResult& aRv) {
-  RecursiveMutexAutoLock lock(mMutex);
-  return FontFaceSetImpl::Add(aFontFace, aRv);
-}
-
-void FontFaceSetWorkerImpl::Clear() {
-  RecursiveMutexAutoLock lock(mMutex);
-  FontFaceSetImpl::Clear();
-}
-
-bool FontFaceSetWorkerImpl::Delete(FontFaceImpl* aFontFace) {
-  RecursiveMutexAutoLock lock(mMutex);
-  return FontFaceSetImpl::Delete(aFontFace);
-}
-
-void FontFaceSetWorkerImpl::CheckLoadingFinished() {
-  RecursiveMutexAutoLock lock(mMutex);
-  FontFaceSetImpl::CheckLoadingFinished();
-}
-
-void FontFaceSetWorkerImpl::FindMatchingFontFaces(
-    const nsACString& aFont, const nsAString& aText,
-    nsTArray<FontFace*>& aFontFaces, ErrorResult& aRv) {
-  RecursiveMutexAutoLock lock(mMutex);
-  FontFaceSetImpl::FindMatchingFontFaces(aFont, aText, aFontFaces, aRv);
-}
-
-void FontFaceSetWorkerImpl::DispatchCheckLoadingFinishedAfterDelay() {
-  RecursiveMutexAutoLock lock(mMutex);
-  FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay();
 }
 
 #undef LOG_ENABLED

@@ -11,6 +11,7 @@
 #include "mozilla/dom/FontFaceSetBinding.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/FontPropertyTypes.h"
+#include "mozilla/RecursiveMutex.h"
 #include "gfxUserFontSet.h"
 #include "nsICSSLoaderObserver.h"
 #include "nsIDOMEventListener.h"
@@ -44,7 +45,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   // gfxUserFontSet
 
   already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
-      const override;
+      const final;
 
   void RecordFontLoadDone(uint32_t aFontSize, TimeStamp aDoneTime) override;
 
@@ -87,7 +88,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   // Called by nsFontFaceLoader when the loader has completed normally.
   // It's removed from the mLoaders set.
-  virtual void RemoveLoader(nsFontFaceLoader* aLoader);
+  void RemoveLoader(nsFontFaceLoader* aLoader);
 
   virtual bool UpdateRules(const nsTArray<nsFontFaceRuleContainer>& aRules) {
     MOZ_ASSERT_UNREACHABLE("Not implemented!");
@@ -111,7 +112,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
    * Notification method called by a FontFace to indicate that its loading
    * status has changed.
    */
-  virtual void OnFontFaceStatusChanged(FontFaceImpl* aFontFace);
+  void OnFontFaceStatusChanged(FontFaceImpl* aFontFace);
 
   /**
    * Notification method called by the nsPresContext to indicate that the
@@ -139,8 +140,8 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   dom::FontFaceSetLoadStatus Status();
 
   virtual bool Add(FontFaceImpl* aFontFace, ErrorResult& aRv);
-  virtual void Clear();
-  virtual bool Delete(FontFaceImpl* aFontFace);
+  void Clear();
+  bool Delete(FontFaceImpl* aFontFace);
 
   // For ServoStyleSet to know ahead of time whether a font is loadable.
   virtual void CacheFontLoadability() {
@@ -153,14 +154,14 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
    * Checks to see whether it is time to resolve mReady and dispatch any
    * "loadingdone" and "loadingerror" events.
    */
-  virtual void CheckLoadingFinished();
+  void CheckLoadingFinished();
 
   virtual void FindMatchingFontFaces(const nsACString& aFont,
                                      const nsAString& aText,
                                      nsTArray<FontFace*>& aFontFaces,
                                      ErrorResult& aRv);
 
-  virtual void DispatchCheckLoadingFinishedAfterDelay();
+  void DispatchCheckLoadingFinishedAfterDelay();
 
  protected:
   ~FontFaceSetImpl() override;
@@ -237,6 +238,8 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
                                      FontSlantStyle& aStyle, ErrorResult& aRv);
 
   virtual TimeStamp GetNavigationStartTimeStamp() = 0;
+
+  mutable RecursiveMutex mMutex;
 
   FontFaceSet* MOZ_NON_OWNING_REF mOwner;
 
