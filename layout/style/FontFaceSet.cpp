@@ -110,7 +110,7 @@ FontFaceSet::~FontFaceSet() {
 /* static */ bool FontFaceSet::IsEnabled() {
   if (NS_IsMainThread()) {
     return StaticPrefs::layout_css_font_loading_api_enabled();
-  };
+  }
   return StaticPrefs::layout_css_font_loading_api_workers_enabled();
 }
 
