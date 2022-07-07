@@ -109,13 +109,13 @@ bool FontFaceSetDocumentImpl::IsOnOwningThread() { return NS_IsMainThread(); }
 
 void FontFaceSetDocumentImpl::DispatchToOwningThread(
     const char* aName, std::function<void()>&& aFunc) {
-  class FontFaceSetDocumentRunnable : public Runnable {
+  class FontFaceSetDocumentRunnable final : public Runnable {
    public:
     FontFaceSetDocumentRunnable(const char* aName,
                                 std::function<void()>&& aFunc)
         : Runnable(aName), mFunc(std::move(aFunc)) {}
 
-    nsresult Run() override {
+    NS_IMETHOD Run() final {
       mFunc();
       return NS_OK;
     }

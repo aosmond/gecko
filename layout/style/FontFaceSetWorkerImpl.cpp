@@ -157,6 +157,13 @@ void FontFaceSetWorkerImpl::DispatchToOwningThread(
     return;
   }
 
+  WorkerPrivate* workerPrivate = mWorkerRef->Private();
+  if (workerPrivate->IsOnCurrentThread()) {
+    NS_DispatchToCurrentThread(
+        NS_NewCancelableRunnableFunction(aName, std::move(aFunc)));
+    return;
+  }
+
   class FontFaceSetWorkerRunnable final : public WorkerRunnable {
    public:
     FontFaceSetWorkerRunnable(WorkerPrivate* aWorkerPrivate,
@@ -173,7 +180,7 @@ void FontFaceSetWorkerImpl::DispatchToOwningThread(
   };
 
   RefPtr<FontFaceSetWorkerRunnable> runnable =
-      new FontFaceSetWorkerRunnable(mWorkerRef->Private(), std::move(aFunc));
+      new FontFaceSetWorkerRunnable(workerPrivate, std::move(aFunc));
   runnable->Dispatch();
 }
 
