@@ -710,8 +710,17 @@ gfxCharacterMap* FontFaceImpl::GetUnicodeRangeAsCharacterMap() {
 void FontFaceImpl::Entry::SetLoadState(UserFontLoadState aLoadState) {
   gfxUserFontEntry::SetLoadState(aLoadState);
 
+  FontFaceLoadStatus status = LoadStateToStatus(aLoadState);
   for (size_t i = 0; i < mFontFaces.Length(); i++) {
-    mFontFaces[i]->SetStatus(LoadStateToStatus(aLoadState));
+    auto* impl = mFontFaces[i];
+    auto* setImpl = impl->GetPrimaryFontFaceSet();
+    if (setImpl->IsOnOwningThread()) {
+      mFontFaces[i]->SetStatus(status);
+    } else {
+      setImpl->DispatchToOwningThread(
+          "FontFaceImpl::Entry::SetLoadState",
+          [self = RefPtr{impl}, status] { self->SetStatus(status); });
+    }
   }
 }
 
