@@ -644,7 +644,7 @@ nsresult FontFaceSetImpl::LogMessage(gfxUserFontEntry* aUserFontEntry,
   LOG(("userfonts (%p) %s", this, message.get()));
 
   if (GetCurrentThreadWorkerPrivate()) {
-    // TODO(aosmond): Log to the console for workers.
+    // TODO(aosmond): Log to the console for workers. See bug 1778537.
     return NS_OK;
   }
 
