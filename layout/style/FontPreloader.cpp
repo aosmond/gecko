@@ -63,8 +63,7 @@ void FontPreloader::PrioritizeAsPreload(nsIChannel* aChannel) {
   if (aHttpChannel) {
     nsresult rv = aHttpChannel->SetRequestHeader(
         "Accept"_ns,
-        nsLiteralCString("application/font-woff2;q=1.0,application/"
-                         "font-woff;q=0.9,*/*;q=0.8"),
+        "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8"_ns,
         false);
     NS_ENSURE_SUCCESS(rv, rv);
 
