@@ -130,7 +130,7 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   virtual void RefreshStandardFontLoadPrincipal();
 
-  virtual dom::Document* Document() const { return nullptr; }
+  virtual dom::Document* GetDocument() const { return nullptr; }
 
   virtual already_AddRefed<URLExtraData> GetURLExtraData() = 0;
 

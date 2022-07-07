@@ -64,7 +64,7 @@ nsFontFaceLoader::nsFontFaceLoader(gfxUserFontEntry* aUserFontEntry,
   // We add an explicit load block rather than just rely on the network
   // request's block, since we need to do some OMT work after the load
   // is finished before we unblock load.
-  auto* doc = mFontFaceSet->Document();
+  auto* doc = mFontFaceSet->GetDocument();
   if (doc) {
     doc->BlockOnload();
   }
@@ -82,7 +82,7 @@ nsFontFaceLoader::~nsFontFaceLoader() {
   }
   if (mFontFaceSet) {
     mFontFaceSet->RemoveLoader(this);
-    auto* doc = mFontFaceSet->Document();
+    auto* doc = mFontFaceSet->GetDocument();
     if (doc) {
       doc->UnblockOnload(false);
     }
@@ -101,7 +101,7 @@ void nsFontFaceLoader::StartedLoading(nsIStreamLoader* aStreamLoader) {
 
   if (loadTimeout > 0) {
     nsIEventTarget* target;
-    auto* doc = mFontFaceSet->Document();
+    auto* doc = mFontFaceSet->GetDocument();
     if (doc) {
       target = doc->EventTargetFor(TaskCategory::Other);
     } else {
@@ -322,7 +322,7 @@ nsresult nsFontFaceLoader::FontLoadComplete() {
 
   MOZ_DIAGNOSTIC_ASSERT(mFontFaceSet);
   mFontFaceSet->RemoveLoader(this);
-  auto* doc = mFontFaceSet->Document();
+  auto* doc = mFontFaceSet->GetDocument();
   if (doc) {
     doc->UnblockOnload(false);
   }
@@ -359,7 +359,7 @@ void nsFontFaceLoader::Cancel() {
 
   mUserFontEntry->LoadCanceled();
   mUserFontEntry = nullptr;
-  auto* doc = mFontFaceSet->Document();
+  auto* doc = mFontFaceSet->GetDocument();
   if (doc) {
     doc->UnblockOnload(false);
   }
