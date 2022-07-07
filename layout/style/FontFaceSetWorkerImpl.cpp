@@ -17,10 +17,12 @@
 
 using namespace mozilla;
 using namespace mozilla::css;
-using namespace mozilla::dom;
 
-#define LOG(args) \
-  MOZ_LOG(gfxUserFontSet::GetUserFontsLog(), mozilla::LogLevel::Debug, args)
+namespace mozilla::dom {
+
+#define LOG(...)                                                       \
+  MOZ_LOG(gfxUserFontSet::GetUserFontsLog(), mozilla::LogLevel::Debug, \
+          (__VA_ARGS__))
 #define LOG_ENABLED() \
   MOZ_LOG_TEST(gfxUserFontSet::GetUserFontsLog(), LogLevel::Debug)
 
@@ -67,11 +69,7 @@ bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
   IgnoredErrorResult rv;
   auto runnable = MakeRefPtr<InitRunnable>(aWorkerPrivate, this);
   runnable->Dispatch(Canceling, rv);
-  if (NS_WARN_IF(rv.Failed())) {
-    return false;
-  }
-
-  return true;
+  return !NS_WARN_IF(rv.Failed());
 }
 
 void FontFaceSetWorkerImpl::InitializeOnMainThread() {
@@ -324,3 +322,5 @@ already_AddRefed<URLExtraData> FontFaceSetWorkerImpl::GetURLExtraData() {
 
 #undef LOG_ENABLED
 #undef LOG
+
+}  // namespace mozilla::dom
