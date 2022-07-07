@@ -159,7 +159,7 @@ already_AddRefed<URLExtraData> FontFaceSetDocumentImpl::GetURLExtraData() {
   if (!mDocument) {
     return nullptr;
   }
-  return RefPtr{mDocument->DefaultStyleAttrURLData()}.forget();
+  return do_AddRef(mDocument->DefaultStyleAttrURLData());
 }
 
 void FontFaceSetDocumentImpl::RemoveDOMContentLoadedListener() {
