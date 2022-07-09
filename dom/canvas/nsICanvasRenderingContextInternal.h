@@ -76,6 +76,8 @@ class nsICanvasRenderingContextInternal : public nsISupports,
 
   virtual mozilla::PresShell* GetPresShell();
 
+  virtual mozilla::dom::Document* GetDocument();
+
   void RemovePostRefreshObserver();
 
   void AddPostRefreshObserverIfNecessary();

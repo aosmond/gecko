@@ -1102,7 +1102,7 @@ JSObject* CanvasRenderingContext2D::WrapObject(
 
 bool CanvasRenderingContext2D::ParseColor(const nsACString& aString,
                                           nscolor* aColor) {
-  Document* document = mCanvasElement ? mCanvasElement->OwnerDoc() : nullptr;
+  Document* document = GetDocument();
   css::Loader* loader = document ? document->CSSLoader() : nullptr;
 
   PresShell* presShell = GetPresShell();
@@ -1621,9 +1621,20 @@ Maybe<SurfaceDescriptor> CanvasRenderingContext2D::GetFrontBuffer(
   return Nothing();
 }
 
+Document* CanvasRenderingContext2D::GetDocument() {
+  if (Document* doc = nsICanvasRenderingContextInternal::GetDocument()) {
+    return doc;
+  }
+  if (mDocShell) {
+    return mDocShell->GetExtantDocument();
+  }
+  return nullptr;
+}
+
 PresShell* CanvasRenderingContext2D::GetPresShell() {
-  if (mCanvasElement) {
-    return mCanvasElement->OwnerDoc()->GetPresShell();
+  if (PresShell* presShell =
+          nsICanvasRenderingContextInternal::GetPresShell()) {
+    return presShell;
   }
   if (mDocShell) {
     return mDocShell->GetPresShell();
@@ -4553,8 +4564,7 @@ bool CanvasRenderingContext2D::IsPointInPath(
   }
 
   // Check for site-specific permission and return false if no permission.
-  if (mCanvasElement) {
-    nsCOMPtr<Document> ownerDoc = mCanvasElement->OwnerDoc();
+  if (Document* ownerDoc = GetDocument()) {
     if (!CanvasUtils::IsImageExtractionAllowed(ownerDoc, aCx,
                                                aSubjectPrincipal)) {
       return false;
@@ -4616,8 +4626,7 @@ bool CanvasRenderingContext2D::IsPointInStroke(
   }
 
   // Check for site-specific permission and return false if no permission.
-  if (mCanvasElement) {
-    nsCOMPtr<Document> ownerDoc = mCanvasElement->OwnerDoc();
+  if (Document* ownerDoc = GetDocument()) {
     if (!CanvasUtils::IsImageExtractionAllowed(ownerDoc, aCx,
                                                aSubjectPrincipal)) {
       return false;
@@ -5543,8 +5552,7 @@ nsresult CanvasRenderingContext2D::GetImageDataArray(
   // canvas was created with a docshell (that is only done for special
   // internal uses).
   bool usePlaceholder = false;
-  if (mCanvasElement) {
-    nsCOMPtr<Document> ownerDoc = mCanvasElement->OwnerDoc();
+  if (Document* ownerDoc = GetDocument()) {
     usePlaceholder = !CanvasUtils::IsImageExtractionAllowed(ownerDoc, aCx,
                                                             aSubjectPrincipal);
   } else if (mOffscreenCanvas) {

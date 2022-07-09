@@ -20,6 +20,29 @@ mozilla::PresShell* nsICanvasRenderingContextInternal::GetPresShell() {
   if (mCanvasElement) {
     return mCanvasElement->OwnerDoc()->GetPresShell();
   }
+  if (mOffscreenCanvas) {
+    if (nsIGlobalObject* global = mOffscreenCanvas->GetOwnerGlobal()) {
+      if (nsPIDOMWindowInner* window = global->AsInnerWindow()) {
+        if (mozilla::dom::Document* doc = window->GetExtantDoc()) {
+          return doc->GetPresShell();
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+mozilla::dom::Document* nsICanvasRenderingContextInternal::GetDocument() {
+  if (mCanvasElement) {
+    return mCanvasElement->OwnerDoc();
+  }
+  if (mOffscreenCanvas) {
+    if (nsIGlobalObject* global = mOffscreenCanvas->GetOwnerGlobal()) {
+      if (nsPIDOMWindowInner* window = global->AsInnerWindow()) {
+        return window->GetExtantDoc();
+      }
+    }
+  }
   return nullptr;
 }
 
