@@ -297,9 +297,9 @@ class gfxFontCache final
   // This protects the ExpirationTracker tables.
   Lock mMutex = Lock("fontCacheExpirationMutex");
 
+ public:
   Lock& GetMutex() override { return mMutex; }
 
- public:
   explicit gfxFontCache(nsIEventTarget* aEventTarget);
   ~gfxFontCache();
 
@@ -1439,13 +1439,12 @@ class gfxFont {
 
   nsrefcnt AddRef(void) {
     MOZ_ASSERT(int32_t(mRefCnt) >= 0, "illegal refcnt");
-    nsExpirationState state;
-    {
-      mozilla::AutoReadLock lock(mLock);
-      state = mExpirationState;
-    }
-    if (state.IsTracked()) {
-      gfxFontCache::GetCache()->RemoveObject(this);
+    gfxFontCache* cache = gfxFontCache::GetCache();
+    if (cache) {
+      mozilla::MutexAutoLock lock(cache->GetMutex());
+      if (mExpirationState.IsTracked()) {
+        cache->RemoveObjectLocked(this, lock);
+      }
     }
     ++mRefCnt;
     NS_LOG_ADDREF(this, mRefCnt, "gfxFont", sizeof(*this));
@@ -2239,7 +2238,9 @@ class gfxFont {
   // This is OK because we only multiply by this factor, never divide.
   float mFUnitsConvFactor;
 
-  nsExpirationState mExpirationState GUARDED_BY(mLock);
+  // This is guarded by gfxFontCache::GetCache()->GetMutex() but it is difficult
+  // to annotate that fact.
+  nsExpirationState mExpirationState;
 
   // Glyph ID of the font's <space> glyph, zero if missing
   uint16_t mSpaceGlyph = 0;

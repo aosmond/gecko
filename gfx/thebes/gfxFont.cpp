@@ -245,22 +245,19 @@ gfxFont* gfxFontCache::Lookup(const gfxFontEntry* aFontEntry,
 }
 
 void gfxFontCache::AddNew(gfxFont* aFont) {
-  gfxFont* oldFont;
-  {
-    MutexAutoLock lock(mMutex);
+  MutexAutoLock lock(mMutex);
 
-    Key key(aFont->GetFontEntry(), aFont->GetStyle(),
-            aFont->GetUnicodeRangeMap());
-    HashEntry* entry = mFonts.PutEntry(key);
-    if (!entry) {
-      return;
-    }
-    oldFont = entry->mFont;
-    entry->mFont = aFont;
-    // Assert that we can find the entry we just put in (this fails if the key
-    // has a NaN float value in it, e.g. 'sizeAdjust').
-    MOZ_ASSERT(entry == mFonts.GetEntry(key));
+  Key key(aFont->GetFontEntry(), aFont->GetStyle(),
+          aFont->GetUnicodeRangeMap());
+  HashEntry* entry = mFonts.PutEntry(key);
+  if (!entry) {
+    return;
   }
+  gfxFont* oldFont = entry->mFont;
+  entry->mFont = aFont;
+  // Assert that we can find the entry we just put in (this fails if the key
+  // has a NaN float value in it, e.g. 'sizeAdjust').
+  MOZ_ASSERT(entry == mFonts.GetEntry(key));
 
   // If someone's asked us to replace an existing font entry, then that's a
   // bit weird, but let it happen, and expire the old font if it's not used.
@@ -268,7 +265,7 @@ void gfxFontCache::AddNew(gfxFont* aFont) {
     // if oldFont == aFont, recount should be > 0,
     // so we shouldn't be here.
     NS_ASSERTION(aFont != oldFont, "new font is tracked for expiry!");
-    NotifyExpired(oldFont);
+    NotifyExpiredLocked(oldFont, lock);
   }
 }
 
