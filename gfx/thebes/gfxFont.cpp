@@ -245,7 +245,7 @@ gfxFont* gfxFontCache::Lookup(const gfxFontEntry* aFontEntry,
 }
 
 void gfxFontCache::AddNew(gfxFont* aFont) {
-  gfxFont* oldFont;
+  nsTArray<gfxFont*> discard;
   {
     MutexAutoLock lock(mMutex);
 
@@ -255,28 +255,39 @@ void gfxFontCache::AddNew(gfxFont* aFont) {
     if (!entry) {
       return;
     }
-    oldFont = entry->mFont;
+    gfxFont* oldFont = entry->mFont;
     entry->mFont = aFont;
     // Assert that we can find the entry we just put in (this fails if the key
     // has a NaN float value in it, e.g. 'sizeAdjust').
     MOZ_ASSERT(entry == mFonts.GetEntry(key));
-  }
 
-  // If someone's asked us to replace an existing font entry, then that's a
-  // bit weird, but let it happen, and expire the old font if it's not used.
-  if (oldFont && oldFont->GetExpirationState()->IsTracked()) {
-    // if oldFont == aFont, recount should be > 0,
-    // so we shouldn't be here.
-    NS_ASSERTION(aFont != oldFont, "new font is tracked for expiry!");
-    NotifyExpired(oldFont);
+    // If someone's asked us to replace an existing font entry, then that's a
+    // bit weird, but let it happen, and expire the old font if it's not used.
+    if (oldFont && oldFont->GetExpirationState()->IsTracked()) {
+      // if oldFont == aFont, recount should be > 0,
+      // so we shouldn't be here.
+      NS_ASSERTION(aFont != oldFont, "new font is tracked for expiry!");
+      NotifyExpiredLocked(oldFont, lock);
+      discard = std::move(mDiscard);
+    }
   }
+  HandleDiscard(discard);
 }
 
 void gfxFontCache::NotifyReleased(gfxFont* aFont) {
-  if (NS_FAILED(AddObject(aFont))) {
+  nsTArray<gfxFont*> discard;
+  {
+    MutexAutoLock lock(mMutex);
+    if (NS_SUCCEEDED(AddObjectLocked(aFont))) {
+      return;
+    }
+
     // We couldn't track it for some reason. Kill it now.
-    DestroyFont(aFont);
+    DestroyFontLocked(aFont);
+    discard = std::move(mDiscard);
   }
+
+  HandleDiscard(discard);
   // Note that we might have fonts that aren't in the hashtable, perhaps because
   // of OOM adding to the hashtable or because someone did an AddNew where
   // we already had a font. These fonts are added to the expiration tracker
@@ -291,9 +302,22 @@ void gfxFontCache::NotifyExpiredLocked(gfxFont* aFont, const AutoLock& aLock) {
 }
 
 void gfxFontCache::NotifyExpired(gfxFont* aFont) {
-  aFont->ClearCachedWords();
-  RemoveObject(aFont);
-  DestroyFont(aFont);
+  nsTArray<gfxFont*> discard;
+  {
+    MutexAutoLock lock(mMutex);
+    NotifyExpiredLocked(aFont, lock);
+    discard = std::move(mDiscard);
+  }
+  HandleDiscard(discard);
+}
+
+void gfxFontCache::NotifyHandlerEnd() {
+  nsTArray<gfxFont*> discard;
+  {
+    MutexAutoLock lock(mMutex);
+    discard = std::move(mDiscard);
+  }
+  HandleDiscard(discard);
 }
 
 void gfxFontCache::DestroyFontLocked(gfxFont* aFont) {
@@ -305,23 +329,25 @@ void gfxFontCache::DestroyFontLocked(gfxFont* aFont) {
   }
   NS_ASSERTION(aFont->GetRefCount() == 0,
                "Destroying with non-zero ref count!");
-  MutexAutoUnlock unlock(mMutex);
-  delete aFont;
+  mDiscard.AppendElement(aFont);
 }
 
 void gfxFontCache::DestroyFont(gfxFont* aFont) {
+  nsTArray<gfxFont*> discard;
   {
     MutexAutoLock lock(mMutex);
-    Key key(aFont->GetFontEntry(), aFont->GetStyle(),
-            aFont->GetUnicodeRangeMap());
-    HashEntry* entry = mFonts.GetEntry(key);
-    if (entry && entry->mFont == aFont) {
-      mFonts.RemoveEntry(entry);
-    }
+    DestroyFontLocked(aFont, lock);
+    discard = std::move(mDiscard);
   }
-  NS_ASSERTION(aFont->GetRefCount() == 0,
-               "Destroying with non-zero ref count!");
-  delete aFont;
+  HandleDiscard(discard);
+}
+
+void gfxFontCache::HandleDiscard(nsTArray<gfxFont*>& aDiscard) {
+  for (gfxFont* font : aDiscard) {
+    NS_ASSERTION(font->GetRefCount() == 0,
+                 "Destroying with non-zero ref count!");
+    delete font;
+  }
 }
 
 /*static*/
