@@ -127,6 +127,7 @@ static void SerializeFontForCanvas(const StyleFontFamilyList& aList,
 
 bool OffscreenCanvasRenderingContext2D::SetFontInternal(const nsACString& aFont,
                                                         ErrorResult& aError) {
+#if 0
   nsIGlobalObject* global = GetParentObject();
   FontFaceSet* fontFaceSet = global ? global->Fonts() : nullptr;
   FontFaceSetImpl* fontFaceSetImpl =
@@ -137,6 +138,9 @@ bool OffscreenCanvasRenderingContext2D::SetFontInternal(const nsACString& aFont,
   if (fontFaceSetImpl) {
     fontFaceSetImpl->FlushUserFontSet();
   }
+#endif
+  FontFaceSetImpl* fontFaceSetImpl = nullptr;
+  RefPtr<URLExtraData> urlExtraData;
 
   // In the OffscreenCanvas case we don't have the context necessary to call
   // GetFontStyleForServo(), as we do in the main-thread canvas context, so
