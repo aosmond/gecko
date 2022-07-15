@@ -16,6 +16,15 @@ interface OffscreenCanvasRenderingContext2D {
   readonly attribute OffscreenCanvas canvas;
 };
 
+interface mixin OffscreenCanvasTextDrawingStyles {
+  // text
+  [SetterThrows]
+  attribute UTF8String font; // (default 10px sans-serif)
+  attribute DOMString textAlign; // "start", "end", "left", "right", "center" (default: "start")
+  attribute DOMString textBaseline; // "top", "hanging", "middle", "alphabetic", "ideographic", "bottom" (default: "alphabetic")
+  attribute DOMString direction; // "ltr", "rtl", "inherit" (default: "inherit")
+};
+
 OffscreenCanvasRenderingContext2D includes CanvasState;
 OffscreenCanvasRenderingContext2D includes CanvasTransform;
 OffscreenCanvasRenderingContext2D includes CanvasCompositing;
@@ -28,5 +37,5 @@ OffscreenCanvasRenderingContext2D includes CanvasText;
 OffscreenCanvasRenderingContext2D includes CanvasDrawImage;
 OffscreenCanvasRenderingContext2D includes CanvasImageData;
 OffscreenCanvasRenderingContext2D includes CanvasPathDrawingStyles;
-OffscreenCanvasRenderingContext2D includes CanvasTextDrawingStyles;
+OffscreenCanvasRenderingContext2D includes OffscreenCanvasTextDrawingStyles;
 OffscreenCanvasRenderingContext2D includes CanvasPathMethods;
