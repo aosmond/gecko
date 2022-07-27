@@ -11,7 +11,7 @@
 #include "mozilla/dom/FontFaceSetBinding.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/FontPropertyTypes.h"
-#include "mozilla/RecursiveMutex.h"
+#include "mozilla/ReentrantMonitor.h"
 #include "gfxUserFontSet.h"
 #include "nsICSSLoaderObserver.h"
 #include "nsIDOMEventListener.h"
@@ -45,11 +45,14 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   // gfxUserFontSet
 
   already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
-      const final;
+      const override;
 
   void RecordFontLoadDone(uint32_t aFontSize, TimeStamp aDoneTime) override;
 
-  bool BypassCache() final { return mBypassCache; }
+  bool BypassCache() final {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mBypassCache;
+  }
 
  protected:
   virtual nsresult CreateChannelForSyncLoadFontData(
@@ -58,7 +61,11 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   // gfxUserFontSet
 
-  bool GetPrivateBrowsing() override { return mPrivateBrowsing; }
+  bool GetPrivateBrowsing() override {
+    MOZ_ASSERT(NS_IsMainThread());
+    return mPrivateBrowsing;
+  }
+
   nsresult SyncLoadFontData(gfxUserFontEntry* aFontToLoad,
                             const gfxFontFaceSrc* aFontFaceSrc,
                             uint8_t*& aBuffer,
@@ -239,9 +246,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   virtual TimeStamp GetNavigationStartTimeStamp() = 0;
 
-  mutable RecursiveMutex mMutex;
+  mutable ReentrantMonitor mMonitor;
 
-  FontFaceSet* MOZ_NON_OWNING_REF mOwner GUARDED_BY(mMutex);
+  FontFaceSet* MOZ_NON_OWNING_REF mOwner GUARDED_BY(mMonitor);
 
   // The document's node principal, which is the principal font loads for
   // this FontFaceSet will generally use.  (This principal is not used for
@@ -255,19 +262,19 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   // Because mDocument's principal can change over time,
   // its value must be updated by a call to ResetStandardFontLoadPrincipal.
   mutable RefPtr<gfxFontSrcPrincipal> mStandardFontLoadPrincipal
-      GUARDED_BY(mMutex);
+      GUARDED_BY(mMonitor);
 
   // Set of all loaders pointing to us. These are not strong pointers,
   // but that's OK because nsFontFaceLoader always calls RemoveLoader on
   // us before it dies (unless we die first).
-  nsTHashtable<nsPtrHashKey<nsFontFaceLoader>> mLoaders GUARDED_BY(mMutex);
+  nsTHashtable<nsPtrHashKey<nsFontFaceLoader>> mLoaders GUARDED_BY(mMonitor);
 
   // The non rule backed FontFace objects that have been added to this
   // FontFaceSet.
-  nsTArray<FontFaceRecord> mNonRuleFaces GUARDED_BY(mMutex);
+  nsTArray<FontFaceRecord> mNonRuleFaces GUARDED_BY(mMonitor);
 
   // The overall status of the loading or loaded fonts in the FontFaceSet.
-  dom::FontFaceSetLoadStatus mStatus GUARDED_BY(mMutex);
+  dom::FontFaceSetLoadStatus mStatus GUARDED_BY(mMonitor);
 
   // A map from gfxFontFaceSrc pointer identity to whether the load is allowed
   // by CSP or other checks. We store this here because querying CSP off the
@@ -276,22 +283,22 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
   // We could use just the pointer and use this as a hash set, but then we'd
   // have no way to verify that we've checked all the loads we should.
   nsTHashMap<nsPtrHashKey<const gfxFontFaceSrc>, bool> mAllowedFontLoads
-      GUARDED_BY(mMutex);
+      GUARDED_BY(mMonitor);
 
   // Whether mNonRuleFaces has changed since last time UpdateRules ran.
-  bool mNonRuleFacesDirty GUARDED_BY(mMutex);
+  bool mNonRuleFacesDirty GUARDED_BY(mMonitor);
 
   // Whether any FontFace objects in mRuleFaces or mNonRuleFaces are
   // loading.  Only valid when mHasLoadingFontFacesIsDirty is false.  Don't use
   // this variable directly; call the HasLoadingFontFaces method instead.
-  bool mHasLoadingFontFaces GUARDED_BY(mMutex);
+  bool mHasLoadingFontFaces GUARDED_BY(mMonitor);
 
   // This variable is only valid when mLoadingDirty is false.
-  bool mHasLoadingFontFacesIsDirty GUARDED_BY(mMutex);
+  bool mHasLoadingFontFacesIsDirty GUARDED_BY(mMonitor);
 
   // Whether CheckLoadingFinished calls should be ignored.  See comment in
   // OnFontFaceStatusChanged.
-  bool mDelayedLoadCheck GUARDED_BY(mMutex);
+  bool mDelayedLoadCheck GUARDED_BY(mMonitor);
 
   // Whether the docshell for our document indicated that loads should
   // bypass the cache.

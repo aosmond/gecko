@@ -26,6 +26,8 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
   void DispatchToOwningThread(const char* aName,
                               std::function<void()>&& aFunc) override;
 
+  already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
+      const override;
   already_AddRefed<URLExtraData> GetURLExtraData() override;
 
   void FlushUserFontSet() override;
@@ -43,6 +45,8 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
   ~FontFaceSetWorkerImpl() override;
 
   void InitializeOnMainThread();
+  void InitializeComplete();
+  void WaitForInitialize() const REQUIRES(mMonitor);
 
   uint64_t GetInnerWindowID() override;
 
@@ -52,9 +56,11 @@ class FontFaceSetWorkerImpl final : public FontFaceSetImpl {
 
   TimeStamp GetNavigationStartTimeStamp() override;
 
-  RefPtr<ThreadSafeWorkerRef> mWorkerRef GUARDED_BY(mMutex);
+  RefPtr<ThreadSafeWorkerRef> mWorkerRef GUARDED_BY(mMonitor);
 
-  RefPtr<URLExtraData> mURLExtraData GUARDED_BY(mMutex);
+  RefPtr<URLExtraData> mURLExtraData GUARDED_BY(mMonitor);
+
+  bool mInitialized GUARDED_BY(mMonitor) = false;
 };
 
 }  // namespace mozilla::dom

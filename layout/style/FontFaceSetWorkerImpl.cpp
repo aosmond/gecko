@@ -44,37 +44,33 @@ bool FontFaceSetWorkerImpl::Initialize(WorkerPrivate* aWorkerPrivate) {
   }
 
   {
-    RecursiveMutexAutoLock lock(mMutex);
+    ReentrantMonitorAutoEnter lock(mMonitor);
     mWorkerRef = new ThreadSafeWorkerRef(workerRef);
   }
 
-  class InitRunnable final : public WorkerMainThreadRunnable {
+  class InitRunnable final : public Runnable {
    public:
-    InitRunnable(WorkerPrivate* aWorkerPrivate, FontFaceSetWorkerImpl* aImpl)
-        : WorkerMainThreadRunnable(aWorkerPrivate,
-                                   "FontFaceSetWorkerImpl :: Initialize"_ns),
-          mImpl(aImpl) {}
+    explicit InitRunnable(FontFaceSetWorkerImpl* aImpl)
+        : Runnable("FontFaceSetWorkerImpl::Initialize"), mImpl(aImpl) {}
 
    protected:
-    ~InitRunnable() override = default;
+    ~InitRunnable() override { mImpl->InitializeComplete(); }
 
-    bool MainThreadRun() override {
+    NS_IMETHOD Run() override {
       mImpl->InitializeOnMainThread();
-      return true;
+      return NS_OK;
     }
 
-    FontFaceSetWorkerImpl* mImpl;
+    RefPtr<FontFaceSetWorkerImpl> mImpl;
   };
 
-  IgnoredErrorResult rv;
-  auto runnable = MakeRefPtr<InitRunnable>(aWorkerPrivate, this);
-  runnable->Dispatch(Canceling, rv);
-  return !NS_WARN_IF(rv.Failed());
+  auto runnable = MakeRefPtr<InitRunnable>(this);
+  return !NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(runnable.forget())));
 }
 
 void FontFaceSetWorkerImpl::InitializeOnMainThread() {
   MOZ_ASSERT(NS_IsMainThread());
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   if (!mWorkerRef) {
     return;
@@ -133,8 +129,30 @@ void FontFaceSetWorkerImpl::InitializeOnMainThread() {
                        workerPrivate->GetReferrerInfo(), defaultPrincipal);
 }
 
+void FontFaceSetWorkerImpl::InitializeComplete() {
+  ReentrantMonitorAutoEnter lock(mMonitor);
+  mInitialized = true;
+  mMonitor.NotifyAll();
+}
+
+void FontFaceSetWorkerImpl::WaitForInitialize() const {
+  mMonitor.AssertCurrentThreadIn();
+  if (mInitialized) {
+    return;
+  }
+
+  if (NS_WARN_IF(NS_IsMainThread())) {
+    MOZ_ASSERT_UNREACHABLE("Dispatched to main thread before initialization?");
+    return;
+  }
+
+  while (!mInitialized && mWorkerRef) {
+    mMonitor.Wait();
+  }
+}
+
 void FontFaceSetWorkerImpl::Destroy() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   class DestroyRunnable final : public Runnable {
    public:
@@ -162,7 +180,7 @@ void FontFaceSetWorkerImpl::Destroy() {
 
   if (!mLoaders.IsEmpty() && !NS_IsMainThread()) {
     auto runnable = MakeRefPtr<DestroyRunnable>(this, std::move(mLoaders));
-    NS_DispatchToMainThread(runnable);
+    NS_DispatchToMainThread(runnable.forget());
   }
 
   mWorkerRef = nullptr;
@@ -170,7 +188,7 @@ void FontFaceSetWorkerImpl::Destroy() {
 }
 
 bool FontFaceSetWorkerImpl::IsOnOwningThread() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (!mWorkerRef) {
     return false;
   }
@@ -180,7 +198,7 @@ bool FontFaceSetWorkerImpl::IsOnOwningThread() {
 
 void FontFaceSetWorkerImpl::DispatchToOwningThread(
     const char* aName, std::function<void()>&& aFunc) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (!mWorkerRef) {
     return;
   }
@@ -213,7 +231,7 @@ void FontFaceSetWorkerImpl::DispatchToOwningThread(
 }
 
 uint64_t FontFaceSetWorkerImpl::GetInnerWindowID() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (!mWorkerRef) {
     return 0;
   }
@@ -222,7 +240,7 @@ uint64_t FontFaceSetWorkerImpl::GetInnerWindowID() {
 }
 
 void FontFaceSetWorkerImpl::FlushUserFontSet() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   // If there was a change to the mNonRuleFaces array, then there could
   // have been a modification to the user font set.
@@ -250,7 +268,7 @@ void FontFaceSetWorkerImpl::FlushUserFontSet() {
 
 nsresult FontFaceSetWorkerImpl::StartLoad(gfxUserFontEntry* aUserFontEntry,
                                           uint32_t aSrcIndex) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   if (NS_WARN_IF(!mWorkerRef)) {
     return NS_ERROR_FAILURE;
@@ -307,7 +325,7 @@ bool FontFaceSetWorkerImpl::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
   MOZ_ASSERT(aSrc.mSourceType == gfxFontFaceSrc::eSourceType_URL);
   MOZ_ASSERT(NS_IsMainThread());
 
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   if (aSrc.mUseOriginPrincipal) {
     return true;
@@ -342,7 +360,7 @@ bool FontFaceSetWorkerImpl::IsFontLoadAllowed(const gfxFontFaceSrc& aSrc) {
 nsresult FontFaceSetWorkerImpl::CreateChannelForSyncLoadFontData(
     nsIChannel** aOutChannel, gfxUserFontEntry* aFontToLoad,
     const gfxFontFaceSrc* aFontFaceSrc) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (NS_WARN_IF(!mWorkerRef)) {
     return NS_ERROR_FAILURE;
   }
@@ -364,7 +382,7 @@ nsresult FontFaceSetWorkerImpl::CreateChannelForSyncLoadFontData(
 nsPresContext* FontFaceSetWorkerImpl::GetPresContext() const { return nullptr; }
 
 TimeStamp FontFaceSetWorkerImpl::GetNavigationStartTimeStamp() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (!mWorkerRef) {
     return TimeStamp();
   }
@@ -372,8 +390,16 @@ TimeStamp FontFaceSetWorkerImpl::GetNavigationStartTimeStamp() {
   return mWorkerRef->Private()->CreationTimeStamp();
 }
 
+already_AddRefed<gfxFontSrcPrincipal>
+FontFaceSetWorkerImpl::GetStandardFontLoadPrincipal() const {
+  ReentrantMonitorAutoEnter lock(mMonitor);
+  WaitForInitialize();
+  return RefPtr{mStandardFontLoadPrincipal}.forget();
+}
+
 already_AddRefed<URLExtraData> FontFaceSetWorkerImpl::GetURLExtraData() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
+  WaitForInitialize();
   return RefPtr{mURLExtraData}.forget();
 }
 

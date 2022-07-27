@@ -67,7 +67,7 @@ using namespace mozilla::dom;
 NS_IMPL_ISUPPORTS0(FontFaceSetImpl)
 
 FontFaceSetImpl::FontFaceSetImpl(FontFaceSet* aOwner)
-    : mMutex("mozilla::dom::FontFaceSetImpl"),
+    : mMonitor("mozilla::dom::FontFaceSetImpl"),
       mOwner(aOwner),
       mStatus(FontFaceSetLoadStatus::Loaded),
       mNonRuleFacesDirty(false),
@@ -86,7 +86,7 @@ FontFaceSetImpl::~FontFaceSetImpl() {
 }
 
 void FontFaceSetImpl::Destroy() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   for (const auto& key : mLoaders.Keys()) {
     key->Cancel();
@@ -133,7 +133,7 @@ void FontFaceSetImpl::FindMatchingFontFaces(const nsACString& aFont,
                                             const nsAString& aText,
                                             nsTArray<FontFace*>& aFontFaces,
                                             ErrorResult& aRv) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   StyleFontFamilyList familyList;
   FontWeight weight;
@@ -193,7 +193,7 @@ void FontFaceSetImpl::FindMatchingFontFaces(const nsACString& aFont,
 void FontFaceSetImpl::FindMatchingFontFaces(
     const nsTHashSet<FontFace*>& aMatchingFaces,
     nsTArray<FontFace*>& aFontFaces) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   for (FontFaceRecord& record : mNonRuleFaces) {
     FontFace* owner = record.mFontFace->GetOwner();
     if (owner && aMatchingFaces.Contains(owner)) {
@@ -203,18 +203,18 @@ void FontFaceSetImpl::FindMatchingFontFaces(
 }
 
 bool FontFaceSetImpl::ReadyPromiseIsPending() const {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   return mOwner && mOwner->ReadyPromiseIsPending();
 }
 
 FontFaceSetLoadStatus FontFaceSetImpl::Status() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   FlushUserFontSet();
   return mStatus;
 }
 
 bool FontFaceSetImpl::Add(FontFaceImpl* aFontFace, ErrorResult& aRv) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   FlushUserFontSet();
 
   if (aFontFace->IsInFontFaceSet(this)) {
@@ -248,7 +248,7 @@ bool FontFaceSetImpl::Add(FontFaceImpl* aFontFace, ErrorResult& aRv) {
 }
 
 void FontFaceSetImpl::Clear() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   FlushUserFontSet();
 
   if (mNonRuleFaces.IsEmpty()) {
@@ -268,7 +268,7 @@ void FontFaceSetImpl::Clear() {
 }
 
 bool FontFaceSetImpl::Delete(FontFaceImpl* aFontFace) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   FlushUserFontSet();
 
   if (aFontFace->HasRule()) {
@@ -301,7 +301,7 @@ bool FontFaceSetImpl::HasAvailableFontFace(FontFaceImpl* aFontFace) {
 }
 
 void FontFaceSetImpl::RemoveLoader(nsFontFaceLoader* aLoader) {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   mLoaders.RemoveEntry(aLoader);
 }
 
@@ -760,7 +760,7 @@ nsresult FontFaceSetImpl::SyncLoadFontData(gfxUserFontEntry* aFontToLoad,
 
 void FontFaceSetImpl::OnFontFaceStatusChanged(FontFaceImpl* aFontFace) {
   gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   MOZ_ASSERT(HasAvailableFontFace(aFontFace));
 
   mHasLoadingFontFacesIsDirty = true;
@@ -806,14 +806,14 @@ void FontFaceSetImpl::DispatchCheckLoadingFinishedAfterDelay() {
 }
 
 void FontFaceSetImpl::CheckLoadingFinishedAfterDelay() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   mDelayedLoadCheck = false;
   CheckLoadingFinished();
 }
 
 void FontFaceSetImpl::CheckLoadingStarted() {
   gfxFontUtils::AssertSafeThreadOrServoFontMetricsLocked();
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
 
   if (!HasLoadingFontFaces()) {
     return;
@@ -837,14 +837,14 @@ void FontFaceSetImpl::CheckLoadingStarted() {
 }
 
 void FontFaceSetImpl::OnLoadingStarted() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (mOwner) {
     mOwner->DispatchLoadingEventAndReplaceReadyPromise();
   }
 }
 
 void FontFaceSetImpl::UpdateHasLoadingFontFaces() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   mHasLoadingFontFacesIsDirty = false;
   mHasLoadingFontFaces = false;
   for (size_t i = 0; i < mNonRuleFaces.Length(); i++) {
@@ -856,7 +856,7 @@ void FontFaceSetImpl::UpdateHasLoadingFontFaces() {
 }
 
 bool FontFaceSetImpl::HasLoadingFontFaces() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (mHasLoadingFontFacesIsDirty) {
     UpdateHasLoadingFontFaces();
   }
@@ -869,7 +869,7 @@ bool FontFaceSetImpl::MightHavePendingFontLoads() {
 }
 
 void FontFaceSetImpl::CheckLoadingFinished() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (mDelayedLoadCheck) {
     // Wait until the runnable posted in OnFontFaceStatusChanged calls us.
     return;
@@ -899,14 +899,14 @@ void FontFaceSetImpl::CheckLoadingFinished() {
 }
 
 void FontFaceSetImpl::OnLoadingFinished() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   if (mOwner) {
     mOwner->MaybeResolve();
   }
 }
 
 void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
-  RecursiveMutexAutoLock lock(mMutex);
+  ReentrantMonitorAutoEnter lock(mMonitor);
   mAllowedFontLoads.Clear();
   IncrementGeneration(false);
 }
@@ -916,7 +916,9 @@ void FontFaceSetImpl::RefreshStandardFontLoadPrincipal() {
 
 already_AddRefed<gfxFontSrcPrincipal>
 FontFaceSetImpl::GetStandardFontLoadPrincipal() const {
-  RecursiveMutexAutoLock lock(mMutex);
+  MOZ_ASSERT(NS_IsMainThread());
+
+  ReentrantMonitorAutoEnter lock(mMonitor);
   return RefPtr{mStandardFontLoadPrincipal}.forget();
 }
 
