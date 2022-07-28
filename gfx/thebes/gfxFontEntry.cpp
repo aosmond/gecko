@@ -272,15 +272,10 @@ already_AddRefed<gfxFont> gfxFontEntry::FindOrMakeFont(
       gfxFontCache::GetCache()->Lookup(this, aStyle, aUnicodeRangeMap);
 
   if (!font) {
-    gfxFont* newFont = CreateFontInstance(aStyle);
-    if (!newFont) {
+    font = CreateFontInstance(aStyle);
+    if (!font || !font->Valid()) {
       return nullptr;
     }
-    if (!newFont->Valid()) {
-      delete newFont;
-      return nullptr;
-    }
-    font = newFont;
     font->SetUnicodeRangeMap(aUnicodeRangeMap);
     gfxFontCache::GetCache()->AddNew(font);
   }

@@ -327,11 +327,6 @@ class gfxFontCache final
   // cache with the same key; we'll forget about the old one.
   void AddNew(gfxFont* aFont);
 
-  // The font's refcount has gone to zero; give ownership of it to
-  // the cache. We delete it if it's not acquired again after a certain
-  // amount of time.
-  void NotifyReleased(gfxFont* aFont);
-
   // Cleans out the hashtable and removes expired fonts waiting for cleanup.
   // Other gfxFont objects may be still in use but they will be pushed
   // into the expiration queues and removed.
@@ -400,8 +395,7 @@ class gfxFontCache final
       REQUIRES(mMutex) override;
   void NotifyHandlerEnd() override;
 
-  void DestroyFontLocked(gfxFont* aFont) REQUIRES(mMutex);
-  void DestroyDiscard(nsTArray<gfxFont*>& aDiscard);
+  void DestroyDiscard(nsTArray<RefPtr<gfxFont>>& aDiscard);
 
   static gfxFontCache* gGlobalCache;
 
@@ -425,24 +419,34 @@ class gfxFontCache final
     // blank. The caller of Put() will fill this in.
     explicit HashEntry(KeyTypePointer aStr) : mFont(nullptr) {}
 
+    HashEntry(const HashEntry&) = delete;
+    HashEntry& operator=(const HashEntry&) = delete;
+
+    HashEntry(HashEntry&& aOther) : mFont(std::move(aOther.mFont)) {}
+
+    HashEntry& operator=(HashEntry&& aOther) {
+      mFont = std::move(aOther.mFont);
+      return *this;
+    }
+
     bool KeyEquals(const KeyTypePointer aKey) const;
     static KeyTypePointer KeyToPointer(KeyType aKey) { return &aKey; }
     static PLDHashNumber HashKey(const KeyTypePointer aKey) {
       return mozilla::HashGeneric(aKey->mStyle->Hash(), aKey->mFontEntry,
                                   aKey->mUnicodeRangeMap);
     }
-    enum { ALLOW_MEMMOVE = true };
+    enum { ALLOW_MEMMOVE = false };
 
     // The cache tracks gfxFont objects whose refcount has dropped to zero,
     // so they are not immediately deleted but may be "resurrected" if they
     // have not yet expired from the tracker when they are needed again.
     // See the custom AddRef/Release methods in gfxFont.
-    gfxFont* MOZ_UNSAFE_REF("tracking for deferred deletion") mFont;
+    RefPtr<gfxFont> mFont;
   };
 
   nsTHashtable<HashEntry> mFonts GUARDED_BY(mMutex);
 
-  nsTArray<gfxFont*> mTrackerDiscard GUARDED_BY(mMutex);
+  nsTArray<RefPtr<gfxFont>> mTrackerDiscard GUARDED_BY(mMutex);
 
   static void WordCacheExpirationTimerCallback(nsITimer* aTimer, void* aCache);
 
@@ -1426,24 +1430,7 @@ class gfxFont {
   using FontSlantStyle = mozilla::FontSlantStyle;
   using FontSizeAdjust = mozilla::StyleFontSizeAdjust;
 
-  nsrefcnt AddRef(void) {
-    MOZ_ASSERT(int32_t(mRefCnt) >= 0, "illegal refcnt");
-    nsrefcnt count = ++mRefCnt;
-    NS_LOG_ADDREF(this, count, "gfxFont", sizeof(*this));
-    return count;
-  }
-  nsrefcnt Release(void) {
-    MOZ_ASSERT(0 != mRefCnt, "dup release");
-    --mRefCnt;
-    NS_LOG_RELEASE(this, mRefCnt, "gfxFont");
-    nsrefcnt rval = mRefCnt;
-    if (!rval) {
-      NotifyReleased();
-      // |this| may have been deleted.
-    }
-    return rval;
-  }
-
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(gfxFont)
   int32_t GetRefCount() { return int32_t(mRefCnt); }
 
   // options to specify the kind of AA to be used when creating a font
@@ -1455,27 +1442,13 @@ class gfxFont {
   } AntialiasOption;
 
  protected:
-  mozilla::ThreadSafeAutoRefCnt mRefCnt;
-
-  void NotifyReleased() {
-    gfxFontCache* cache = gfxFontCache::GetCache();
-    if (cache) {
-      // Don't delete just yet; return the object to the cache for
-      // possibly recycling within some time limit
-      cache->NotifyReleased(this);
-    } else {
-      // The cache may have already been shut down.
-      delete this;
-    }
-  }
-
   gfxFont(const RefPtr<mozilla::gfx::UnscaledFont>& aUnscaledFont,
           gfxFontEntry* aFontEntry, const gfxFontStyle* aFontStyle,
           AntialiasOption anAAOption = kAntialiasDefault);
 
- public:
   virtual ~gfxFont();
 
+ public:
   bool Valid() const { return mIsValid; }
 
   // options for the kind of bounding box to return from measurement
