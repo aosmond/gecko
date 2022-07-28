@@ -2283,6 +2283,7 @@ already_AddRefed<gfxFont> gfxFontGroup::GetFirstValidFont(
       if (aGeneric) {
         *aGeneric = ff.Generic();
       }
+      font->MarkUsed();
       return font.forget();
     }
 
@@ -2313,13 +2314,16 @@ already_AddRefed<gfxFont> gfxFontGroup::GetFirstValidFont(
       if (aGeneric) {
         *aGeneric = ff.Generic();
       }
+      font->MarkUsed();
       return font.forget();
     }
   }
   if (aGeneric) {
     *aGeneric = StyleGenericFontFamily::None;
   }
-  return GetDefaultFont();
+  RefPtr<gfxFont> defaultFont = GetDefaultFont();
+  defaultFont->MarkUsed();
+  return defaultFont.forget();
 }
 
 already_AddRefed<gfxFont> gfxFontGroup::GetFirstMathFont() {
@@ -2327,6 +2331,7 @@ already_AddRefed<gfxFont> gfxFontGroup::GetFirstMathFont() {
   for (uint32_t i = 0; i < count; ++i) {
     RefPtr<gfxFont> font = GetFontAt(i);
     if (font && font->TryGetMathTable()) {
+      font->MarkUsed();
       return font.forget();
     }
   }
@@ -3126,6 +3131,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
       if (firstFont->HasCharacter(aCh) ||
           (fallbackChar && firstFont->HasCharacter(fallbackChar))) {
         *aMatchType = {FontMatchType::Kind::kFontGroup, mFonts[0].Generic()};
+        firstFont->MarkUsed();
         return firstFont.forget();
       }
 
@@ -3141,6 +3147,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
       }
       if (font) {
         *aMatchType = {FontMatchType::Kind::kFontGroup, mFonts[0].Generic()};
+        font->MarkUsed();
         return font.forget();
       }
     } else {
@@ -3232,6 +3239,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
           (fallbackChar && font->HasCharacter(fallbackChar))) {
         if (CheckCandidate(font,
                            {FontMatchType::Kind::kFontGroup, ff.Generic()})) {
+          font->MarkUsed();
           return font.forget();
         }
       }
@@ -3267,6 +3275,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
           if (font) {
             if (CheckCandidate(font, {FontMatchType::Kind::kFontGroup,
                                       mFonts[i].Generic()})) {
+              font->MarkUsed();
               return font.forget();
             }
           }
@@ -3279,6 +3288,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
         if (font) {
           if (CheckCandidate(font, {FontMatchType::Kind::kFontGroup,
                                     mFonts[i].Generic()})) {
+            font->MarkUsed();
             return font.forget();
           }
         }
@@ -3305,6 +3315,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
       if (font) {
         if (CheckCandidate(font,
                            {FontMatchType::Kind::kFontGroup, ff.Generic()})) {
+          font->MarkUsed();
           return font.forget();
         }
       }
@@ -3318,6 +3329,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
         if (font) {
           if (CheckCandidate(font,
                              {FontMatchType::Kind::kFontGroup, ff.Generic()})) {
+            font->MarkUsed();
             return font.forget();
           }
         }
@@ -3330,6 +3342,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
     if (defaultFont->HasCharacter(aCh) ||
         (fallbackChar && defaultFont->HasCharacter(fallbackChar))) {
       if (CheckCandidate(defaultFont, FontMatchType::Kind::kFontGroup)) {
+        defaultFont->MarkUsed();
         return defaultFont.forget();
       }
     }
@@ -3349,6 +3362,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
       GetGeneralCategory(aCh) == HB_UNICODE_GENERAL_CATEGORY_UNASSIGNED) {
     if (candidateFont) {
       *aMatchType = candidateMatchType;
+      candidateFont->MarkUsed();
     }
     return candidateFont.forget();
   }
@@ -3369,6 +3383,7 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
       return font.forget();
     }
     if (CheckCandidate(font, FontMatchType::Kind::kPrefsFallback)) {
+      font->MarkUsed();
       return font.forget();
     }
   }
@@ -3404,11 +3419,13 @@ already_AddRefed<gfxFont> gfxFontGroup::FindFontForChar(
   font = WhichSystemFontSupportsChar(aCh, aNextCh, aRunScript, presentation);
   if (font) {
     if (CheckCandidate(font, FontMatchType::Kind::kSystemFallback)) {
+      font->MarkUsed();
       return font.forget();
     }
   }
   if (candidateFont) {
     *aMatchType = candidateMatchType;
+    candidateFont->MarkUsed();
   }
   return candidateFont.forget();
 }

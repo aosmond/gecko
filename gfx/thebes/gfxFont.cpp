@@ -245,9 +245,7 @@ already_AddRefed<gfxFont> gfxFontCache::Lookup(
     return nullptr;
   }
 
-  RefPtr<gfxFont> font = entry->mFont;
-  MarkUsedLocked(font, lock);
-  return font.forget();
+  return do_AddRef(entry->mFont);
 }
 
 void gfxFontCache::AddNew(gfxFont* aFont) {
@@ -281,6 +279,13 @@ void gfxFontCache::AddNew(gfxFont* aFont) {
     MOZ_ASSERT(entry == mFonts.GetEntry(key));
   }
   DestroyDiscard(discard);
+}
+
+void gfxFontCache::MarkUsed(gfxFont* aFont) {
+  MutexAutoLock lock(mMutex);
+  if (aFont->GetExpirationState()->IsTracked()) {
+    MarkUsedLocked(aFont, lock);
+  }
 }
 
 void gfxFontCache::NotifyExpiredLocked(gfxFont* aFont, const AutoLock& aLock) {

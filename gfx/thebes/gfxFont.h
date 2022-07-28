@@ -327,6 +327,8 @@ class gfxFontCache final
   // cache with the same key; we'll forget about the old one.
   void AddNew(gfxFont* aFont);
 
+  void MarkUsed(gfxFont* aFont);
+
   // Cleans out the hashtable and removes expired fonts waiting for cleanup.
   // Other gfxFont objects may be still in use but they will be pushed
   // into the expiration queues and removed.
@@ -1432,6 +1434,13 @@ class gfxFont {
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(gfxFont)
   int32_t GetRefCount() { return int32_t(mRefCnt); }
+
+  void MarkUsed() {
+    gfxFontCache* cache = gfxFontCache::GetCache();
+    if (cache) {
+      cache->MarkUsed(this);
+    }
+  }
 
   // options to specify the kind of AA to be used when creating a font
   typedef enum : uint8_t {
