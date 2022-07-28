@@ -5756,7 +5756,7 @@
 # Enable OffscreenCanvas everywhere.
 - name: gfx.offscreencanvas.enabled
   type: RelaxedAtomicBool
-  value: true
+  value: false
   mirror: always
 
 # Enable OffscreenCanvas based on the domain allowlist.
