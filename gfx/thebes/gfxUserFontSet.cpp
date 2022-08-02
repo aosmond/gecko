@@ -254,10 +254,21 @@ gfxUserFontFamily::~gfxUserFontFamily() {
   MOZ_ASSERT(!gfxFontUtils::IsInServoTraversal());
 }
 
+void gfxFontFaceSrc::EnsureOriginPrincipal() const {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mUseOriginPrincipal);
+  if (!mOriginPrincipal) {
+    mOriginPrincipal = new gfxFontSrcPrincipal(mURLExtraData->Principal(),
+                                               mURLExtraData->Principal());
+    mURLExtraData = nullptr;
+  }
+}
+
 already_AddRefed<gfxFontSrcPrincipal> gfxFontFaceSrc::LoadPrincipal(
     const gfxUserFontSet& aFontSet) const {
   MOZ_ASSERT(mSourceType == eSourceType_URL);
-  if (mUseOriginPrincipal && mOriginPrincipal) {
+  if (mUseOriginPrincipal) {
+    EnsureOriginPrincipal();
     return RefPtr{mOriginPrincipal}.forget();
   }
   return aFontSet.GetStandardFontLoadPrincipal();

@@ -35,6 +35,7 @@
 #include "mozilla/Assertions.h"  // for AssertionConditionType, MOZ_ASSERT_HELPER2, MOZ_ASSERT, MOZ_ASSERT_UNREACHABLE, MOZ_ASSER...
 #include "mozilla/HashFunctions.h"      // for HashBytes, HashGeneric
 #include "mozilla/TimeStamp.h"          // for TimeStamp
+#include "mozilla/URLExtraData.h"       // for URLExtraData
 #include "mozilla/gfx/FontVariation.h"  // for FontVariation
 #include "nsDebug.h"                    // for NS_WARNING
 #include "nsIReferrerInfo.h"            // for nsIReferrerInfo
@@ -75,7 +76,7 @@ struct gfxFontFaceSrc {
   SourceType mSourceType;
 
   // if url, whether to use the origin principal or not
-  bool mUseOriginPrincipal;
+  bool mUseOriginPrincipal = false;
 
   // format hint flags, union of all possible formats
   // (e.g. TrueType, EOT, SVG, etc.)
@@ -85,7 +86,14 @@ struct gfxFontFaceSrc {
   nsCString mLocalName;                          // full font name if local
   RefPtr<gfxFontSrcURI> mURI;                    // uri if url
   nsCOMPtr<nsIReferrerInfo> mReferrerInfo;       // referrer info if url
-  RefPtr<gfxFontSrcPrincipal> mOriginPrincipal;  // principal if url
+
+  // For URL types only, if mUseOriginPrincipal is true, then mURLExtraData is
+  // set at initialization. This is safe on any thread. mOriginPrincipal remains
+  // unset until EnsureOriginPrincipal is called on the main thread prior to its
+  // first use. Once mOriginPrincipal is created, then mURLExtra is cleared.
+  mutable RefPtr<const mozilla::URLExtraData>
+      mURLExtraData;                                     // URLExtraData if url
+  mutable RefPtr<gfxFontSrcPrincipal> mOriginPrincipal;  // principal if url
 
   RefPtr<gfxFontFaceBufferSource> mBuffer;
 
@@ -93,6 +101,9 @@ struct gfxFontFaceSrc {
   // URL sources.
   already_AddRefed<gfxFontSrcPrincipal> LoadPrincipal(
       const gfxUserFontSet&) const;
+
+  // Ensure mOriginPrincipal is set. Should only be used for URL sources.
+  void EnsureOriginPrincipal() const;
 };
 
 inline bool operator==(const gfxFontFaceSrc& a, const gfxFontFaceSrc& b) {
@@ -106,6 +117,12 @@ inline bool operator==(const gfxFontFaceSrc& a, const gfxFontFaceSrc& b) {
     case gfxFontFaceSrc::eSourceType_Local:
       return a.mLocalName == b.mLocalName;
     case gfxFontFaceSrc::eSourceType_URL: {
+      if (a.mUseOriginPrincipal) {
+        a.EnsureOriginPrincipal();
+      }
+      if (b.mUseOriginPrincipal) {
+        b.EnsureOriginPrincipal();
+      }
       bool equals;
       return a.mUseOriginPrincipal == b.mUseOriginPrincipal &&
              a.mFormatFlags == b.mFormatFlags &&
