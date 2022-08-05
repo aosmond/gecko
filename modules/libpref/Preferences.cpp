@@ -1129,6 +1129,10 @@ class MOZ_STACK_CLASS PrefWrapper : public PrefWrapperBase {
     return NS_OK;
   }
 
+  nsresult GetValue(PrefValueKind aKind, nsACString* aResult) const {
+    return GetValue(aKind, *aResult);
+  }
+
   // Returns false if this pref doesn't have a user value worth saving.
   bool UserValueToStringForSaving(nsCString& aStr) {
     // Should we save the user value, if present? Only if it does not match the
@@ -4529,6 +4533,9 @@ static nsCString PrefValueToString(const uint32_t* u) {
 static nsCString PrefValueToString(const float* f) {
   return nsPrintfCString("%f", *f);
 }
+static nsCString PrefValueToString(const nsACString* s) {
+  return nsCString(*s);
+}
 static nsCString PrefValueToString(const nsACString& s) { return nsCString(s); }
 
 // These preference getter wrappers allow us to look up the value for static
@@ -4637,13 +4644,30 @@ struct Internals {
     return result;
   }
 
+  template <typename T, typename V>
+  static void AssignMirror(T* aMirror, V aValue) {
+    *aMirror = aValue;
+  }
+
+  static void AssignMirror(DataMutexString* aMirror, nsCString&& aValue) {
+    auto lock = aMirror->Lock();
+    lock->Assign(std::move(aValue));
+  }
+
+  static void AssignMirror(DataMutexString* aMirror,
+                           const nsLiteralCString& aValue) {
+    auto lock = aMirror->Lock();
+    lock->Assign(aValue);
+  }
+
   template <typename T>
   static void UpdateMirror(const char* aPref, void* aMirror) {
     StripAtomic<T> value;
 
     nsresult rv = GetPrefValue(aPref, &value, PrefValueKind::User);
     if (NS_SUCCEEDED(rv)) {
-      *static_cast<T*>(aMirror) = value;
+      AssignMirror(static_cast<T*>(aMirror),
+                   std::forward<StripAtomic<T>>(value));
     } else {
       // GetPrefValue() can fail if the update is caused by the pref being
       // deleted or if it fails to make a cast. This assertion is the only place
@@ -5433,6 +5457,17 @@ static MOZ_NEVER_INLINE void AddMirror(T* aMirror, const nsACString& aPref,
   AddMirrorCallback(aMirror, aPref);
 }
 
+static MOZ_NEVER_INLINE void AddMirror(DataMutexString* aMirror,
+                                       const nsACString& aPref,
+                                       const DataMutexString& aDefault) {
+  auto lock = aMirror->Lock();
+  nsCString result(*lock);
+  Internals::GetPrefValue(PromiseFlatCString(aPref).get(), result,
+                          PrefValueKind::User);
+  lock->Assign(std::move(result));
+  AddMirrorCallback(aMirror, aPref);
+}
+
 // The InitPref_*() functions below end in a `_<type>` suffix because they are
 // used by the PREF macro definition in InitAll() below.
 
@@ -5509,6 +5544,15 @@ static void InitAlwaysPref(const nsCString& aName, T* aCache,
   // `once` mirrors will be initialized lazily in InitOncePrefs().
   InitPref(aName, aDefaultValue);
   *aCache = aDefaultValue;
+}
+
+static void InitAlwaysPref(const nsCString& aName, DataMutexString* aCache,
+                           const nsLiteralCString& aDefaultValue) {
+  // Only called in the parent process. Set/reset the pref value and the
+  // `always` mirror to the default value.
+  // `once` mirrors will be initialized lazily in InitOncePrefs().
+  InitPref_String(aName, aDefaultValue.Data());
+  Internals::AssignMirror(aCache, aDefaultValue);
 }
 
 static Atomic<bool> sOncePrefRead(false);
@@ -5742,7 +5786,8 @@ static void InitStaticPrefsFromShared() {
     }                                                                          \
     DebugOnly<nsresult> rv = Internals::GetSharedPrefValue(name, &val);        \
     MOZ_ASSERT(NS_SUCCEEDED(rv), "Failed accessing " name);                    \
-    StaticPrefs::sMirror_##full_id = val;                                      \
+    Internals::AssignMirror(&StaticPrefs::sMirror_##full_id,                   \
+                            std::forward<StripAtomic<cpp_type>>(val));         \
   }
 #define ONCE_PREF(name, base_id, full_id, cpp_type, default_value)             \
   {                                                                            \

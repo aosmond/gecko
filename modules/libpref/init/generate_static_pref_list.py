@@ -46,6 +46,7 @@ VALID_TYPES.update(
         "SequentiallyConsistentAtomicUint32": "uint32_t",
         "AtomicFloat": "float",
         "String": None,
+        "DataMutexString": None,
     }
 )
 
@@ -165,11 +166,11 @@ def check_pref_list(pref_list):
         if "value" not in pref:
             error("missing `value` key for pref `{}`".format(name))
         value = pref["value"]
-        if typ == "String":
+        if typ == "String" or typ == "DataMutexString":
             if type(value) != str:
                 error(
-                    "non-string `value` value `{}` for `String` pref `{}`; "
-                    "add double quotes".format(value, name)
+                    "non-string `value` value `{}` for `{}` pref `{}`; "
+                    "add double quotes".format(value, typ, name)
                 )
         elif typ in VALID_BOOL_TYPES:
             if value not in (True, False):
@@ -273,6 +274,9 @@ def generate_code(pref_list, input_filename):
         if typ == "String":
             # Quote string literals, and escape double-quote chars.
             value = '"{}"'.format(value.replace('"', '\\"'))
+        elif typ == "DataMutexString":
+            # Quote string literals, and escape double-quote chars.
+            value = '"{}"_ns'.format(value.replace('"', '\\"'))
         elif typ in VALID_BOOL_TYPES:
             # Convert Python bools to C++ bools.
             if value is True:
