@@ -354,7 +354,7 @@ bool IsOffscreenCanvasEnabled(JSContext* aCx, JSObject* aObj) {
     return false;
   }
 
-  const auto& allowlist = gfxVars::GetOffscreenCanvasDomainAllowlistOrDefault();
+  const auto allowlist = StaticPrefs::gfx_offscreencanvas_domain_allowlist();
 
   if (!NS_IsMainThread()) {
     dom::WorkerPrivate* workerPrivate = dom::GetWorkerPrivateFromContext(aCx);
