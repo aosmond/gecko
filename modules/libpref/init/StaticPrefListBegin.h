@@ -31,7 +31,7 @@ namespace StaticPrefs {
     MOZ_DIAGNOSTIC_ASSERT(IsAtomic<cpp_type>::value || NS_IsMainThread(),      \
                           "Non-atomic static pref '" name                      \
                           "' being accessed on background thread by getter");  \
-    return sMirror_##full_id;                                                  \
+    return ReadAtomic(sMirror_##full_id);                                      \
   }                                                                            \
   inline const char* GetPrefName_##base_id() { return name; }                  \
   inline StripAtomic<cpp_type> GetPrefDefault_##base_id() {                    \
