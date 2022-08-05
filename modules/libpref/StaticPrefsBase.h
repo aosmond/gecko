@@ -10,6 +10,8 @@
 #include <type_traits>
 
 #include "mozilla/Atomics.h"
+#include "mozilla/DataMutex.h"
+#include "nsString.h"
 
 namespace mozilla {
 
@@ -19,11 +21,22 @@ class SharedPrefMapBuilder;
 
 typedef const char* String;
 
+class DataMutexString : public StaticDataMutex<nsCString> {
+ public:
+  // We don't pass aDefault into nsCString directly because otherwise we trip
+  // the leak detector in debug builds for addref-ing in a static constructor.
+  explicit DataMutexString(const nsLiteralCString& aDefault)
+      : StaticDataMutex<nsCString>(nsCString(aDefault.get()), "") {}
+};
+
 template <typename T>
 struct IsString : std::false_type {};
 
 template <>
 struct IsString<String> : std::true_type {};
+
+template <>
+struct IsString<DataMutexString> : std::true_type {};
 
 typedef Atomic<bool, Relaxed> RelaxedAtomicBool;
 typedef Atomic<bool, ReleaseAcquire> ReleaseAcquireAtomicBool;
@@ -58,8 +71,26 @@ struct StripAtomicImpl<std::atomic<T>> {
   typedef T Type;
 };
 
+template <>
+struct StripAtomicImpl<DataMutexString> {
+  typedef nsCString Type;
+};
+
 template <typename T>
 using StripAtomic = typename StripAtomicImpl<T>::Type;
+
+template <typename T>
+struct StripAtomicRvImpl {
+  typedef typename StripAtomicImpl<T>::Type Type;
+};
+
+template <>
+struct StripAtomicRvImpl<DataMutexString> {
+  typedef DataMutexString::ConstAutoLock Type;
+};
+
+template <typename T>
+using StripAtomicRv = typename StripAtomicRvImpl<T>::Type;
 
 template <typename T>
 struct IsAtomic : std::false_type {};
@@ -69,6 +100,28 @@ struct IsAtomic<Atomic<T, Order>> : std::true_type {};
 
 template <typename T>
 struct IsAtomic<std::atomic<T>> : std::true_type {};
+
+template <>
+struct IsAtomic<DataMutexString> : std::true_type {};
+
+template <typename T>
+T ReadAtomic(T& aValue) {
+  return aValue;
+}
+
+template <typename T, MemoryOrdering Order>
+T ReadAtomic(Atomic<T, Order>& aValue) {
+  return aValue;
+}
+
+template <typename T>
+T ReadAtomic(std::atomic<T>& aValue) {
+  return aValue;
+}
+
+inline DataMutexString::ConstAutoLock ReadAtomic(DataMutexString& aValue) {
+  return aValue.ConstLock();
+}
 
 namespace StaticPrefs {
 
