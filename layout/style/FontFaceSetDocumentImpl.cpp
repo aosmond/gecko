@@ -105,7 +105,9 @@ void FontFaceSetDocumentImpl::Destroy() {
   mDocument = nullptr;
 }
 
-bool FontFaceSetDocumentImpl::IsOnOwningThread() { return NS_IsMainThread(); }
+bool FontFaceSetDocumentImpl::IsOnOwningThread() {
+  return NS_IsMainThread() || ServoStyleSet::IsInServoTraversal();
+}
 
 void FontFaceSetDocumentImpl::DispatchToOwningThread(
     const char* aName, std::function<void()>&& aFunc) {
@@ -130,7 +132,7 @@ void FontFaceSetDocumentImpl::DispatchToOwningThread(
 }
 
 uint64_t FontFaceSetDocumentImpl::GetInnerWindowID() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
   if (!mDocument) {
     return 0;
   }
@@ -139,7 +141,7 @@ uint64_t FontFaceSetDocumentImpl::GetInnerWindowID() {
 }
 
 nsPresContext* FontFaceSetDocumentImpl::GetPresContext() const {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
   if (!mDocument) {
     return nullptr;
   }
@@ -148,7 +150,7 @@ nsPresContext* FontFaceSetDocumentImpl::GetPresContext() const {
 }
 
 void FontFaceSetDocumentImpl::RefreshStandardFontLoadPrincipal() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
   RecursiveMutexAutoLock lock(mMutex);
   if (NS_WARN_IF(!mDocument)) {
     return;
@@ -193,7 +195,7 @@ TimeStamp FontFaceSetDocumentImpl::GetNavigationStartTimeStamp() {
 }
 
 void FontFaceSetDocumentImpl::EnsureReady() {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(NS_IsMainThread() || ServoStyleSet::IsInServoTraversal());
 
   // There may be outstanding style changes that will trigger the loading of
   // new fonts.  We need to flush layout to initiate any such loads so that
