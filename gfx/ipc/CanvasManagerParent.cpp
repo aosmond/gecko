@@ -48,14 +48,7 @@ CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
 /* static */ void CanvasManagerParent::Shutdown() {
   MOZ_ASSERT(NS_IsMainThread());
 
-  nsCOMPtr<nsISerialEventTarget> owningThread;
-  if (!gfxVars::SupportsThreadsafeGL()) {
-    owningThread = wr::RenderThread::GetRenderThread();
-  } else if (gfxVars::UseCanvasRenderThread()) {
-    owningThread = gfx::CanvasRenderThread::GetCanvasRenderThread();
-  } else {
-    owningThread = layers::CompositorThread();
-  }
+  nsCOMPtr<nsISerialEventTarget> owningThread = GetOwningThread();
   if (!owningThread) {
     return;
   }
@@ -76,6 +69,30 @@ CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
 
   for (auto const& actor : actors) {
     actor->Close();
+  }
+}
+
+/* static */ nsCOMPtr<nsISerialEventTarget>
+CanvasManagerParent::GetOwningThread() {
+  if (!gfxVars::SupportsThreadsafeGL()) {
+    return wr::RenderThread::GetRenderThread();
+  }
+  if (gfxVars::UseCanvasRenderThread()) {
+    return gfx::CanvasRenderThread::GetCanvasRenderThread();
+  }
+  return layers::CompositorThread();
+}
+
+/* static */ bool CanvasManagerParent::IsOnOwningThread() {
+  nsCOMPtr<nsISerialEventTarget> owningThread = GetOwningThread();
+  return owningThread && owningThread->IsOnCurrentThread();
+}
+
+/* static */ void CanvasManagerParent::DispatchToOwningThread(
+    already_AddRefed<Runnable>&& aRunnable) {
+  nsCOMPtr<nsISerialEventTarget> owningThread = GetOwningThread();
+  if (owningThread) {
+    owningThread->Dispatch(std::move(aRunnable));
   }
 }
 

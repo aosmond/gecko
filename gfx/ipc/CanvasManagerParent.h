@@ -8,6 +8,8 @@
 
 #include "mozilla/gfx/PCanvasManagerParent.h"
 #include "nsHashtablesFwd.h"
+#include "nsISerialEventTarget.h"
+#include "nsThreadUtils.h"
 
 namespace mozilla::gfx {
 
@@ -18,6 +20,10 @@ class CanvasManagerParent final : public PCanvasManagerParent {
   static void Init(Endpoint<PCanvasManagerParent>&& aEndpoint);
 
   static void Shutdown();
+
+  static bool IsOnOwningThread();
+
+  static void DispatchToOwningThread(already_AddRefed<Runnable>&& aRunnable);
 
   CanvasManagerParent();
 
@@ -35,6 +41,7 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
  private:
   static void ShutdownInternal();
+  static nsCOMPtr<nsISerialEventTarget> GetOwningThread();
 
   ~CanvasManagerParent() override;
 

@@ -710,6 +710,61 @@ void WebGLContext::BumpLru() {
   BumpLruLocked();
 }
 
+/* static */ void WebGLContext::LoseContextsOnOwningThread() {
+  StaticMutexAutoLock lock(sLruMutex);
+  for (auto i = sLru.begin(); i != sLru.end();) {
+    auto* context = *i++;
+    const auto& host = context->mHost;
+    if (host && host->IsOnOwningThread()) {
+      context->LoseContextLruLocked(webgl::ContextLossReason::None);
+    }
+  }
+}
+
+/* static */ void WebGLContext::MaybeLoseLruContext() {
+  StaticMutexAutoLock lock(sLruMutex);
+  MaybeLoseLruContextLocked();
+}
+
+/* static */ void WebGLContext::MaybeLoseLruContextLocked() {
+  const auto maxContexts = std::max(1u, StaticPrefs::webgl_max_contexts());
+  const auto total = sLru.size();
+  if (total <= maxContexts) {
+    return;
+  }
+
+  auto GetRunnable = []() -> already_AddRefed<Runnable> {
+    return NS_NewRunnableFunction(
+        "WebGLContext::LoseLruContextIfLimitedExceeded",
+        []() { WebGLContext::MaybeLoseLruContext(); });
+  };
+
+  auto remainder = total - maxContexts;
+  bool dispatchToMain = false;
+
+  for (auto i = sLru.begin(); i != sLru.end() && remainder > 0; --remainder) {
+    auto* context = *i++;
+    const auto& host = context->mHost;
+    if (!host) {
+      continue;
+    }
+    if (host->IsOnOwningThread()) {
+      context->LoseContextLruLocked(webgl::ContextLossReason::None);
+    } else if (NS_IsMainThread()) {
+      // We can dispatch from the main thread to a worker.
+      host->DispatchToOwningThread(GetRunnable());
+    } else {
+      // We cannot dispatch between worker threads.
+      dispatchToMain = true;
+    }
+  }
+
+  if (dispatchToMain) {
+    // Dispatch to main thread to loop again
+    NS_DispatchToMainThread(GetRunnable());
+  }
+}
+
 void WebGLContext::LoseLruContextIfLimitExceeded() {
   StaticMutexAutoLock lock(sLruMutex);
 
@@ -725,7 +780,8 @@ void WebGLContext::LoseLruContextIfLimitExceeded() {
   {
     size_t forPrincipal = 0;
     for (const auto& context : sLru) {
-      if (context->mPrincipalKey == mPrincipalKey) {
+      if (context->mHost && context->mHost->IsOnOwningThread() &&
+          context->mPrincipalKey == mPrincipalKey) {
         forPrincipal += 1;
       }
     }
@@ -738,7 +794,8 @@ void WebGLContext::LoseLruContextIfLimitExceeded() {
       mHost->JsWarning(ToString(text));
 
       for (const auto& context : sLru) {
-        if (context->mPrincipalKey == mPrincipalKey) {
+        if (context->mHost && context->mHost->IsOnOwningThread() &&
+            context->mPrincipalKey == mPrincipalKey) {
           MOZ_ASSERT(context != this);
           context->LoseContextLruLocked(webgl::ContextLossReason::None);
           forPrincipal -= 1;
@@ -748,19 +805,19 @@ void WebGLContext::LoseLruContextIfLimitExceeded() {
     }
   }
 
-  auto total = sLru.size();
-  while (total > maxContexts) {
-    const auto text = nsPrintfCString(
-        "Exceeded %u live WebGL contexts, losing the least "
-        "recently used one.",
-        maxContexts);
-    mHost->JsWarning(ToString(text));
-
-    const auto& context = sLru.front();
-    MOZ_ASSERT(context != this);
-    context->LoseContextLruLocked(webgl::ContextLossReason::None);
-    total -= 1;
+  const auto total = sLru.size();
+  if (total <= maxContexts) {
+    return;
   }
+
+  const uint32_t remainder = total - maxContexts;
+  const auto text = nsPrintfCString(
+      "Exceeded %u live WebGL contexts, losing %u of the least recently used "
+      "ones.",
+      maxContexts, remainder);
+  mHost->JsWarning(ToString(text));
+
+  MaybeLoseLruContextLocked();
 }
 
 // -

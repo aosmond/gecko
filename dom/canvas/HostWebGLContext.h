@@ -26,6 +26,7 @@ namespace mozilla {
 
 namespace dom {
 class WebGLParent;
+class ThreadSafeWorkerRef;
 }
 namespace layers {
 class CompositableHost;
@@ -79,6 +80,7 @@ class HostWebGLContext final : public SupportsWeakPtr {
 
  private:
   explicit HostWebGLContext(const OwnerData&);
+  bool Initialize();
 
  public:
   virtual ~HostWebGLContext();
@@ -88,7 +90,11 @@ class HostWebGLContext final : public SupportsWeakPtr {
  public:
   const OwnerData mOwnerData;
 
+  bool IsOnOwningThread() const;
+  void DispatchToOwningThread(already_AddRefed<Runnable>&& aRunnable) const;
+
  private:
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
   RefPtr<WebGLContext> mContext;
 
 #define _(X) std::unordered_map<ObjectId, RefPtr<WebGL##X>> m##X##Map;

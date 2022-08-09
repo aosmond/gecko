@@ -273,10 +273,13 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
   mutable LruPosition mLruPosition MOZ_GUARDED_BY(sLruMutex);
 
   void BumpLruLocked() MOZ_REQUIRES(sLruMutex);
+  static void MaybeLoseLruContextLocked() MOZ_REQUIRES(sLruMutex);
 
  public:
   void BumpLru();
   void LoseLruContextIfLimitExceeded();
+  static void MaybeLoseLruContext();
+  static void LoseContextsOnOwningThread();
 
   // -
 

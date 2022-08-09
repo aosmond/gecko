@@ -27,6 +27,10 @@
 #include "WebGLQuery.h"
 
 #include "mozilla/StaticMutex.h"
+#include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerRef.h"
+#include "mozilla/dom/WorkerRunnable.h"
+#include "mozilla/gfx/CanvasManagerParent.h"
 
 namespace mozilla {
 
@@ -55,6 +59,7 @@ UniquePtr<HostWebGLContext> HostWebGLContext::Create(
     const OwnerData& ownerData, const webgl::InitContextDesc& desc,
     webgl::InitContextResult* const out) {
   auto host = WrapUnique(new HostWebGLContext(ownerData));
+  if (!host->Initialize()) return nullptr;
   auto webgl = WebGLContext::Create(*host, desc, out);
   if (!webgl) return nullptr;
   return host;
@@ -75,8 +80,77 @@ HostWebGLContext::~HostWebGLContext() {
 
 // -
 
+bool HostWebGLContext::Initialize() {
+  dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
+  if (!workerPrivate) {
+    return true;
+  }
+
+  RefPtr<dom::StrongWorkerRef> workerRef = dom::StrongWorkerRef::Create(
+      workerPrivate, "HostWebGLContext",
+      []() { WebGLContext::LoseContextsOnOwningThread(); });
+  if (!workerRef) {
+    return false;
+  }
+
+  StaticMutexAutoLock lock(sContextSetLock);
+  mWorkerRef = new dom::ThreadSafeWorkerRef(workerRef);
+  return true;
+}
+
+bool HostWebGLContext::IsOnOwningThread() const {
+  {
+    StaticMutexAutoLock lock(sContextSetLock);
+    if (mWorkerRef) {
+      return mWorkerRef->Private()->IsOnCurrentThread();
+    }
+    if (mOwnerData.inProcess) {
+      return NS_IsMainThread();
+    }
+  }
+  return CanvasManagerParent::IsOnOwningThread();
+}
+
+void HostWebGLContext::DispatchToOwningThread(
+    already_AddRefed<Runnable>&& aRunnable) const {
+  {
+    StaticMutexAutoLock lock(sContextSetLock);
+    if (mWorkerRef) {
+      class WorkerWrapperRunnable final : public dom::WorkerRunnable {
+       public:
+        WorkerWrapperRunnable(WorkerPrivate* aWorkerPrivate,
+                              already_AddRefed<Runnable>&& aRunnable)
+            : dom::WorkerRunnable(aWorkerPrivate), mRunnable(aRunnable) {}
+
+        bool WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override {
+          mRunnable->Run();
+          return true;
+        }
+
+       private:
+        RefPtr<Runnable> mRunnable;
+      };
+
+      auto runnable = MakeRefPtr<WorkerWrapperRunnable>(mWorkerRef->Private(),
+                                                        std::move(aRunnable));
+      runnable->Dispatch();
+      return;
+    }
+
+    if (mOwnerData.inProcess) {
+      NS_DispatchToMainThread(std::move(aRunnable));
+      return;
+    }
+  }
+  CanvasManagerParent::DispatchToOwningThread(std::move(aRunnable));
+}
+
 void HostWebGLContext::OnContextLoss(const webgl::ContextLossReason reason) {
   if (mOwnerData.inProcess) {
+    {
+      StaticMutexAutoLock lock(sContextSetLock);
+      mWorkerRef = nullptr;
+    }
     mOwnerData.inProcess->OnContextLoss(reason);
   } else {
     (void)mOwnerData.outOfProcess->SendOnContextLoss(reason);
