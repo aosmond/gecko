@@ -34,7 +34,7 @@ namespace StaticPrefs {
     return ReadAtomic(sMirror_##full_id);                                      \
   }                                                                            \
   inline const char* GetPrefName_##base_id() { return name; }                  \
-  inline StripAtomic<cpp_type> GetPrefDefault_##base_id() {                    \
+  inline StripAtomicDefaultRv<cpp_type> GetPrefDefault_##base_id() {           \
     return default_value;                                                      \
   }
 #define ONCE_PREF(name, base_id, full_id, cpp_type, default_value)             \

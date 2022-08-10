@@ -24,7 +24,7 @@ typedef const char* String;
 class DataMutexString : public StaticDataMutex<nsCString> {
  public:
   explicit DataMutexString(const nsLiteralCString& aDefault)
-      : StaticDataMutex<nsCString>(nsCString(aDefault), "DataMutexString") {}
+      : StaticDataMutex<nsCString>(nsCString(aDefault), "") {}
 };
 
 template <typename T>
@@ -99,6 +99,29 @@ struct StripAtomicRvImpl<DataMutexString> {
 
 template <typename T>
 using StripAtomicRv = typename StripAtomicRvImpl<T>::Type;
+
+template <typename T>
+struct StripAtomicDefaultRvImpl {
+  typedef T Type;
+};
+
+template <typename T, MemoryOrdering Order>
+struct StripAtomicDefaultRvImpl<Atomic<T, Order>> {
+  typedef T Type;
+};
+
+template <typename T>
+struct StripAtomicDefaultRvImpl<std::atomic<T>> {
+  typedef T Type;
+};
+
+template <>
+struct StripAtomicDefaultRvImpl<DataMutexString> {
+  typedef nsLiteralCString Type;
+};
+
+template <typename T>
+using StripAtomicDefaultRv = typename StripAtomicDefaultRvImpl<T>::Type;
 
 template <typename T>
 struct IsAtomic : std::false_type {};
