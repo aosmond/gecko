@@ -4655,7 +4655,7 @@ struct Internals {
   }
 
   static void AssignMirror(DataMutexString* aMirror,
-                           const nsLiteralCString& aValue) {
+                           const char* aValue) {
     auto lock = aMirror->Lock();
     lock->Assign(aValue);
   }
@@ -5548,11 +5548,11 @@ static void InitAlwaysPref(const nsCString& aName, T* aCache,
 }
 
 static void InitAlwaysPref(const nsCString& aName, DataMutexString* aCache,
-                           const nsLiteralCString& aDefaultValue) {
+                           const char* aDefaultValue) {
   // Only called in the parent process. Set/reset the pref value and the
   // `always` mirror to the default value.
   // `once` mirrors will be initialized lazily in InitOncePrefs().
-  InitPref_String(aName, aDefaultValue.get());
+  InitPref_String(aName, aDefaultValue);
   Internals::AssignMirror(aCache, aDefaultValue);
 }
 

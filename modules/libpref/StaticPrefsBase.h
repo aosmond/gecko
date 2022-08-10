@@ -23,8 +23,8 @@ typedef const char* String;
 
 class DataMutexString : public StaticDataMutex<nsCString> {
  public:
-  explicit DataMutexString(const nsLiteralCString& aDefault)
-      : StaticDataMutex<nsCString>(aDefault, "") {}
+  explicit DataMutexString(const char* aDefault)
+      : StaticDataMutex<nsCString>(nsDependentCString(aDefault), "") {}
 };
 
 template <typename T>
@@ -117,7 +117,7 @@ struct StripAtomicDefaultRvImpl<std::atomic<T>> {
 
 template <>
 struct StripAtomicDefaultRvImpl<DataMutexString> {
-  typedef const nsLiteralCString& Type;
+  typedef const char* Type;
 };
 
 template <typename T>

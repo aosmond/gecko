@@ -271,12 +271,9 @@ def generate_code(pref_list, input_filename):
                 include = '"{}"'.format(include)
             includes[group].add(include)
 
-        if typ == "String":
+        if typ == "String" or typ == "DataMutexString":
             # Quote string literals, and escape double-quote chars.
             value = '"{}"'.format(value.replace('"', '\\"'))
-        elif typ == "DataMutexString":
-            # Quote string literals, and escape double-quote chars.
-            value = '"{}"_ns'.format(value.replace('"', '\\"'))
         elif typ in VALID_BOOL_TYPES:
             # Convert Python bools to C++ bools.
             if value is True:
