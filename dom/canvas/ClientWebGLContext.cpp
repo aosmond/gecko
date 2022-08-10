@@ -2149,17 +2149,17 @@ void ClientWebGLContext::GetParameter(JSContext* cx, GLenum pname,
 
   if (!debug) {
     const auto GetUnmaskedRenderer = [&]() {
-      const auto overrideVal = StaticPrefs::webgl_override_unmasked_renderer();
-      if (!overrideVal.IsEmpty()) {
-        return Some(ToString(overrideVal));
+      const auto prefLock = StaticPrefs::webgl_override_unmasked_renderer();
+      if (!prefLock->IsEmpty()) {
+        return Some(ToString(*prefLock));
       }
       return GetString(LOCAL_GL_RENDERER);
     };
 
     const auto GetUnmaskedVendor = [&]() {
-      const auto overrideVal = StaticPrefs::webgl_override_unmasked_vendor();
-      if (!overrideVal.IsEmpty()) {
-        return Some(ToString(overrideVal));
+      const auto prefLock = StaticPrefs::webgl_override_unmasked_vendor();
+      if (!prefLock->IsEmpty()) {
+        return Some(ToString(*prefLock));
       }
       return GetString(LOCAL_GL_VENDOR);
     };
