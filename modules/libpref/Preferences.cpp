@@ -5460,11 +5460,12 @@ static MOZ_NEVER_INLINE void AddMirror(T* aMirror, const nsACString& aPref,
 static MOZ_NEVER_INLINE void AddMirror(DataMutexString* aMirror,
                                        const nsACString& aPref,
                                        const DataMutexString& aDefault) {
-  auto lock = aMirror->Lock();
-  nsCString result(*lock);
-  Internals::GetPrefValue(PromiseFlatCString(aPref).get(), result,
-                          PrefValueKind::User);
-  lock->Assign(std::move(result));
+  nsCString result;
+  nsresult rv = Internals::GetPrefValue(PromiseFlatCString(aPref).get(), result,
+                                        PrefValueKind::User);
+  if (NS_SUCCEEDED(rv)) {
+    Internals::AssignMirror(aMirror, std::move(result));
+  }
   AddMirrorCallback(aMirror, aPref);
 }
 
