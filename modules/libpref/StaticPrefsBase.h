@@ -101,6 +101,29 @@ template <typename T>
 using StripAtomicRv = typename StripAtomicRvImpl<T>::Type;
 
 template <typename T>
+struct StripAtomicDefaultRvImpl {
+  typedef T Type;
+};
+
+template <typename T, MemoryOrdering Order>
+struct StripAtomicDefaultRvImpl<Atomic<T, Order>> {
+  typedef T Type;
+};
+
+template <typename T>
+struct StripAtomicDefaultRvImpl<std::atomic<T>> {
+  typedef T Type;
+};
+
+template <>
+struct StripAtomicDefaultRvImpl<DataMutexString> {
+  typedef const nsLiteralCString& Type;
+};
+
+template <typename T>
+using StripAtomicDefaultRv = typename StripAtomicDefaultRvImpl<T>::Type;
+
+template <typename T>
 struct IsAtomic : std::false_type {};
 
 template <typename T, MemoryOrdering Order>
