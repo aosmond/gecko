@@ -5551,7 +5551,7 @@ static void InitAlwaysPref(const nsCString& aName, DataMutexString* aCache,
   // Only called in the parent process. Set/reset the pref value and the
   // `always` mirror to the default value.
   // `once` mirrors will be initialized lazily in InitOncePrefs().
-  InitPref_String(aName, aDefaultValue.Data());
+  InitPref_String(aName, aDefaultValue.get());
   Internals::AssignMirror(aCache, aDefaultValue);
 }
 
