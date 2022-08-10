@@ -78,6 +78,29 @@ template <typename T>
 using StripAtomic = typename StripAtomicImpl<T>::Type;
 
 template <typename T>
+struct StripAtomicRvImpl {
+  typedef T Type;
+};
+
+template <typename T, MemoryOrdering Order>
+struct StripAtomicRvImpl<Atomic<T, Order>> {
+  typedef T Type;
+};
+
+template <typename T>
+struct StripAtomicRvImpl<std::atomic<T>> {
+  typedef T Type;
+};
+
+template <>
+struct StripAtomicRvImpl<DataMutexString> {
+  typedef DataMutexString::ReadOnlyAutoLock Type;
+};
+
+template <typename T>
+using StripAtomicRv = typename StripAtomicRvImpl<T>::Type;
+
+template <typename T>
 struct IsAtomic : std::false_type {};
 
 template <typename T, MemoryOrdering Order>
@@ -104,9 +127,8 @@ T ReadAtomic(std::atomic<T>& aValue) {
   return aValue;
 }
 
-inline nsCString ReadAtomic(DataMutexString& aValue) {
-  auto lock = aValue.Lock();
-  return *lock;
+inline DataMutexString::ReadOnlyAutoLock ReadAtomic(DataMutexString& aValue) {
+  return aValue.ReadOnlyLock();
 }
 
 namespace StaticPrefs {

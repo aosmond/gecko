@@ -21,7 +21,7 @@ namespace StaticPrefs {
 #define NEVER_PREF(name, cpp_type, default_value)
 #define ALWAYS_PREF(name, base_id, full_id, cpp_type, default_value)           \
   extern cpp_type sMirror_##full_id;                                           \
-  inline StripAtomic<cpp_type> full_id() {                                     \
+  inline StripAtomicRv<cpp_type> full_id() {                                   \
     if (!XRE_IsParentProcess() && IsString<cpp_type>::value &&                 \
         sCrashOnBlocklistedPref) {                                             \
       MOZ_DIAGNOSTIC_ASSERT(                                                   \
