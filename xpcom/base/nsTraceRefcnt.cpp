@@ -199,8 +199,7 @@ static void AssertActivityIsLegal(const char* aType, const char* aAction) {
     char buf[1024];
     SprintfLiteral(buf, "XPCOM object %s %s from static ctor/dtor", aType,
                    aAction);
-
-    if (PR_GetEnv("MOZ_FATAL_STATIC_XPCOM_CTORS_DTORS")) {
+    if (strcmp(aType, "nsStringBuffer") == 0 && PR_GetEnv("MOZ_RUN_GTEST")) {
       MOZ_CRASH_UNSAFE_PRINTF("%s", buf);
     } else {
       NS_WARNING(buf);
