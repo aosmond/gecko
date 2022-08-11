@@ -23,8 +23,8 @@ typedef const char* String;
 
 class DataMutexString : public StaticDataMutex<nsCString> {
  public:
-  explicit DataMutexString(const char* aDefault)
-      : StaticDataMutex<nsCString>(nsCString(aDefault), "") {}
+  explicit DataMutexString(const char*)
+      : StaticDataMutex<nsCString>(nsCString(), "") {}
 };
 
 template <typename T>
