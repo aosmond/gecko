@@ -75,21 +75,8 @@ struct StripAtomicImpl<DataMutexString> {
 };
 
 template <typename T>
-using StripAtomic = typename StripAtomicImpl<T>::Type;
-
-template <typename T>
 struct StripAtomicRvImpl {
-  typedef T Type;
-};
-
-template <typename T, MemoryOrdering Order>
-struct StripAtomicRvImpl<Atomic<T, Order>> {
-  typedef T Type;
-};
-
-template <typename T>
-struct StripAtomicRvImpl<std::atomic<T>> {
-  typedef T Type;
+  typedef typename StripAtomicImpl<T>::Type Type;
 };
 
 template <>
@@ -98,27 +85,20 @@ struct StripAtomicRvImpl<DataMutexString> {
 };
 
 template <typename T>
-using StripAtomicRv = typename StripAtomicRvImpl<T>::Type;
-
-template <typename T>
 struct StripAtomicDefaultRvImpl {
-  typedef T Type;
-};
-
-template <typename T, MemoryOrdering Order>
-struct StripAtomicDefaultRvImpl<Atomic<T, Order>> {
-  typedef T Type;
-};
-
-template <typename T>
-struct StripAtomicDefaultRvImpl<std::atomic<T>> {
-  typedef T Type;
+  typedef typename StripAtomicImpl<T>::Type Type;
 };
 
 template <>
 struct StripAtomicDefaultRvImpl<DataMutexString> {
   typedef const char* Type;
 };
+
+template <typename T>
+using StripAtomic = typename StripAtomicImpl<T>::Type;
+
+template <typename T>
+using StripAtomicRv = typename StripAtomicRvImpl<T>::Type;
 
 template <typename T>
 using StripAtomicDefaultRv = typename StripAtomicDefaultRvImpl<T>::Type;
