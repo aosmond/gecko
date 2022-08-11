@@ -4654,6 +4654,11 @@ struct Internals {
     lock->Assign(aValue);
   }
 
+  static void AssignMirror(DataMutexString* aMirror, const nsLiteralCString& aValue) {
+    auto lock = aMirror->Lock();
+    lock->Assign(aValue);
+  }
+
   template <typename T>
   static void UpdateMirror(const char* aPref, void* aMirror) {
     StripAtomic<T> value;
