@@ -4649,9 +4649,9 @@ struct Internals {
     *aMirror = aValue;
   }
 
-  static void AssignMirror(DataMutexString* aMirror, nsCString&& aValue) {
+  static void AssignMirror(DataMutexString* aMirror, const nsCString& aValue) {
     auto lock = aMirror->Lock();
-    lock->Assign(std::move(aValue));
+    lock->Assign(aValue);
   }
 
   static void AssignMirror(DataMutexString* aMirror,
@@ -4666,8 +4666,7 @@ struct Internals {
 
     nsresult rv = GetPrefValue(aPref, &value, PrefValueKind::User);
     if (NS_SUCCEEDED(rv)) {
-      AssignMirror(static_cast<T*>(aMirror),
-                   std::forward<StripAtomic<T>>(value));
+      AssignMirror(static_cast<T*>(aMirror), value);
     } else {
       // GetPrefValue() can fail if the update is caused by the pref being
       // deleted or if it fails to make a cast. This assertion is the only place
@@ -5464,7 +5463,7 @@ static MOZ_NEVER_INLINE void AddMirror(DataMutexString* aMirror,
   nsresult rv = Internals::GetPrefValue(PromiseFlatCString(aPref).get(), result,
                                         PrefValueKind::User);
   if (NS_SUCCEEDED(rv)) {
-    Internals::AssignMirror(aMirror, std::move(result));
+    Internals::AssignMirror(aMirror, result);
   }
   AddMirrorCallback(aMirror, aPref);
 }
@@ -5787,8 +5786,7 @@ static void InitStaticPrefsFromShared() {
     }                                                                          \
     DebugOnly<nsresult> rv = Internals::GetSharedPrefValue(name, &val);        \
     MOZ_ASSERT(NS_SUCCEEDED(rv), "Failed accessing " name);                    \
-    Internals::AssignMirror(&StaticPrefs::sMirror_##full_id,                   \
-                            std::forward<StripAtomic<cpp_type>>(val));         \
+    Internals::AssignMirror(&StaticPrefs::sMirror_##full_id, val);             \
   }
 #define ONCE_PREF(name, base_id, full_id, cpp_type, default_value)             \
   {                                                                            \
