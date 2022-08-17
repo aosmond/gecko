@@ -1041,6 +1041,8 @@ pub struct DisplayListBuilder {
     payload: DisplayListPayload,
     pub pipeline_id: PipelineId,
 
+    prev_capacity: DisplayListCapacity,
+
     pending_chunk: Vec<u8>,
     writing_to_chunk: bool,
 
@@ -1077,6 +1079,32 @@ impl DisplayListCapacity {
             spatial_tree_size: 0,
         }
     }
+
+    fn max() -> Self {
+        DisplayListCapacity {
+            items_size: usize::max_value(),
+            cache_size: usize::max_value(),
+            spatial_tree_size: usize::max_value(),
+        }
+    }
+
+    fn limit_size(self_size: usize, prev_size: usize, min_size: usize) -> usize {
+        // If we are shrinking, then go with the mininum. If we are growing, use
+        // the last size.
+        if self_size + self_size/8 < prev_size {
+            self_size.min(min_size)
+        } else {
+            self_size
+        }
+    }
+
+    fn limit(&self, prev: &Self, min: &Self) -> Self {
+        DisplayListCapacity {
+            items_size: Self::limit_size(self.items_size, prev.items_size, min.items_size),
+            cache_size: Self::limit_size(self.cache_size, prev.cache_size, min.cache_size),
+            spatial_tree_size: Self::limit_size(self.spatial_tree_size, prev.spatial_tree_size, min.spatial_tree_size),
+        }
+    }
 }
 
 impl DisplayListBuilder {
@@ -1084,6 +1112,7 @@ impl DisplayListBuilder {
         DisplayListBuilder {
             payload: DisplayListPayload::new(DisplayListCapacity::empty()),
             pipeline_id,
+            prev_capacity: DisplayListCapacity::max(),
 
             pending_chunk: Vec::new(),
             writing_to_chunk: false,
@@ -1104,6 +1133,7 @@ impl DisplayListBuilder {
 
     fn reset(&mut self) {
         self.payload.clear();
+        self.prev_capacity = DisplayListCapacity::max();
         self.pending_chunk.clear();
         self.writing_to_chunk = false;
 
@@ -2174,17 +2204,23 @@ impl DisplayListBuilder {
         // following ones are always smaller thanks to interning.
         // So don't let the spike of the first allocation make us allocate a large
         // contiguous buffer (with some likelihood of OOM, see bug 1531819).
-        let next_capacity = DisplayListCapacity {
-            cache_size: self.payload.cache_data.len().min(128 * 1024),
-            items_size: self.payload.items_data.len().min(512 * 1024),
-            spatial_tree_size: self.payload.spatial_tree.len().min(128 * 1024),
+        let capacity = DisplayListCapacity {
+            cache_size: self.payload.cache_data.len(),
+            items_size: self.payload.items_data.len(),
+            spatial_tree_size: self.payload.spatial_tree.len(),
         };
+        let next_capacity = capacity.limit(&self.prev_capacity, &DisplayListCapacity {
+            cache_size: 128 * 1024,
+            items_size: 512 * 1024,
+            spatial_tree_size: 128 * 1024,
+        });
         let payload = mem::replace(
             &mut self.payload,
             DisplayListPayload::new(next_capacity),
         );
         let end_time = precise_time_ns();
 
+        self.prev_capacity = capacity;
         self.state = BuildState::Idle;
 
         (
