@@ -482,7 +482,7 @@ class gfxTextRun : public gfxShapedText {
   // The text is divided into GlyphRuns as necessary. (In the vast majority
   // of cases, a gfxTextRun contains just a single GlyphRun.)
   struct GlyphRun {
-    RefPtr<gfxFont> mFont;      // never null in a valid GlyphRun
+    gfxFont::CannotExpireRefPtr mFont;  // never null in a valid GlyphRun
     uint32_t mCharacterOffset;  // into original UTF16 string
     mozilla::gfx::ShapedTextFlags
         mOrientation;  // gfxTextRunFactory::TEXT_ORIENT_* value
@@ -504,7 +504,8 @@ class gfxTextRun : public gfxShapedText {
     // the given FontMatchType will be added to the run if not present.
     bool Matches(gfxFont* aFont, mozilla::gfx::ShapedTextFlags aOrientation,
                  bool aIsCJK, FontMatchType aMatchType) {
-      if (mFont == aFont && mOrientation == aOrientation && mIsCJK == aIsCJK) {
+      if (mFont.get() == aFont && mOrientation == aOrientation &&
+          mIsCJK == aIsCJK) {
         mMatchType.kind |= aMatchType.kind;
         if (mMatchType.generic == mozilla::StyleGenericFontFamily::None) {
           mMatchType.generic = aMatchType.generic;
@@ -1104,7 +1105,7 @@ class gfxFontGroup final : public gfxTextRunFactory {
  protected:
   friend class mozilla::PostTraversalTask;
 
-  struct TextRange {
+  struct MOZ_STACK_CLASS TextRange {
     TextRange(uint32_t aStart, uint32_t aEnd, gfxFont* aFont,
               FontMatchType aMatchType,
               mozilla::gfx::ShapedTextFlags aOrientation)
@@ -1385,7 +1386,7 @@ class gfxFontGroup final : public gfxTextRunFactory {
   // Code should be careful about addressing this array directly.
   nsTArray<FamilyFace> mFonts;
 
-  RefPtr<gfxFont> mDefaultFont;
+  gfxFont::CannotExpireRefPtr mDefaultFont;
   gfxFontStyle mStyle;
 
   RefPtr<nsAtom> mLanguage;
@@ -1406,7 +1407,7 @@ class gfxFontGroup final : public gfxTextRunFactory {
 
   // cache the most recent pref font to avoid general pref font lookup
   FontFamily mLastPrefFamily;
-  RefPtr<gfxFont> mLastPrefFont;
+  gfxFont::CannotExpireRefPtr mLastPrefFont;
   eFontPrefLang mLastPrefLang;  // lang group for last pref font
   eFontPrefLang mPageLang;
   bool mLastPrefFirstFont;  // is this the first font in the list of pref fonts

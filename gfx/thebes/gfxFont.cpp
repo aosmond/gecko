@@ -240,7 +240,9 @@ already_AddRefed<gfxFont> gfxFontCache::Lookup(
   }
 
   RefPtr<gfxFont> font = entry->mFont;
-  MarkUsedLocked(font, lock);
+  if (font->GetExpirationState()->IsTracked()) {
+    MarkUsedLocked(font, lock);
+  }
   return font.forget();
 }
 
@@ -264,11 +266,41 @@ already_AddRefed<gfxFont> gfxFontCache::MaybeInsert(RefPtr<gfxFont>&& aFont) {
     // Assert that we can find the entry we just put in (this fails if the key
     // has a NaN float value in it, e.g. 'sizeAdjust').
     MOZ_ASSERT(entry == mFonts.GetEntry(key));
-  } else {
+  } else if (entry->mFont->GetExpirationState()->IsTracked()) {
     MarkUsedLocked(entry->mFont, lock);
   }
 
   return do_AddRef(entry->mFont);
+}
+
+void gfxFontCache::MaybeTrack(gfxFont* aFont) {
+  MOZ_ASSERT(aFont);
+  MutexAutoLock lock(mMutex);
+
+  MOZ_ASSERT(aFont->CannotExpireCount() > 0);
+  MOZ_ASSERT(!aFont->GetExpirationState()->IsTracked());
+
+  if (--aFont->CannotExpireCount() > 0) {
+    return;
+  }
+
+  // Only readd to the expiration tracker if we are still in the hash table.
+  Key key(aFont->GetFontEntry(), aFont->GetStyle(),
+          aFont->GetUnicodeRangeMap());
+  HashEntry* entry = mFonts.GetEntry(key);
+  if (entry && entry->mFont == aFont) {
+    AddObjectLocked(aFont, lock);
+  }
+}
+
+void gfxFontCache::MaybeUntrack(gfxFont* aFont) {
+  MOZ_ASSERT(aFont);
+  MutexAutoLock lock(mMutex);
+
+  if (++aFont->CannotExpireCount() == 1 &&
+      aFont->GetExpirationState()->IsTracked()) {
+    RemoveObjectLocked(aFont, lock);
+  }
 }
 
 void gfxFontCache::NotifyExpiredLocked(gfxFont* aFont, const AutoLock& aLock) {
@@ -317,7 +349,9 @@ void gfxFontCache::Flush() {
     MutexAutoLock lock(mMutex);
     for (auto iter = mFonts.Iter(); !iter.Done(); iter.Next()) {
       HashEntry* entry = static_cast<HashEntry*>(iter.Get());
-      RemoveObjectLocked(entry->mFont, lock);
+      if (entry->mFont->GetExpirationState()->IsTracked()) {
+        RemoveObjectLocked(entry->mFont, lock);
+      }
     }
     MOZ_ASSERT(IsEmptyLocked(lock),
                "Cache tracker still has fonts after flush!");
