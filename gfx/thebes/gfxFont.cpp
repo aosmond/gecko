@@ -277,10 +277,9 @@ void gfxFontCache::MaybeTrack(gfxFont* aFont) {
   MOZ_ASSERT(aFont);
   MutexAutoLock lock(mMutex);
 
-  MOZ_ASSERT(aFont->CannotExpireCount() > 0);
-  MOZ_ASSERT(!aFont->GetExpirationState()->IsTracked());
-
-  if (--aFont->CannotExpireCount() > 0) {
+  // We may have raced to track/untrack so we need to verify the state.
+  if (aFont->GetExpirationState()->IsTracked() ||
+      aFont->CannotExpireCount() > 0) {
     return;
   }
 
@@ -297,10 +296,13 @@ void gfxFontCache::MaybeUntrack(gfxFont* aFont) {
   MOZ_ASSERT(aFont);
   MutexAutoLock lock(mMutex);
 
-  if (++aFont->CannotExpireCount() == 1 &&
-      aFont->GetExpirationState()->IsTracked()) {
-    RemoveObjectLocked(aFont, lock);
+  // We may have raced to track/untrack so we need to verify the state.
+  if (!aFont->GetExpirationState()->IsTracked() ||
+      aFont->CannotExpireCount() == 0) {
+    return;
   }
+
+  RemoveObjectLocked(aFont, lock);
 }
 
 void gfxFontCache::NotifyExpiredLocked(gfxFont* aFont, const AutoLock& aLock) {
@@ -902,6 +904,7 @@ gfxFont::gfxFont(const RefPtr<UnscaledFont>& aUnscaledFont,
       mStyle(*aFontStyle),
       mAdjustedSize(-1.0),       // negative to indicate "not yet initialized"
       mFUnitsConvFactor(-1.0f),  // negative to indicate "not yet initialized"
+      mCannotExpireCount(0),
       mAntialiasOption(anAAOption),
       mIsValid(true),
       mApplySyntheticBold(false),

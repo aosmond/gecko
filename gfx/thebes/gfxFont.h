@@ -1486,7 +1486,7 @@ class gfxFont {
 
    private:
     void MaybeTrack() {
-      if (!mFont) {
+      if (!mFont || --mFont->mCannotExpireCount > 0) {
         return;
       }
 
@@ -1496,7 +1496,7 @@ class gfxFont {
     }
 
     void MaybeUntrack() {
-      if (!mFont) {
+      if (!mFont || ++mFont->mCannotExpireCount > 1) {
         return;
       }
 
@@ -1813,7 +1813,7 @@ class gfxFont {
 
   // Expiration tracking
   nsExpirationState* GetExpirationState() { return &mExpirationState; }
-  size_t& CannotExpireCount() { return mCannotExpireCount; }
+  size_t CannotExpireCount() const { return mCannotExpireCount; }
 
   // Get the glyphID of a space
   uint16_t GetSpaceGlyph() const { return mSpaceGlyph; }
@@ -2293,7 +2293,7 @@ class gfxFont {
   // This is guarded by gfxFontCache::GetCache()->GetMutex() but it is difficult
   // to annotate that fact.
   nsExpirationState mExpirationState;
-  size_t mCannotExpireCount = 0;
+  mozilla::Atomic<size_t> mCannotExpireCount;
 
   // Glyph ID of the font's <space> glyph, zero if missing
   uint16_t mSpaceGlyph = 0;
