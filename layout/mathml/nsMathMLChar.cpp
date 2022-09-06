@@ -397,7 +397,7 @@ class nsOpenTypeTable final : public nsGlyphTable {
   }
 
  private:
-  RefPtr<gfxFont> mFont;
+  gfxFont::CannotExpireRefPtr mFont;
   nsCString mFontFamilyName;
   uint32_t mGlyphID;
 

@@ -330,6 +330,9 @@ class gfxFontCache final
   // and destroy the new one.
   already_AddRefed<gfxFont> MaybeInsert(RefPtr<gfxFont>&& aFont);
 
+  void MaybeTrack(gfxFont* aFont);
+  void MaybeUntrack(gfxFont* aFont);
+
   // Cleans out the hashtable and removes expired fonts waiting for cleanup.
   // Other gfxFont objects may be still in use but they will be pushed
   // into the expiration queues and removed.
@@ -1430,6 +1433,81 @@ class gfxFont {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(gfxFont)
   int32_t GetRefCount() { return int32_t(mRefCnt); }
 
+  /**
+   * When we need to hold a pointer to a gfxFont object off the stack, we
+   * would like to stop the expiration tracker timer for it. This class should
+   * be used instead of RefPtr<gfxFont> in such cases to explicitly remove it
+   * from the tracker if we know its lifetime is long.
+   */
+  class CannotExpireRefPtr final {
+   public:
+    explicit CannotExpireRefPtr(gfxFont* aFont) : mFont(aFont) {
+      MaybeUntrack();
+    }
+
+    explicit CannotExpireRefPtr(RefPtr<gfxFont>&& aFont)
+        : mFont(std::move(aFont)) {
+      MaybeUntrack();
+    }
+
+    CannotExpireRefPtr() = default;
+    CannotExpireRefPtr(const CannotExpireRefPtr& aOther) = default;
+    CannotExpireRefPtr(CannotExpireRefPtr&& aOther) = default;
+    CannotExpireRefPtr& operator=(const CannotExpireRefPtr& aOther) = default;
+    CannotExpireRefPtr& operator=(CannotExpireRefPtr&& aOther) = default;
+
+    CannotExpireRefPtr& operator=(gfxFont* aFont) {
+      if (mFont != aFont) {
+        MaybeTrack();
+        mFont = aFont;
+        MaybeUntrack();
+      }
+      return *this;
+    }
+
+    CannotExpireRefPtr& operator=(RefPtr<gfxFont>&& aFont) {
+      if (mFont != aFont) {
+        MaybeTrack();
+        mFont = std::move(aFont);
+        MaybeUntrack();
+      }
+      return *this;
+    }
+
+    ~CannotExpireRefPtr() { MaybeTrack(); }
+
+    // Mirror some RefPtr accessors/operators
+    gfxFont* get() const { return mFont; }
+    operator gfxFont*() const& { return mFont; }
+    operator gfxFont*() const&& = delete;
+    explicit operator bool() const { return mFont; }
+    bool operator!() const { return !mFont; }
+    gfxFont* operator->() const { return mFont; }
+
+   private:
+    void MaybeTrack() {
+      if (!mFont) {
+        return;
+      }
+
+      if (gfxFontCache* fc = gfxFontCache::GetCache()) {
+        fc->MaybeTrack(mFont);
+      }
+    }
+
+    void MaybeUntrack() {
+      if (!mFont) {
+        return;
+      }
+
+      if (gfxFontCache* fc = gfxFontCache::GetCache()) {
+        fc->MaybeUntrack(mFont);
+      }
+    }
+
+    RefPtr<gfxFont> mFont;
+  };
+
   // options to specify the kind of AA to be used when creating a font
   typedef enum : uint8_t {
     kAntialiasDefault,
@@ -1735,6 +1813,7 @@ class gfxFont {
 
   // Expiration tracking
   nsExpirationState* GetExpirationState() { return &mExpirationState; }
+  size_t& CannotExpireCount() { return mCannotExpireCount; }
 
   // Get the glyphID of a space
   uint16_t GetSpaceGlyph() const { return mSpaceGlyph; }
@@ -2214,6 +2293,7 @@ class gfxFont {
   // This is guarded by gfxFontCache::GetCache()->GetMutex() but it is difficult
   // to annotate that fact.
   nsExpirationState mExpirationState;
+  size_t mCannotExpireCount = 0;
 
   // Glyph ID of the font's <space> glyph, zero if missing
   uint16_t mSpaceGlyph = 0;

@@ -2133,7 +2133,7 @@ static nsAutoCString FamilyListToString(
 
 already_AddRefed<gfxFont> gfxFontGroup::GetDefaultFont() {
   if (mDefaultFont) {
-    return do_AddRef(mDefaultFont);
+    return do_AddRef(mDefaultFont.get());
   }
 
   gfxPlatformFontList* pfl = gfxPlatformFontList::PlatformFontList();
@@ -2256,7 +2256,7 @@ already_AddRefed<gfxFont> gfxFontGroup::GetDefaultFont() {
     MOZ_CRASH_UNSAFE(msg);
   }
 
-  return do_AddRef(mDefaultFont);
+  return do_AddRef(mDefaultFont.get());
 }
 
 already_AddRefed<gfxFont> gfxFontGroup::GetFirstValidFont(
@@ -3687,7 +3687,7 @@ already_AddRefed<gfxFont> gfxFontGroup::WhichPrefFontSupportsChar(
   // recheck through a list of families
   if (mLastPrefFont && charLang == mLastPrefLang && mLastPrefFirstFont &&
       mLastPrefFont->HasCharacter(aCh)) {
-    return do_AddRef(mLastPrefFont);
+    return do_AddRef(mLastPrefFont.get());
   }
 
   // based on char lang and page lang, set up list of pref lang fonts to check
@@ -3721,7 +3721,7 @@ already_AddRefed<gfxFont> gfxFontGroup::WhichPrefFontSupportsChar(
       // than calling FindOrMakeFont repeatedly.  speeds up FindFontForChar
       // lookup times for subsequent pref font lookups
       if (family == mLastPrefFamily && mLastPrefFont->HasCharacter(aCh)) {
-        return do_AddRef(mLastPrefFont);
+        return do_AddRef(mLastPrefFont.get());
       }
 
       gfxFontEntry* fe = nullptr;
