@@ -270,12 +270,16 @@ already_AddRefed<gfxFont> gfxFontEntry::FindOrMakeFont(
     return font.forget();
   }
 
-  font = CreateFontInstance(aStyle);
-  if (!font || !font->Valid()) {
+  gfxFont* newFont = CreateFontInstance(aStyle);
+  if (!newFont) {
     return nullptr;
   }
-  font->SetUnicodeRangeMap(aUnicodeRangeMap);
-  return gfxFontCache::GetCache()->MaybeInsert(std::move(font));
+  if (!newFont->Valid()) {
+    newFont->Destroy();
+    return nullptr;
+  }
+  newFont->SetUnicodeRangeMap(aUnicodeRangeMap);
+  return gfxFontCache::GetCache()->MaybeInsert(newFont);
 }
 
 uint16_t gfxFontEntry::UnitsPerEm() {
