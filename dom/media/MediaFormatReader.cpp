@@ -720,16 +720,16 @@ class MediaFormatReader::DemuxerProxy::Wrapper : public MediaTrackDemuxer {
   void BreakCycles() override {}
 
  private:
-  Mutex mMutex MOZ_UNANNOTATED;
+  Mutex mMutex;
   const RefPtr<TaskQueue> mTaskQueue;
   const bool mGetSamplesMayBlock;
   const UniquePtr<TrackInfo> mInfo;
   // mTrackDemuxer is only ever accessed on demuxer's task queue.
   RefPtr<MediaTrackDemuxer> mTrackDemuxer;
   // All following members are protected by mMutex
-  nsresult mNextRandomAccessPointResult = NS_OK;
-  TimeUnit mNextRandomAccessPoint;
-  TimeIntervals mBuffered;
+  nsresult mNextRandomAccessPointResult MOZ_GUARDED_BY(mMutex) = NS_OK;
+  TimeUnit mNextRandomAccessPoint MOZ_GUARDED_BY(mMutex);
+  TimeIntervals mBuffered MOZ_GUARDED_BY(mMutex);
   friend class DemuxerProxy;
 
   ~Wrapper() {
