@@ -179,13 +179,13 @@ class MediaQueue : private nsRefPtrDeque<T> {
     }
   }
 
-  mutable RecursiveMutex mRecursiveMutex MOZ_UNANNOTATED;
-  MediaEventProducer<RefPtr<T>> mPopFrontEvent;
-  MediaEventProducer<RefPtr<T>> mPushEvent;
-  MediaEventProducer<void> mFinishEvent;
+  mutable RecursiveMutex mRecursiveMutex;
+  MediaEventProducer<RefPtr<T>> mPopFrontEvent MOZ_GUARDED_BY(mRecursiveMutex);
+  MediaEventProducer<RefPtr<T>> mPushEvent MOZ_GUARDED_BY(mRecursiveMutex);
+  MediaEventProducer<void> mFinishEvent MOZ_GUARDED_BY(mRecursiveMutex);
   // True when we've decoded the last frame of data in the
   // bitstream for which we're queueing frame data.
-  bool mEndOfStream;
+  bool mEndOfStream MOZ_GUARDED_BY(mRecursiveMutex);
 };
 
 }  // namespace mozilla
