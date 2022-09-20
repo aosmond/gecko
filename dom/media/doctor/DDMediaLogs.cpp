@@ -90,16 +90,16 @@ void DDMediaLogs::Shutdown(bool aPanic) {
 }
 
 DDMediaLog& DDMediaLogs::LogForUnassociatedMessages() {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   return mMediaLogs[0];
 }
 const DDMediaLog& DDMediaLogs::LogForUnassociatedMessages() const {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   return mMediaLogs[0];
 }
 
 DDMediaLog* DDMediaLogs::GetLogFor(const dom::HTMLMediaElement* aMediaElement) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   if (!aMediaElement) {
     return &LogForUnassociatedMessages();
   }
@@ -112,7 +112,7 @@ DDMediaLog* DDMediaLogs::GetLogFor(const dom::HTMLMediaElement* aMediaElement) {
 }
 
 DDMediaLog& DDMediaLogs::LogFor(const dom::HTMLMediaElement* aMediaElement) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   DDMediaLog* log = GetLogFor(aMediaElement);
   if (!log) {
     log = mMediaLogs.AppendElement();
@@ -123,7 +123,7 @@ DDMediaLog& DDMediaLogs::LogFor(const dom::HTMLMediaElement* aMediaElement) {
 
 void DDMediaLogs::SetMediaElement(DDLifetime& aLifetime,
                                   const dom::HTMLMediaElement* aMediaElement) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   DDMediaLog& log = LogFor(aMediaElement);
 
   // List of lifetimes that are to be linked to aMediaElement.
@@ -192,7 +192,7 @@ void DDMediaLogs::SetMediaElement(DDLifetime& aLifetime,
 DDLifetime& DDMediaLogs::FindOrCreateLifetime(const DDLogObject& aObject,
                                               DDMessageIndex aIndex,
                                               const DDTimeStamp& aTimeStamp) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   // Try to find lifetime corresponding to message object.
   DDLifetime* lifetime = mLifetimes.FindLifetime(aObject, aIndex);
   if (!lifetime) {
@@ -218,7 +218,7 @@ void DDMediaLogs::LinkLifetimes(DDLifetime& aParentLifetime,
                                 const char* aLinkName,
                                 DDLifetime& aChildLifetime,
                                 DDMessageIndex aIndex) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   mObjectLinks.AppendElement(DDObjectLink{
       aParentLifetime.mObject, aChildLifetime.mObject, aLinkName, aIndex});
   if (aParentLifetime.mMediaElement) {
@@ -233,7 +233,7 @@ void DDMediaLogs::LinkLifetimes(DDLifetime& aParentLifetime,
 }
 
 void DDMediaLogs::UnlinkLifetime(DDLifetime& aLifetime, DDMessageIndex aIndex) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   for (DDObjectLink& link : mObjectLinks) {
     if ((link.mParent == aLifetime.mObject ||
          link.mChild == aLifetime.mObject) &&
@@ -246,7 +246,7 @@ void DDMediaLogs::UnlinkLifetime(DDLifetime& aLifetime, DDMessageIndex aIndex) {
 void DDMediaLogs::UnlinkLifetimes(DDLifetime& aParentLifetime,
                                   DDLifetime& aChildLifetime,
                                   DDMessageIndex aIndex) {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   for (DDObjectLink& link : mObjectLinks) {
     if ((link.mParent == aParentLifetime.mObject &&
          link.mChild == aChildLifetime.mObject) &&
@@ -266,6 +266,7 @@ void DDMediaLogs::DestroyLifetimeLinks(const DDLifetime& aLifetime) {
 }
 
 size_t DDMediaLogs::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const {
+  MutexAutoLock lock(mMutex);
   size_t size = aMallocSizeOf(this) +
                 // This will usually be called after processing, so negligible
                 // external data should still be present in the queue.
@@ -281,7 +282,7 @@ size_t DDMediaLogs::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const {
 }
 
 void DDMediaLogs::ProcessBuffer() {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
 
   mMessagesQueue.PopAll([this](const DDLogMessage& message) {
     DDL_DEBUG("Processing: %s", message.Print().Data());
@@ -376,8 +377,6 @@ void DDMediaLogs::ProcessBuffer() {
 }
 
 void DDMediaLogs::FulfillPromises() {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
-
   MozPromiseHolder<LogMessagesPromise> promiseHolder;
   const dom::HTMLMediaElement* mediaElement = nullptr;
   {
@@ -385,6 +384,7 @@ void DDMediaLogs::FulfillPromises() {
     // Note that we don't pop it yet, so we don't potentially leave the list
     // empty and therefore allow another processing task to be dispatched.
     MutexAutoLock lock(mMutex);
+    AssertOnLogThreadLocked();
     if (mPendingPromises.IsEmpty()) {
       return;
     }
@@ -507,7 +507,7 @@ void DDMediaLogs::FulfillPromises() {
 }
 
 void DDMediaLogs::CleanUpLogs() {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
 
   DDTimeStamp now = DDNow();
 
@@ -619,7 +619,7 @@ void DDMediaLogs::CleanUpLogs() {
 }
 
 void DDMediaLogs::ProcessLog() {
-  MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  AssertOnLogThread();
   ProcessBuffer();
   FulfillPromises();
   CleanUpLogs();
@@ -627,7 +627,7 @@ void DDMediaLogs::ProcessLog() {
            SizeOfIncludingThis(moz_malloc_size_of));
 }
 
-nsresult DDMediaLogs::DispatchProcessLog(const MutexAutoLock& aProofOfLock) {
+nsresult DDMediaLogs::DispatchProcessLogLocked() {
   if (!mThread) {
     return NS_ERROR_SERVICE_NOT_AVAILABLE;
   }
@@ -640,7 +640,7 @@ nsresult DDMediaLogs::DispatchProcessLog() {
   DDL_INFO("DispatchProcessLog() - Yet-unprocessed message buffers: %d",
            mMessagesQueue.LiveBuffersStats().mCount);
   MutexAutoLock lock(mMutex);
-  return DispatchProcessLog(lock);
+  return DispatchProcessLogLocked();
 }
 
 RefPtr<DDMediaLogs::LogMessagesPromise> DDMediaLogs::RetrieveMessages(
@@ -653,7 +653,7 @@ RefPtr<DDMediaLogs::LogMessagesPromise> DDMediaLogs::RetrieveMessages(
     // been requested.
     if (mPendingPromises.IsEmpty()) {
       // But if we're the first one, start processing.
-      nsresult rv = DispatchProcessLog(lock);
+      nsresult rv = DispatchProcessLogLocked();
       if (NS_FAILED(rv)) {
         holder.Reject(rv, __func__);
       }

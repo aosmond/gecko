@@ -143,7 +143,18 @@ struct DDMediaLogs {
   nsresult DispatchProcessLog();
 
   // Request log-processing on the processing thread.
-  nsresult DispatchProcessLog(const MutexAutoLock& aProofOfLock);
+  nsresult DispatchProcessLogLocked() MOZ_REQUIRES(mMutex);
+
+  void AssertOnLogThread() const {
+#ifdef DEBUG
+    MutexAutoLock lock(mMutex);
+    AssertOnLogThreadLocked();
+#endif
+  }
+
+  void AssertOnLogThreadLocked() const MOZ_REQUIRES(mMutex) {
+    MOZ_ASSERT(!mThread || mThread.get() == NS_GetCurrentThread());
+  }
 
   using MessagesQueue =
       MultiWriterQueue<DDLogMessage, MultiWriterQueueDefaultBufferSize,
@@ -175,17 +186,17 @@ struct DDMediaLogs {
   nsTArray<DDObjectLink> mObjectLinks;
 
   // Protects members below.
-  Mutex mMutex MOZ_UNANNOTATED;
+  mutable Mutex mMutex;
 
   // Processing thread.
-  nsCOMPtr<nsIThread> mThread;
+  nsCOMPtr<nsIThread> mThread MOZ_GUARDED_BY(mMutex);
 
   struct PendingPromise {
     MozPromiseHolder<LogMessagesPromise> mPromiseHolder;
     const dom::HTMLMediaElement* mMediaElement;
   };
   // Most cases should have 1 media panel requesting 1 promise at a time.
-  AutoTArray<PendingPromise, 2> mPendingPromises;
+  AutoTArray<PendingPromise, 2> mPendingPromises MOZ_GUARDED_BY(mMutex);
 };
 
 }  // namespace mozilla
