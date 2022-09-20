@@ -44,16 +44,12 @@ class VideoFrameContainer {
                        const TimeStamp& aTargetTime);
   // Returns the last principalHandle we notified mElement about.
   PrincipalHandle GetLastPrincipalHandle();
-  PrincipalHandle GetLastPrincipalHandleLocked();
   // We will notify mElement that aPrincipalHandle has been applied when all
   // FrameIDs prior to aFrameID have been flushed out.
   // aFrameID is ignored if aPrincipalHandle already is our pending
   // principalHandle.
   void UpdatePrincipalHandleForFrameID(const PrincipalHandle& aPrincipalHandle,
                                        const ImageContainer::FrameID& aFrameID);
-  void UpdatePrincipalHandleForFrameIDLocked(
-      const PrincipalHandle& aPrincipalHandle,
-      const ImageContainer::FrameID& aFrameID);
   void SetCurrentFrames(
       const gfx::IntSize& aIntrinsicSize,
       const nsTArray<ImageContainer::NonOwningImage>& aImages);
@@ -76,14 +72,21 @@ class VideoFrameContainer {
   // Returns a new frame ID for SetCurrentFrames().  The client must either
   // call this on only one thread or provide barriers.  Do not use together
   // with SetCurrentFrame().
-  ImageContainer::FrameID NewFrameID() { return ++mFrameID; }
+  ImageContainer::FrameID NewFrameID() MOZ_NO_THREAD_SAFETY_ANALYSIS {
+    return ++mFrameID;
+  }
 
   // Call on main thread
   enum { INVALIDATE_DEFAULT, INVALIDATE_FORCE };
   void Invalidate() { InvalidateWithFlags(INVALIDATE_DEFAULT); }
   void InvalidateWithFlags(uint32_t aFlags);
-  ImageContainer* GetImageContainer();
   void ForgetElement() { mOwner = nullptr; }
+
+  ImageContainer* GetImageContainer() const MOZ_NO_THREAD_SAFETY_ANALYSIS {
+    // Note - you'll need the lock to manipulate this.  The pointer is not
+    // modified from multiple threads, just the data pointed to by it.
+    return mImageContainer;
+  }
 
   uint32_t GetDroppedImageCount() {
     MutexAutoLock lock(mMutex);
@@ -91,14 +94,19 @@ class VideoFrameContainer {
   }
 
  protected:
+  PrincipalHandle GetLastPrincipalHandleLocked() MOZ_REQUIRES(mMutex);
+  void UpdatePrincipalHandleForFrameIDLocked(
+      const PrincipalHandle& aPrincipalHandle,
+      const ImageContainer::FrameID& aFrameID) MOZ_REQUIRES(mMutex);
   void SetCurrentFramesLocked(
       const gfx::IntSize& aIntrinsicSize,
-      const nsTArray<ImageContainer::NonOwningImage>& aImages);
+      const nsTArray<ImageContainer::NonOwningImage>& aImages)
+      MOZ_REQUIRES(mMutex);
 
   // Non-addreffed pointer to the owner. The owner calls ForgetElement
   // to clear this reference when the owner is destroyed.
   MediaDecoderOwner* mOwner;
-  RefPtr<ImageContainer> mImageContainer;
+  RefPtr<ImageContainer> const mImageContainer MOZ_GUARDED_BY(mMutex);
 
   struct {
     // True when the Image size has changed since the last time Invalidate() was
@@ -117,23 +125,24 @@ class VideoFrameContainer {
   } mMainThreadState;
 
   // mMutex protects all the fields below.
-  Mutex mMutex MOZ_UNANNOTATED;
+  Mutex mMutex;
   // The intrinsic size is the ideal size which we should render the
   // ImageContainer's current Image at.
   // This can differ from the Image's actual size when the media resource
   // specifies that the Image should be stretched to have the correct aspect
   // ratio.
-  gfx::IntSize mIntrinsicSize;
+  gfx::IntSize mIntrinsicSize MOZ_GUARDED_BY(mMutex);
   // We maintain our own mFrameID which is auto-incremented at every
   // SetCurrentFrame() or NewFrameID() call.
-  ImageContainer::FrameID mFrameID;
+  ImageContainer::FrameID mFrameID MOZ_GUARDED_BY(mMutex);
   // The last PrincipalHandle we notified mElement about.
-  PrincipalHandle mLastPrincipalHandle;
+  PrincipalHandle mLastPrincipalHandle MOZ_GUARDED_BY(mMutex);
   // The PrincipalHandle the client has notified us is changing with FrameID
   // mFrameIDForPendingPrincipalHandle.
-  PrincipalHandle mPendingPrincipalHandle;
+  PrincipalHandle mPendingPrincipalHandle MOZ_GUARDED_BY(mMutex);
   // The FrameID for which mPendingPrincipal is first valid.
-  ImageContainer::FrameID mFrameIDForPendingPrincipalHandle;
+  ImageContainer::FrameID mFrameIDForPendingPrincipalHandle
+      MOZ_GUARDED_BY(mMutex);
 
   const RefPtr<AbstractThread> mMainThread;
 };
