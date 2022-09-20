@@ -379,7 +379,7 @@ class MediaEventSourceImpl {
   template <typename Method>
   using TakeArgs = detail::TakeArgs<Method>;
 
-  void PruneListeners() {
+  void PruneListeners() MOZ_REQUIRES(mMutex) {
     mListeners.RemoveElementsBy(
         [](const auto& listener) { return listener->IsRevoked(); });
   }
@@ -475,8 +475,8 @@ class MediaEventSourceImpl {
   }
 
  private:
-  Mutex mMutex MOZ_UNANNOTATED;
-  nsTArray<RefPtr<Listener>> mListeners;
+  Mutex mMutex;
+  nsTArray<RefPtr<Listener>> mListeners MOZ_GUARDED_BY(mMutex);
 };
 
 template <typename... Es>
