@@ -7,34 +7,33 @@
 #ifndef FrameStatistics_h_
 #define FrameStatistics_h_
 
-#include "mozilla/ReentrantMonitor.h"
+#include "mozilla/Mutex.h"
 
 namespace mozilla {
 
 struct FrameStatisticsData {
   // Number of frames parsed and demuxed from media.
-  // Access protected by mReentrantMonitor.
+  // Access protected by mMutex.
   uint64_t mParsedFrames = 0;
 
   // Number of parsed frames which were actually decoded.
-  // Access protected by mReentrantMonitor.
+  // Access protected by mMutex.
   uint64_t mDecodedFrames = 0;
 
   // Number of parsed frames which were dropped in the decoder.
-  // Access protected by mReentrantMonitor.
+  // Access protected by mMutex.
   uint64_t mDroppedDecodedFrames = 0;
 
   // Number of decoded frames which were dropped in the sink
-  // Access protected by mReentrantMonitor.
+  // Access protected by mMutex.
   uint64_t mDroppedSinkFrames = 0;
 
   // Number of sinked frames which were dropped in the compositor
-  // Access protected by mReentrantMonitor.
+  // Access protected by mMutex.
   uint64_t mDroppedCompositorFrames = 0;
 
   // Number of decoded frames which were actually sent down the rendering
-  // pipeline to be painted ("presented"). Access protected by
-  // mReentrantMonitor.
+  // pipeline to be painted ("presented"). Access protected by mMutex.
   uint64_t mPresentedFrames = 0;
 
   // Sum of all inter-keyframe segment durations, in microseconds.
@@ -80,26 +79,26 @@ class FrameStatistics {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(FrameStatistics);
 
-  FrameStatistics() : mReentrantMonitor("FrameStats") {}
+  FrameStatistics() : mMutex("FrameStats") {}
 
   // Returns a copy of all frame statistics data.
   // Can be called on any thread.
   FrameStatisticsData GetFrameStatisticsData() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData;
   }
 
   // Returns number of frames which have been parsed from the media.
   // Can be called on any thread.
   uint64_t GetParsedFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData.mParsedFrames;
   }
 
   // Returns the number of parsed frames which have been decoded.
   // Can be called on any thread.
   uint64_t GetDecodedFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData.mDecodedFrames;
   }
 
@@ -107,14 +106,14 @@ class FrameStatistics {
   // pipeline for painting ("presented").
   // Can be called on any thread.
   uint64_t GetPresentedFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData.mPresentedFrames;
   }
 
   // Returns the number of presented and dropped frames
   // Can be called on any thread.
   uint64_t GetTotalFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return GetTotalFrames(mFrameStatisticsData);
   }
 
@@ -125,7 +124,7 @@ class FrameStatistics {
   // Returns the number of frames that have been skipped because they have
   // missed their composition deadline.
   uint64_t GetDroppedFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return GetDroppedFrames(mFrameStatisticsData);
   }
 
@@ -135,31 +134,31 @@ class FrameStatistics {
   }
 
   uint64_t GetDroppedDecodedFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData.mDroppedDecodedFrames;
   }
 
   uint64_t GetDroppedSinkFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData.mDroppedSinkFrames;
   }
 
   uint64_t GetDroppedCompositorFrames() const {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     return mFrameStatisticsData.mDroppedCompositorFrames;
   }
 
   // Increments the parsed and decoded frame counters by the passed in counts.
   // Can be called on any thread.
   void Accumulate(const FrameStatisticsData& aStats) {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     mFrameStatisticsData.Accumulate(aStats);
   }
 
   // Increments the presented frame counters.
   // Can be called on any thread.
   void NotifyPresentedFrame() {
-    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MutexAutoLock lock(mMutex);
     ++mFrameStatisticsData.mPresentedFrames;
   }
 
@@ -185,10 +184,10 @@ class FrameStatistics {
  private:
   ~FrameStatistics() = default;
 
-  // ReentrantMonitor to protect access of playback statistics.
-  mutable ReentrantMonitor mReentrantMonitor MOZ_UNANNOTATED;
+  // Mutex to protect access of playback statistics.
+  mutable Mutex mMutex;
 
-  FrameStatisticsData mFrameStatisticsData;
+  FrameStatisticsData mFrameStatisticsData MOZ_GUARDED_BY(mMutex);
 };
 
 }  // namespace mozilla
