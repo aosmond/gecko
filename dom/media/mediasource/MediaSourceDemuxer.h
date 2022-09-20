@@ -13,7 +13,7 @@
 #  include "TrackBuffersManager.h"
 #  include "mozilla/Atomics.h"
 #  include "mozilla/Maybe.h"
-#  include "mozilla/Monitor.h"
+#  include "mozilla/Mutex.h"
 #  include "mozilla/TaskQueue.h"
 #  include "mozilla/dom/MediaDebugInfoBinding.h"
 
@@ -85,10 +85,10 @@ class MediaSourceDemuxer : public MediaDataDemuxer,
 
   MozPromiseHolder<InitPromise> mInitPromise;
 
-  // Monitor to protect members below across multiple threads.
-  mutable Monitor mMonitor MOZ_UNANNOTATED;
-  RefPtr<TrackBuffersManager> mAudioTrack;
-  RefPtr<TrackBuffersManager> mVideoTrack;
+  // Mutex to protect members below across multiple threads.
+  mutable Mutex mMutex;
+  RefPtr<TrackBuffersManager> mAudioTrack MOZ_GUARDED_BY(mMutex);
+  RefPtr<TrackBuffersManager> mVideoTrack MOZ_GUARDED_BY(mMutex);
   MediaInfo mInfo;
 };
 
@@ -137,9 +137,9 @@ class MediaSourceTrackDemuxer
   const RefPtr<TaskQueue> mTaskQueue;
 
   TrackInfo::TrackType mType;
-  // Monitor protecting members below accessed from multiple threads.
-  Monitor mMonitor MOZ_UNANNOTATED;
-  media::TimeUnit mNextRandomAccessPoint;
+  // Mutex protecting members below accessed from multiple threads.
+  Mutex mMutex;
+  media::TimeUnit mNextRandomAccessPoint MOZ_GUARDED_BY(mMutex);
   // Would be accessed in MFR's demuxer proxy task queue and TaskQueue, and
   // only be set on the TaskQueue. It can be accessed while on TaskQueue without
   // the need for the lock.

@@ -27,7 +27,7 @@ MediaSourceDemuxer::MediaSourceDemuxer(AbstractThread* aAbstractMainThread)
     : mTaskQueue(
           TaskQueue::Create(GetMediaThreadPool(MediaThreadType::SUPERVISOR),
                             "MediaSourceDemuxer::mTaskQueue")),
-      mMonitor("MediaSourceDemuxer") {
+      mMutex("MediaSourceDemuxer") {
   MOZ_ASSERT(NS_IsMainThread());
 }
 
@@ -89,7 +89,7 @@ bool MediaSourceDemuxer::ScanSourceBuffersForContent() {
     return false;
   }
 
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
 
   bool haveEmptySourceBuffer = false;
   for (const auto& sourceBuffer : mSourceBuffers) {
@@ -117,7 +117,7 @@ bool MediaSourceDemuxer::ScanSourceBuffersForContent() {
 }
 
 uint32_t MediaSourceDemuxer::GetNumberTracks(TrackType aType) const {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
 
   switch (aType) {
     case TrackType::kAudioTrack:
@@ -145,7 +145,7 @@ already_AddRefed<MediaTrackDemuxer> MediaSourceDemuxer::GetTrackDemuxer(
 bool MediaSourceDemuxer::IsSeekable() const { return true; }
 
 UniquePtr<EncryptionInfo> MediaSourceDemuxer::GetCrypto() {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   auto crypto = MakeUnique<EncryptionInfo>();
   *crypto = mInfo.mCrypto;
   return crypto;
@@ -186,7 +186,7 @@ void MediaSourceDemuxer::DoDetachSourceBuffer(
         return aLinkedSourceBuffer == aSourceBuffer;
       });
   {
-    MonitorAutoLock mon(mMonitor);
+    MutexAutoLock lock(mMutex);
     if (aSourceBuffer == mAudioTrack) {
       mAudioTrack = nullptr;
     }
@@ -204,7 +204,7 @@ void MediaSourceDemuxer::DoDetachSourceBuffer(
 }
 
 TrackInfo* MediaSourceDemuxer::GetTrackInfo(TrackType aTrack) {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   switch (aTrack) {
     case TrackType::kAudioTrack:
       return &mInfo.mAudio;
@@ -216,7 +216,7 @@ TrackInfo* MediaSourceDemuxer::GetTrackInfo(TrackType aTrack) {
 }
 
 RefPtr<TrackBuffersManager> MediaSourceDemuxer::GetManager(TrackType aTrack) {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   switch (aTrack) {
     case TrackType::kAudioTrack:
       return mAudioTrack;
@@ -233,7 +233,7 @@ MediaSourceDemuxer::~MediaSourceDemuxer() {
 
 RefPtr<GenericPromise> MediaSourceDemuxer::GetDebugInfo(
     dom::MediaSourceDemuxerDebugInfo& aInfo) const {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   nsTArray<RefPtr<GenericPromise>> promises;
   if (mAudioTrack) {
     promises.AppendElement(mAudioTrack->RequestDebugInfo(aInfo.mAudioTrack));
@@ -256,7 +256,7 @@ MediaSourceTrackDemuxer::MediaSourceTrackDemuxer(MediaSourceDemuxer* aParent,
     : mParent(aParent),
       mTaskQueue(mParent->GetTaskQueue()),
       mType(aType),
-      mMonitor("MediaSourceTrackDemuxer"),
+      mMutex("MediaSourceTrackDemuxer"),
       mManager(aManager),
       mReset(true),
       mPreRoll(TimeUnit::FromMicroseconds(
@@ -308,7 +308,7 @@ void MediaSourceTrackDemuxer::Reset() {
         MOZ_ASSERT(self->OnTaskQueue());
         self->mManager->Seek(self->mType, TimeUnit::Zero(), TimeUnit::Zero());
         {
-          MonitorAutoLock mon(self->mMonitor);
+          MutexAutoLock lock(self->mMutex);
           self->mNextRandomAccessPoint =
               self->mManager->GetNextRandomAccessPoint(
                   self->mType, MediaSourceDemuxer::EOS_FUZZ);
@@ -320,7 +320,7 @@ void MediaSourceTrackDemuxer::Reset() {
 }
 
 nsresult MediaSourceTrackDemuxer::GetNextRandomAccessPoint(TimeUnit* aTime) {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   *aTime = mNextRandomAccessPoint;
   return NS_OK;
 }
@@ -334,7 +334,7 @@ MediaSourceTrackDemuxer::SkipToNextRandomAccessPoint(
 }
 
 media::TimeIntervals MediaSourceTrackDemuxer::GetBuffered() {
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   if (!mManager) {
     return media::TimeIntervals();
   }
@@ -398,7 +398,7 @@ RefPtr<MediaSourceTrackDemuxer::SeekPromise> MediaSourceTrackDemuxer::DoSeek(
   mNextSample = Some(sample);
   mReset = false;
   {
-    MonitorAutoLock mon(mMonitor);
+    MutexAutoLock lock(mMutex);
     mNextRandomAccessPoint =
         mManager->GetNextRandomAccessPoint(mType, MediaSourceDemuxer::EOS_FUZZ);
   }
@@ -453,7 +453,7 @@ MediaSourceTrackDemuxer::DoGetSamples(int32_t aNumSamples) {
   RefPtr<SamplesHolder> samples = new SamplesHolder;
   samples->AppendSample(sample);
   {
-    MonitorAutoLock mon(mMonitor);  // spurious warning will be given
+    MutexAutoLock lock(mMutex);  // spurious warning will be given
     if (mNextRandomAccessPoint <= sample->mTime) {
       mNextRandomAccessPoint = mManager->GetNextRandomAccessPoint(
           mType, MediaSourceDemuxer::EOS_FUZZ);
@@ -500,7 +500,7 @@ bool MediaSourceTrackDemuxer::HasManager(TrackBuffersManager* aManager) const {
 
 void MediaSourceTrackDemuxer::DetachManager() {
   MOZ_ASSERT(OnTaskQueue());
-  MonitorAutoLock mon(mMonitor);
+  MutexAutoLock lock(mMutex);
   mManager = nullptr;
 }
 
