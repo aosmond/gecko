@@ -543,16 +543,16 @@ class TrackBuffersManager final
   Atomic<EvictionState> mEvictionState;
 
   // Monitor to protect following objects accessed across multiple threads.
-  mutable Mutex mMutex MOZ_UNANNOTATED;
+  mutable Mutex mMutex;
   // mTaskQueue is only ever written after construction on the task queue.
   // As such, it can be accessed while on task queue without the need for the
   // mutex.
   RefPtr<TaskQueue> mTaskQueue;
   // Stable audio and video track time ranges.
-  media::TimeIntervals mVideoBufferedRanges;
-  media::TimeIntervals mAudioBufferedRanges;
+  media::TimeIntervals mVideoBufferedRanges MOZ_GUARDED_BY(mMutex);
+  media::TimeIntervals mAudioBufferedRanges MOZ_GUARDED_BY(mMutex);
   // MediaInfo of the first init segment read.
-  MediaInfo mInfo;
+  MediaInfo mInfo MOZ_GUARDED_BY(mMutex);
   // End mutex protected members.
 
   // EventTargetCapability used to ensure we're running on the task queue
