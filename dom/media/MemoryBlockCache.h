@@ -67,7 +67,7 @@ class MemoryBlockCache : public MediaBlockCacheBase {
   // Ensure the buffer has at least a multiple of BLOCK_SIZE that can contain
   // aContentLength bytes. Buffer size can only grow.
   // Returns false if allocation failed.
-  bool EnsureBufferCanContain(size_t aContentLength);
+  bool EnsureBufferCanContain(size_t aContentLength) MOZ_REQUIRES(mMutex);
 
   // Initial content length.
   const size_t mInitialContentLength;
@@ -76,10 +76,10 @@ class MemoryBlockCache : public MediaBlockCacheBase {
   const size_t mMaxBlocks;
 
   // Mutex which controls access to all members below.
-  Mutex mMutex MOZ_UNANNOTATED;
+  Mutex mMutex;
 
-  nsTArray<uint8_t> mBuffer;
-  bool mHasGrown = false;
+  nsTArray<uint8_t> mBuffer MOZ_GUARDED_BY(mMutex);
+  bool mHasGrown MOZ_GUARDED_BY(mMutex) = false;
 };
 
 }  // End namespace mozilla.

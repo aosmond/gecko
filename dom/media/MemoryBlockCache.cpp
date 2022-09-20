@@ -60,7 +60,6 @@ MemoryBlockCache::~MemoryBlockCache() {
 }
 
 bool MemoryBlockCache::EnsureBufferCanContain(size_t aContentLength) {
-  mMutex.AssertCurrentThreadOwns();
   if (aContentLength == 0) {
     return true;
   }
