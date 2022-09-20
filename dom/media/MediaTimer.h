@@ -56,19 +56,23 @@ class MediaTimer {
   void Destroy();          // Runs on the timer thread.
 
   bool OnMediaTimerThread();
-  void ScheduleUpdate();
+  void ScheduleUpdate() MOZ_REQUIRES(mMonitor);
   void Update();
-  void UpdateLocked();
-  bool IsExpired(const TimeStamp& aTarget, const TimeStamp& aNow);
-  void Reject();
+  void UpdateLocked() MOZ_REQUIRES(mMonitor);
+  bool IsExpired(const TimeStamp& aTarget, const TimeStamp& aNow)
+      MOZ_REQUIRES(mMonitor);
+  void Reject() MOZ_REQUIRES(mMonitor);
 
   static void TimerCallback(nsITimer* aTimer, void* aClosure);
   void TimerFired();
-  void ArmTimer(const TimeStamp& aTarget, const TimeStamp& aNow);
+  void ArmTimer(const TimeStamp& aTarget, const TimeStamp& aNow)
+      MOZ_REQUIRES(mMonitor);
 
-  bool TimerIsArmed() { return !mCurrentTimerTarget.IsNull(); }
+  bool TimerIsArmed() MOZ_REQUIRES(mMonitor) {
+    return !mCurrentTimerTarget.IsNull();
+  }
 
-  void CancelTimerIfArmed() {
+  void CancelTimerIfArmed() MOZ_REQUIRES(mMonitor) {
     MOZ_ASSERT(OnMediaTimerThread());
     if (TimerIsArmed()) {
       TIMER_LOG("MediaTimer::CancelTimerIfArmed canceling timer");
@@ -94,19 +98,19 @@ class MediaTimer {
   };
 
   nsCOMPtr<nsIEventTarget> mThread;
-  std::priority_queue<Entry> mEntries;
-  Monitor mMonitor MOZ_UNANNOTATED;
-  nsCOMPtr<nsITimer> mTimer;
-  TimeStamp mCurrentTimerTarget;
+  std::priority_queue<Entry> mEntries MOZ_GUARDED_BY(mMonitor);
+  Monitor mMonitor;
+  nsCOMPtr<nsITimer> mTimer MOZ_GUARDED_BY(mMonitor);
+  TimeStamp mCurrentTimerTarget MOZ_GUARDED_BY(mMonitor);
 
   // Timestamps only have relative meaning, so we need a base timestamp for
   // logging purposes.
-  TimeStamp mCreationTimeStamp;
+  const TimeStamp mCreationTimeStamp;
   int64_t RelativeMicroseconds(const TimeStamp& aTimeStamp) {
     return (int64_t)(aTimeStamp - mCreationTimeStamp).ToMicroseconds();
   }
 
-  bool mUpdateScheduled;
+  bool mUpdateScheduled MOZ_GUARDED_BY(mMonitor);
   const bool mFuzzy;
 };
 

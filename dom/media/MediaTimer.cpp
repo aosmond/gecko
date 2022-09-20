@@ -90,7 +90,6 @@ void MediaTimer::Cancel() {
 }
 
 void MediaTimer::ScheduleUpdate() {
-  mMonitor.AssertCurrentThreadOwns();
   if (mUpdateScheduled) {
     return;
   }
@@ -111,7 +110,6 @@ void MediaTimer::Update() {
 
 bool MediaTimer::IsExpired(const TimeStamp& aTarget, const TimeStamp& aNow) {
   MOZ_ASSERT(OnMediaTimerThread());
-  mMonitor.AssertCurrentThreadOwns();
   // Treat this timer as expired in fuzzy mode even if it is fired
   // slightly (< 1ms) before the schedule target. So we don't need to schedule a
   // timer with very small timeout again when the client doesn't need a high-res
@@ -122,7 +120,6 @@ bool MediaTimer::IsExpired(const TimeStamp& aTarget, const TimeStamp& aNow) {
 
 void MediaTimer::UpdateLocked() {
   MOZ_ASSERT(OnMediaTimerThread());
-  mMonitor.AssertCurrentThreadOwns();
   mUpdateScheduled = false;
 
   TIMER_LOG("MediaTimer::UpdateLocked");
@@ -151,7 +148,6 @@ void MediaTimer::UpdateLocked() {
 }
 
 void MediaTimer::Reject() {
-  mMonitor.AssertCurrentThreadOwns();
   while (!mEntries.empty()) {
     mEntries.top().mPromise->Reject(false, __func__);
     mEntries.pop();
