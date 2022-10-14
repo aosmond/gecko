@@ -4700,7 +4700,7 @@ SurfaceFromElementResult CanvasRenderingContext2D::CachedSurfaceFromElement(
     return res;
   }
 
-  res.mSourceSurface = CanvasImageCache::LookupAllCanvas(aElement);
+  res.mSourceSurface = CanvasImageCache::LookupAllCanvas(aElement, mTarget);
   if (!res.mSourceSurface) {
     return res;
   }
@@ -4846,8 +4846,8 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       element = video;
     }
 
-    srcSurf = CanvasImageCache::LookupCanvas(element, mCanvasElement, &imgSize,
-                                             &intrinsicImgSize);
+    srcSurf = CanvasImageCache::LookupCanvas(element, mCanvasElement, mTarget,
+                                             &imgSize, &intrinsicImgSize);
   }
 
   DirectDrawInfo drawInfo;
@@ -4892,7 +4892,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
     if (res.mSourceSurface) {
       if (res.mImageRequest) {
-        CanvasImageCache::NotifyDrawImage(element, mCanvasElement,
+        CanvasImageCache::NotifyDrawImage(element, mCanvasElement, mTarget,
                                           res.mSourceSurface, imgSize,
                                           intrinsicImgSize);
       }
