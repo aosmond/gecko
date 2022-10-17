@@ -1507,15 +1507,6 @@ void CanvasRenderingContext2D::AddZoneWaitingForGC() {
   }
 }
 
-static WindowRenderer* WindowRendererFromCanvasElement(
-    nsINode* aCanvasElement) {
-  if (!aCanvasElement) {
-    return nullptr;
-  }
-
-  return nsContentUtils::WindowRendererForDocument(aCanvasElement->OwnerDoc());
-}
-
 bool CanvasRenderingContext2D::TryAcceleratedTarget(
     RefPtr<gfx::DrawTarget>& aOutDT,
     RefPtr<layers::PersistentBufferProvider>& aOutProvider) {
@@ -1543,10 +1534,6 @@ bool CanvasRenderingContext2D::TrySharedTarget(
   aOutDT = nullptr;
   aOutProvider = nullptr;
 
-  if (!mCanvasElement) {
-    return false;
-  }
-
   if (mBufferProvider && mBufferProvider->IsShared()) {
     // we are already using a shared buffer provider, we are allocating a new
     // one because the current one failed so let's just fall back to the basic
@@ -1555,8 +1542,12 @@ bool CanvasRenderingContext2D::TrySharedTarget(
     return false;
   }
 
-  WindowRenderer* renderer = WindowRendererFromCanvasElement(mCanvasElement);
+  Document* doc = DocumentOrNull();
+  if (!doc) {
+    return false;
+  }
 
+  WindowRenderer* renderer = nsContentUtils::WindowRendererForDocument(doc);
   if (!renderer) {
     return false;
   }

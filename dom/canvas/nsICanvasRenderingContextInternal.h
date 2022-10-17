@@ -84,6 +84,8 @@ class nsICanvasRenderingContextInternal : public nsISupports,
 
   nsIPrincipal* PrincipalOrNull() const;
 
+  mozilla::dom::Document* DocumentOrNull() const;
+
   void SetOffscreenCanvas(mozilla::dom::OffscreenCanvas* aOffscreenCanvas) {
     mOffscreenCanvas = aOffscreenCanvas;
   }

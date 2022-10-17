@@ -46,6 +46,21 @@ nsIPrincipal* nsICanvasRenderingContextInternal::PrincipalOrNull() const {
   return nullptr;
 }
 
+mozilla::dom::Document* nsICanvasRenderingContextInternal::DocumentOrNull()
+    const {
+  if (mCanvasElement) {
+    return mCanvasElement->OwnerDoc();
+  }
+  if (mOffscreenCanvas) {
+    if (nsIGlobalObject* global = mOffscreenCanvas->GetParentObject()) {
+      if (nsPIDOMWindowInner* innerWindow = global->AsInnerWindow()) {
+        return innerWindow->GetExtantDoc();
+      }
+    }
+  }
+  return nullptr;
+}
+
 void nsICanvasRenderingContextInternal::RemovePostRefreshObserver() {
   if (mRefreshDriver) {
     mRefreshDriver->RemovePostRefreshObserver(this);
