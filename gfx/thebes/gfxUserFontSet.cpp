@@ -37,64 +37,53 @@ mozilla::LogModule* gfxUserFontSet::GetUserFontsLog() {
 
 static Atomic<uint64_t> sFontSetGeneration(0);
 
-gfxUserFontEntry::gfxUserFontEntry(
-    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList, WeightRange aWeight,
-    StretchRange aStretch, SlantStyleRange aStyle,
-    const nsTArray<gfxFontFeature>& aFeatureSettings,
-    const nsTArray<gfxFontVariation>& aVariationSettings,
-    uint32_t aLanguageOverride, gfxCharacterMap* aUnicodeRanges,
-    StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
-    float aAscentOverride, float aDescentOverride, float aLineGapOverride,
-    float aSizeAdjust)
+gfxUserFontEntry::gfxUserFontEntry(nsTArray<gfxFontFaceSrc>&& aFontFaceSrcList,
+                                   gfxUserFontAttributes&& aAttr)
     : gfxFontEntry("userfont"_ns),
       mUserFontLoadState(STATUS_NOT_LOADED),
       mFontDataLoadingState(NOT_LOADING),
       mSeenLocalSource(false),
       mUnsupportedFormat(false),
-      mFontDisplay(aFontDisplay),
+      mFontDisplay(aAttr.mFontDisplay),
       mLoader(nullptr) {
   mIsUserFontContainer = true;
-  mSrcList = aFontFaceSrcList.Clone();
+  mSrcList = std::move(aFontFaceSrcList);
   mCurrentSrcIndex = 0;
-  mWeightRange = aWeight;
-  mStretchRange = aStretch;
-  mStyleRange = aStyle;
-  mFeatureSettings.AppendElements(aFeatureSettings);
-  mVariationSettings.AppendElements(aVariationSettings);
-  mLanguageOverride = aLanguageOverride;
-  SetUnicodeRangeMap(aUnicodeRanges);
-  mRangeFlags = aRangeFlags;
-  mAscentOverride = aAscentOverride;
-  mDescentOverride = aDescentOverride;
-  mLineGapOverride = aLineGapOverride;
-  mSizeAdjust = aSizeAdjust;
+  mWeightRange = aAttr.mWeight;
+  mStretchRange = aAttr.mStretch;
+  mStyleRange = aAttr.mStyle;
+  mFeatureSettings = std::move(aAttr.mFeatureSettings);
+  mVariationSettings = std::move(aAttr.mVariationSettings);
+  mLanguageOverride = aAttr.mLanguageOverride;
+  SetUnicodeRangeMap(std::move(aAttr.mUnicodeRanges));
+  mRangeFlags = aAttr.mRangeFlags;
+  mAscentOverride = aAttr.mAscentOverride;
+  mDescentOverride = aAttr.mDescentOverride;
+  mLineGapOverride = aAttr.mLineGapOverride;
+  mSizeAdjust = aAttr.mSizeAdjust;
+  mFamilyName =
+      aAttr.mFamilyName;  // TODO(aosmond): verify this is always correct?
 }
 
-void gfxUserFontEntry::UpdateAttributes(
-    WeightRange aWeight, StretchRange aStretch, SlantStyleRange aStyle,
-    const nsTArray<gfxFontFeature>& aFeatureSettings,
-    const nsTArray<gfxFontVariation>& aVariationSettings,
-    uint32_t aLanguageOverride, gfxCharacterMap* aUnicodeRanges,
-    StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
-    float aAscentOverride, float aDescentOverride, float aLineGapOverride,
-    float aSizeAdjust) {
+void gfxUserFontEntry::UpdateAttributes(gfxUserFontAttributes&& aAttr) {
   // Remove the entry from the user font cache, if present there, as the cache
   // key may no longer be correct with the new attributes.
   gfxUserFontSet::UserFontCache::ForgetFont(this);
 
-  mFontDisplay = aFontDisplay;
-  mWeightRange = aWeight;
-  mStretchRange = aStretch;
-  mStyleRange = aStyle;
-  mFeatureSettings = aFeatureSettings.Clone();
-  mVariationSettings = aVariationSettings.Clone();
-  mLanguageOverride = aLanguageOverride;
-  SetUnicodeRangeMap(aUnicodeRanges);
-  mRangeFlags = aRangeFlags;
-  mAscentOverride = aAscentOverride;
-  mDescentOverride = aDescentOverride;
-  mLineGapOverride = aLineGapOverride;
-  mSizeAdjust = aSizeAdjust;
+  AutoWriteLock lock(mLock);
+  mFontDisplay = aAttr.mFontDisplay;
+  mWeightRange = aAttr.mWeight;
+  mStretchRange = aAttr.mStretch;
+  mStyleRange = aAttr.mStyle;
+  mFeatureSettings = std::move(aAttr.mFeatureSettings);
+  mVariationSettings = std::move(aAttr.mVariationSettings);
+  mLanguageOverride = aAttr.mLanguageOverride;
+  SetUnicodeRangeMap(std::move(aAttr.mUnicodeRanges));
+  mRangeFlags = aAttr.mRangeFlags;
+  mAscentOverride = aAttr.mAscentOverride;
+  mDescentOverride = aAttr.mDescentOverride;
+  mLineGapOverride = aAttr.mLineGapOverride;
+  mSizeAdjust = aAttr.mSizeAdjust;
 }
 
 gfxUserFontEntry::~gfxUserFontEntry() {
@@ -104,26 +93,40 @@ gfxUserFontEntry::~gfxUserFontEntry() {
   MOZ_ASSERT(!gfxFontUtils::IsInServoTraversal());
 }
 
-bool gfxUserFontEntry::Matches(
-    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList, WeightRange aWeight,
-    StretchRange aStretch, SlantStyleRange aStyle,
-    const nsTArray<gfxFontFeature>& aFeatureSettings,
-    const nsTArray<gfxFontVariation>& aVariationSettings,
-    uint32_t aLanguageOverride, gfxCharacterMap* aUnicodeRanges,
-    StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
-    float aAscentOverride, float aDescentOverride, float aLineGapOverride,
-    float aSizeAdjust) {
-  return Weight() == aWeight && Stretch() == aStretch &&
-         SlantStyle() == aStyle && mFeatureSettings == aFeatureSettings &&
-         mVariationSettings == aVariationSettings &&
-         mLanguageOverride == aLanguageOverride &&
-         mSrcList == aFontFaceSrcList && mFontDisplay == aFontDisplay &&
-         mRangeFlags == aRangeFlags && mAscentOverride == aAscentOverride &&
-         mDescentOverride == aDescentOverride &&
-         mLineGapOverride == aLineGapOverride && mSizeAdjust == aSizeAdjust &&
-         ((!aUnicodeRanges && !mCharacterMap) ||
-          (aUnicodeRanges && mCharacterMap &&
-           GetCharacterMap()->Equals(aUnicodeRanges)));
+void gfxUserFontEntry::GetAttributes(gfxUserFontAttributes& aAttr) const {
+  AutoReadLock lock(mLock);
+  aAttr.mFontDisplay = mFontDisplay;
+  aAttr.mWeight = mWeightRange;
+  aAttr.mStretch = mStretchRange;
+  aAttr.mStyle = mStyleRange;
+  aAttr.mFeatureSettings.AppendElements(mFeatureSettings);
+  aAttr.mVariationSettings.AppendElements(mVariationSettings);
+  aAttr.mLanguageOverride = mLanguageOverride;
+  aAttr.mUnicodeRanges = GetCharacterMap();
+  aAttr.mRangeFlags = mRangeFlags;
+  aAttr.mAscentOverride = mAscentOverride;
+  aAttr.mDescentOverride = mDescentOverride;
+  aAttr.mLineGapOverride = mLineGapOverride;
+  aAttr.mSizeAdjust = mSizeAdjust;
+}
+
+bool gfxUserFontEntry::Matches(const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
+                               const gfxUserFontAttributes& aAttr) {
+  AutoReadLock lock(mLock);
+  return mWeightRange == aAttr.mWeight && mStretchRange == aAttr.mStretch &&
+         mStyleRange == aAttr.mStyle &&
+         mFeatureSettings == aAttr.mFeatureSettings &&
+         mVariationSettings == aAttr.mVariationSettings &&
+         mLanguageOverride == aAttr.mLanguageOverride &&
+         mSrcList == aFontFaceSrcList && mFontDisplay == aAttr.mFontDisplay &&
+         mRangeFlags == aAttr.mRangeFlags &&
+         mAscentOverride == aAttr.mAscentOverride &&
+         mDescentOverride == aAttr.mDescentOverride &&
+         mLineGapOverride == aAttr.mLineGapOverride &&
+         mSizeAdjust == aAttr.mSizeAdjust &&
+         ((!aAttr.mUnicodeRanges && !mCharacterMap) ||
+          (aAttr.mUnicodeRanges && mCharacterMap &&
+           GetCharacterMap()->Equals(aAttr.mUnicodeRanges)));
 }
 
 gfxFont* gfxUserFontEntry::CreateFontInstance(const gfxFontStyle* aFontStyle) {
@@ -420,6 +423,11 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aForceAsync) {
 
   uint32_t numSrc = mSrcList.Length();
 
+  // We take a copy now because if we need to update another gfxFontEntry, we
+  // must not hold both locks at the same time.
+  gfxUserFontAttributes attr;
+  GetAttributes(attr);
+
   // load each src entry in turn, until a local face is found
   // or a download begins successfully
   while (mCurrentSrcIndex < numSrc) {
@@ -433,8 +441,8 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aForceAsync) {
       gfxFontEntry* fe = nullptr;
       if (!pfl->IsFontFamilyWhitelistActive()) {
         fe = gfxPlatform::GetPlatform()->LookupLocalFont(
-            fontSet->GetPresContext(), currSrc.mLocalName, Weight(), Stretch(),
-            SlantStyle());
+            fontSet->GetPresContext(), currSrc.mLocalName, attr.mWeight,
+            attr.mStretch, attr.mStyle);
         // Note that we've attempted a local lookup, even if it failed,
         // as this means we are dependent on any updates to the font list.
         mSeenLocalSource = true;
@@ -450,15 +458,19 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aForceAsync) {
         LOG(("userfonts (%p) [src %d] loaded local: (%s) for (%s) gen: %8.8x\n",
              fontSet.get(), mCurrentSrcIndex, currSrc.mLocalName.get(),
              mFamilyName.get(), uint32_t(fontSet->mGeneration)));
-        fe->mFeatureSettings.AppendElements(mFeatureSettings);
-        fe->mVariationSettings.AppendElements(mVariationSettings);
-        fe->mLanguageOverride = mLanguageOverride;
-        fe->mFamilyName = mFamilyName;
-        fe->mRangeFlags = mRangeFlags;
-        fe->mAscentOverride = mAscentOverride;
-        fe->mDescentOverride = mDescentOverride;
-        fe->mLineGapOverride = mLineGapOverride;
-        fe->mSizeAdjust = mSizeAdjust;
+        {
+          AutoWriteLock lock(fe->mLock);
+          fe->mFeatureSettings.AppendElements(std::move(attr.mFeatureSettings));
+          fe->mVariationSettings.AppendElements(
+              std::move(attr.mVariationSettings));
+          fe->mLanguageOverride = attr.mLanguageOverride;
+          fe->mFamilyName = mFamilyName;
+          fe->mRangeFlags = attr.mRangeFlags;
+          fe->mAscentOverride = attr.mAscentOverride;
+          fe->mDescentOverride = attr.mDescentOverride;
+          fe->mLineGapOverride = attr.mLineGapOverride;
+          fe->mSizeAdjust = attr.mSizeAdjust;
+        }
         // For src:local(), we don't care whether the request is from
         // a private window as there's no issue of caching resources;
         // local fonts are just available all the time.
@@ -693,6 +705,11 @@ bool gfxUserFontEntry::LoadPlatformFont(uint32_t aSrcIndex,
     }
   }
 
+  // We take a copy now because if we need to update another gfxFontEntry, we
+  // must not hold both locks at the same time.
+  gfxUserFontAttributes attr;
+  GetAttributes(attr);
+
   // Because platform font activation code may replace the name table
   // in the font with a synthetic one, we save the original name so that
   // it can be reported via the InspectorUtils API.
@@ -732,7 +749,7 @@ bool gfxUserFontEntry::LoadPlatformFont(uint32_t aSrcIndex,
     // Here ownership of aSanitizedFontData is passed to the platform,
     // which will delete it when no longer required
     fe = gfxPlatform::GetPlatform()->MakePlatformFont(
-        mName, Weight(), Stretch(), SlantStyle(), aSanitizedFontData,
+        mName, attr.mWeight, attr.mStretch, attr.mStyle, aSanitizedFontData,
         aSanitizedLength);
     if (!fe) {
       fontSet->LogMessage(this, aSrcIndex, "not usable by platform");
@@ -758,17 +775,21 @@ bool gfxUserFontEntry::LoadPlatformFont(uint32_t aSrcIndex,
       compression = gfxUserFontData::kBrotliCompression;
     }
 
-    // copy OpenType feature/language settings from the userfont entry to the
-    // newly-created font entry
-    fe->mFeatureSettings.AppendElements(mFeatureSettings);
-    fe->mVariationSettings.AppendElements(mVariationSettings);
-    fe->mLanguageOverride = mLanguageOverride;
-    fe->mFamilyName = mFamilyName;
-    fe->mRangeFlags = mRangeFlags;
-    fe->mAscentOverride = mAscentOverride;
-    fe->mDescentOverride = mDescentOverride;
-    fe->mLineGapOverride = mLineGapOverride;
-    fe->mSizeAdjust = mSizeAdjust;
+    {
+      AutoWriteLock lock(fe->mLock);
+      // copy OpenType feature/language settings from the userfont entry to the
+      // newly-created font entry
+      fe->mFeatureSettings.AppendElements(std::move(attr.mFeatureSettings));
+      fe->mVariationSettings.AppendElements(std::move(attr.mVariationSettings));
+      fe->mLanguageOverride = attr.mLanguageOverride;
+      fe->mFamilyName = mFamilyName;
+      fe->mRangeFlags = attr.mRangeFlags;
+      fe->mAscentOverride = attr.mAscentOverride;
+      fe->mDescentOverride = attr.mDescentOverride;
+      fe->mLineGapOverride = attr.mLineGapOverride;
+      fe->mSizeAdjust = attr.mSizeAdjust;
+    }
+
     StoreUserFontData(fe, aSrcIndex, fontSet->GetPrivateBrowsing(),
                       originalFullName, &metadata, metaOrigLen, compression);
     if (LOG_ENABLED()) {
@@ -975,15 +996,8 @@ void gfxUserFontSet::Destroy() {
 }
 
 already_AddRefed<gfxUserFontEntry> gfxUserFontSet::FindOrCreateUserFontEntry(
-    const nsACString& aFamilyName,
-    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList, WeightRange aWeight,
-    StretchRange aStretch, SlantStyleRange aStyle,
-    const nsTArray<gfxFontFeature>& aFeatureSettings,
-    const nsTArray<gfxFontVariation>& aVariationSettings,
-    uint32_t aLanguageOverride, gfxCharacterMap* aUnicodeRanges,
-    StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
-    float aAscentOverride, float aDescentOverride, float aLineGapOverride,
-    float aSizeAdjust) {
+    nsTArray<gfxFontFaceSrc>&& aFontFaceSrcList,
+    gfxUserFontAttributes&& aAttr) {
   RefPtr<gfxUserFontEntry> entry;
 
   // If there's already a userfont entry in the family whose descriptors all
@@ -992,22 +1006,13 @@ already_AddRefed<gfxUserFontEntry> gfxUserFontSet::FindOrCreateUserFontEntry(
   // Note that we can't do this for platform font entries, even if the
   // style descriptors match, as they might have had a different source list,
   // but we no longer have the old source list available to check.
-  gfxUserFontFamily* family = LookupFamily(aFamilyName);
+  gfxUserFontFamily* family = LookupFamily(aAttr.mFamilyName);
   if (family) {
-    entry = FindExistingUserFontEntry(
-        family, aFontFaceSrcList, aWeight, aStretch, aStyle, aFeatureSettings,
-        aVariationSettings, aLanguageOverride, aUnicodeRanges, aFontDisplay,
-        aRangeFlags, aAscentOverride, aDescentOverride, aLineGapOverride,
-        aSizeAdjust);
+    entry = FindExistingUserFontEntry(family, aFontFaceSrcList, aAttr);
   }
 
   if (!entry) {
-    entry = CreateUserFontEntry(aFontFaceSrcList, aWeight, aStretch, aStyle,
-                                aFeatureSettings, aVariationSettings,
-                                aLanguageOverride, aUnicodeRanges, aFontDisplay,
-                                aRangeFlags, aAscentOverride, aDescentOverride,
-                                aLineGapOverride, aSizeAdjust);
-    entry->mFamilyName = aFamilyName;
+    entry = CreateUserFontEntry(std::move(aFontFaceSrcList), std::move(aAttr));
   }
 
   return entry.forget();
@@ -1015,14 +1020,8 @@ already_AddRefed<gfxUserFontEntry> gfxUserFontSet::FindOrCreateUserFontEntry(
 
 gfxUserFontEntry* gfxUserFontSet::FindExistingUserFontEntry(
     gfxUserFontFamily* aFamily,
-    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList, WeightRange aWeight,
-    StretchRange aStretch, SlantStyleRange aStyle,
-    const nsTArray<gfxFontFeature>& aFeatureSettings,
-    const nsTArray<gfxFontVariation>& aVariationSettings,
-    uint32_t aLanguageOverride, gfxCharacterMap* aUnicodeRanges,
-    StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
-    float aAscentOverride, float aDescentOverride, float aLineGapOverride,
-    float aSizeAdjust) {
+    const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList,
+    const gfxUserFontAttributes& aAttr) {
   aFamily->ReadLock();
   const auto& fontList = aFamily->GetFontList();
   gfxUserFontEntry* result = nullptr;
@@ -1033,10 +1032,7 @@ gfxUserFontEntry* gfxUserFontSet::FindExistingUserFontEntry(
     }
 
     gfxUserFontEntry* ufe = static_cast<gfxUserFontEntry*>(font.get());
-    if (ufe->Matches(aFontFaceSrcList, aWeight, aStretch, aStyle,
-                     aFeatureSettings, aVariationSettings, aLanguageOverride,
-                     aUnicodeRanges, aFontDisplay, aRangeFlags, aAscentOverride,
-                     aDescentOverride, aLineGapOverride, aSizeAdjust)) {
+    if (ufe->Matches(aFontFaceSrcList, aAttr)) {
       result = ufe;
       break;
     }
@@ -1192,17 +1188,38 @@ bool gfxUserFontSet::UserFontCache::Entry::KeyEquals(
     return false;
   }
 
-  if (mFontEntry->SlantStyle() != fe->SlantStyle() ||
-      mFontEntry->Weight() != fe->Weight() ||
-      mFontEntry->Stretch() != fe->Stretch() ||
-      mFontEntry->mFeatureSettings != fe->mFeatureSettings ||
-      mFontEntry->mVariationSettings != fe->mVariationSettings ||
-      mFontEntry->mLanguageOverride != fe->mLanguageOverride ||
-      mFontEntry->mAscentOverride != fe->mAscentOverride ||
-      mFontEntry->mDescentOverride != fe->mDescentOverride ||
-      mFontEntry->mLineGapOverride != fe->mLineGapOverride ||
-      mFontEntry->mSizeAdjust != fe->mSizeAdjust ||
-      mFontEntry->mFamilyName != fe->mFamilyName) {
+  if (mFontEntry->mFamilyName != fe->mFamilyName) {
+    return false;
+  }
+
+  // We take a copy now because if we need to update another gfxFontEntry, we
+  // must not hold both locks at the same time.
+  gfxUserFontAttributes attr;
+  {
+    AutoReadLock lock(mFontEntry->mLock);
+    attr.mWeight = mFontEntry->mWeightRange;
+    attr.mStretch = mFontEntry->mStretchRange;
+    attr.mStyle = mFontEntry->mStyleRange;
+    attr.mFeatureSettings.AppendElements(mFontEntry->mFeatureSettings);
+    attr.mVariationSettings.AppendElements(mFontEntry->mVariationSettings);
+    attr.mLanguageOverride = mFontEntry->mLanguageOverride;
+    attr.mRangeFlags = mFontEntry->mRangeFlags;
+    attr.mAscentOverride = mFontEntry->mAscentOverride;
+    attr.mDescentOverride = mFontEntry->mDescentOverride;
+    attr.mLineGapOverride = mFontEntry->mLineGapOverride;
+    attr.mSizeAdjust = mFontEntry->mSizeAdjust;
+  }
+
+  AutoReadLock lock(fe->mLock);
+  if (attr.mStyle != fe->mStyleRange || attr.mWeight != fe->mWeightRange ||
+      attr.mStretch != fe->mStretchRange ||
+      attr.mFeatureSettings != fe->mFeatureSettings ||
+      attr.mVariationSettings != fe->mVariationSettings ||
+      attr.mLanguageOverride != fe->mLanguageOverride ||
+      attr.mAscentOverride != fe->mAscentOverride ||
+      attr.mDescentOverride != fe->mDescentOverride ||
+      attr.mLineGapOverride != fe->mLineGapOverride ||
+      attr.mSizeAdjust != fe->mSizeAdjust) {
     return false;
   }
 

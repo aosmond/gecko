@@ -146,6 +146,7 @@ gfxFontEntry::~gfxFontEntry() {
 // the entry, so locking not required.
 void gfxFontEntry::InitializeFrom(fontlist::Face* aFace,
                                   const fontlist::Family* aFamily) {
+  AutoWriteLock lock(mLock);
   mStyleRange = aFace->mStyle;
   mWeightRange = aFace->mWeight;
   mStretchRange = aFace->mStretch;
@@ -1182,6 +1183,8 @@ void gfxFontEntry::SetupVariationRanges() {
   }
   AutoTArray<gfxFontVariationAxis, 4> axes;
   GetVariationAxes(axes);
+
+  AutoWriteLock lock(mLock);
   for (const auto& axis : axes) {
     switch (axis.mTag) {
       case HB_TAG('w', 'g', 'h', 't'):
@@ -1306,6 +1309,8 @@ void gfxFontEntry::GetVariationsForStyle(nsTArray<gfxFontVariation>& aResult,
     return;
   }
 
+  AutoReadLock lock(mLock);
+
   // Resolve high-level CSS properties from the requested style
   // (font-{style,weight,stretch}) to the appropriate variations.
   // The value used is clamped to the range available in the font face,
@@ -1320,14 +1325,14 @@ void gfxFontEntry::GetVariationsForStyle(nsTArray<gfxFontVariation>& aResult,
   if (!(mRangeFlags & RangeFlags::eNonCSSWeight)) {
     float weight = (IsUserFont() && (mRangeFlags & RangeFlags::eAutoWeight))
                        ? aStyle.weight.ToFloat()
-                       : Weight().Clamp(aStyle.weight).ToFloat();
+                       : mWeightRange.Clamp(aStyle.weight).ToFloat();
     aResult.AppendElement(gfxFontVariation{HB_TAG('w', 'g', 'h', 't'), weight});
   }
 
   if (!(mRangeFlags & RangeFlags::eNonCSSStretch)) {
     float stretch = (IsUserFont() && (mRangeFlags & RangeFlags::eAutoStretch))
                         ? aStyle.stretch.ToFloat()
-                        : Stretch().Clamp(aStyle.stretch).ToFloat();
+                        : mStretchRange.Clamp(aStyle.stretch).ToFloat();
     aResult.AppendElement(
         gfxFontVariation{HB_TAG('w', 'd', 't', 'h'), stretch});
   }
@@ -1336,7 +1341,7 @@ void gfxFontEntry::GetVariationsForStyle(nsTArray<gfxFontVariation>& aResult,
     // The 'ital' axis is normally a binary toggle; intermediate values
     // can only be set using font-variation-settings.
     aResult.AppendElement(gfxFontVariation{HB_TAG('i', 't', 'a', 'l'), 1.0f});
-  } else if (SlantStyle().Min().IsOblique()) {
+  } else if (mStyleRange.Min().IsOblique()) {
     // Figure out what slant angle we should try to match from the
     // requested style.
     float angle = aStyle.style.IsNormal() ? 0.0f
@@ -1347,7 +1352,7 @@ void gfxFontEntry::GetVariationsForStyle(nsTArray<gfxFontVariation>& aResult,
     // with no explicit descriptor.
     if (!(IsUserFont() && (mRangeFlags & RangeFlags::eAutoSlantStyle))) {
       angle =
-          SlantStyle().Clamp(FontSlantStyle::FromFloat(angle)).ObliqueAngle();
+          mStyleRange.Clamp(FontSlantStyle::FromFloat(angle)).ObliqueAngle();
     }
     // OpenType and CSS measure angles in opposite directions, so we have to
     // invert the sign of the CSS oblique value when setting OpenType 'slnt'.

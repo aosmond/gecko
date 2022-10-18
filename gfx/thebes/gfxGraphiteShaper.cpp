@@ -190,8 +190,8 @@ bool gfxGraphiteShaper::ShapeText(DrawTarget* aDrawTarget,
   uint32_t grLang = 0;
   if (style->languageOverride) {
     grLang = MakeGraphiteLangTag(style->languageOverride);
-  } else if (entry->mLanguageOverride) {
-    grLang = MakeGraphiteLangTag(entry->mLanguageOverride);
+  } else if (uint32_t languageOverride = entry->GetLanguageOverride()) {
+    grLang = MakeGraphiteLangTag(languageOverride);
   } else if (aLanguage) {
     nsAutoCString langString;
     aLanguage->ToUTF8String(langString);
@@ -202,9 +202,8 @@ bool gfxGraphiteShaper::ShapeText(DrawTarget* aDrawTarget,
 
   // insert any merged features into Graphite feature list
   GrFontFeatures f = {t_mGrFace, grFeatures, mSandbox};
-  MergeFontFeatures(style, mFont->GetFontEntry()->mFeatureSettings,
-                    aShapedText->DisableLigatures(),
-                    mFont->GetFontEntry()->FamilyName(), mFallbackToSmallCaps,
+  MergeFontFeatures(style, mFont->GetFontEntry(),
+                    aShapedText->DisableLigatures(), mFallbackToSmallCaps,
                     AddFeature, &f);
 
   // Graphite shaping doesn't map U+00a0 (nbsp) to space if it is missing

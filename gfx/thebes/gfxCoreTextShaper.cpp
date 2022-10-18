@@ -100,8 +100,8 @@ bool gfxCoreTextShaper::ShapeText(DrawTarget* aDrawTarget,
     }
   };
   bool addSmallCaps = false;
-  MergeFontFeatures(style, entry->mFeatureSettings, false, entry->FamilyName(),
-                    false, handleFeatureTag, &addSmallCaps);
+  MergeFontFeatures(style, entry, false, false, handleFeatureTag,
+                    &addSmallCaps);
 
   // Get an attributes dictionary suitable for shaping text in the
   // current direction, creating it if necessary.

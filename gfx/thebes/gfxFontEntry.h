@@ -171,9 +171,35 @@ class gfxFontEntry {
   // returns Name() if nothing better is available.
   virtual nsCString RealFaceName();
 
-  WeightRange Weight() const { return mWeightRange; }
-  StretchRange Stretch() const { return mStretchRange; }
-  SlantStyleRange SlantStyle() const { return mStyleRange; }
+  WeightRange Weight() const {
+    mozilla::AutoReadLock lock(mLock);
+    return mWeightRange;
+  }
+
+  StretchRange Stretch() const {
+    mozilla::AutoReadLock lock(mLock);
+    return mStretchRange;
+  }
+
+  SlantStyleRange SlantStyle() const {
+    mozilla::AutoReadLock lock(mLock);
+    return mStyleRange;
+  }
+
+  float GetSizeAdjust() const {
+    mozilla::AutoReadLock lock(mLock);
+    return mSizeAdjust;
+  }
+
+  uint32_t GetLanguageOverride() const {
+    mozilla::AutoReadLock lock(mLock);
+    return mLanguageOverride;
+  }
+
+  bool IsFeatureSettingsEmpty() const {
+    mozilla::AutoReadLock lock(mLock);
+    return mFeatureSettings.IsEmpty();
+  }
 
   bool IsUserFont() const { return mIsDataUserFont || mIsLocalUserFont; }
   bool IsLocalUserFont() const { return mIsLocalUserFont; }
@@ -508,8 +534,8 @@ class gfxFontEntry {
 
   // list of gfxFonts that are using SVG glyphs
   nsTArray<const gfxFont*> mFontsUsingSVGGlyphs MOZ_GUARDED_BY(mLock);
-  nsTArray<gfxFontFeature> mFeatureSettings;
-  nsTArray<gfxFontVariation> mVariationSettings;
+  nsTArray<gfxFontFeature> mFeatureSettings MOZ_GUARDED_BY(mLock);
+  nsTArray<gfxFontVariation> mVariationSettings MOZ_GUARDED_BY(mLock);
 
   mozilla::UniquePtr<nsTHashMap<nsUint32HashKey, bool>> mSupportedFeatures
       MOZ_GUARDED_BY(mFeatureInfoLock);
@@ -531,20 +557,23 @@ class gfxFontEntry {
 
   mozilla::Atomic<uint32_t> mUVSOffset;
 
-  uint32_t mLanguageOverride = NO_FONT_LANGUAGE_OVERRIDE;
+  uint32_t mLanguageOverride MOZ_GUARDED_BY(mLock) = NO_FONT_LANGUAGE_OVERRIDE;
 
-  WeightRange mWeightRange = WeightRange(FontWeight::FromInt(500));
-  StretchRange mStretchRange = StretchRange(FontStretch::NORMAL);
-  SlantStyleRange mStyleRange = SlantStyleRange(FontSlantStyle::NORMAL);
+  WeightRange mWeightRange MOZ_GUARDED_BY(mLock) =
+      WeightRange(FontWeight::FromInt(500));
+  StretchRange mStretchRange MOZ_GUARDED_BY(mLock) =
+      StretchRange(FontStretch::NORMAL);
+  SlantStyleRange mStyleRange MOZ_GUARDED_BY(mLock) =
+      SlantStyleRange(FontSlantStyle::NORMAL);
 
   // Font metrics overrides (as multiples of used font size); negative values
   // indicate no override to be applied.
-  float mAscentOverride = -1.0;
-  float mDescentOverride = -1.0;
-  float mLineGapOverride = -1.0;
+  float mAscentOverride MOZ_GUARDED_BY(mLock) = -1.0;
+  float mDescentOverride MOZ_GUARDED_BY(mLock) = -1.0;
+  float mLineGapOverride MOZ_GUARDED_BY(mLock) = -1.0;
 
   // Scaling factor to be applied to the font size.
-  float mSizeAdjust = 1.0;
+  float mSizeAdjust MOZ_GUARDED_BY(mLock) = 1.0;
 
   // For user fonts (only), we need to record whether or not weight/stretch/
   // slant variations should be clamped to the range specified in the entry
