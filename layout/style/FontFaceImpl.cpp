@@ -507,37 +507,44 @@ void FontFaceImpl::GetDesc(nsCSSFontDesc aDescID, nsACString& aResult) const {
 void FontFaceImpl::SetUserFontEntry(gfxUserFontEntry* aEntry) {
   AssertIsOnOwningThread();
 
+  if (mUserFontEntry == aEntry) {
+    return;
+  }
+
   if (mUserFontEntry) {
     MutexAutoLock lock(mUserFontEntry->mMutex);
     mUserFontEntry->mFontFaces.RemoveElement(this);
   }
 
-  mUserFontEntry = static_cast<Entry*>(aEntry);
-  if (mUserFontEntry) {
-    {
-      MutexAutoLock lock(mUserFontEntry->mMutex);
-      mUserFontEntry->mFontFaces.AppendElement(this);
-    }
+  auto* entry = static_cast<Entry*>(aEntry);
+  if (entry) {
+    MutexAutoLock lock(entry->mMutex);
+    entry->mFontFaces.AppendElement(this);
+  }
 
-    MOZ_ASSERT(mUserFontEntry->GetUserFontSet() == mFontFaceSet,
-               "user font entry must be associated with the same user font set "
-               "as the FontFace");
+  mUserFontEntry = entry;
 
-    // Our newly assigned user font entry might be in the process of or
-    // finished loading, so set our status accordingly.  But only do so
-    // if we're not going "backwards" in status, which could otherwise
-    // happen in this case:
-    //
-    //   new FontFace("ABC", "url(x)").load();
-    //
-    // where the SetUserFontEntry call (from the after-initialization
-    // DoLoad call) comes after the author's call to load(), which set mStatus
-    // to Loading.
-    FontFaceLoadStatus newStatus =
-        LoadStateToStatus(mUserFontEntry->LoadState());
-    if (newStatus > mStatus) {
-      SetStatus(newStatus);
-    }
+  if (!mUserFontEntry) {
+    return;
+  }
+
+  MOZ_ASSERT(mUserFontEntry->GetUserFontSet() == mFontFaceSet,
+             "user font entry must be associated with the same user font set "
+             "as the FontFace");
+
+  // Our newly assigned user font entry might be in the process of or
+  // finished loading, so set our status accordingly.  But only do so
+  // if we're not going "backwards" in status, which could otherwise
+  // happen in this case:
+  //
+  //   new FontFace("ABC", "url(x)").load();
+  //
+  // where the SetUserFontEntry call (from the after-initialization
+  // DoLoad call) comes after the author's call to load(), which set mStatus
+  // to Loading.
+  FontFaceLoadStatus newStatus = LoadStateToStatus(mUserFontEntry->LoadState());
+  if (newStatus > mStatus) {
+    SetStatus(newStatus);
   }
 }
 
