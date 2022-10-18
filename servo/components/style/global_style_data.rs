@@ -185,3 +185,11 @@ lazy_static! {
         options: StyleSystemOptions::default(),
     };
 }
+
+thread_local! {
+    /// Thread-local global style data for DOM workers
+    pub static DOM_WORKER_STYLE_DATA: GlobalStyleData = GlobalStyleData {
+        shared_lock: SharedRwLock::new(),
+        options: StyleSystemOptions::default(),
+    };
+}
