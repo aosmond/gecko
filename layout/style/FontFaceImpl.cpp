@@ -74,6 +74,12 @@ FontFaceImpl::~FontFaceImpl() {
   SetUserFontEntry(nullptr);
 }
 
+#ifdef DEBUG
+void FontFaceImpl::AssertIsOnOwningThread() const {
+  mFontFaceSet->AssertIsOnOwningThread();
+}
+#endif
+
 void FontFaceImpl::Destroy() {
   mInFontFaceSet = false;
   SetUserFontEntry(nullptr);
@@ -333,15 +339,17 @@ gfxUserFontEntry* FontFaceImpl::CreateUserFontEntry() {
 }
 
 void FontFaceImpl::DoLoad() {
-  if (!NS_IsMainThread()) {
-    NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "FontFaceImpl::DoLoad", [self = RefPtr{this}]() { self->DoLoad(); }));
-    return;
-  }
-
   if (!CreateUserFontEntry()) {
     return;
   }
+
+  if (!NS_IsMainThread()) {
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "FontFaceImpl::DoLoad",
+        [entry = RefPtr{mUserFontEntry}]() { entry->Load(); }));
+    return;
+  }
+
   mUserFontEntry->Load();
 }
 
@@ -497,13 +505,19 @@ void FontFaceImpl::GetDesc(nsCSSFontDesc aDescID, nsACString& aResult) const {
 }
 
 void FontFaceImpl::SetUserFontEntry(gfxUserFontEntry* aEntry) {
+  AssertIsOnOwningThread();
+
   if (mUserFontEntry) {
+    MutexAutoLock lock(mUserFontEntry->mMutex);
     mUserFontEntry->mFontFaces.RemoveElement(this);
   }
 
   mUserFontEntry = static_cast<Entry*>(aEntry);
   if (mUserFontEntry) {
-    mUserFontEntry->mFontFaces.AppendElement(this);
+    {
+      MutexAutoLock lock(mUserFontEntry->mMutex);
+      mUserFontEntry->mFontFaces.AppendElement(this);
+    }
 
     MOZ_ASSERT(mUserFontEntry->GetUserFontSet() == mFontFaceSet,
                "user font entry must be associated with the same user font set "
@@ -709,13 +723,21 @@ gfxCharacterMap* FontFaceImpl::GetUnicodeRangeAsCharacterMap() {
 /* virtual */
 void FontFaceImpl::Entry::SetLoadState(UserFontLoadState aLoadState) {
   gfxUserFontEntry::SetLoadState(aLoadState);
-
   FontFaceLoadStatus status = LoadStateToStatus(aLoadState);
-  for (size_t i = 0; i < mFontFaces.Length(); i++) {
-    auto* impl = mFontFaces[i];
+
+  nsTArray<RefPtr<FontFaceImpl>> fontFaces;
+  {
+    MutexAutoLock lock(mMutex);
+    fontFaces.SetCapacity(mFontFaces.Length());
+    for (FontFaceImpl* f : mFontFaces) {
+      fontFaces.AppendElement(f);
+    }
+  }
+
+  for (FontFaceImpl* impl : fontFaces) {
     auto* setImpl = impl->GetPrimaryFontFaceSet();
     if (setImpl->IsOnOwningThread()) {
-      mFontFaces[i]->SetStatus(status);
+      impl->SetStatus(status);
     } else {
       setImpl->DispatchToOwningThread(
           "FontFaceImpl::Entry::SetLoadState",
@@ -725,15 +747,19 @@ void FontFaceImpl::Entry::SetLoadState(UserFontLoadState aLoadState) {
 }
 
 /* virtual */
-void FontFaceImpl::Entry::GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult) {
+void FontFaceImpl::Entry::GetUserFontSets(
+    nsTArray<RefPtr<gfxUserFontSet>>& aResult) {
   aResult.Clear();
 
-  for (FontFaceImpl* f : mFontFaces) {
-    if (f->mInFontFaceSet) {
-      aResult.AppendElement(f->mFontFaceSet);
-    }
-    for (FontFaceSetImpl* s : f->mOtherFontFaceSets) {
-      aResult.AppendElement(s);
+  {
+    MutexAutoLock lock(mMutex);
+    for (FontFaceImpl* f : mFontFaces) {
+      if (f->mInFontFaceSet) {
+        aResult.AppendElement(f->mFontFaceSet);
+      }
+      for (FontFaceSetImpl* s : f->mOtherFontFaceSets) {
+        aResult.AppendElement(s);
+      }
     }
   }
 
@@ -741,6 +767,15 @@ void FontFaceImpl::Entry::GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult) {
   aResult.Sort();
   auto it = std::unique(aResult.begin(), aResult.end());
   aResult.TruncateLength(it - aResult.begin());
+}
+
+void FontFaceImpl::Entry::FindFontFaceOwners(nsTHashSet<FontFace*>& aOwners) {
+  MutexAutoLock lock(mMutex);
+  for (FontFaceImpl* f : mFontFaces) {
+    if (FontFace* owner = f->GetOwner()) {
+      aOwners.Insert(owner);
+    }
+  }
 }
 
 }  // namespace dom
