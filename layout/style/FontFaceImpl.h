@@ -45,20 +45,10 @@ class FontFaceImpl final {
     friend class FontFaceImpl;
 
    public:
-    Entry(gfxUserFontSet* aFontSet,
-          const nsTArray<gfxFontFaceSrc>& aFontFaceSrcList, WeightRange aWeight,
-          StretchRange aStretch, SlantStyleRange aStyle,
-          const nsTArray<gfxFontFeature>& aFeatureSettings,
-          const nsTArray<gfxFontVariation>& aVariationSettings,
-          uint32_t aLanguageOverride, gfxCharacterMap* aUnicodeRanges,
-          StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
-          float aAscentOverride, float aDescentOverride, float aLineGapOverride,
-          float aSizeAdjust)
-        : gfxUserFontEntry(aFontSet, aFontFaceSrcList, aWeight, aStretch,
-                           aStyle, aFeatureSettings, aVariationSettings,
-                           aLanguageOverride, aUnicodeRanges, aFontDisplay,
-                           aRangeFlags, aAscentOverride, aDescentOverride,
-                           aLineGapOverride, aSizeAdjust) {}
+    Entry(gfxUserFontSet* aFontSet, nsTArray<gfxFontFaceSrc>&& aFontFaceSrcList,
+          gfxUserFontAttributes&& aAttr)
+        : gfxUserFontEntry(aFontSet, std::move(aFontFaceSrcList),
+                           std::move(aAttr)) {}
 
     virtual void SetLoadState(UserFontLoadState aLoadState) override;
     virtual void GetUserFontSets(nsTArray<gfxUserFontSet*>& aResult) override;
@@ -81,19 +71,8 @@ class FontFaceImpl final {
   RawServoFontFaceRule* GetRule() { return mRule; }
 
   bool HasLocalSrc() const;
-  Maybe<StyleComputedFontWeightRange> GetFontWeight() const;
-  Maybe<StyleComputedFontStretchRange> GetFontStretch() const;
-  Maybe<StyleComputedFontStyleDescriptor> GetFontStyle() const;
-  Maybe<StyleFontDisplay> GetFontDisplay() const;
-  void GetFontFeatureSettings(nsTArray<gfxFontFeature>&) const;
-  void GetFontVariationSettings(nsTArray<gfxFontVariation>&) const;
-  void GetSources(nsTArray<StyleFontFaceSourceListComponent>&) const;
-  Maybe<StyleFontLanguageOverride> GetFontLanguageOverride() const;
-  Maybe<StylePercentage> GetAscentOverride() const;
-  Maybe<StylePercentage> GetDescentOverride() const;
-  Maybe<StylePercentage> GetLineGapOverride() const;
-  Maybe<StylePercentage> GetSizeAdjust() const;
 
+  bool GetAttributes(gfxUserFontAttributes& aAttr);
   gfxUserFontEntry* CreateUserFontEntry();
   gfxUserFontEntry* GetUserFontEntry() const { return mUserFontEntry; }
   void SetUserFontEntry(gfxUserFontEntry* aEntry);
