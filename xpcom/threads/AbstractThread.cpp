@@ -16,6 +16,9 @@
 #include "mozilla/TaskDispatcher.h"
 #include "mozilla/TaskQueue.h"
 #include "mozilla/Unused.h"
+#include "mozilla/dom/WorkerPrivate.h"
+#include "mozilla/dom/WorkerRef.h"
+#include "mozilla/dom/WorkerRunnable.h"
 #include "nsContentUtils.h"
 #include "nsIDirectTaskDispatcher.h"
 #include "nsIThreadInternal.h"
@@ -31,6 +34,164 @@ LazyLogModule gStateWatchingLog("StateWatching");
 
 StaticRefPtr<AbstractThread> sMainThread;
 MOZ_THREAD_LOCAL(AbstractThread*) AbstractThread::sCurrentThreadTLS;
+
+class DOMWorkerThreadWrapper final : public AbstractThread,
+                                     public TaskDispatcher {
+ public:
+  DOMWorkerThreadWrapper()
+      : AbstractThread(/* aRequireTailDispatch */ false),
+        mMutex("DOMWorkerThreadWrapper::mMutex") {}
+
+  bool Initialize() {
+    MutexAutoLock lock(mMutex);
+    MOZ_ASSERT(!mWorkerRef);
+
+    dom::WorkerPrivate* wp = dom::GetCurrentThreadWorkerPrivate();
+    MOZ_DIAGNOSTIC_ASSERT(wp, "Not initialized on worker thread!");
+
+    RefPtr<dom::StrongWorkerRef> workerRef = dom::StrongWorkerRef::Create(
+        wp, "DOMWorkerThreadWrapper::Shutdown",
+        [self = RefPtr{this}]() { self->Shutdown(); });
+    if (NS_WARN_IF(!workerRef)) {
+      return false;
+    }
+
+    mWorkerRef = new dom::ThreadSafeWorkerRef(workerRef);
+
+    // Set the default current thread so that GetCurrent() never returns
+    // nullptr.
+    MOZ_ASSERT(!sCurrentThreadTLS.get());
+    AddRef();
+    sCurrentThreadTLS.set(this);
+    return true;
+  }
+
+  void Shutdown() {
+    MutexAutoLock lock(mMutex);
+    if (!mWorkerRef) {
+      MOZ_ASSERT(mShutdownTasks.IsEmpty());
+      return;
+    }
+
+    mWorkerRef->Private()->AssertIsOnWorkerThread();
+    for (auto& task : mShutdownTasks) {
+      task->TargetShutdown();
+    }
+    mShutdownTasks.Clear();
+    mWorkerRef = nullptr;
+
+    if (sCurrentThreadTLS.get() == this) {
+      sCurrentThreadTLS.set(nullptr);
+      Release();
+    }
+  }
+
+  NS_DECL_THREADSAFE_ISUPPORTS
+
+  nsresult Dispatch(already_AddRefed<nsIRunnable> aRunnable,
+                    DispatchReason aReason = NormalDispatch) override {
+    nsCOMPtr<nsIRunnable> r = aRunnable;
+
+    MutexAutoLock lock(mMutex);
+    if (!mWorkerRef) {
+      return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
+    }
+
+    RefPtr<dom::WorkerRunnable> workerRunnable =
+        mWorkerRef->Private()->MaybeWrapAsWorkerRunnable(r.forget());
+    if (NS_WARN_IF(!workerRunnable->Dispatch())) {
+      return NS_ERROR_FAILURE;
+    }
+
+    return NS_OK;
+  }
+
+  // Prevent a GCC warning about the other overload of Dispatch being hidden.
+  using AbstractThread::Dispatch;
+
+  NS_IMETHOD RegisterShutdownTask(nsITargetShutdownTask* aTask) override {
+    MutexAutoLock lock(mMutex);
+    if (!mWorkerRef) {
+      return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
+    }
+    mShutdownTasks.AppendElement(aTask);
+    return NS_OK;
+  }
+
+  NS_IMETHOD UnregisterShutdownTask(nsITargetShutdownTask* aTask) override {
+    MutexAutoLock lock(mMutex);
+    if (!mWorkerRef) {
+      return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
+    }
+    if (!mShutdownTasks.RemoveElement(aTask)) {
+      return NS_ERROR_UNEXPECTED;
+    }
+    return NS_OK;
+  }
+
+  bool IsCurrentThreadIn() const override {
+    MutexAutoLock lock(mMutex);
+    if (!mWorkerRef) {
+      return false;
+    }
+    return mWorkerRef->Private()->IsOnCurrentThread();
+  }
+
+  TaskDispatcher& TailDispatcher() override {
+    MOZ_ASSERT(IsCurrentThreadIn());
+    MOZ_ASSERT(IsTailDispatcherAvailable());
+    return *this;
+  }
+
+  bool IsTailDispatcherAvailable() override { return false; }
+
+  bool MightHaveTailTasks() override {
+    MOZ_ASSERT_UNREACHABLE("Should never be called!");
+    return false;
+  }
+
+  void AddDirectTask(already_AddRefed<nsIRunnable> aRunnable) override {
+    Dispatch(std::move(aRunnable));
+  }
+
+  void AddStateChangeTask(AbstractThread* aThread,
+                          already_AddRefed<nsIRunnable> aRunnable) override {
+    MOZ_DIAGNOSTIC_ASSERT(aThread == this);
+    Dispatch(std::move(aRunnable));
+  }
+
+  nsresult AddTask(AbstractThread* aThread,
+                   already_AddRefed<nsIRunnable> aRunnable) override {
+    MOZ_DIAGNOSTIC_ASSERT(aThread == this);
+    return Dispatch(std::move(aRunnable));
+  }
+
+  nsresult DispatchTasksFor(AbstractThread* aThread) override {
+    MOZ_ASSERT_UNREACHABLE("Should never be called!");
+    return NS_ERROR_NOT_IMPLEMENTED;
+  }
+
+  bool HasTasksFor(AbstractThread* aThread) override {
+    MOZ_ASSERT_UNREACHABLE("Should never be called!");
+    return false;
+  }
+
+  void DrainDirectTasks() override {
+    MOZ_ASSERT_UNREACHABLE("Should never be called!");
+  }
+
+ private:
+  ~DOMWorkerThreadWrapper() override {
+    MOZ_ASSERT(sCurrentThreadTLS.get() != this);
+  }
+
+  mutable Mutex mMutex;
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
+  nsTArray<nsCOMPtr<nsITargetShutdownTask>> mShutdownTasks
+      MOZ_GUARDED_BY(mMutex);
+};
+
+NS_IMPL_ISUPPORTS(DOMWorkerThreadWrapper, nsISerialEventTarget, nsIEventTarget)
 
 class XPCOMThreadWrapper final : public AbstractThread,
                                  public nsIThreadObserver,
@@ -59,11 +220,9 @@ class XPCOMThreadWrapper final : public AbstractThread,
   nsresult Dispatch(already_AddRefed<nsIRunnable> aRunnable,
                     DispatchReason aReason = NormalDispatch) override {
     nsCOMPtr<nsIRunnable> r = aRunnable;
-    AbstractThread* currentThread;
-    if (aReason != TailDispatch && (currentThread = GetCurrent()) &&
-        RequiresTailDispatch(currentThread) &&
-        currentThread->IsTailDispatcherAvailable()) {
-      return currentThread->TailDispatcher().AddTask(this, r.forget());
+    if (aReason == TailDispatch && IsOnCurrentThread() &&
+        RequiresTailDispatch(this) && IsTailDispatcherAvailable()) {
+      return TailDispatcher().AddTask(this, r.forget());
     }
 
     // At a certain point during shutdown, we stop processing events from the
@@ -121,6 +280,7 @@ class XPCOMThreadWrapper final : public AbstractThread,
   }
 
   bool IsTailDispatcherAvailable() override {
+    MOZ_ASSERT(IsCurrentThreadIn());
     // Our tail dispatching implementation relies on nsIThreadObserver
     // callbacks. If we're not doing event processing, it won't work.
     bool inEventLoop =
@@ -128,7 +288,10 @@ class XPCOMThreadWrapper final : public AbstractThread,
     return inEventLoop;
   }
 
-  bool MightHaveTailTasks() override { return !!mTailDispatcher; }
+  bool MightHaveTailTasks() override {
+    MOZ_ASSERT(IsCurrentThreadIn());
+    return !!mTailDispatcher;
+  }
 
   nsIEventTarget* AsEventTarget() override { return mThread; }
 
@@ -318,6 +481,36 @@ void AbstractThread::InitMainThread() {
   sMainThread = new XPCOMThreadWrapper(mainThread.get(),
                                        /* aRequireTailDispatch = */ true,
                                        true /* onThread */);
+}
+
+void AbstractThread::InitCurrentThread() {
+  const bool tlsInit = sCurrentThreadTLS.init();
+  MOZ_RELEASE_ASSERT(tlsInit);
+
+  if (sCurrentThreadTLS.get()) {
+    return;
+  }
+
+  if (NS_IsMainThread()) {
+    MOZ_ASSERT_UNREACHABLE("Main thread not initialized!");
+    return;
+  }
+
+  dom::WorkerPrivate* wp = dom::GetCurrentThreadWorkerPrivate();
+  if (!wp) {
+    MOZ_ASSERT_UNREACHABLE("Initializing off main and DOM worker thread!");
+    return;
+  }
+
+  auto threadWrapper = MakeRefPtr<DOMWorkerThreadWrapper>();
+  if (NS_WARN_IF(!threadWrapper->Initialize())) {
+    MOZ_ASSERT(!sCurrentThreadTLS.get());
+    MOZ_ASSERT_UNREACHABLE(
+        "Could not create AbstractThread for DOM worker thread!");
+    return;
+  }
+
+  MOZ_ASSERT(sCurrentThreadTLS.get() == threadWrapper.get());
 }
 
 void AbstractThread::ShutdownMainThread() {
