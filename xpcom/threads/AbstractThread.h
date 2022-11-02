@@ -109,6 +109,7 @@ class AbstractThread : public nsISerialEventTarget {
   // Must be called exactly once during startup.
   static void InitTLS();
   static void InitMainThread();
+  static void InitCurrentThread();
   static void ShutdownMainThread();
 
   void DispatchStateChange(already_AddRefed<nsIRunnable> aRunnable);
