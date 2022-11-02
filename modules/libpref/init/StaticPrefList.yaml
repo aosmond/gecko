@@ -9245,6 +9245,12 @@
   value: true
   mirror: always
 
+# Whether to enable MediaSource support on DOM workers.
+- name: media.mediasource.workers.enabled
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 - name: media.mediasource.mp4.enabled
   type: RelaxedAtomicBool
   value: true

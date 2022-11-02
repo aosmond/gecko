@@ -21,8 +21,8 @@ enum MediaSourceEndOfStreamError {
   "decode"
 };
 
-[Pref="media.mediasource.enabled",
- Exposed=Window]
+[Func="mozilla::dom::MediaSource::PrefEnabled",
+ Exposed=(Window,DedicatedWorker)]
 interface MediaSource : EventTarget {
   [Throws]
   constructor();
@@ -35,6 +35,7 @@ interface MediaSource : EventTarget {
   attribute EventHandler onsourceopen;
   attribute EventHandler onsourceended;
   attribute EventHandler onsourceclose;
+  static readonly attribute boolean canConstructInDedicatedWorker;
   [NewObject, Throws]
   SourceBuffer addSourceBuffer(DOMString type);
   [Throws]
@@ -49,3 +50,9 @@ interface MediaSource : EventTarget {
   [NewObject, ChromeOnly]
   Promise<MediaSourceDecoderDebugInfo> mozDebugReaderData();
 };
+
+[Func="mozilla::dom::MediaSource::PrefEnabled",
+ Exposed=(Window,DedicatedWorker)
+ // Transferable, see bug 1562065
+]
+interface MediaSourceHandle {};

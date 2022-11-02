@@ -2173,23 +2173,30 @@ bool HTMLMediaElement::HasSuspendTaint() const {
   return mHasSuspendTaint;
 }
 
-already_AddRefed<DOMMediaStream> HTMLMediaElement::GetSrcObject() const {
-  return do_AddRef(mSrcAttrStream);
-}
-
-void HTMLMediaElement::SetSrcObject(DOMMediaStream& aValue) {
-  SetSrcObject(&aValue);
-}
-
-void HTMLMediaElement::SetSrcObject(DOMMediaStream* aValue) {
-  for (auto& outputStream : mOutputStreams) {
-    if (aValue == outputStream.mStream) {
-      ReportToConsole(nsIScriptError::warningFlag,
-                      "MediaElementStreamCaptureCycle");
-      return;
-    }
+void HTMLMediaElement::GetSrcObject(Nullable<OwningMediaProvider>& aRv) const {
+  if (mSrcAttrStream) {
+    aRv.SetValue().SetAsMediaStream() = mSrcAttrStream;
+  } else {
+    aRv.SetNull();
   }
-  mSrcAttrStream = aValue;
+}
+
+void HTMLMediaElement::SetSrcObject(const Nullable<MediaProvider>& aValue) {
+  if (aValue.IsNull()) {
+    mSrcAttrStream = nullptr;
+  } else if (aValue.Value().IsMediaStream()) {
+    DOMMediaStream* stream = &aValue.Value().GetAsMediaStream();
+    for (auto& outputStream : mOutputStreams) {
+      if (stream == outputStream.mStream) {
+        ReportToConsole(nsIScriptError::warningFlag,
+                        "MediaElementStreamCaptureCycle");
+        return;
+      }
+    }
+    mSrcAttrStream = stream;
+  } else {
+    MOZ_ASSERT_UNREACHABLE("Unhandled MediaProvider type!");
+  }
   UpdateAudioChannelPlayingState();
   DoLoad();
 }

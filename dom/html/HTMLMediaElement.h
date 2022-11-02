@@ -119,6 +119,8 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   using MediaResource = mozilla::MediaResource;
   using MediaDecoderOwner = mozilla::MediaDecoderOwner;
   using MetadataTags = mozilla::MetadataTags;
+  using OwningMediaProvider = OwningMediaStreamOrMediaSourceHandle;
+  using MediaProvider = MediaStreamOrMediaSourceHandle;
 
   // Helper struct to keep track of the MediaStreams returned by
   // mozCaptureStream(). For each OutputMediaStream, dom::MediaTracks get
@@ -678,9 +680,8 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   // via drawImage().
   already_AddRefed<layers::Image> GetCurrentImage();
 
-  already_AddRefed<DOMMediaStream> GetSrcObject() const;
-  void SetSrcObject(DOMMediaStream& aValue);
-  void SetSrcObject(DOMMediaStream* aValue);
+  void GetSrcObject(Nullable<OwningMediaProvider>& aRv) const;
+  void SetSrcObject(const Nullable<MediaProvider>& aValue);
 
   bool PreservesPitch() const { return mPreservesPitch; }
   void SetPreservesPitch(bool aPreservesPitch);

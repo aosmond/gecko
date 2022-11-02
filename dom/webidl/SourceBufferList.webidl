@@ -10,8 +10,8 @@
  * liability, trademark and document use rules apply.
  */
 
-[Pref="media.mediasource.enabled",
- Exposed=Window]
+[Func="mozilla::dom::MediaSource::PrefEnabled",
+ Exposed=(Window,DedicatedWorker)]
 interface SourceBufferList : EventTarget {
   readonly attribute unsigned long length;
   attribute EventHandler onaddsourcebuffer;
