@@ -210,6 +210,18 @@ already_AddRefed<MediaSource> MediaSource::Constructor(
   return mediaSource.forget();
 }
 
+/* static */ bool MediaSource::PrefEnabled(JSContext* aCx, JSObject* aObj) {
+  if (NS_IsMainThread()) {
+    return StaticPrefs::media_mediasource_enabled();
+  }
+  return StaticPrefs::media_mediasource_workers_enabled();
+}
+
+/* static */ bool MediaSource::CanConstructInDedicatedWorker(
+    GlobalObject& aGlobal) {
+  return StaticPrefs::media_mediasource_workers_enabled();
+}
+
 MediaSource::~MediaSource() {
   MOZ_ASSERT(NS_IsMainThread());
   MSE_API("");

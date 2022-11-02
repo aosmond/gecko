@@ -61,6 +61,10 @@ class MediaSource final : public DOMEventTargetHelper,
   static already_AddRefed<MediaSource> Constructor(const GlobalObject& aGlobal,
                                                    ErrorResult& aRv);
 
+  static bool PrefEnabled(JSContext* aCx, JSObject* aObj);
+
+  static bool CanConstructInDedicatedWorker(GlobalObject& aGlobal);
+
   SourceBufferList* SourceBuffers();
   SourceBufferList* ActiveSourceBuffers();
   MediaSourceReadyState ReadyState();

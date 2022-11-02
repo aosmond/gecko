@@ -11,6 +11,8 @@
  * and create derivative works of this document.
  */
 
+typedef (MediaStream or MediaSourceHandle) MediaProvider;
+
 [Exposed=Window]
 interface HTMLMediaElement : HTMLElement {
 
@@ -112,7 +114,7 @@ partial interface HTMLMediaElement {
   [Func="HasDebuggerOrTabsPrivilege", NewObject]
   Promise<DOMString> mozRequestDebugLog();
 
-  attribute MediaStream? srcObject;
+  attribute MediaProvider? srcObject;
 
   // TODO: Remove mozPreservesPitch. (bug 1765201)
   [Deprecated="MozPreservesPitchDeprecatedPrefix", BinaryName="preservesPitch"]

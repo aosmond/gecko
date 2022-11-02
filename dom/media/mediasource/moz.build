@@ -16,6 +16,7 @@ EXPORTS += [
 
 EXPORTS.mozilla.dom += [
     "MediaSource.h",
+    "MediaSourceHandle.h",
     "SourceBuffer.h",
     "SourceBufferList.h",
 ]
@@ -25,6 +26,7 @@ UNIFIED_SOURCES += [
     "MediaSource.cpp",
     "MediaSourceDecoder.cpp",
     "MediaSourceDemuxer.cpp",
+    "MediaSourceHandle.cpp",
     "MediaSourceUtils.cpp",
     "ResourceQueue.cpp",
     "SourceBuffer.cpp",
