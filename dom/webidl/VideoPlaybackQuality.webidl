@@ -10,7 +10,7 @@
  * liability, trademark and document use rules apply.
  */
 
-[Pref="media.mediasource.enabled",
+[Func="mozilla::dom::MediaSource::PrefEnabled",
  Exposed=Window]
 interface VideoPlaybackQuality {
   readonly attribute DOMHighResTimeStamp creationTime;
