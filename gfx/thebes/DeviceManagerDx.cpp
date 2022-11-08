@@ -1007,10 +1007,12 @@ RefPtr<ID3D11Device> DeviceManagerDx::CreateMediaEngineDevice() {
 
 void DeviceManagerDx::ResetDevices() {
   MutexAutoLock lock(mDeviceLock);
+  printf_stderr("[AO] DeviceManagerDx::ResetDevices\n");
   ResetDevicesLocked();
 }
 
 void DeviceManagerDx::ResetDevicesLocked() {
+  printf_stderr("[AO] DeviceManagerDx::ResetDevicesLocked\n");
   mAdapter = nullptr;
   mCompositorAttachments = nullptr;
   mCompositorDevice = nullptr;
@@ -1030,9 +1032,11 @@ bool DeviceManagerDx::MaybeResetAndReacquireDevices() {
 
   DeviceResetReason resetReason;
   if (!HasDeviceResetLocked(&resetReason)) {
+    printf_stderr("[AO] DeviceManagerDx::MaybeResetAndReacquireDevices -- early exit, no reason\n");
     return false;
   }
 
+  printf_stderr("[AO] DeviceManagerDx::MaybeResetAndReacquireDevices -- reset\n");
   GPUProcessManager::RecordDeviceReset(resetReason);
 
   bool createCompositorDevice = !!mCompositorDevice;
@@ -1042,6 +1046,7 @@ bool DeviceManagerDx::MaybeResetAndReacquireDevices() {
 
   ResetDevicesLocked();
 
+  printf_stderr("[AO] DeviceManagerDx::MaybeResetAndReacquireDevices -- recreate\n");
   if (createCompositorDevice && !CreateCompositorDevicesLocked()) {
     // Just stop, don't try anything more
     return true;
@@ -1056,6 +1061,7 @@ bool DeviceManagerDx::MaybeResetAndReacquireDevices() {
     CreateDirectCompositionDeviceLocked();
   }
 
+  printf_stderr("[AO] DeviceManagerDx::MaybeResetAndReacquireDevices -- exit\n");
   return true;
 }
 
@@ -1108,6 +1114,7 @@ bool DeviceManagerDx::HasDeviceReset(DeviceResetReason* aOutReason) {
 
 bool DeviceManagerDx::HasDeviceResetLocked(DeviceResetReason* aOutReason) {
   if (mDeviceResetReason) {
+    printf_stderr("[AO] DeviceManagerDx::HasDeviceResetLocked -- has cached reason\n");
     if (aOutReason) {
       *aOutReason = mDeviceResetReason.value();
     }
@@ -1116,6 +1123,7 @@ bool DeviceManagerDx::HasDeviceResetLocked(DeviceResetReason* aOutReason) {
 
   DeviceResetReason reason;
   if (GetAnyDeviceRemovedReason(&reason)) {
+    printf_stderr("[AO] DeviceManagerDx::HasDeviceResetLocked -- found reason\n");
     mDeviceResetReason = Some(reason);
     if (aOutReason) {
       *aOutReason = reason;
@@ -1158,6 +1166,7 @@ bool DeviceManagerDx::GetAnyDeviceRemovedReason(DeviceResetReason* aOutReason) {
 }
 
 void DeviceManagerDx::ForceDeviceReset(ForcedDeviceResetReason aReason) {
+  printf_stderr("[AO] DeviceManagerDx::ForceDeviceReset -- reason %u\n", uint32_t(aReason));
   Telemetry::Accumulate(Telemetry::FORCED_DEVICE_RESET_REASON,
                         uint32_t(aReason));
   {

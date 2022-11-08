@@ -465,6 +465,7 @@ bool gfxWindowsPlatform::InitDWriteSupport() {
 bool gfxWindowsPlatform::HandleDeviceReset() {
   DeviceResetReason resetReason = DeviceResetReason::OK;
   if (!DidRenderingDeviceReset(&resetReason)) {
+    printf_stderr("[AO] gfxWindowsPlatform::HandleDeviceReset -- ignoring, did not reset\n");
     return false;
   }
 
@@ -474,6 +475,7 @@ bool gfxWindowsPlatform::HandleDeviceReset() {
   }
 
   // Remove devices and adapters.
+  printf_stderr("[AO] gfxWindowsPlatform::HandleDeviceReset -- reset devices\n");
   DeviceManagerDx::Get()->ResetDevices();
 
   imgLoader::NormalLoader()->ClearCache(true);
@@ -486,6 +488,7 @@ bool gfxWindowsPlatform::HandleDeviceReset() {
   gfxConfig::Reset(Feature::D3D11_HW_ANGLE);
   gfxConfig::Reset(Feature::DIRECT2D);
 
+  printf_stderr("[AO] gfxWindowsPlatform::HandleDeviceReset -- reinit\n");
   InitializeConfig();
   // XXX Add InitWebRenderConfig() calling.
   if (mInitializedDevices) {
@@ -493,6 +496,7 @@ bool gfxWindowsPlatform::HandleDeviceReset() {
     InitializeDevices();
   }
   UpdateANGLEConfig();
+  printf_stderr("[AO] gfxWindowsPlatform::HandleDeviceReset -- exit\n");
   return true;
 }
 
