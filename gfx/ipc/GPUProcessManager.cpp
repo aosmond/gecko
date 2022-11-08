@@ -539,9 +539,13 @@ void GPUProcessManager::SimulateDeviceReset() {
 
   if (mProcess) {
     if (mGPUChild) {
+      printf_stderr("[AO] GPUProcessManager::SimulateDeviceReset -- send via GPUChild\n");
       mGPUChild->SendSimulateDeviceReset();
+    } else {
+      printf_stderr("[AO] GPUProcessManager::SimulateDeviceReset -- dropped?\n");
     }
   } else {
+    printf_stderr("[AO] GPUProcessManager::SimulateDeviceReset -- run in process\n");
     wr::RenderThread::Get()->SimulateDeviceReset();
   }
 }
@@ -645,6 +649,7 @@ void GPUProcessManager::NotifyWebRenderError(wr::WebRenderError aError) {
 
 /* static */ void GPUProcessManager::RecordDeviceReset(
     DeviceResetReason aReason) {
+  printf_stderr("[AO] GPUProcessManager::RecordDeviceReset -- recording reason %u\n", uint32_t(aReason));
   if (aReason != DeviceResetReason::FORCED_RESET) {
     Telemetry::Accumulate(Telemetry::DEVICE_RESET_REASON, uint32_t(aReason));
   }
@@ -673,6 +678,7 @@ bool GPUProcessManager::OnDeviceReset(bool aTrackThreshold) {
 
 void GPUProcessManager::OnInProcessDeviceReset(bool aTrackThreshold) {
   if (OnDeviceReset(aTrackThreshold)) {
+    printf_stderr("[AO] GPUProcessManager::OnInProcessDeviceReset -- disabling WR due to threshold\n");
     gfxCriticalNoteOnce << "In-process device reset threshold exceeded";
 #ifdef MOZ_WIDGET_GTK
     // FIXME(aosmond): Should we disable WebRender on other platforms?
@@ -684,18 +690,21 @@ void GPUProcessManager::OnInProcessDeviceReset(bool aTrackThreshold) {
   // Normally nsWindow::OnPaint() already handled it.
   gfxWindowsPlatform::GetPlatform()->HandleDeviceReset();
 #endif
+  printf_stderr("[AO] GPUProcessManager::OnInProcessDeviceReset -- destroying compositors\n");
   DestroyInProcessCompositorSessions();
   NotifyListenersOnCompositeDeviceReset();
 }
 
 void GPUProcessManager::OnRemoteProcessDeviceReset(GPUProcessHost* aHost) {
   if (OnDeviceReset(/* aTrackThreshold */ true)) {
+    printf_stderr("[AO] GPUProcessManager::OnRemoteProcessDeviceReset -- disabling GPU process due to threshold\n");
     DestroyProcess();
     DisableGPUProcess("GPU processed experienced too many device resets");
     HandleProcessLost();
     return;
   }
 
+  printf_stderr("[AO] GPUProcessManager::OnRemoteProcessDeviceReset -- destroying compositors\n");
   DestroyRemoteCompositorSessions();
   NotifyListenersOnCompositeDeviceReset();
 }

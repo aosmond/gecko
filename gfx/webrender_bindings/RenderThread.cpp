@@ -934,7 +934,9 @@ void RenderThread::HandleDeviceReset(const char* aWhere, GLenum aReason) {
 
   // This happens only on simulate device reset.
   if (aReason == LOCAL_GL_NO_ERROR) {
-    if (!mHandlingDeviceReset) {
+    if (mHandlingDeviceReset) {
+      printf_stderr("[AO] RenderThread::HandleDeviceReset -- handling reset already (simulate)\n");
+    } else {
       mHandlingDeviceReset = true;
 
       MutexAutoLock lock(mRenderTextureMapLock);
@@ -947,8 +949,10 @@ void RenderThread::HandleDeviceReset(const char* aWhere, GLenum aReason) {
       // either OnRemoteProcessDeviceReset via the GPUChild, or
       // OnInProcessDeviceReset here directly.
       if (XRE_IsGPUProcess()) {
+        printf_stderr("[AO] RenderThread::HandleDeviceReset -- notifying from GPU process (simulated)\n");
         gfx::GPUParent::GetSingleton()->NotifyDeviceReset();
       } else {
+        printf_stderr("[AO] RenderThread::HandleDeviceReset -- notifying from parent process (simulated)\n");
         NS_DispatchToMainThread(NS_NewRunnableFunction(
             "gfx::GPUProcessManager::OnInProcessDeviceReset", []() -> void {
               gfx::GPUProcessManager::Get()->OnInProcessDeviceReset(
@@ -960,6 +964,7 @@ void RenderThread::HandleDeviceReset(const char* aWhere, GLenum aReason) {
   }
 
   if (mHandlingDeviceReset) {
+    printf_stderr("[AO] RenderThread::HandleDeviceReset -- handling reset already (real)\n");
     return;
   }
 
@@ -984,9 +989,11 @@ void RenderThread::HandleDeviceReset(const char* aWhere, GLenum aReason) {
   // On Windows, device will be re-created before sessions re-creation.
   gfxCriticalNote << "GFX: RenderThread detected a device reset in " << aWhere;
   if (XRE_IsGPUProcess()) {
+    printf_stderr("[AO] RenderThread::HandleDeviceReset -- notifying from GPU process (real)\n");
     gfx::GPUParent::GetSingleton()->NotifyDeviceReset();
   } else {
 #ifndef XP_WIN
+    printf_stderr("[AO] RenderThread::HandleDeviceReset -- notifying from parent process (real)\n");
     // FIXME(aosmond): Do we need to do this on Windows? nsWindow::OnPaint
     // seems to do its own detection for the parent process.
     bool guilty = aReason == LOCAL_GL_GUILTY_CONTEXT_RESET_ARB;
@@ -994,6 +1001,8 @@ void RenderThread::HandleDeviceReset(const char* aWhere, GLenum aReason) {
         "gfx::GPUProcessManager::OnInProcessDeviceReset", [guilty]() -> void {
           gfx::GPUProcessManager::Get()->OnInProcessDeviceReset(guilty);
         }));
+#else
+    printf_stderr("[AO] RenderThread::HandleDeviceReset -- dropping from parent process (real)\n");
 #endif
   }
 }
@@ -1005,12 +1014,14 @@ bool RenderThread::IsHandlingDeviceReset() {
 
 void RenderThread::SimulateDeviceReset() {
   if (!IsInRenderThread()) {
+    printf_stderr("[AO] RenderThread::SimulateDeviceReset -- post to render thread\n");
     PostRunnable(NewRunnableMethod("RenderThread::SimulateDeviceReset", this,
                                    &RenderThread::SimulateDeviceReset));
   } else {
     // When this function is called GPUProcessManager::SimulateDeviceReset()
     // already triggers destroying all CompositorSessions before re-creating
     // them.
+    printf_stderr("[AO] RenderThread::SimulateDeviceReset -- reset device\n");
     HandleDeviceReset("SimulateDeviceReset", LOCAL_GL_NO_ERROR);
   }
 }
