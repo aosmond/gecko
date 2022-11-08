@@ -477,7 +477,7 @@ mochitest-chrome-gpu:
     treeherder-symbol: M(gpu-c)
     loopback-video: true
     virtualization: virtual-with-gpu
-    run-without-variant: false
+    run-without-variant: true
     variants:
         - 1proc
         - socketprocess_networking+1proc
@@ -500,6 +500,10 @@ mochitest-chrome-gpu:
                     .*-tsan-qr/opt: ['trunk']
                     android.*/.*: []
                     default: built-projects
+            default:
+                by-test-platform:
+                    windows10-.*: built-projects
+                    default: []
     tier: default
     mozharness:
         mochitest-flavor: chrome
