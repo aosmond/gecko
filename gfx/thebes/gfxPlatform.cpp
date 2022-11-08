@@ -2483,11 +2483,14 @@ void gfxPlatform::InitGPUProcessPrefs() {
   // We require E10S - otherwise, there is very little benefit to the GPU
   // process, since the UI process must still use acceleration for
   // performance.
+#if 0
   if (!BrowserTabsRemoteAutostart()) {
     gpuProc.DisableByDefault(FeatureStatus::Unavailable,
                              "Multi-process mode is not enabled",
                              "FEATURE_FAILURE_NO_E10S"_ns);
-  } else {
+  } else
+#endif
+  {
     gpuProc.SetDefaultFromPref(
         StaticPrefs::GetPrefName_layers_gpu_process_enabled(), true,
         StaticPrefs::GetPrefDefault_layers_gpu_process_enabled());
