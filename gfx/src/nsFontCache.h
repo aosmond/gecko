@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include "mozilla/RefPtr.h"
+#include "mozilla/RecursiveMutex.h"
 #include "nsCOMPtr.h"
 #include "nsFontMetrics.h"
 #include "nsIObserver.h"
@@ -23,7 +24,7 @@ struct nsFont;
 
 class nsFontCache final : public nsIObserver {
  public:
-  nsFontCache() : mContext(nullptr) {}
+  nsFontCache() : mContext(nullptr), mMutex("nsFontCache::mMutex") {}
 
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIOBSERVER
@@ -37,8 +38,11 @@ class nsFontCache final : public nsIObserver {
   void FontMetricsDeleted(const nsFontMetrics* aFontMetrics);
   void Compact();
 
-  // Flush aFlushCount oldest entries, or all if aFlushCount is negative
-  void Flush(int32_t aFlushCount = -1);
+  // Flush aFlushCount oldest entries, or all if aPartial is false.
+  void Flush(bool aPartial = false) {
+    mozilla::RecursiveMutexAutoLock lock(mMutex);
+    FlushLocked(aPartial);
+  }
 
   void UpdateUserFonts(gfxUserFontSet* aUserFontSet);
 
@@ -52,8 +56,16 @@ class nsFontCache final : public nsIObserver {
 
   ~nsFontCache() = default;
 
+  nsFontMetrics* LookupLocked(nsAtom* aLanguage, const nsFont& aFont,
+                              const nsFontMetrics::Params& aParams)
+      MOZ_REQUIRES(mMutex);
+
+  void FlushLocked(bool aPartial) MOZ_REQUIRES(mMutex);
+
   nsPresContext* mContext;  // owner
   RefPtr<nsAtom> mLocaleLanguage;
+
+  mozilla::RecursiveMutex mMutex;
 
   // We may not flush older entries immediately the array reaches
   // kMaxCacheEntries length, because this usually happens on a stylo
@@ -61,9 +73,13 @@ class nsFontCache final : public nsIObserver {
   // oversized autoarray buffer here, so that we're unlikely to overflow
   // it and need separate heap allocation before the flush happens on the
   // main thread.
-  AutoTArray<nsFontMetrics*, kMaxCacheEntries * 2> mFontMetrics;
+  AutoTArray<nsFontMetrics*, kMaxCacheEntries * 2> mFontMetrics
+      MOZ_GUARDED_BY(mMutex);
 
-  bool mFlushPending = false;
+  bool mFlushPending MOZ_GUARDED_BY(mMutex) = false;
+
+  // Generation counter for when we insert new entries into mFontMetrics.
+  uint32_t mGeneration MOZ_GUARDED_BY(mMutex) = 0;
 
   class FlushFontMetricsTask : public mozilla::Runnable {
    public:
@@ -72,8 +88,7 @@ class nsFontCache final : public nsIObserver {
     NS_IMETHOD Run() override {
       // Partially flush the cache, leaving the kMaxCacheEntries/2 most
       // recent entries.
-      mCache->Flush(mCache->mFontMetrics.Length() - kMaxCacheEntries / 2);
-      mCache->mFlushPending = false;
+      mCache->Flush(/* aPartial */ true);
       return NS_OK;
     }
 
