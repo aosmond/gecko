@@ -686,11 +686,12 @@ class gfxFontShaper {
 
   gfxFont* GetFont() const { return mFont; }
 
-  static void MergeFontFeatures(
-      const gfxFontStyle* aStyle, const nsTArray<gfxFontFeature>& aFontFeatures,
-      bool aDisableLigatures, const nsACString& aFamilyName, bool aAddSmallCaps,
-      void (*aHandleFeature)(const uint32_t&, uint32_t&, void*),
-      void* aHandleFeatureData);
+  static void MergeFontFeatures(const gfxFontStyle* aStyle,
+                                const gfxFontEntry* aFontEntry,
+                                bool aDisableLigatures, bool aAddSmallCaps,
+                                void (*aHandleFeature)(const uint32_t&,
+                                                       uint32_t&, void*),
+                                void* aHandleFeatureData);
 
  protected:
   // the font this shaper is working with. The font owns a UniquePtr reference
@@ -1490,7 +1491,7 @@ class gfxFont {
     if (mAdjustedSize < 0.0) {
       mAdjustedSize = mStyle.AdjustedSizeMustBeZero()
                           ? 0.0
-                          : mStyle.size * mFontEntry->mSizeAdjust;
+                          : mStyle.size * mFontEntry->GetSizeAdjust();
     }
     return mAdjustedSize;
   }

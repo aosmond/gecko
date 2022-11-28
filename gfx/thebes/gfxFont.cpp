@@ -493,26 +493,28 @@ static void LookupAlternateValues(const gfxFontFeatureValueSet& aFeatureLookup,
 
 /* static */
 void gfxFontShaper::MergeFontFeatures(
-    const gfxFontStyle* aStyle, const nsTArray<gfxFontFeature>& aFontFeatures,
-    bool aDisableLigatures, const nsACString& aFamilyName, bool aAddSmallCaps,
+    const gfxFontStyle* aStyle, const gfxFontEntry* aFontEntry,
+    bool aDisableLigatures, bool aAddSmallCaps,
     void (*aHandleFeature)(const uint32_t&, uint32_t&, void*),
     void* aHandleFeatureData) {
   const nsTArray<gfxFontFeature>& styleRuleFeatures = aStyle->featureSettings;
-
-  // Bail immediately if nothing to do, which is the common case.
-  if (styleRuleFeatures.IsEmpty() && aFontFeatures.IsEmpty() &&
-      !aDisableLigatures &&
-      aStyle->variantCaps == NS_FONT_VARIANT_CAPS_NORMAL &&
-      aStyle->variantSubSuper == NS_FONT_VARIANT_POSITION_NORMAL &&
-      aStyle->variantAlternates.IsEmpty()) {
-    return;
-  }
-
   nsTHashMap<nsUint32HashKey, uint32_t> mergedFeatures;
 
-  // add feature values from font
-  for (const gfxFontFeature& feature : aFontFeatures) {
-    mergedFeatures.InsertOrUpdate(feature.mTag, feature.mValue);
+  {
+    AutoReadLock lock(aFontEntry->mLock);
+    // Bail immediately if nothing to do, which is the common case.
+    if (styleRuleFeatures.IsEmpty() && aFontEntry->mFeatureSettings.IsEmpty() &&
+        !aDisableLigatures &&
+        aStyle->variantCaps == NS_FONT_VARIANT_CAPS_NORMAL &&
+        aStyle->variantSubSuper == NS_FONT_VARIANT_POSITION_NORMAL &&
+        aStyle->variantAlternates.IsEmpty()) {
+      return;
+    }
+
+    // add feature values from font
+    for (const gfxFontFeature& feature : aFontEntry->mFeatureSettings) {
+      mergedFeatures.InsertOrUpdate(feature.mTag, feature.mValue);
+    }
   }
 
   // font-variant-caps - handled here due to the need for fallback handling
@@ -578,8 +580,8 @@ void gfxFontShaper::MergeFontFeatures(
 
     // insert list of alternate feature settings
     for (auto& alternate : aStyle->variantAlternates.AsSpan()) {
-      LookupAlternateValues(*aStyle->featureValueLookup, aFamilyName, alternate,
-                            featureList);
+      LookupAlternateValues(*aStyle->featureValueLookup,
+                            aFontEntry->FamilyName(), alternate, featureList);
     }
 
     for (const gfxFontFeature& feature : featureList) {
@@ -1384,7 +1386,7 @@ bool gfxFont::HasSubstitutionRulesWithSpaceLookups(Script aRunScript) const {
                        Script::COMMON) ||
        HasSubstitution(mFontEntry->mNonDefaultSubSpaceFeatures, aRunScript)) &&
       (!mStyle.featureSettings.IsEmpty() ||
-       !mFontEntry->mFeatureSettings.IsEmpty())) {
+       !mFontEntry->IsFeatureSettingsEmpty())) {
     return true;
   }
 
@@ -1396,7 +1398,7 @@ tainted_boolean_hint gfxFont::SpaceMayParticipateInShaping(
   // avoid checking fonts known not to include default space-dependent features
   if (MOZ_UNLIKELY(mFontEntry->mSkipDefaultFeatureSpaceCheck)) {
     if (!mKerningSet && mStyle.featureSettings.IsEmpty() &&
-        mFontEntry->mFeatureSettings.IsEmpty()) {
+        mFontEntry->IsFeatureSettingsEmpty()) {
       return false;
     }
   }
@@ -1592,10 +1594,12 @@ bool gfxFont::FeatureWillHandleChar(Script aRunScript, uint32_t aFeature,
 }
 
 bool gfxFont::HasFeatureSet(uint32_t aFeature, bool& aFeatureOn) {
+  AutoReadLock lock(mFontEntry->mLock);
+
   aFeatureOn = false;
 
   if (mStyle.featureSettings.IsEmpty() &&
-      GetFontEntry()->mFeatureSettings.IsEmpty()) {
+      mFontEntry->mFeatureSettings.IsEmpty()) {
     return false;
   }
 
@@ -1603,7 +1607,7 @@ bool gfxFont::HasFeatureSet(uint32_t aFeature, bool& aFeatureOn) {
   bool featureSet = false;
   uint32_t i, count;
 
-  nsTArray<gfxFontFeature>& fontFeatures = GetFontEntry()->mFeatureSettings;
+  nsTArray<gfxFontFeature>& fontFeatures = mFontEntry->mFeatureSettings;
   count = fontFeatures.Length();
   for (i = 0; i < count; i++) {
     const gfxFontFeature& feature = fontFeatures.ElementAt(i);
@@ -3978,6 +3982,8 @@ void gfxFont::SanitizeMetrics(gfxFont::Metrics* aMetrics,
     memset(aMetrics, 0, sizeof(gfxFont::Metrics));
     return;
   }
+
+  AutoReadLock lock(mFontEntry->mLock);
 
   // If the font entry has ascent/descent/lineGap-override values,
   // replace the metrics from the font with the overrides.

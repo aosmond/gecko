@@ -1348,9 +1348,8 @@ bool gfxHarfBuzzShaper::ShapeText(DrawTarget* aDrawTarget,
 
   // insert any merged features into hb_feature array
   AutoTArray<hb_feature_t, 20> features;
-  MergeFontFeatures(style, entry->mFeatureSettings,
-                    aShapedText->DisableLigatures(), entry->FamilyName(),
-                    addSmallCaps, AddOpenTypeFeature, &features);
+  MergeFontFeatures(style, entry, aShapedText->DisableLigatures(), addSmallCaps,
+                    AddOpenTypeFeature, &features);
 
   // For CJK script, match kerning and proportional-alternates (palt) features
   // (and their vertical counterparts) as per spec:
@@ -1404,8 +1403,8 @@ bool gfxHarfBuzzShaper::ShapeText(DrawTarget* aDrawTarget,
   hb_language_t language;
   if (style->languageOverride) {
     language = hb_ot_tag_to_language(style->languageOverride);
-  } else if (entry->mLanguageOverride) {
-    language = hb_ot_tag_to_language(entry->mLanguageOverride);
+  } else if (uint32_t languageOverride = entry->GetLanguageOverride()) {
+    language = hb_ot_tag_to_language(languageOverride);
   } else if (aLanguage) {
     nsCString langString;
     aLanguage->ToUTF8String(langString);

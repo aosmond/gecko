@@ -258,6 +258,7 @@ static void GetFontProperties(FcPattern* aFontPattern, WeightRange* aWeight,
 }
 
 void gfxFontconfigFontEntry::GetUserFontFeatures(FcPattern* aPattern) {
+  AutoWriteLock lock(mLock);
   int fontFeaturesNum = 0;
   char* s;
   hb_feature_t tmpFeature;
@@ -814,7 +815,7 @@ static inline gfxFloat SizeForStyle(gfxFontconfigFontEntry* aEntry,
   return StyleFontSizeAdjust::Tag(aStyle.sizeAdjustBasis) !=
                  StyleFontSizeAdjust::Tag::None
              ? aStyle.GetAdjustedSize(aEntry->GetAspect(aStyle.sizeAdjustBasis))
-             : aStyle.size * aEntry->mSizeAdjust;
+             : aStyle.size * aEntry->GetSizeAdjust();
 }
 
 static double ChooseFontSize(gfxFontconfigFontEntry* aEntry,

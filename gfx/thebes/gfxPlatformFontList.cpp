@@ -852,6 +852,7 @@ gfxFontEntry* gfxPlatformFontList::LookupInSharedFaceNameList(
   }
   gfxFontEntry* fe = CreateFontEntry(face, family);
   if (fe) {
+    AutoWriteLock lock(fe->mLock);
     fe->mIsLocalUserFont = true;
     fe->mWeightRange = aWeightForEntry;
     fe->mStretchRange = aStretchForEntry;
