@@ -537,6 +537,15 @@ class gfxFontEntry {
   nsTArray<gfxFontFeature> mFeatureSettings MOZ_GUARDED_BY(mLock);
   nsTArray<gfxFontVariation> mVariationSettings MOZ_GUARDED_BY(mLock);
 
+  mozilla::Atomic<uint32_t> mHash = mozilla::Atomic<uint32_t>{0};
+
+  uint32_t GetHash() const { return mHash; }
+  void ComputeHash() {
+    mozilla::AutoWriteLock lock(mLock);
+    ComputeHashLocked();
+  }
+  void ComputeHashLocked() MOZ_REQUIRES(mLock);
+
   mozilla::UniquePtr<nsTHashMap<nsUint32HashKey, bool>> mSupportedFeatures
       MOZ_GUARDED_BY(mFeatureInfoLock);
   mozilla::UniquePtr<nsTHashMap<nsUint32HashKey, hb_set_t*>> mFeatureInputs
@@ -940,6 +949,7 @@ class gfxFontFamily {
     }
     if (aFontEntry->mFamilyName.IsEmpty()) {
       aFontEntry->mFamilyName = Name();
+      aFontEntry->ComputeHash();
     } else {
       MOZ_ASSERT(aFontEntry->mFamilyName.Equals(Name()));
     }

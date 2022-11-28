@@ -258,7 +258,6 @@ static void GetFontProperties(FcPattern* aFontPattern, WeightRange* aWeight,
 }
 
 void gfxFontconfigFontEntry::GetUserFontFeatures(FcPattern* aPattern) {
-  AutoWriteLock lock(mLock);
   int fontFeaturesNum = 0;
   char* s;
   hb_feature_t tmpFeature;
@@ -281,8 +280,10 @@ gfxFontconfigFontEntry::gfxFontconfigFontEntry(const nsACString& aFaceName,
       mFTFaceInitialized(false),
       mIgnoreFcCharmap(aIgnoreFcCharmap),
       mHasVariationsInitialized(false) {
+  AutoWriteLock lock(mLock);
   GetFontProperties(aFontPattern, &mWeightRange, &mStretchRange, &mStyleRange);
   GetUserFontFeatures(mFontPattern);
+  ComputeHashLocked();
 }
 
 gfxFontEntry* gfxFontconfigFontEntry::Clone() const {
@@ -357,6 +358,7 @@ gfxFontconfigFontEntry::gfxFontconfigFontEntry(const nsACString& aFaceName,
       mFontPattern(aFontPattern),
       mFTFaceInitialized(false),
       mHasVariationsInitialized(false) {
+  AutoWriteLock lock(mLock);
   mWeightRange = aWeight;
   mStyleRange = aStyle;
   mStretchRange = aStretch;
@@ -376,6 +378,7 @@ gfxFontconfigFontEntry::gfxFontconfigFontEntry(const nsACString& aFaceName,
   mIgnoreFcCharmap = true;
 
   GetUserFontFeatures(mFontPattern);
+  ComputeHashLocked();
 }
 
 typedef FT_Error (*GetVarFunc)(FT_Face, FT_MM_Var**);

@@ -196,6 +196,7 @@ class gfxUserFontFamily : public gfxFontFamily {
 
     if (aFontEntry->mFamilyName.IsEmpty()) {
       aFontEntry->mFamilyName = Name();
+      aFontEntry->ComputeHash();
     } else {
 #ifdef DEBUG
       nsCString thisName = Name();
@@ -435,15 +436,9 @@ class gfxUserFontSet {
         mozilla::AutoReadLock lock(aKey->mFontEntry->mLock);
         PLDHashNumber principalHash =
             aKey->mPrincipal ? aKey->mPrincipal->Hash() : 0;
-        return mozilla::HashGeneric(
-            principalHash + int(aKey->mPrivate), aKey->mURI->Hash(),
-            HashFeatures(aKey->mFontEntry->mFeatureSettings),
-            HashVariations(aKey->mFontEntry->mVariationSettings),
-            mozilla::HashString(aKey->mFontEntry->mFamilyName),
-            aKey->mFontEntry->mWeightRange.AsScalar(),
-            aKey->mFontEntry->mStyleRange.AsScalar(),
-            aKey->mFontEntry->mStretchRange.AsScalar(),
-            aKey->mFontEntry->mLanguageOverride);
+        return mozilla::HashGeneric(principalHash + int(aKey->mPrivate),
+                                    aKey->mURI->Hash(),
+                                    aKey->mFontEntry->GetHash());
       }
 
       enum { ALLOW_MEMMOVE = false };
@@ -461,18 +456,6 @@ class gfxUserFontSet {
 #endif
 
      private:
-      static uint32_t HashFeatures(const nsTArray<gfxFontFeature>& aFeatures) {
-        return mozilla::HashBytes(aFeatures.Elements(),
-                                  aFeatures.Length() * sizeof(gfxFontFeature));
-      }
-
-      static uint32_t HashVariations(
-          const nsTArray<mozilla::gfx::FontVariation>& aVariations) {
-        return mozilla::HashBytes(
-            aVariations.Elements(),
-            aVariations.Length() * sizeof(mozilla::gfx::FontVariation));
-      }
-
       RefPtr<gfxFontSrcURI> mURI;
       RefPtr<gfxFontSrcPrincipal> mPrincipal;  // or nullptr for data: URLs
 

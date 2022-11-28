@@ -156,6 +156,7 @@ void gfxFontEntry::InitializeFrom(fontlist::Face* aFace,
   auto* list = gfxPlatformFontList::PlatformFontList()->SharedFontList();
   mFamilyName = aFamily->DisplayName().AsString(list);
   mHasCmapTable = TrySetShmemCharacterMap();
+  ComputeHashLocked();
 }
 
 bool gfxFontEntry::TrySetShmemCharacterMap() {
@@ -1254,6 +1255,7 @@ void gfxFontEntry::SetupVariationRanges() {
         continue;
     }
   }
+  ComputeHashLocked();
 }
 
 void gfxFontEntry::CheckForVariationAxes() {
@@ -1408,6 +1410,17 @@ size_t gfxFontEntry::FontTableHashEntry::SizeOfExcludingThis(
     n += mSharedBlobData->SizeOfIncludingThis(aMallocSizeOf);
   }
   return n;
+}
+
+void gfxFontEntry::ComputeHashLocked() {
+  mHash = mozilla::HashGeneric(
+      mozilla::HashBytes(mFeatureSettings.Elements(),
+                         mFeatureSettings.Length() * sizeof(gfxFontFeature)),
+      mozilla::HashBytes(
+          mVariationSettings.Elements(),
+          mVariationSettings.Length() * sizeof(mozilla::gfx::FontVariation)),
+      mozilla::HashString(mFamilyName), mWeightRange.AsScalar(),
+      mStyleRange.AsScalar(), mStretchRange.AsScalar(), mLanguageOverride);
 }
 
 void gfxFontEntry::AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf,

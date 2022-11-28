@@ -568,6 +568,7 @@ bool gfxPlatformFontList::InitFontList() {
       entry->mShmemCharacterMap = nullptr;
       entry->mShmemFace = nullptr;
       entry->mFamilyName.Truncate();
+      entry->ComputeHashLocked();
     }
     mFontEntries.Clear();
     mShmemCharMaps.Clear();

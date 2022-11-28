@@ -353,6 +353,7 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
         family->RemoveFontEntry(existingEntry);
       }
       existingEntry->mFamilyName.Truncate(0);
+      existingEntry->ComputeHash();
     }
     return existingEntry.forget();
   }

@@ -61,8 +61,8 @@ gfxUserFontEntry::gfxUserFontEntry(nsTArray<gfxFontFaceSrc>&& aFontFaceSrcList,
   mDescentOverride = aAttr.mDescentOverride;
   mLineGapOverride = aAttr.mLineGapOverride;
   mSizeAdjust = aAttr.mSizeAdjust;
-  mFamilyName =
-      aAttr.mFamilyName;  // TODO(aosmond): verify this is always correct?
+  mFamilyName = aAttr.mFamilyName;
+  ComputeHash();
 }
 
 void gfxUserFontEntry::UpdateAttributes(gfxUserFontAttributes&& aAttr) {
@@ -84,6 +84,7 @@ void gfxUserFontEntry::UpdateAttributes(gfxUserFontAttributes&& aAttr) {
   mDescentOverride = aAttr.mDescentOverride;
   mLineGapOverride = aAttr.mLineGapOverride;
   mSizeAdjust = aAttr.mSizeAdjust;
+  ComputeHashLocked();
 }
 
 gfxUserFontEntry::~gfxUserFontEntry() {
@@ -470,6 +471,7 @@ void gfxUserFontEntry::DoLoadNextSrc(bool aForceAsync) {
           fe->mDescentOverride = attr.mDescentOverride;
           fe->mLineGapOverride = attr.mLineGapOverride;
           fe->mSizeAdjust = attr.mSizeAdjust;
+          fe->ComputeHashLocked();
         }
         // For src:local(), we don't care whether the request is from
         // a private window as there's no issue of caching resources;
@@ -788,6 +790,7 @@ bool gfxUserFontEntry::LoadPlatformFont(uint32_t aSrcIndex,
       fe->mDescentOverride = attr.mDescentOverride;
       fe->mLineGapOverride = attr.mLineGapOverride;
       fe->mSizeAdjust = attr.mSizeAdjust;
+      fe->ComputeHashLocked();
     }
 
     StoreUserFontData(fe, aSrcIndex, fontSet->GetPrivateBrowsing(),
