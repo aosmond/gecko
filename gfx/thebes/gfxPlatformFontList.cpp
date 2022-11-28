@@ -610,7 +610,7 @@ bool gfxPlatformFontList::InitFontList() {
   gfxFontStyle defStyle;
   FontFamily fam = GetDefaultFontLocked(nullptr, &defStyle);
   gfxFontEntry* fe;
-  if (fam.mIsShared) {
+  if (fam.mShared) {
     auto face = fam.mShared->FindFaceForStyle(SharedFontList(), defStyle);
     fe = face ? GetOrCreateFontEntryLocked(face, fam.mShared) : nullptr;
   } else {
@@ -967,14 +967,14 @@ already_AddRefed<gfxFont> gfxPlatformFontList::SystemFindFontForChar(
   if (aCh == 0xFFFD) {
     gfxFontEntry* fontEntry = nullptr;
     auto& fallbackFamily = mReplacementCharFallbackFamily[level];
-    if (fallbackFamily.mIsShared && fallbackFamily.mShared) {
+    if (fallbackFamily.mShared) {
       fontlist::Face* face =
           fallbackFamily.mShared->FindFaceForStyle(SharedFontList(), *aStyle);
       if (face) {
         fontEntry = GetOrCreateFontEntryLocked(face, fallbackFamily.mShared);
         *aVisibility = fallbackFamily.mShared->Visibility();
       }
-    } else if (!fallbackFamily.mIsShared && fallbackFamily.mUnshared) {
+    } else if (fallbackFamily.mUnshared) {
       fontEntry = fallbackFamily.mUnshared->FindFontForStyle(*aStyle);
       *aVisibility = fallbackFamily.mUnshared->Visibility();
     }
@@ -1041,7 +1041,7 @@ already_AddRefed<gfxFont> gfxPlatformFontList::SystemFindFontForChar(
   if (!font) {
     mCodepointsWithNoFonts[level].set(aCh);
   } else {
-    *aVisibility = fallbackFamily.mIsShared
+    *aVisibility = fallbackFamily.mShared
                        ? fallbackFamily.mShared->Visibility()
                        : fallbackFamily.mUnshared->Visibility();
     if (aCh == 0xFFFD) {
@@ -1160,7 +1160,7 @@ already_AddRefed<gfxFont> gfxPlatformFontList::GlobalFontFallback(
     gfxFontEntry* fe = PlatformGlobalFontFallback(aPresContext, aCh, aRunScript,
                                                   aMatchStyle, aMatchedFamily);
     if (fe) {
-      if (aMatchedFamily.mIsShared) {
+      if (aMatchedFamily.mShared) {
         if (IsVisibleToCSS(*aMatchedFamily.mShared, level)) {
           RefPtr<gfxFont> font = fe->FindOrMakeFont(aMatchStyle);
           if (font) {
@@ -1640,7 +1640,7 @@ fontlist::Family* gfxPlatformFontList::FindSharedFamily(
   if (!FindAndAddFamiliesLocked(aPresContext, StyleGenericFontFamily::None,
                                 aFamily, &families, aFlags, aStyle, aLanguage,
                                 aDevToCss) ||
-      !families[0].mFamily.mIsShared) {
+      !families[0].mFamily.mShared) {
     return nullptr;
   }
   fontlist::Family* family = families[0].mFamily.mShared;
@@ -1750,7 +1750,7 @@ gfxFontEntry* gfxPlatformFontList::FindFontForFamily(
   if (family.IsNull()) {
     return nullptr;
   }
-  if (family.mIsShared) {
+  if (family.mShared) {
     auto face = family.mShared->FindFaceForStyle(SharedFontList(), *aStyle);
     if (!face) {
       return nullptr;
@@ -1818,12 +1818,11 @@ bool gfxPlatformFontList::GetStandardFamilyName(const nsCString& aFontName,
 
 bool gfxPlatformFontList::GetLocalizedFamilyName(const FontFamily& aFamily,
                                                  nsACString& aFamilyName) {
-  if (aFamily.mIsShared) {
-    if (aFamily.mShared) {
-      aFamilyName = SharedFontList()->LocalizedFamilyName(aFamily.mShared);
-      return true;
-    }
-  } else if (aFamily.mUnshared) {
+  if (aFamily.mShared) {
+    aFamilyName = SharedFontList()->LocalizedFamilyName(aFamily.mShared);
+    return true;
+  }
+  if (aFamily.mUnshared) {
     aFamily.mUnshared->LocalizedName(aFamilyName);
     return true;
   }
