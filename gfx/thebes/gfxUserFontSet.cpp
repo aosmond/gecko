@@ -970,7 +970,7 @@ already_AddRefed<gfxUserFontEntry> gfxUserFontSet::FindOrCreateUserFontEntry(
   // Note that we can't do this for platform font entries, even if the
   // style descriptors match, as they might have had a different source list,
   // but we no longer have the old source list available to check.
-  gfxUserFontFamily* family = LookupFamily(aAttr.mFamilyName);
+  RefPtr<gfxUserFontFamily> family = LookupFamily(aAttr.mFamilyName);
   if (family) {
     entry = FindExistingUserFontEntry(family, aFontFaceSrcList, aAttr);
   }
@@ -1008,7 +1008,7 @@ gfxUserFontEntry* gfxUserFontSet::FindExistingUserFontEntry(
 
 void gfxUserFontSet::AddUserFontEntry(const nsCString& aFamilyName,
                                       gfxUserFontEntry* aUserFontEntry) {
-  gfxUserFontFamily* family = GetFamily(aFamilyName);
+  RefPtr<gfxUserFontFamily> family = GetFamily(aFamilyName);
   family->AddFontEntry(aUserFontEntry);
 
   if (LOG_ENABLED()) {
@@ -1045,19 +1045,20 @@ void gfxUserFontSet::RebuildLocalRules() {
   }
 }
 
-gfxUserFontFamily* gfxUserFontSet::LookupFamily(
+already_AddRefed<gfxUserFontFamily> gfxUserFontSet::LookupFamily(
     const nsACString& aFamilyName) const {
   nsAutoCString key(aFamilyName);
   ToLowerCase(key);
 
-  return mFontFamilies.GetWeak(key);
+  return mFontFamilies.Get(key);
 }
 
-gfxUserFontFamily* gfxUserFontSet::GetFamily(const nsACString& aFamilyName) {
+already_AddRefed<gfxUserFontFamily> gfxUserFontSet::GetFamily(
+    const nsACString& aFamilyName) {
   nsAutoCString key(aFamilyName);
   ToLowerCase(key);
 
-  return mFontFamilies.GetOrInsertNew(key, aFamilyName);
+  return do_AddRef(mFontFamilies.GetOrInsertNew(key, aFamilyName));
 }
 
 void gfxUserFontSet::ForgetLocalFaces() {

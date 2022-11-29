@@ -348,7 +348,8 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
     // and clear the mFamilyName field so it can be reset when added to a new
     // family.
     if (resetFamilyName) {
-      gfxUserFontFamily* family = set->LookupFamily(existingEntry->mFamilyName);
+      RefPtr<gfxUserFontFamily> family =
+          set->LookupFamily(existingEntry->mFamilyName);
       if (family) {
         family->RemoveFontEntry(existingEntry);
       }
@@ -847,6 +848,23 @@ already_AddRefed<gfxUserFontEntry> FontFaceSetImpl::CreateUserFontEntry(
   RefPtr<gfxUserFontEntry> entry = new FontFaceImpl::Entry(
       this, std::move(aFontFaceSrcList), std::move(aAttr));
   return entry.forget();
+}
+
+already_AddRefed<gfxUserFontFamily> FontFaceSetImpl::LookupFamily(
+    const nsACString& aName) const {
+  RecursiveMutexAutoLock lock(mMutex);
+  return gfxUserFontSet::LookupFamily(aName);
+}
+
+void FontFaceSetImpl::ForgetLocalFaces() {
+  RecursiveMutexAutoLock lock(mMutex);
+  return gfxUserFontSet::ForgetLocalFaces();
+}
+
+already_AddRefed<gfxUserFontFamily> FontFaceSetImpl::GetFamily(
+    const nsACString& aFamilyName) {
+  RecursiveMutexAutoLock lock(mMutex);
+  return gfxUserFontSet::GetFamily(aFamilyName);
 }
 
 #undef LOG_ENABLED
