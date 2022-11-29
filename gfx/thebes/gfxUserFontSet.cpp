@@ -992,7 +992,7 @@ already_AddRefed<gfxUserFontEntry> gfxUserFontSet::FindOrCreateUserFontEntry(
   // Note that we can't do this for platform font entries, even if the
   // style descriptors match, as they might have had a different source list,
   // but we no longer have the old source list available to check.
-  gfxUserFontFamily* family = LookupFamily(aFamilyName);
+  RefPtr<gfxUserFontFamily> family = LookupFamily(aFamilyName);
   if (family) {
     entry = FindExistingUserFontEntry(
         family, aFontFaceSrcList, aWeight, aStretch, aStyle, aFeatureSettings,
@@ -1048,7 +1048,7 @@ gfxUserFontEntry* gfxUserFontSet::FindExistingUserFontEntry(
 
 void gfxUserFontSet::AddUserFontEntry(const nsCString& aFamilyName,
                                       gfxUserFontEntry* aUserFontEntry) {
-  gfxUserFontFamily* family = GetFamily(aFamilyName);
+  RefPtr<gfxUserFontFamily> family = GetFamily(aFamilyName);
   family->AddFontEntry(aUserFontEntry);
 
   if (LOG_ENABLED()) {
@@ -1085,42 +1085,47 @@ void gfxUserFontSet::RebuildLocalRules() {
   }
 }
 
-gfxUserFontFamily* gfxUserFontSet::LookupFamily(
+already_AddRefed<gfxUserFontFamily> gfxUserFontSet::LookupFamily(
     const nsACString& aFamilyName) const {
   nsAutoCString key(aFamilyName);
   ToLowerCase(key);
 
-  return mFontFamilies.GetWeak(key);
+  return mFontFamilies.Get(key);
 }
 
-gfxUserFontFamily* gfxUserFontSet::GetFamily(const nsACString& aFamilyName) {
+already_AddRefed<gfxUserFontFamily> gfxUserFontSet::GetFamily(
+    const nsACString& aFamilyName) {
   nsAutoCString key(aFamilyName);
   ToLowerCase(key);
 
-  return mFontFamilies.GetOrInsertNew(key, aFamilyName);
+  return do_AddRef(mFontFamilies.GetOrInsertNew(key, aFamilyName));
 }
 
 void gfxUserFontSet::ForgetLocalFaces() {
   for (const auto& fam : mFontFamilies.Values()) {
-    fam->ReadLock();
-    const auto& fonts = fam->GetFontList();
-    for (const auto& f : fonts) {
-      auto ufe = static_cast<gfxUserFontEntry*>(f.get());
-      // If the user font entry has loaded an entry using src:local(),
-      // discard it as no longer valid.
-      if (ufe->GetPlatformFontEntry() &&
-          ufe->GetPlatformFontEntry()->IsLocalUserFont()) {
-        ufe->mPlatformFontEntry = nullptr;
-      }
-      // We need to re-evaluate the source list in the context of the new
-      // platform fontlist, whether or not the entry actually used a local()
-      // source last time, as one might be newly available.
-      if (ufe->mSeenLocalSource) {
-        ufe->LoadCanceled();
-      }
-    }
-    fam->ReadUnlock();
+    ForgetLocalFace(fam);
   }
+}
+
+void gfxUserFontSet::ForgetLocalFace(gfxUserFontFamily* aFontFamily) {
+  aFontFamily->ReadLock();
+  const auto& fonts = aFontFamily->GetFontList();
+  for (const auto& f : fonts) {
+    auto ufe = static_cast<gfxUserFontEntry*>(f.get());
+    // If the user font entry has loaded an entry using src:local(),
+    // discard it as no longer valid.
+    if (ufe->GetPlatformFontEntry() &&
+        ufe->GetPlatformFontEntry()->IsLocalUserFont()) {
+      ufe->mPlatformFontEntry = nullptr;
+    }
+    // We need to re-evaluate the source list in the context of the new
+    // platform fontlist, whether or not the entry actually used a local()
+    // source last time, as one might be newly available.
+    if (ufe->mSeenLocalSource) {
+      ufe->LoadCanceled();
+    }
+  }
+  aFontFamily->ReadUnlock();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

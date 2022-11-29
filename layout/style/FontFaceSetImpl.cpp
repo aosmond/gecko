@@ -86,16 +86,25 @@ FontFaceSetImpl::~FontFaceSetImpl() {
 }
 
 void FontFaceSetImpl::Destroy() {
-  RecursiveMutexAutoLock lock(mMutex);
+  nsTArray<FontFaceRecord> nonRuleFaces;
+  nsRefPtrHashtable<nsCStringHashKey, gfxUserFontFamily> fontFamilies;
 
-  for (const auto& key : mLoaders.Keys()) {
-    key->Cancel();
+  {
+    RecursiveMutexAutoLock lock(mMutex);
+    for (const auto& key : mLoaders.Keys()) {
+      key->Cancel();
+    }
+
+    mLoaders.Clear();
+    nonRuleFaces = std::move(mNonRuleFaces);
+    fontFamilies = std::move(mFontFamilies);
+    mOwner = nullptr;
   }
 
-  mLoaders.Clear();
-  mNonRuleFaces.Clear();
-  gfxUserFontSet::Destroy();
-  mOwner = nullptr;
+  gfxPlatformFontList* fp = gfxPlatformFontList::PlatformFontList();
+  if (fp) {
+    fp->RemoveUserFontSet(this);
+  }
 }
 
 void FontFaceSetImpl::ParseFontShorthandForMatching(
@@ -466,7 +475,8 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
     // family.
     if (!existingEntry->mFamilyName.IsEmpty() &&
         existingEntry->mFamilyName != aFamilyName) {
-      gfxUserFontFamily* family = set->LookupFamily(existingEntry->mFamilyName);
+      RefPtr<gfxUserFontFamily> family =
+          set->LookupFamily(existingEntry->mFamilyName);
       if (family) {
         family->RemoveFontEntry(existingEntry);
       }
@@ -981,6 +991,35 @@ already_AddRefed<gfxUserFontEntry> FontFaceSetImpl::CreateUserFontEntry(
       aRangeFlags, aAscentOverride, aDescentOverride, aLineGapOverride,
       aSizeAdjust);
   return entry.forget();
+}
+
+already_AddRefed<gfxUserFontFamily> FontFaceSetImpl::LookupFamily(
+    const nsACString& aName) const {
+  RecursiveMutexAutoLock lock(mMutex);
+  return gfxUserFontSet::LookupFamily(aName);
+}
+
+void FontFaceSetImpl::ForgetLocalFaces() {
+  // We cannot hold our lock at the same time as the gfxUserFontFamily lock, so
+  // we need to make a copy of the table first.
+  nsTArray<RefPtr<gfxUserFontFamily>> fontFamilies;
+  {
+    RecursiveMutexAutoLock lock(mMutex);
+    fontFamilies.SetCapacity(mFontFamilies.Count());
+    for (const auto& fam : mFontFamilies.Values()) {
+      fontFamilies.AppendElement(fam);
+    }
+  }
+
+  for (const auto& fam : fontFamilies) {
+    ForgetLocalFace(fam);
+  }
+}
+
+already_AddRefed<gfxUserFontFamily> FontFaceSetImpl::GetFamily(
+    const nsACString& aFamilyName) {
+  RecursiveMutexAutoLock lock(mMutex);
+  return gfxUserFontSet::GetFamily(aFamilyName);
 }
 
 #undef LOG_ENABLED

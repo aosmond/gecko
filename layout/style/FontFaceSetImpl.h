@@ -51,6 +51,11 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
 
   bool BypassCache() final { return mBypassCache; }
 
+  already_AddRefed<gfxUserFontFamily> LookupFamily(
+      const nsACString& aName) const final;
+
+  void ForgetLocalFaces() final;
+
  protected:
   virtual nsresult CreateChannelForSyncLoadFontData(
       nsIChannel** aOutChannel, gfxUserFontEntry* aFontToLoad,
@@ -77,6 +82,9 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
       StyleFontDisplay aFontDisplay, RangeFlags aRangeFlags,
       float aAscentOverride, float aDescentOverride, float aLineGapOverride,
       float aSizeAdjust) override;
+
+  already_AddRefed<gfxUserFontFamily> GetFamily(
+      const nsACString& aFamilyName) final;
 
   explicit FontFaceSetImpl(FontFaceSet* aOwner);
 
