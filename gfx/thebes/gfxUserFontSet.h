@@ -224,6 +224,36 @@ class gfxUserFontFamily : public gfxFontFamily {
 class gfxUserFontEntry;
 class gfxOTSMessageContext;
 
+struct gfxUserFontAttributes {
+  typedef mozilla::FontStretch FontStretch;
+  typedef mozilla::StretchRange StretchRange;
+  typedef mozilla::FontSlantStyle FontSlantStyle;
+  typedef mozilla::SlantStyleRange SlantStyleRange;
+  typedef mozilla::FontWeight FontWeight;
+  typedef mozilla::WeightRange WeightRange;
+  typedef mozilla::StyleFontFaceSourceListComponent
+      StyleFontFaceSourceListComponent;
+  typedef gfxFontEntry::RangeFlags RangeFlags;
+
+  WeightRange mWeight = WeightRange(FontWeight::NORMAL);
+  StretchRange mStretch = StretchRange(FontStretch::NORMAL);
+  SlantStyleRange mStyle = SlantStyleRange(FontSlantStyle::NORMAL);
+  RangeFlags mRangeFlags = RangeFlags::eAutoWeight | RangeFlags::eAutoStretch |
+                           RangeFlags::eAutoSlantStyle;
+  mozilla::StyleFontDisplay mFontDisplay = mozilla::StyleFontDisplay::Auto;
+  float mAscentOverride = -1.0;
+  float mDescentOverride = -1.0;
+  float mLineGapOverride = -1.0;
+  float mSizeAdjust = 1.0;
+  uint32_t mLanguageOverride = NO_FONT_LANGUAGE_OVERRIDE;
+  nsTArray<gfxFontFeature> mFeatureSettings;
+  nsTArray<gfxFontVariation> mVariationSettings;
+  RefPtr<gfxCharacterMap> mUnicodeRanges;
+
+  nsCString mFamilyName;
+  AutoTArray<StyleFontFaceSourceListComponent, 8> mSources;
+};
+
 class gfxUserFontSet {
   friend class gfxUserFontEntry;
   friend class gfxOTSMessageContext;

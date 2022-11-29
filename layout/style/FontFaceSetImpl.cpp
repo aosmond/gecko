@@ -351,48 +351,6 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
                                                aFontFace, StyleOrigin::Author);
 }
 
-static WeightRange GetWeightRangeForDescriptor(
-    const Maybe<StyleComputedFontWeightRange>& aVal,
-    gfxFontEntry::RangeFlags& aRangeFlags) {
-  if (!aVal) {
-    aRangeFlags |= gfxFontEntry::RangeFlags::eAutoWeight;
-    return WeightRange(FontWeight::NORMAL);
-  }
-  return WeightRange(FontWeight::FromFloat(aVal->_0),
-                     FontWeight::FromFloat(aVal->_1));
-}
-
-static SlantStyleRange GetStyleRangeForDescriptor(
-    const Maybe<StyleComputedFontStyleDescriptor>& aVal,
-    gfxFontEntry::RangeFlags& aRangeFlags) {
-  if (!aVal) {
-    aRangeFlags |= gfxFontEntry::RangeFlags::eAutoSlantStyle;
-    return SlantStyleRange(FontSlantStyle::NORMAL);
-  }
-  auto& val = *aVal;
-  switch (val.tag) {
-    case StyleComputedFontStyleDescriptor::Tag::Normal:
-      return SlantStyleRange(FontSlantStyle::NORMAL);
-    case StyleComputedFontStyleDescriptor::Tag::Italic:
-      return SlantStyleRange(FontSlantStyle::ITALIC);
-    case StyleComputedFontStyleDescriptor::Tag::Oblique:
-      return SlantStyleRange(FontSlantStyle::FromFloat(val.AsOblique()._0),
-                             FontSlantStyle::FromFloat(val.AsOblique()._1));
-  }
-  MOZ_ASSERT_UNREACHABLE("How?");
-  return SlantStyleRange(FontSlantStyle::NORMAL);
-}
-
-static StretchRange GetStretchRangeForDescriptor(
-    const Maybe<StyleComputedFontStretchRange>& aVal,
-    gfxFontEntry::RangeFlags& aRangeFlags) {
-  if (!aVal) {
-    aRangeFlags |= gfxFontEntry::RangeFlags::eAutoStretch;
-    return StretchRange(FontStretch::NORMAL);
-  }
-  return StretchRange(aVal->_0, aVal->_1);
-}
-
 // TODO(emilio): Should this take an nsAtom* aFamilyName instead?
 //
 // All callers have one handy.
@@ -403,64 +361,23 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
     StyleOrigin aOrigin) {
   FontFaceSetImpl* set = aFontFace->GetPrimaryFontFaceSet();
 
-  uint32_t languageOverride = NO_FONT_LANGUAGE_OVERRIDE;
-  StyleFontDisplay fontDisplay = StyleFontDisplay::Auto;
-  float ascentOverride = -1.0;
-  float descentOverride = -1.0;
-  float lineGapOverride = -1.0;
-  float sizeAdjust = 1.0;
+  gfxUserFontAttributes attr;
+  MOZ_RELEASE_ASSERT(aFontFace->GetAttributes(attr));
 
-  gfxFontEntry::RangeFlags rangeFlags = gfxFontEntry::RangeFlags::eNoFlags;
-
-  // set up weight
-  WeightRange weight =
-      GetWeightRangeForDescriptor(aFontFace->GetFontWeight(), rangeFlags);
-
-  // set up stretch
-  StretchRange stretch =
-      GetStretchRangeForDescriptor(aFontFace->GetFontStretch(), rangeFlags);
-
-  // set up font style
-  SlantStyleRange italicStyle =
-      GetStyleRangeForDescriptor(aFontFace->GetFontStyle(), rangeFlags);
-
-  // set up font display
-  if (Maybe<StyleFontDisplay> display = aFontFace->GetFontDisplay()) {
-    fontDisplay = *display;
-  }
-
-  // set up font metrics overrides
-  if (Maybe<StylePercentage> ascent = aFontFace->GetAscentOverride()) {
-    ascentOverride = ascent->_0;
-  }
-  if (Maybe<StylePercentage> descent = aFontFace->GetDescentOverride()) {
-    descentOverride = descent->_0;
-  }
-  if (Maybe<StylePercentage> lineGap = aFontFace->GetLineGapOverride()) {
-    lineGapOverride = lineGap->_0;
-  }
-
-  // set up size-adjust scaling factor
-  if (Maybe<StylePercentage> percentage = aFontFace->GetSizeAdjust()) {
-    sizeAdjust = percentage->_0;
-  }
-
-  // set up font features
-  nsTArray<gfxFontFeature> featureSettings;
-  aFontFace->GetFontFeatureSettings(featureSettings);
-
-  // set up font variations
-  nsTArray<gfxFontVariation> variationSettings;
-  aFontFace->GetFontVariationSettings(variationSettings);
-
-  // set up font language override
-  if (Maybe<StyleFontLanguageOverride> descriptor =
-          aFontFace->GetFontLanguageOverride()) {
-    languageOverride = descriptor->_0;
-  }
-
-  // set up unicode-range
-  gfxCharacterMap* unicodeRanges = aFontFace->GetUnicodeRangeAsCharacterMap();
+  uint32_t languageOverride = attr.mLanguageOverride;
+  StyleFontDisplay fontDisplay = attr.mFontDisplay;
+  float ascentOverride = attr.mAscentOverride;
+  float descentOverride = attr.mDescentOverride;
+  float lineGapOverride = attr.mLineGapOverride;
+  float sizeAdjust = attr.mSizeAdjust;
+  gfxFontEntry::RangeFlags rangeFlags = attr.mRangeFlags;
+  WeightRange weight = attr.mWeight;
+  StretchRange stretch = attr.mStretch;
+  SlantStyleRange italicStyle = attr.mStyle;
+  nsTArray<gfxFontFeature> featureSettings = std::move(attr.mFeatureSettings);
+  nsTArray<gfxFontVariation> variationSettings =
+      std::move(attr.mVariationSettings);
+  RefPtr<gfxCharacterMap> unicodeRanges = std::move(attr.mUnicodeRanges);
 
   RefPtr<gfxUserFontEntry> existingEntry = aFontFace->GetUserFontEntry();
   if (existingEntry) {
@@ -497,8 +414,8 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
     face->mSourceType = gfxFontFaceSrc::eSourceType_Buffer;
     face->mBuffer = aFontFace->TakeBufferSource();
   } else {
-    AutoTArray<StyleFontFaceSourceListComponent, 8> sourceListComponents;
-    aFontFace->GetSources(sourceListComponents);
+    AutoTArray<StyleFontFaceSourceListComponent, 8> sourceListComponents =
+        std::move(attr.mSources);
     size_t len = sourceListComponents.Length();
     for (size_t i = 0; i < len; ++i) {
       gfxFontFaceSrc* face = srcArray.AppendElement();

@@ -90,7 +90,7 @@ class FontFaceImpl final {
     mutable Mutex mMutex;
 
     // Font set which owns this entry;
-    gfxUserFontSet* MOZ_NON_OWNING_REF mFontSet;
+    gfxUserFontSet* MOZ_NON_OWNING_REF mFontSet MOZ_GUARDED_BY(mMutex);
 
     // The FontFace objects that use this user font entry.  We need to store
     // an array of these, not just a single pointer, since the user font
@@ -117,19 +117,8 @@ class FontFaceImpl final {
   RawServoFontFaceRule* GetRule() { return mRule; }
 
   bool HasLocalSrc() const;
-  Maybe<StyleComputedFontWeightRange> GetFontWeight() const;
-  Maybe<StyleComputedFontStretchRange> GetFontStretch() const;
-  Maybe<StyleComputedFontStyleDescriptor> GetFontStyle() const;
-  Maybe<StyleFontDisplay> GetFontDisplay() const;
-  void GetFontFeatureSettings(nsTArray<gfxFontFeature>&) const;
-  void GetFontVariationSettings(nsTArray<gfxFontVariation>&) const;
-  void GetSources(nsTArray<StyleFontFaceSourceListComponent>&) const;
-  Maybe<StyleFontLanguageOverride> GetFontLanguageOverride() const;
-  Maybe<StylePercentage> GetAscentOverride() const;
-  Maybe<StylePercentage> GetDescentOverride() const;
-  Maybe<StylePercentage> GetLineGapOverride() const;
-  Maybe<StylePercentage> GetSizeAdjust() const;
 
+  bool GetAttributes(gfxUserFontAttributes& aAttr);
   gfxUserFontEntry* CreateUserFontEntry();
   gfxUserFontEntry* GetUserFontEntry() const { return mUserFontEntry; }
   void SetUserFontEntry(gfxUserFontEntry* aEntry);
