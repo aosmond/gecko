@@ -5,6 +5,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "FontFaceSetWorkerImpl.h"
+#include "FontFaceImpl.h"
 #include "FontPreloader.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
@@ -243,8 +244,22 @@ void FontFaceSetWorkerImpl::FlushUserFontSet() {
   bool modified = mNonRuleFacesDirty;
   mNonRuleFacesDirty = false;
 
-  for (size_t i = 0, i_end = mNonRuleFaces.Length(); i < i_end; ++i) {
-    InsertNonRuleFontFace(mNonRuleFaces[i].mFontFace, modified);
+  // We duplicate and unlock the array here to avoid a mutex cycle with the
+  // gfxPlatformFontList mutex. It should be safe as if we add/remove from the
+  // set in the interim, mNonRuleFacesDirty will be reset to true, the next pass
+  // will handle any new font faces, and the array on the stack will keep any
+  // removed alive.
+  AutoTArray<RefPtr<FontFaceImpl>, 32> nonRuleFaces;
+  nonRuleFaces.SetCapacity(mNonRuleFaces.Length());
+  for (const auto& record : mNonRuleFaces) {
+    nonRuleFaces.AppendElement(record.mFontFace);
+  }
+
+  {
+    RecursiveMutexAutoUnlock unlock(mMutex);
+    for (const auto& face : nonRuleFaces) {
+      InsertNonRuleFontFace(face, modified);
+    }
   }
 
   // Remove any residual families that have no font entries.
