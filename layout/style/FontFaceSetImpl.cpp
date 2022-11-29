@@ -21,6 +21,7 @@
 #include "mozilla/dom/FontFaceSetLoadEventBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerRunnable.h"
 #include "mozilla/FontPropertyTypes.h"
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/BasePrincipal.h"
@@ -327,6 +328,50 @@ void FontFaceSetImpl::InsertNonRuleFontFace(FontFaceImpl* aFontFace,
   AddUserFontEntry(family, aFontFace->GetUserFontEntry());
 }
 
+void FontFaceSetImpl::UpdateUserFontEntry(gfxUserFontEntry* aEntry,
+                                          gfxUserFontAttributes&& aAttr) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  bool resetFamilyName = !aEntry->mFamilyName.IsEmpty() &&
+                         aEntry->mFamilyName != aAttr.mFamilyName;
+  // aFontFace already has a user font entry, so we update its attributes
+  // rather than creating a new one.
+  aEntry->UpdateAttributes(std::move(aAttr));
+  // If the family name has changed, remove the entry from its current family
+  // and clear the mFamilyName field so it can be reset when added to a new
+  // family.
+  if (resetFamilyName) {
+    RefPtr<gfxUserFontFamily> family = LookupFamily(aEntry->mFamilyName);
+    if (family) {
+      family->RemoveFontEntry(aEntry);
+    }
+    aEntry->mFamilyName.Truncate(0);
+  }
+}
+
+class FontFaceSetImpl::UpdateUserFontEntryRunnable final
+    : public WorkerMainThreadRunnable {
+ public:
+  UpdateUserFontEntryRunnable(FontFaceSetImpl* aSet, gfxUserFontEntry* aEntry,
+                              gfxUserFontAttributes& aAttr)
+      : WorkerMainThreadRunnable(
+            GetCurrentThreadWorkerPrivate(),
+            "FontFaceSetImpl :: FindOrCreateUserFontEntryFromFontFace"_ns),
+        mSet(aSet),
+        mEntry(aEntry),
+        mAttr(aAttr) {}
+
+  bool MainThreadRun() override {
+    mSet->UpdateUserFontEntry(mEntry, std::move(mAttr));
+    return true;
+  }
+
+ private:
+  FontFaceSetImpl* mSet;
+  gfxUserFontEntry* mEntry;
+  gfxUserFontAttributes& mAttr;
+};
+
 // TODO(emilio): Should this take an nsAtom* aFamilyName instead?
 //
 // All callers have one handy.
@@ -339,21 +384,13 @@ FontFaceSetImpl::FindOrCreateUserFontEntryFromFontFace(
 
   RefPtr<gfxUserFontEntry> existingEntry = aFontFace->GetUserFontEntry();
   if (existingEntry) {
-    bool resetFamilyName = !existingEntry->mFamilyName.IsEmpty() &&
-                           existingEntry->mFamilyName != aAttr.mFamilyName;
-    // aFontFace already has a user font entry, so we update its attributes
-    // rather than creating a new one.
-    existingEntry->UpdateAttributes(std::move(aAttr));
-    // If the family name has changed, remove the entry from its current family
-    // and clear the mFamilyName field so it can be reset when added to a new
-    // family.
-    if (resetFamilyName) {
-      RefPtr<gfxUserFontFamily> family =
-          set->LookupFamily(existingEntry->mFamilyName);
-      if (family) {
-        family->RemoveFontEntry(existingEntry);
-      }
-      existingEntry->mFamilyName.Truncate(0);
+    if (NS_IsMainThread()) {
+      set->UpdateUserFontEntry(existingEntry, std::move(aAttr));
+    } else {
+      auto task =
+          MakeRefPtr<UpdateUserFontEntryRunnable>(set, existingEntry, aAttr);
+      IgnoredErrorResult ignoredRv;
+      task->Dispatch(Canceling, ignoredRv);
     }
     return existingEntry.forget();
   }

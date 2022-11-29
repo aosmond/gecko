@@ -221,6 +221,10 @@ class FontFaceSetImpl : public nsISupports, public gfxUserFontSet {
       const nsTHashSet<FontFace*>& aMatchingFaces,
       nsTArray<FontFace*>& aFontFaces);
 
+  class UpdateUserFontEntryRunnable;
+  void UpdateUserFontEntry(gfxUserFontEntry* aEntry,
+                           gfxUserFontAttributes&& aAttr);
+
   nsresult CheckFontLoad(const gfxFontFaceSrc* aFontFaceSrc,
                          gfxFontSrcPrincipal** aPrincipal, bool* aBypassCache);
 
