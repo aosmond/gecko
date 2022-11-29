@@ -294,14 +294,10 @@ class gfxUserFontSet {
   void AddUserFontEntry(const nsCString& aFamilyName,
                         gfxUserFontEntry* aUserFontEntry);
 
-  // Whether there is a face with this family name
-  bool HasFamily(const nsACString& aFamilyName) const {
-    return LookupFamily(aFamilyName) != nullptr;
-  }
-
   // Look up and return the gfxUserFontFamily in mFontFamilies with
   // the given name
-  gfxUserFontFamily* LookupFamily(const nsACString& aName) const;
+  virtual already_AddRefed<gfxUserFontFamily> LookupFamily(
+      const nsACString& aName) const;
 
   virtual already_AddRefed<gfxFontSrcPrincipal> GetStandardFontLoadPrincipal()
       const = 0;
@@ -334,7 +330,7 @@ class gfxUserFontSet {
   // be reloaded next time they're needed. This is called when the platform
   // font list has changed, which means local font entries that were set up
   // may no longer be valid.
-  void ForgetLocalFaces();
+  virtual void ForgetLocalFaces();
 
   class UserFontCache {
    public:
@@ -535,7 +531,8 @@ class gfxUserFontSet {
 
   // creates a new gfxUserFontFamily in mFontFamilies, or returns an existing
   // family if there is one
-  gfxUserFontFamily* GetFamily(const nsACString& aFamilyName);
+  virtual already_AddRefed<gfxUserFontFamily> GetFamily(
+      const nsACString& aFamilyName);
 
   // font families defined by @font-face rules
   nsRefPtrHashtable<nsCStringHashKey, gfxUserFontFamily> mFontFamilies;
