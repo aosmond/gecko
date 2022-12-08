@@ -10,6 +10,7 @@
 #include "base/process.h"      // for ProcessId
 #include "base/task.h"         // for CancelableTask, DeleteTask, etc
 #include "mozilla/ClearOnShutdown.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/Point.h"  // for IntSize
 #include "mozilla/Hal.h"        // for hal::SetCurrentThreadPriority()
 #include "mozilla/HalTypes.h"   // for hal::THREAD_PRIORITY_COMPOSITOR
@@ -141,6 +142,10 @@ void ImageBridgeParent::Shutdown() {
       []() -> void { ImageBridgeParent::ShutdownInternal(); }));
 }
 
+bool ImageBridgeParent::ShouldContinueFromReplyTimeout() {
+  return GPUProcessManager::ProcessReplyTimeout(this);
+}
+
 void ImageBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
   // Can't alloc/dealloc shmems from now on.
   mClosed = true;
@@ -236,6 +241,8 @@ bool ImageBridgeParent::CreateForContent(
 
 void ImageBridgeParent::Bind(Endpoint<PImageBridgeParent>&& aEndpoint) {
   if (!aEndpoint.Bind(this)) return;
+
+  GPUProcessManager::MaybeUseReplyTimeout(this);
   mSelfRef = this;
 
   // If the child process ID was reused by the OS before the ImageBridgeParent

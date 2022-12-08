@@ -17,6 +17,7 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"  // for StaticRefPtr
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/Point.h"  // for IntSize
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/ipc/Endpoint.h"
@@ -244,6 +245,10 @@ void ImageBridgeChild::ShutdownStep2(SynchronousTask* aTask) {
   if (!mDestroyed) {
     Close();
   }
+}
+
+bool ImageBridgeChild::ShouldContinueFromReplyTimeout() {
+  return GPUProcessManager::ProcessReplyTimeout(this);
 }
 
 void ImageBridgeChild::ActorDestroy(ActorDestroyReason aWhy) {
@@ -505,6 +510,8 @@ void ImageBridgeChild::Bind(Endpoint<PImageBridgeChild>&& aEndpoint) {
   if (!aEndpoint.Bind(this)) {
     return;
   }
+
+  GPUProcessManager::MaybeUseReplyTimeout(this);
 
   // This reference is dropped in DeallocPImageBridgeChild.
   this->AddRef();

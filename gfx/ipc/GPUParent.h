@@ -25,6 +25,7 @@ class GPUParent final : public PGPUParent {
   ~GPUParent();
 
   static GPUParent* GetSingleton();
+  static base::ProcessId MaybeGetParentProcessId();
 
   ipc::AsyncBlockers& AsyncShutdownService() { return mShutdownBlockers; }
 
@@ -108,6 +109,7 @@ class GPUParent final : public PGPUParent {
 
   mozilla::ipc::IPCResult RecvCrashProcess();
 
+  bool ShouldContinueFromReplyTimeout() override;
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
  private:

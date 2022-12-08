@@ -7776,9 +7776,15 @@
   value: false
   mirror: once
 
+# How long before a sync IPC message times out between the parent and GPU
+# processes.
 - name: layers.gpu-process.ipc_reply_timeout_ms
   type: int32_t
+#ifdef DEBUG
+  value: 0
+#else
   value: 10000
+#endif
   mirror: once
 
 # How many unstable GPU process restarts we allow for a given configuration.

@@ -330,6 +330,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
   void ShutdownStep2(SynchronousTask* aTask);
   void MarkShutDown();
 
+  bool ShouldContinueFromReplyTimeout() override;
   void ActorDestroy(ActorDestroyReason aWhy) override;
   void ActorDealloc() override;
 

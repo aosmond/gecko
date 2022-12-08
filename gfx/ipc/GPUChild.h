@@ -30,6 +30,8 @@ class GPUChild final : public ipc::CrashReporterHelper<GeckoProcessType_GPU>,
   explicit GPUChild(GPUProcessHost* aHost);
   virtual ~GPUChild();
 
+  static base::ProcessId MaybeGetGPUProcessId();
+
   void Init();
 
   bool EnsureGPUReady();
@@ -68,6 +70,7 @@ class GPUChild final : public ipc::CrashReporterHelper<GeckoProcessType_GPU>,
   mozilla::ipc::IPCResult RecvRecordDiscardedData(
       const DiscardedData& aDiscardedData);
 
+  bool ShouldContinueFromReplyTimeout() override;
   void ActorDestroy(ActorDestroyReason aWhy) override;
   mozilla::ipc::IPCResult RecvGraphicsError(const nsCString& aError);
   mozilla::ipc::IPCResult RecvNotifyUiObservers(const nsCString& aTopic);

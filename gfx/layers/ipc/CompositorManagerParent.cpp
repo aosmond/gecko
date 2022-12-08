@@ -128,6 +128,7 @@ void CompositorManagerParent::Bind(
   }
 
   BindComplete(aIsRoot);
+  gfx::GPUProcessManager::MaybeUseReplyTimeout(this);
 }
 
 void CompositorManagerParent::BindComplete(bool aIsRoot) {
@@ -149,6 +150,10 @@ void CompositorManagerParent::BindComplete(bool aIsRoot) {
   }
   sActiveActors->AppendElement(this);
 #endif
+}
+
+bool CompositorManagerParent::ShouldContinueFromReplyTimeout() {
+  return gfx::GPUProcessManager::ProcessReplyTimeout(this);
 }
 
 void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {

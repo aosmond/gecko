@@ -84,6 +84,9 @@ class GPUProcessManager final : public GPUProcessHost::Listener {
   static void Shutdown();
   static GPUProcessManager* Get();
 
+  static void MaybeUseReplyTimeout(mozilla::ipc::IToplevelProtocol* aProtocol);
+  static bool ProcessReplyTimeout(mozilla::ipc::IToplevelProtocol* aProtocol);
+
   ~GPUProcessManager();
 
   // If not using a GPU process, launch a new GPU process asynchronously.

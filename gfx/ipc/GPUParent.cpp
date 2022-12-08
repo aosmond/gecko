@@ -24,6 +24,7 @@
 #include "gfxCrashReporterUtils.h"
 #include "gfxPlatform.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Components.h"
 #include "mozilla/FOGIPC.h"
 #include "mozilla/HangDetails.h"
@@ -101,15 +102,25 @@ using namespace ipc;
 using namespace layers;
 
 static GPUParent* sGPUParent;
+static Atomic<base::ProcessId> sGPUParentOtherPid(base::kInvalidProcessId);
 
 GPUParent::GPUParent() : mLaunchTime(TimeStamp::Now()) { sGPUParent = this; }
 
-GPUParent::~GPUParent() { sGPUParent = nullptr; }
+GPUParent::~GPUParent() {
+  sGPUParent = nullptr;
+  sGPUParentOtherPid = base::kInvalidProcessId;
+}
 
 /* static */
 GPUParent* GPUParent::GetSingleton() {
   MOZ_DIAGNOSTIC_ASSERT(sGPUParent);
   return sGPUParent;
+}
+
+/* static */
+base::ProcessId GPUParent::MaybeGetParentProcessId() {
+  MOZ_ASSERT(XRE_IsGPUProcess());
+  return sGPUParentOtherPid;
 }
 
 /* static */ bool GPUParent::MaybeFlushMemory() {
@@ -162,6 +173,8 @@ bool GPUParent::Init(mozilla::ipc::UntypedEndpoint&& aEndpoint,
     return false;
   }
 
+  sGPUParentOtherPid = OtherPid();
+  GPUProcessManager::MaybeUseReplyTimeout(this);
   nsDebugImpl::SetMultiprocessMode("GPU");
 
   // This must be checked before any IPDL message, which may hit sentinel
@@ -656,6 +669,10 @@ mozilla::ipc::IPCResult GPUParent::RecvTestTriggerMetrics(
 mozilla::ipc::IPCResult GPUParent::RecvCrashProcess() {
   MOZ_CRASH("Deliberate GPU process crash");
   return IPC_OK();
+}
+
+bool GPUParent::ShouldContinueFromReplyTimeout() {
+  return GPUProcessManager::ProcessReplyTimeout(this);
 }
 
 void GPUParent::ActorDestroy(ActorDestroyReason aWhy) {

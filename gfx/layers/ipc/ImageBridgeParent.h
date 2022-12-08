@@ -56,6 +56,7 @@ class ImageBridgeParent final : public PImageBridgeParent,
 
   IShmemAllocator* AsShmemAllocator() override { return this; }
 
+  bool ShouldContinueFromReplyTimeout() override;
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
   // CompositableParentManager

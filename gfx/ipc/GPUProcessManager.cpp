@@ -24,6 +24,7 @@
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUChild.h"
+#include "mozilla/gfx/GPUParent.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/ipc/ProcessChild.h"
 #include "mozilla/layers/APZCTreeManagerChild.h"
@@ -86,6 +87,72 @@ void GPUProcessManager::Initialize() {
 }
 
 void GPUProcessManager::Shutdown() { sSingleton = nullptr; }
+
+/* static */
+void GPUProcessManager::MaybeUseReplyTimeout(
+    ipc::IToplevelProtocol* aProtocol) {
+  // We only want to allow a sync IPC timeout if this is a protocol instance
+  // between the parent process and the GPU process. Otherwise we risk allowing
+  // the content process to dictate when we kill/recreate the GPU process.
+  const auto otherPid = aProtocol->OtherPidMaybeInvalid();
+  if (XRE_IsParentProcess()) {
+    if (otherPid != GPUChild::MaybeGetGPUProcessId()) {
+      return;
+    }
+  } else if (XRE_IsGPUProcess()) {
+    if (otherPid != GPUParent::MaybeGetParentProcessId()) {
+      return;
+    }
+  } else {
+    return;
+  }
+
+  int32_t timeout =
+      StaticPrefs::layers_gpu_process_ipc_reply_timeout_ms_AtStartup();
+  if (timeout <= 0) {
+    return;
+  }
+
+  aProtocol->SetReplyTimeoutMs(timeout);
+}
+
+/* static */
+bool GPUProcessManager::ProcessReplyTimeout(ipc::IToplevelProtocol* aProtocol) {
+  if (XRE_IsGPUProcess()) {
+    MOZ_CRASH("IPC reply timeout with parent");
+  }
+
+  MOZ_RELEASE_ASSERT(XRE_IsParentProcess());
+
+  if (NS_IsMainThread()) {
+    gfxCriticalNote << "Killing GPU process, " << aProtocol->GetProtocolName()
+                    << " reply timeout";
+    MOZ_DIAGNOSTIC_ASSERT(sSingleton && sSingleton->mGPUChild &&
+                          sSingleton->mGPUChild->OtherPid() ==
+                              aProtocol->OtherPidMaybeInvalid());
+    if (sSingleton) {
+      sSingleton->KillProcess();
+    }
+
+    return false;
+  }
+
+  gfxCriticalNote << "Killing GPU process via dispatch, "
+                  << aProtocol->GetProtocolName() << " reply timeout";
+  NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "GPUProcess::ProcessReplyTimeout",
+      [otherPid = aProtocol->OtherPidMaybeInvalid()] {
+        if (GPUProcessManager* gpm = GPUProcessManager::Get()) {
+          // Avoid killing the GPU process if it already died after our
+          // dispatch.
+          if (gpm->GPUProcessPid() == otherPid) {
+            gpm->KillProcess();
+          }
+        }
+      }));
+
+  return false;
+}
 
 GPUProcessManager::GPUProcessManager()
     : mTaskFactory(this),

@@ -11,6 +11,7 @@
 #include "VRProcessManager.h"
 #include "gfxConfig.h"
 #include "gfxPlatform.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Components.h"
 #include "mozilla/FOGIPC.h"
 #include "mozilla/StaticPrefs_dom.h"
@@ -41,13 +42,26 @@ namespace gfx {
 
 using namespace layers;
 
+static Atomic<base::ProcessId> sGPUChildOtherPid(base::kInvalidProcessId);
+
 GPUChild::GPUChild(GPUProcessHost* aHost) : mHost(aHost), mGPUReady(false) {
   MOZ_COUNT_CTOR(GPUChild);
 }
 
-GPUChild::~GPUChild() { MOZ_COUNT_DTOR(GPUChild); }
+GPUChild::~GPUChild() {
+  MOZ_COUNT_DTOR(GPUChild);
+  sGPUChildOtherPid = base::kInvalidProcessId;
+}
+
+/* static */ base::ProcessId GPUChild::MaybeGetGPUProcessId() {
+  MOZ_ASSERT(XRE_IsParentProcess());
+  return sGPUChildOtherPid;
+}
 
 void GPUChild::Init() {
+  sGPUChildOtherPid = OtherPid();
+  GPUProcessManager::MaybeUseReplyTimeout(this);
+
   nsTArray<GfxVarUpdate> updates = gfxVars::FetchNonDefaultVars();
 
   DevicePrefs devicePrefs;
@@ -285,6 +299,10 @@ mozilla::ipc::IPCResult GPUChild::RecvAddMemoryReport(
     mMemoryReportRequest->RecvReport(aReport);
   }
   return IPC_OK();
+}
+
+bool GPUChild::ShouldContinueFromReplyTimeout() {
+  return GPUProcessManager::ProcessReplyTimeout(this);
 }
 
 void GPUChild::ActorDestroy(ActorDestroyReason aWhy) {

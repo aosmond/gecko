@@ -186,7 +186,7 @@ CompositorManagerChild::CompositorManagerChild(CompositorManagerParent* aParent,
 
   mCanSend = true;
   AddRef();
-  SetReplyTimeout();
+  GPUProcessManager::MaybeUseReplyTimeout(this);
 }
 
 CompositorManagerChild::CompositorManagerChild(
@@ -203,7 +203,7 @@ CompositorManagerChild::CompositorManagerChild(
 
   mCanSend = true;
   AddRef();
-  SetReplyTimeout();
+  GPUProcessManager::MaybeUseReplyTimeout(this);
 }
 
 void CompositorManagerChild::ActorDealloc() {
@@ -230,24 +230,8 @@ void CompositorManagerChild::ProcessingError(Result aCode,
   }
 }
 
-void CompositorManagerChild::SetReplyTimeout() {
-#ifndef DEBUG
-  // Add a timeout for release builds to kill GPU process when it hangs.
-  if (XRE_IsParentProcess() && GPUProcessManager::Get()->GetGPUChild()) {
-    int32_t timeout =
-        StaticPrefs::layers_gpu_process_ipc_reply_timeout_ms_AtStartup();
-    SetReplyTimeoutMs(timeout);
-  }
-#endif
-}
-
 bool CompositorManagerChild::ShouldContinueFromReplyTimeout() {
-  if (XRE_IsParentProcess()) {
-    gfxCriticalNote << "Killing GPU process due to IPC reply timeout";
-    MOZ_DIAGNOSTIC_ASSERT(GPUProcessManager::Get()->GetGPUChild());
-    GPUProcessManager::Get()->KillProcess();
-  }
-  return false;
+  return GPUProcessManager::ProcessReplyTimeout(this);
 }
 
 mozilla::ipc::IPCResult CompositorManagerChild::RecvNotifyWebRenderError(

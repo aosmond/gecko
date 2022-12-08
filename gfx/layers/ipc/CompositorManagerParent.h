@@ -56,6 +56,7 @@ class CompositorManagerParent final : public PCompositorManagerParent {
       Endpoint<PCanvasManagerParent>&&);
 
   void BindComplete(bool aIsRoot);
+  bool ShouldContinueFromReplyTimeout() override;
   void ActorDestroy(ActorDestroyReason aReason) override;
 
   already_AddRefed<PCompositorBridgeParent> AllocPCompositorBridgeParent(
