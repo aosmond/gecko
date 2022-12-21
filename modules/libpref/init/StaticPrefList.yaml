@@ -9552,7 +9552,9 @@
     mirror: always
 #endif
 
-#ifdef XP_MACOSX
+# (When reading the next line, know that preprocessor.py doesn't
+# understand parentheses, but && is higher precedence than ||.)
+#if defined(XP_WIN) && defined(_ARM64_) || defined(XP_MACOSX) && defined(__aarch64__)
   # These prefs control whether or not a universal build running on
   # an Apple Silicon machine will attempt to use an x64 Widevine or
   # OpenH264 plugin. This requires launching the GMP child process
