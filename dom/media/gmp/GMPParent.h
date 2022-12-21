@@ -153,6 +153,7 @@ class GMPParent final
       const nsAString& aJSON);  // Worker thread.
   RefPtr<GenericPromise> ReadChromiumManifestFile(
       nsIFile* aFile);  // GMP thread.
+  RefPtr<GenericPromise> VerifyGMPMetaData();
   void AddCrashAnnotations();
   void GetCrashID(nsString& aResult);
   void ActorDestroy(ActorDestroyReason aWhy) override;
@@ -198,9 +199,13 @@ class GMPParent final
   GMPState mState;
   nsCOMPtr<nsIFile> mDirectory;  // plugin directory on disk
   nsString mName;  // base name of plugin on disk, UTF-16 because used for paths
+#ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
+  nsString mParentLeafName;
+#endif
   nsCString mDisplayName;  // name of plugin displayed to users
   nsCString mDescription;  // description of plugin for display to users
   nsCString mVersion;
+  nsCString mArch;
 #if defined(XP_WIN) || defined(XP_LINUX)
   nsCString mLibs;
 #endif

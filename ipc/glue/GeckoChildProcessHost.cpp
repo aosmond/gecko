@@ -1353,15 +1353,18 @@ bool WindowsProcessLauncher::DoSetup() {
   const bool isGMP = mProcessType == GeckoProcessType_GMPlugin;
   const bool isWidevine = isGMP && Contains(mExtraOpts, "gmp-widevinecdm");
 #    if defined(_ARM64_)
-  const bool isClearKey = isGMP && Contains(mExtraOpts, "gmp-clearkey");
-  const bool isSandboxBroker =
-      mProcessType == GeckoProcessType_RemoteSandboxBroker;
-  if (isClearKey || isWidevine || isSandboxBroker) {
+  // FIXME how did we tell the sandbox broker to use the right arch?
+  bool useRemoteSandboxBroker = false;
+  if (mLaunchArch & (base::PROCESS_ARCH_I386 | base::PROCESS_ARCH_X86_64)) {
     // On Windows on ARM64 for ClearKey and Widevine, and for the sandbox
     // launcher process, we want to run the x86 plugin-container.exe in
     // the "i686" subdirectory, instead of the aarch64 plugin-container.exe.
     // So insert "i686" into the exePath.
     exePath = exePath.DirName().AppendASCII("i686").Append(exePath.BaseName());
+    useRemoteSandboxBroker =
+        mProcessType != GeckoProcessType_RemoteSandboxBroker;
+  } else {
+    MOZ_ASSERT(mLaunchArch & base::PROCESS_ARCH_ARM_64);
   }
 #    endif  // if defined(_ARM64_)
 #  endif    // defined(MOZ_SANDBOX) || defined(_ARM64_)
@@ -1391,7 +1394,7 @@ bool WindowsProcessLauncher::DoSetup() {
 
 #  if defined(MOZ_SANDBOX)
 #    if defined(_ARM64_)
-  if (isClearKey || isWidevine)
+  if (useRemoteSandboxBroker)
     mResults.mSandboxBroker = new RemoteSandboxBroker();
   else
 #    endif  // if defined(_ARM64_)
