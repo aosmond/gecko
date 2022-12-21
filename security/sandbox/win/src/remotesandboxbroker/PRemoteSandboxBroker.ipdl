@@ -17,6 +17,7 @@ struct LaunchParameters {
   nsString args;
   EnvVar[] env;
   uint32_t processType;
+  uint32_t processLaunchArch;
   uint32_t sandboxLevel;
   nsString[] allowedReadFiles;
   uint64_t[] shareHandles;

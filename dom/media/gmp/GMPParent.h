@@ -153,6 +153,7 @@ class GMPParent final
       const nsAString& aJSON);  // Worker thread.
   RefPtr<GenericPromise> ReadChromiumManifestFile(
       nsIFile* aFile);  // GMP thread.
+  RefPtr<GenericPromise> VerifyGMPMetaData();
   void AddCrashAnnotations();
   void GetCrashID(nsString& aResult);
   void ActorDestroy(ActorDestroyReason aWhy) override;
@@ -191,16 +192,19 @@ class GMPParent final
 #endif
 
 #if defined(XP_MACOSX)
-  nsresult GetPluginFileArch(nsIFile* aPluginDir, nsAutoString& aLeafName,
+  nsresult GetPluginFileArch(nsIFile* aPluginDir, const nsString& aLeafName,
                              uint32_t& aArchSet);
 #endif
 
   GMPState mState;
   nsCOMPtr<nsIFile> mDirectory;  // plugin directory on disk
-  nsString mName;  // base name of plugin on disk, UTF-16 because used for paths
+  nsString mParentLeafName;
+  nsDependentSubstring
+      mName;  // base name of plugin on disk, UTF-16 because used for paths
   nsCString mDisplayName;  // name of plugin displayed to users
   nsCString mDescription;  // description of plugin for display to users
   nsCString mVersion;
+  nsCString mArch;
 #if defined(XP_WIN) || defined(XP_LINUX)
   nsCString mLibs;
 #endif
@@ -234,9 +238,11 @@ class GMPParent final
   // to terminate gracefully.
   bool mHoldingSelfRef;
 
-#if defined(XP_MACOSX) && defined(__aarch64__)
+#ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
   // The child process architecture to use.
   uint32_t mChildLaunchArch;
+#endif
+#if defined(XP_MACOSX) && defined(__aarch64__)
   nsCString mPluginFilePath;
 #endif
 

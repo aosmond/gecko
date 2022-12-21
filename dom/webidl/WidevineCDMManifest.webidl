@@ -9,6 +9,7 @@ dictionary WidevineCDMManifest {
   required DOMString name;
   required DOMString description;
   required DOMString version;
+  required DOMString arch;
   required DOMString x-cdm-module-versions;
   required DOMString x-cdm-interface-versions;
   required DOMString x-cdm-host-versions;
