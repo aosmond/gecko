@@ -189,6 +189,12 @@ class BaseProcessLauncher {
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(BaseProcessLauncher);
 
+#ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
+  void SetLaunchArchitecture(uint32_t aLaunchArch) {
+    mLaunchArch = aLaunchArch;
+  }
+#endif
+
   RefPtr<ProcessLaunchPromise> Launch(GeckoChildProcessHost*);
 
  protected:
@@ -217,6 +223,9 @@ class BaseProcessLauncher {
   nsCOMPtr<nsISerialEventTarget> mLaunchThread;
   GeckoProcessType mProcessType;
   UniquePtr<base::LaunchOptions> mLaunchOptions;
+#ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
+  uint32_t mLaunchArch = base::PROCESS_ARCH_INVALID;
+#endif
   std::vector<std::string> mExtraOpts;
 #ifdef XP_WIN
   nsString mGroupId;
@@ -703,6 +712,9 @@ bool GeckoChildProcessHost::AsyncLaunch(std::vector<std::string> aExtraOpts) {
 
   RefPtr<BaseProcessLauncher> launcher =
       new ProcessLauncher(this, std::move(aExtraOpts));
+#ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
+  launcher->SetLaunchArchitecture(mLaunchArch);
+#endif
 
   // Note: Destroy() waits on mHandlePromise to delete |this|. As such, we want
   // to be sure that all of our post-launch processing on |this| happens before
@@ -1395,7 +1407,7 @@ bool WindowsProcessLauncher::DoSetup() {
 #  if defined(MOZ_SANDBOX)
 #    if defined(_ARM64_)
   if (useRemoteSandboxBroker)
-    mResults.mSandboxBroker = new RemoteSandboxBroker();
+    mResults.mSandboxBroker = new RemoteSandboxBroker(mLaunchArch);
   else
 #    endif  // if defined(_ARM64_)
     mResults.mSandboxBroker = new SandboxBroker();

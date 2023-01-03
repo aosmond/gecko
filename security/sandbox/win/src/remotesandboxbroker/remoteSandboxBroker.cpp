@@ -11,7 +11,8 @@
 
 namespace mozilla {
 
-RemoteSandboxBroker::RemoteSandboxBroker() {}
+RemoteSandboxBroker::RemoteSandboxBroker(uint32_t aLaunchArch)
+    : mLaunchArch(aLaunchArch) {}
 
 RemoteSandboxBroker::~RemoteSandboxBroker() {
   MOZ_ASSERT(
@@ -65,6 +66,7 @@ bool RemoteSandboxBroker::LaunchApp(
         EnvVar(toNsString(itr.first), toNsString(itr.second)));
   }
 
+  mParameters.processLaunchArch() = mLaunchArch;
   mParameters.processType() = uint32_t(aProcessType);
   mParameters.enableLogging() = aEnableLogging;
 
@@ -165,7 +167,7 @@ bool RemoteSandboxBroker::SetSecurityLevelForUtilityProcess(
 }
 
 AbstractSandboxBroker* CreateRemoteSandboxBroker() {
-  return new RemoteSandboxBroker();
+  return new RemoteSandboxBroker(base::PROCESS_ARCH_INVALID);
 }
 
 }  // namespace mozilla
