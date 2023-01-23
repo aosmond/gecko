@@ -189,7 +189,7 @@ RefPtr<GenericPromise> GMPParent::VerifyGMPMetaData() {
 #else
   if (mArch.Equals("x64"_ns)) {
     pluginArch = base::PROCESS_ARCH_X86_64;
-  } else if (mArch.Equals("ia32"_ns)) {
+  } else if (mArch.Equals("ia32"_ns) || mArch.Equals("x86"_ns)) {
     pluginArch = base::PROCESS_ARCH_I386;
   } else if (mArch.Equals("arm64"_ns)) {
     pluginArch = base::PROCESS_ARCH_ARM_64;
