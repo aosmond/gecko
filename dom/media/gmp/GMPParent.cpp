@@ -198,6 +198,7 @@ RefPtr<GenericPromise> GMPParent::VerifyGMPMetaData() {
                          mArch.get());
     return GenericPromise::CreateAndReject(NS_ERROR_NOT_IMPLEMENTED, __func__);
   }
+  GMP_PARENT_LOG_DEBUG("%s: Plugin arch: 0x%x", __FUNCTION__, pluginArch);
 #endif
 
   const uint32_t x86 = base::PROCESS_ARCH_X86_64 | base::PROCESS_ARCH_I386;

@@ -1381,6 +1381,12 @@ bool WindowsProcessLauncher::DoSetup() {
 #    endif  // if defined(_ARM64_)
 #  endif    // defined(MOZ_SANDBOX) || defined(_ARM64_)
 
+  CHROMIUM_LOG(INFO) << "Path: " << exePath.value();
+  CHROMIUM_LOG(INFO) << "Process type: " << mProcessType;
+#  ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
+  CHROMIUM_LOG(INFO) << "Launch arch: " << mLaunchArch;
+#  endif
+
   mCmdLine.emplace(exePath.ToWStringHack());
 
   if (pathType == BinPathType::Self) {
