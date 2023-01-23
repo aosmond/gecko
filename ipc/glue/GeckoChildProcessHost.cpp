@@ -1375,8 +1375,6 @@ bool WindowsProcessLauncher::DoSetup() {
     exePath = exePath.DirName().AppendASCII("i686").Append(exePath.BaseName());
     useRemoteSandboxBroker =
         mProcessType != GeckoProcessType_RemoteSandboxBroker;
-  } else {
-    MOZ_ASSERT(mLaunchArch & base::PROCESS_ARCH_ARM_64);
   }
 #    endif  // if defined(_ARM64_)
 #  endif    // defined(MOZ_SANDBOX) || defined(_ARM64_)
