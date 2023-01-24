@@ -191,7 +191,7 @@ class GMPParent final
   void PreTranslateBinsWorker();
 #endif
 
-#if defined(XP_MACOSX)
+#if defined(XP_WIN) || defined(XP_MACOSX)
   nsresult GetPluginFileArch(nsIFile* aPluginDir, const nsString& aLeafName,
                              uint32_t& aArchSet);
 #endif
@@ -204,7 +204,6 @@ class GMPParent final
   nsCString mDisplayName;  // name of plugin displayed to users
   nsCString mDescription;  // description of plugin for display to users
   nsCString mVersion;
-  nsCString mArch;
 #if defined(XP_WIN) || defined(XP_LINUX)
   nsCString mLibs;
 #endif
