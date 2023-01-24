@@ -16,6 +16,7 @@
 #include "nsWindowsDllInterceptor.h"
 #include "mozilla/CmdLineAndEnvUtils.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/FileUtilsWin.h"
 #include "mozilla/StackWalk_windows.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/UniquePtr.h"
@@ -109,62 +110,6 @@ BOOLEAN WINAPI patched_RtlInstallFunctionTableCallback(
                                               OutOfProcessCallbackDll);
 }
 #endif
-
-template <class T>
-struct RVAMap {
-  RVAMap(HANDLE map, DWORD offset) {
-    SYSTEM_INFO info;
-    GetSystemInfo(&info);
-
-    DWORD alignedOffset =
-        (offset / info.dwAllocationGranularity) * info.dwAllocationGranularity;
-
-    MOZ_ASSERT(offset - alignedOffset < info.dwAllocationGranularity, "Wtf");
-
-    mRealView = ::MapViewOfFile(map, FILE_MAP_READ, 0, alignedOffset,
-                                sizeof(T) + (offset - alignedOffset));
-
-    mMappedView =
-        mRealView
-            ? reinterpret_cast<T*>((char*)mRealView + (offset - alignedOffset))
-            : nullptr;
-  }
-  ~RVAMap() {
-    if (mRealView) {
-      ::UnmapViewOfFile(mRealView);
-    }
-  }
-  operator const T*() const { return mMappedView; }
-  const T* operator->() const { return mMappedView; }
-
- private:
-  const T* mMappedView;
-  void* mRealView;
-};
-
-static DWORD GetTimestamp(const wchar_t* path) {
-  DWORD timestamp = 0;
-
-  HANDLE file = ::CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr,
-                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-  if (file != INVALID_HANDLE_VALUE) {
-    HANDLE map =
-        ::CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
-    if (map) {
-      RVAMap<IMAGE_DOS_HEADER> peHeader(map, 0);
-      if (peHeader) {
-        RVAMap<IMAGE_NT_HEADERS> ntHeader(map, peHeader->e_lfanew);
-        if (ntHeader) {
-          timestamp = ntHeader->FileHeader.TimeDateStamp;
-        }
-      }
-      ::CloseHandle(map);
-    }
-    ::CloseHandle(file);
-  }
-
-  return timestamp;
-}
 
 // This lock protects both the reentrancy sentinel and the crash reporter
 // data structures.
@@ -499,7 +444,7 @@ static NTSTATUS NTAPI patched_LdrLoadDll(PWCHAR filePath, PULONG flags,
         }
 
         if (info->mFlags & DllBlockInfo::USE_TIMESTAMP) {
-          fVersion = GetTimestamp(full_fname.get());
+          fVersion = GetFileTimestamp(full_fname.get());
           if (fVersion > info->mMaxVersion) {
             load_ok = true;
           }

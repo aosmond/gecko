@@ -140,6 +140,10 @@ inline bool NtPathToDosPath(const nsAString& aNtPath, nsAString& aDosPath) {
 bool HandleToFilename(HANDLE aHandle, const LARGE_INTEGER& aOffset,
                       nsAString& aFilename);
 
+DWORD GetFileTimestamp(const wchar_t* path);
+
+uint32_t GetExecutableArchitecture(const wchar_t* aPath);
+
 }  // namespace mozilla
 
 #endif  // mozilla_FileUtilsWin_h

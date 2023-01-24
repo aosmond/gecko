@@ -37,6 +37,7 @@
 #include "ProfilerParent.h"
 #include "runnable_utils.h"
 #ifdef XP_WIN
+#  include "mozilla/FileUtilsWin.h"
 #  include "WMFDecoderModule.h"
 #endif
 #if defined(MOZ_WIDGET_ANDROID)
@@ -97,7 +98,6 @@ void GMPParent::CloneFrom(const GMPParent* aOther) {
   MOZ_ASSERT(mParentLeafName.Length() > 4);
   mName.Assign(Substring(mParentLeafName, 4));
   mVersion = aOther->mVersion;
-  mArch = aOther->mArch;
   mDescription = aOther->mDescription;
   mDisplayName = aOther->mDisplayName;
 #if defined(XP_WIN) || defined(XP_LINUX)
@@ -113,14 +113,18 @@ void GMPParent::CloneFrom(const GMPParent* aOther) {
 #endif
 }
 
-#if defined(XP_MACOSX)
+#ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
 nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginDir,
                                       const nsString& aLeafName,
                                       uint32_t& aArchSet) {
   // Build up the plugin filename
   nsAutoString baseName;
   baseName = Substring(aLeafName, 4, aLeafName.Length() - 1);
+#  if defined(XP_MACOSX)
   nsAutoString pluginFileName = u"lib"_ns + baseName + u".dylib"_ns;
+#  elif defined(XP_WIN)
+  nsAutoString pluginFileName = baseName + u".dll"_ns;
+#  endif
   GMP_PARENT_LOG_DEBUG("%s: pluginFileName: %s", __FUNCTION__,
                        NS_LossyConvertUTF16toASCII(pluginFileName).get());
 
@@ -136,16 +140,23 @@ nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginDir,
   NS_ENSURE_SUCCESS(rv, rv);
   GMP_PARENT_LOG_DEBUG("%s: pluginPath: %s", __FUNCTION__, pluginPath.get());
 
+#  if defined(XP_MACOSX)
   rv = nsMacUtilsImpl::GetArchitecturesForBinary(pluginPath.get(), &aArchSet);
   NS_ENSURE_SUCCESS(rv, rv);
 
 #  if defined(__aarch64__)
   mPluginFilePath = pluginPath;
 #  endif
+#  elif defined(XP_WIN)
+  aArchSet = GetExecutableArchitecture(pluginPath.get());
+  if (aArchSet == base::PROCESS_ARCH_INVALID) {
+    return NS_ERROR_FAILURE;
+  }
+#  endif
 
   return NS_OK;
 }
-#endif  // defined(XP_MACOSX)
+#endif  // defined(ALLOW_GECKO_CHILD_PROCESS_ARCH)
 
 RefPtr<GenericPromise> GMPParent::Init(GeckoMediaPluginServiceParent* aService,
                                        nsIFile* aPluginDir) {
@@ -177,27 +188,12 @@ RefPtr<GenericPromise> GMPParent::Init(GeckoMediaPluginServiceParent* aService,
 
 RefPtr<GenericPromise> GMPParent::VerifyGMPMetaData() {
   uint32_t pluginArch = base::PROCESS_ARCH_INVALID;
-#if defined(XP_MACOSX)
   nsresult rv = GetPluginFileArch(mDirectory, mParentLeafName, pluginArch);
   if (NS_FAILED(rv)) {
     GMP_PARENT_LOG_DEBUG("%s: Plugin arch error: %d", __FUNCTION__, rv);
   } else {
     GMP_PARENT_LOG_DEBUG("%s: Plugin arch: 0x%x", __FUNCTION__, pluginArch);
   }
-#else
-  if (mArch.Equals("x64"_ns)) {
-    pluginArch = base::PROCESS_ARCH_X86_64;
-  } else if (mArch.Equals("ia32"_ns) || mArch.Equals("x86"_ns)) {
-    pluginArch = base::PROCESS_ARCH_I386;
-  } else if (mArch.Equals("arm64"_ns)) {
-    pluginArch = base::PROCESS_ARCH_ARM_64;
-  } else {
-    GMP_PARENT_LOG_DEBUG("%s: Unrecognized plugin arch: %s", __FUNCTION__,
-                         mArch.get());
-    return GenericPromise::CreateAndReject(NS_ERROR_NOT_IMPLEMENTED, __func__);
-  }
-  GMP_PARENT_LOG_DEBUG("%s: Plugin arch: 0x%x", __FUNCTION__, pluginArch);
-#endif
 
   const uint32_t x86 = base::PROCESS_ARCH_X86_64 | base::PROCESS_ARCH_I386;
 #ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
@@ -844,11 +840,6 @@ RefPtr<GenericPromise> GMPParent::ReadGMPInfoFile(nsIFile* aFile) {
     return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
   }
 
-  // "Arch" field is optional.
-  if (!ReadInfoField(parser, "arch"_ns, mArch)) {
-    mArch.Assign("ia32"_ns);
-  }
-
 #if defined(XP_WIN) || defined(XP_LINUX)
   // "Libraries" field is optional.
   ReadInfoField(parser, "libraries"_ns, mLibs);
@@ -955,7 +946,6 @@ RefPtr<GenericPromise> GMPParent::ParseChromiumManifest(
   CopyUTF16toUTF8(m.mName, mDisplayName);
   CopyUTF16toUTF8(m.mDescription, mDescription);
   CopyUTF16toUTF8(m.mVersion, mVersion);
-  CopyUTF16toUTF8(m.mArch, mArch);
 
 #if defined(XP_LINUX) && defined(MOZ_SANDBOX)
   if (!mozilla::SandboxInfo::Get().CanSandboxMedia()) {
