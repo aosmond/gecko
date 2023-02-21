@@ -900,7 +900,7 @@ TEST_F(GfxConfigManager, WebRenderScissoredCacheClearsBlocked) {
 }
 
 TEST_F(GfxConfigManager, WebRenderScissoredCacheClearsForceEnabled) {
-  mWrScissoredCacheClearsForceEnabled = false;
+  mWrScissoredCacheClearsForceEnabled = true;
   mMockGfxInfo->mStatusWrScissoredCacheClears =
       nsIGfxInfo::FEATURE_BLOCKED_DEVICE;
   ConfigureWebRender();
@@ -911,7 +911,7 @@ TEST_F(GfxConfigManager, WebRenderScissoredCacheClearsForceEnabled) {
   EXPECT_TRUE(mFeatures.mWrDComp.IsEnabled());
   EXPECT_TRUE(mFeatures.mWrShaderCache.IsEnabled());
   EXPECT_TRUE(mFeatures.mWrOptimizedShaders.IsEnabled());
-  EXPECT_FALSE(mFeatures.mWrScissoredCacheClears.IsEnabled());
+  EXPECT_TRUE(mFeatures.mWrScissoredCacheClears.IsEnabled());
   EXPECT_TRUE(mFeatures.mWrPartial.IsEnabled());
   EXPECT_TRUE(mFeatures.mHwCompositing.IsEnabled());
   EXPECT_TRUE(mFeatures.mGPUProcess.IsEnabled());
