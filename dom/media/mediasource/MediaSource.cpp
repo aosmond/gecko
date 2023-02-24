@@ -199,14 +199,15 @@ void MediaSource::IsTypeSupported(const nsAString& aType,
 /* static */
 already_AddRefed<MediaSource> MediaSource::Constructor(
     const GlobalObject& aGlobal, ErrorResult& aRv) {
-  nsCOMPtr<nsPIDOMWindowInner> window =
+  nsCOMPtr<nsIGlobalObject> global =
       do_QueryInterface(aGlobal.GetAsSupports());
-  if (!window) {
+  if (!global) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
 
-  RefPtr<MediaSource> mediaSource = new MediaSource(window);
+  RefPtr<MediaSource> mediaSource = new MediaSource(global);
+  mediaSource->Initialize();
   return mediaSource.forget();
 }
 
@@ -225,62 +226,31 @@ already_AddRefed<MediaSource> MediaSource::Constructor(
 MediaSource::~MediaSource() {
   MOZ_ASSERT(NS_IsMainThread());
   MSE_API("");
-  if (mDecoder) {
-    mDecoder->DetachMediaSource();
-  }
+  Destroy();
 }
 
 SourceBufferList* MediaSource::SourceBuffers() {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT_IF(mReadyState == MediaSourceReadyState::Closed,
-                mSourceBuffers->IsEmpty());
-  return mSourceBuffers;
+  return mImpl->SourceBuffers();
 }
 
 SourceBufferList* MediaSource::ActiveSourceBuffers() {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT_IF(mReadyState == MediaSourceReadyState::Closed,
-                mActiveSourceBuffers->IsEmpty());
-  return mActiveSourceBuffers;
+  return mImpl->ActiveSourceBuffers();
 }
 
 MediaSourceReadyState MediaSource::ReadyState() {
-  MOZ_ASSERT(NS_IsMainThread());
-  return mReadyState;
+  return mImpl->ReadyState();
 }
 
 double MediaSource::Duration() {
-  MOZ_ASSERT(NS_IsMainThread());
-  if (mReadyState == MediaSourceReadyState::Closed) {
-    return UnspecifiedNaN<double>();
-  }
-  MOZ_ASSERT(mDecoder);
-  return mDecoder->GetDuration();
+  return mImpl->Duration();
 }
 
 void MediaSource::SetDuration(double aDuration, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-  if (aDuration < 0 || IsNaN(aDuration)) {
-    nsPrintfCString error("Invalid duration value %f", aDuration);
-    MSE_API("SetDuration(aDuration=%f, invalid value)", aDuration);
-    aRv.ThrowTypeError(error);
-    return;
-  }
-  if (mReadyState != MediaSourceReadyState::Open ||
-      mSourceBuffers->AnyUpdating()) {
-    MSE_API("SetDuration(aDuration=%f, invalid state)", aDuration);
-    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
-    return;
-  }
-  DurationChange(aDuration, aRv);
-  MSE_API("SetDuration(aDuration=%f, errorCode=%d)", aDuration,
-          aRv.ErrorCodeAsInt());
+  mImpl->SetDuration(aDuration, aRv);
 }
 
 void MediaSource::SetDuration(double aDuration) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MSE_API("SetDuration(aDuration=%f)", aDuration);
-  mDecoder->SetMediaSourceDuration(aDuration);
+  mImpl->SetDuration(aDuration);
 }
 
 already_AddRefed<SourceBuffer> MediaSource::AddSourceBuffer(
@@ -532,130 +502,38 @@ void MediaSource::Detach() {
   mDecoder = nullptr;
 }
 
-MediaSource::MediaSource(nsPIDOMWindowInner* aWindow)
-    : DOMEventTargetHelper(aWindow),
-      mDecoder(nullptr),
-      mPrincipal(nullptr),
-      mAbstractMainThread(
-          GetOwnerGlobal()->AbstractMainThreadFor(TaskCategory::Other)),
-      mReadyState(MediaSourceReadyState::Closed) {
+MediaSource::MediaSource(nsIGlobalObject* aGlobal)
+    : DOMEventTargetHelper(aGlobal) {
   MOZ_ASSERT(NS_IsMainThread());
-  mSourceBuffers = new SourceBufferList(this);
-  mActiveSourceBuffers = new SourceBufferList(this);
-
-  nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(aWindow);
-  if (sop) {
-    mPrincipal = sop->GetPrincipal();
-  }
 
   MSE_API("MediaSource(aWindow=%p) mSourceBuffers=%p mActiveSourceBuffers=%p",
           aWindow, mSourceBuffers.get(), mActiveSourceBuffers.get());
 }
 
-void MediaSource::SetReadyState(MediaSourceReadyState aState) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aState != mReadyState);
-  MSE_DEBUG("SetReadyState(aState=%" PRIu32 ") mReadyState=%" PRIu32,
-            static_cast<uint32_t>(aState), static_cast<uint32_t>(mReadyState));
-
-  MediaSourceReadyState oldState = mReadyState;
-  mReadyState = aState;
-
-  if (mReadyState == MediaSourceReadyState::Open &&
-      (oldState == MediaSourceReadyState::Closed ||
-       oldState == MediaSourceReadyState::Ended)) {
-    QueueAsyncSimpleEvent("sourceopen");
-    if (oldState == MediaSourceReadyState::Ended) {
-      // Notify reader that more data may come.
-      mDecoder->Ended(false);
-    }
-    return;
-  }
-
-  if (mReadyState == MediaSourceReadyState::Ended &&
-      oldState == MediaSourceReadyState::Open) {
-    QueueAsyncSimpleEvent("sourceended");
-    return;
-  }
-
-  if (mReadyState == MediaSourceReadyState::Closed &&
-      (oldState == MediaSourceReadyState::Open ||
-       oldState == MediaSourceReadyState::Ended)) {
-    QueueAsyncSimpleEvent("sourceclose");
-    return;
-  }
-
-  NS_WARNING("Invalid MediaSource readyState transition");
+void MediaSource::Initialize() {
+  mImpl = MediaSourceImpl::Create(this);
 }
 
-void MediaSource::DispatchSimpleEvent(const char* aName) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MSE_API("Dispatch event '%s'", aName);
-  DispatchTrustedEvent(NS_ConvertUTF8toUTF16(aName));
-}
-
-void MediaSource::QueueAsyncSimpleEvent(const char* aName) {
-  MSE_DEBUG("Queuing event '%s'", aName);
-  nsCOMPtr<nsIRunnable> event = new AsyncEventRunner<MediaSource>(this, aName);
-  mAbstractMainThread->Dispatch(event.forget());
-}
-
-void MediaSource::DurationChange(double aNewDuration, ErrorResult& aRv) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MSE_DEBUG("DurationChange(aNewDuration=%f)", aNewDuration);
-
-  // 1. If the current value of duration is equal to new duration, then return.
-  if (mDecoder->GetDuration() == aNewDuration) {
-    return;
-  }
-
-  // 2. If new duration is less than the highest starting presentation timestamp
-  // of any buffered coded frames for all SourceBuffer objects in sourceBuffers,
-  // then throw an InvalidStateError exception and abort these steps.
-  if (aNewDuration < mSourceBuffers->HighestStartTime()) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
-    return;
-  }
-
-  // 3. Let highest end time be the largest track buffer ranges end time across
-  // all the track buffers across all SourceBuffer objects in sourceBuffers.
-  double highestEndTime = mSourceBuffers->HighestEndTime();
-  // 4. If new duration is less than highest end time, then
-  //    4.1 Update new duration to equal highest end time.
-  aNewDuration = std::max(aNewDuration, highestEndTime);
-
-  // 5. Update the media duration to new duration and run the HTMLMediaElement
-  // duration change algorithm.
-  mDecoder->SetMediaSourceDuration(aNewDuration);
+void MediaSource::Destroy() {
+  mImpl->Destroy();
 }
 
 already_AddRefed<Promise> MediaSource::MozDebugReaderData(ErrorResult& aRv) {
   // Creating a JS promise
-  nsPIDOMWindowInner* win = GetOwner();
-  if (!win) {
+  nsIGlobalObject* global = GetOwnerGlobal();
+  if (!global) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
-  RefPtr<Promise> domPromise = Promise::Create(win->AsGlobal(), aRv);
+  RefPtr<Promise> domPromise = Promise::Create(global, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
-  MOZ_ASSERT(domPromise);
-  UniquePtr<MediaSourceDecoderDebugInfo> info =
-      MakeUnique<MediaSourceDecoderDebugInfo>();
-  mDecoder->RequestDebugInfo(*info)->Then(
-      mAbstractMainThread, __func__,
-      [domPromise, infoPtr = std::move(info)] {
-        domPromise->MaybeResolve(infoPtr.get());
-      },
-      [] {
-        MOZ_ASSERT_UNREACHABLE("Unexpected rejection while getting debug data");
-      });
-
+  mImpl->MozDebugReaderData(domPromise);
   return domPromise.forget();
 }
 
-nsPIDOMWindowInner* MediaSource::GetParentObject() const { return GetOwner(); }
+nsIGlobalObject* MediaSource::GetParentObject() const { return GetOwnerGlobal(); }
 
 JSObject* MediaSource::WrapObject(JSContext* aCx,
                                   JS::Handle<JSObject*> aGivenProto) {
