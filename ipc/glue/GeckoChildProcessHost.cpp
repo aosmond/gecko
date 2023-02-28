@@ -1561,6 +1561,9 @@ RefPtr<ProcessHandlePromise> WindowsProcessLauncher::DoLaunch() {
                  mCmdLine->command_line_string().c_str());
       return ProcessHandlePromise::CreateAndResolve(handle, __func__);
     }
+    // Ensure the IPDL channel for the broker is shutdown if we created it
+    // before we failed to launch the process.
+    mResults.mSandboxBroker->Shutdown();
     return ProcessHandlePromise::CreateAndReject(LaunchError{}, __func__);
   }
 #  endif  // defined(MOZ_SANDBOX)
