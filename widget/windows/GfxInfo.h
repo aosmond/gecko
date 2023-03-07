@@ -79,7 +79,7 @@ class GfxInfo : public GfxInfoBase {
                                 OperatingSystem* aOS = nullptr) override;
   const nsTArray<GfxDriverInfo>& GetGfxDriverInfo() override;
 
-  void DescribeFeatures(JSContext* cx, JS::Handle<JSObject*> aOut) override;
+  void DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aOut) override;
 
   void AddCrashReportAnnotations();
 

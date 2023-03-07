@@ -79,6 +79,8 @@ class GfxInfo final : public GfxInfoBase {
   virtual bool DoesDriverVendorMatch(const nsAString& aBlocklistVendor,
                                      const nsAString& aDriverVendor) override;
 
+  void DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aOut) override;
+
  private:
   nsCString mVendorId;
   nsCString mDeviceId;

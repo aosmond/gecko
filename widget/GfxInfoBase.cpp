@@ -1741,34 +1741,51 @@ bool GfxInfoBase::BuildFeatureStateLog(JSContext* aCx,
 void GfxInfoBase::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
   JS::Rooted<JSObject*> obj(aCx);
 
-  gfx::FeatureState& hwCompositing =
+  const gfx::FeatureState& hwCompositing =
       gfxConfig::GetFeature(gfx::Feature::HW_COMPOSITING);
   InitFeatureObject(aCx, aObj, "hwCompositing", hwCompositing, &obj);
 
-  gfx::FeatureState& gpuProcess =
+  const gfx::FeatureState& gpuProcess =
       gfxConfig::GetFeature(gfx::Feature::GPU_PROCESS);
   InitFeatureObject(aCx, aObj, "gpuProcess", gpuProcess, &obj);
 
-  gfx::FeatureState& webrender = gfxConfig::GetFeature(gfx::Feature::WEBRENDER);
+  const gfx::FeatureState& webrender =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER);
   InitFeatureObject(aCx, aObj, "webrender", webrender, &obj);
 
-  gfx::FeatureState& wrCompositor =
+  const gfx::FeatureState& wrCompositor =
       gfxConfig::GetFeature(gfx::Feature::WEBRENDER_COMPOSITOR);
   InitFeatureObject(aCx, aObj, "wrCompositor", wrCompositor, &obj);
 
-  gfx::FeatureState& openglCompositing =
+  const gfx::FeatureState& wrPartial =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_PARTIAL);
+  InitFeatureObject(aCx, aObj, "wrPartial", wrPartial, &obj);
+
+  const gfx::FeatureState& wrShaderCache =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_SHADER_CACHE);
+  InitFeatureObject(aCx, aObj, "wrShaderCache", wrShaderCache, &obj);
+
+  const gfx::FeatureState& wrOptimizedShaders =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_OPTIMIZED_SHADERS);
+  InitFeatureObject(aCx, aObj, "wrOptimizedShaders", wrOptimizedShaders, &obj);
+
+  const gfx::FeatureState& wrScissoredCacheClears =
+      gfxConfig::GetFeature(gfx::Feature::WEBRENDER_SCISSORED_CACHE_CLEARS);
+  InitFeatureObject(aCx, aObj, "wrScissoredCacheClears", wrScissoredCacheClears,
+                    &obj);
+
+  const gfx::FeatureState& openglCompositing =
       gfxConfig::GetFeature(gfx::Feature::OPENGL_COMPOSITING);
   InitFeatureObject(aCx, aObj, "openglCompositing", openglCompositing, &obj);
 
-  gfx::FeatureState& omtp = gfxConfig::GetFeature(gfx::Feature::OMTP);
-  InitFeatureObject(aCx, aObj, "omtp", omtp, &obj);
+  const gfx::FeatureState& webgpu = gfxConfig::GetFeature(gfx::Feature::WEBGPU);
+  InitFeatureObject(aCx, aObj, "webgpu", webgpu, &obj);
 }
 
-bool GfxInfoBase::InitFeatureObject(JSContext* aCx,
-                                    JS::Handle<JSObject*> aContainer,
-                                    const char* aName,
-                                    mozilla::gfx::FeatureState& aFeatureState,
-                                    JS::MutableHandle<JSObject*> aOutObj) {
+bool GfxInfoBase::InitFeatureObject(
+    JSContext* aCx, JS::Handle<JSObject*> aContainer, const char* aName,
+    const mozilla::gfx::FeatureState& aFeatureState,
+    JS::MutableHandle<JSObject*> aOutObj) {
   JS::Rooted<JSObject*> obj(aCx, JS_NewPlainObject(aCx));
   if (!obj) {
     return false;

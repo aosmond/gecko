@@ -82,6 +82,7 @@ class GfxInfo : public GfxInfoBase {
       int32_t aFeature, int32_t* aStatus, nsAString& aSuggestedDriverVersion,
       const nsTArray<GfxDriverInfo>& aDriverInfo, nsACString& aFailureId,
       OperatingSystem* aOS = nullptr) override;
+  void DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) override;
   virtual const nsTArray<GfxDriverInfo>& GetGfxDriverInfo() override;
 
  private:

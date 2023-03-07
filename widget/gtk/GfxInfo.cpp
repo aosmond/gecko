@@ -16,6 +16,7 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
+#include "gfxConfig.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/SSE.h"
 #include "mozilla/Telemetry.h"
@@ -992,6 +993,30 @@ nsresult GfxInfo::GetFeatureStatusImpl(
 
   return GfxInfoBase::GetFeatureStatusImpl(
       aFeature, aStatus, aSuggestedDriverVersion, aDriverInfo, aFailureId, &os);
+}
+
+void GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
+  // Add the platform neutral features
+  GfxInfoBase::DescribeFeatures(aCx, aObj);
+
+  JS::Rooted<JSObject*> obj(aCx);
+
+  const gfx::FeatureState& x11Egl =
+      gfx::gfxConfig::GetFeature(Feature::X11_EGL);
+  InitFeatureObject(aCx, aObj, "x11Egl", x11Egl, &obj);
+
+  const gfx::FeatureState& dmabuf = gfx::gfxConfig::GetFeature(Feature::DMABUF);
+  InitFeatureObject(aCx, aObj, "dmabuf", dmabuf, &obj);
+
+  const gfx::FeatureState& dmabufSurfaceExport =
+      gfx::gfxConfig::GetFeature(Feature::DMABUF_SURFACE_EXPORT);
+  InitFeatureObject(aCx, aObj, "dmabufSurfaceExport", dmabufSurfaceExport,
+                    &obj);
+
+  const gfx::FeatureState& hardwareVideoDecoding =
+      gfx::gfxConfig::GetFeature(Feature::HARDWARE_VIDEO_DECODING);
+  InitFeatureObject(aCx, aObj, "hardwareVideoDecoding", hardwareVideoDecoding,
+                    &obj);
 }
 
 NS_IMETHODIMP

@@ -1973,11 +1973,31 @@ void GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
 
   JS::Rooted<JSObject*> obj(aCx);
 
-  gfx::FeatureState& d3d11 = gfxConfig::GetFeature(Feature::D3D11_COMPOSITING);
-  if (!InitFeatureObject(aCx, aObj, "d3d11", d3d11, &obj)) {
-    return;
-  }
-  if (d3d11.GetValue() == gfx::FeatureStatus::Available) {
+  const gfx::FeatureState& reuseDecoderDevice =
+      gfxConfig::GetFeature(Feature::REUSE_DECODER_DEVICE);
+  InitFeatureObject(aCx, aObj, "reuseDecoderDevice", reuseDecoderDevice, &obj);
+
+  const gfx::FeatureState& videoOverlay =
+      gfxConfig::GetFeature(Feature::VIDEO_OVERLAY);
+  InitFeatureObject(aCx, aObj, "videoOverlay", videoOverlay, &obj);
+
+  const gfx::FeatureState& hwDecodedVideoZeroCopy =
+      gfxConfig::GetFeature(Feature::HW_DECODED_VIDEO_ZERO_COPY);
+  InitFeatureObject(aCx, aObj, "hwDecodedVideoZeroCopy", hwDecodedVideoZeroCopy,
+                    &obj);
+
+  const gfx::FeatureState& vp8HwDecode =
+      gfxConfig::GetFeature(Feature::VP8_HW_DECODE);
+  InitFeatureObject(aCx, aObj, "vp8HwDecode", vp8HwDecode, &obj);
+
+  const gfx::FeatureState& vp9HwDecode =
+      gfxConfig::GetFeature(Feature::VP9_HW_DECODE);
+  InitFeatureObject(aCx, aObj, "vp9HwDecode", vp9HwDecode, &obj);
+
+  const gfx::FeatureState& d3d11 =
+      gfxConfig::GetFeature(Feature::D3D11_COMPOSITING);
+  if (InitFeatureObject(aCx, aObj, "d3d11", d3d11, &obj) &&
+      d3d11.GetValue() == gfx::FeatureStatus::Available) {
     DeviceManagerDx* dm = DeviceManagerDx::Get();
     JS::Rooted<JS::Value> val(aCx,
                               JS::Int32Value(dm->GetCompositorFeatureLevel()));
@@ -2004,11 +2024,8 @@ void GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
     JS_SetProperty(aCx, obj, "blocklisted", val);
   }
 
-  gfx::FeatureState& d2d = gfxConfig::GetFeature(Feature::DIRECT2D);
-  if (!InitFeatureObject(aCx, aObj, "d2d", d2d, &obj)) {
-    return;
-  }
-  {
+  const gfx::FeatureState& d2d = gfxConfig::GetFeature(Feature::DIRECT2D);
+  if (InitFeatureObject(aCx, aObj, "d2d", d2d, &obj)) {
     const char* version = "1.1";
     JS::Rooted<JSString*> str(aCx, JS_NewStringCopyZ(aCx, version));
     JS::Rooted<JS::Value> val(aCx, JS::StringValue(str));

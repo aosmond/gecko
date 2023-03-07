@@ -5,6 +5,7 @@
 
 #include "GfxInfo.h"
 #include "AndroidBuild.h"
+#include "gfxConfig.h"
 #include "GLContext.h"
 #include "GLContextProvider.h"
 #include "nsUnicharUtils.h"
@@ -679,6 +680,21 @@ nsresult GfxInfo::GetFeatureStatusImpl(
 
   return GfxInfoBase::GetFeatureStatusImpl(
       aFeature, aStatus, aSuggestedDriverVersion, aDriverInfo, aFailureId, &os);
+}
+
+void GfxInfo::DescribeFeatures(JSContext* aCx, JS::Handle<JSObject*> aObj) {
+  // Add the platform neutral features
+  GfxInfoBase::DescribeFeatures(aCx, aObj);
+
+  JS::Rooted<JSObject*> obj(aCx);
+
+  const gfx::FeatureState& vp8HwDecode =
+      gfx::gfxConfig::GetFeature(gfx::Feature::VP8_HW_DECODE);
+  InitFeatureObject(aCx, aObj, "vp8HwDecode", vp8HwDecode, &obj);
+
+  const gfx::FeatureState& vp9HwDecode =
+      gfx::gfxConfig::GetFeature(gfx::Feature::VP9_HW_DECODE);
+  InitFeatureObject(aCx, aObj, "vp9HwDecode", vp9HwDecode, &obj);
 }
 
 static nsCString FeatureCacheOsVerPrefName(int32_t aFeature) {
