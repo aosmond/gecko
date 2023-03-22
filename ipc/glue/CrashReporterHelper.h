@@ -32,9 +32,13 @@ namespace ipc {
 template <GeckoProcessType PT>
 class CrashReporterHelper {
  public:
-  CrashReporterHelper() : mCrashReporter(nullptr) {}
+  CrashReporterHelper()
+      : mCrashReporter(MakeUnique<ipc::CrashReporterHost>(PT)) {}
+
   IPCResult RecvInitCrashReporter(const CrashReporter::ThreadId& aThreadId) {
-    mCrashReporter = MakeUnique<ipc::CrashReporterHost>(PT, aThreadId);
+    if (mCrashReporter) {
+      mCrashReporter->Initialize(aThreadId);
+    }
     return IPC_OK();
   }
 

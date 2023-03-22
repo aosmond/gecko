@@ -17,12 +17,26 @@
 namespace mozilla {
 namespace ipc {
 
+CrashReporterHost::CrashReporterHost(GeckoProcessType aProcessType)
+    : mProcessType(aProcessType),
+      mThreadId(CrashReporter::kInvalidThreadId),
+      mStartTime(::time(nullptr)),
+      mFinalized(false) {}
+
 CrashReporterHost::CrashReporterHost(GeckoProcessType aProcessType,
                                      CrashReporter::ThreadId aThreadId)
     : mProcessType(aProcessType),
       mThreadId(aThreadId),
       mStartTime(::time(nullptr)),
       mFinalized(false) {}
+
+void CrashReporterHost::Initialize(CrashReporter::ThreadId aThreadId) {
+  MOZ_ASSERT(!IsInitialized());
+  MOZ_ASSERT(!mFinalized);
+
+  mThreadId = aThreadId;
+  mStartTime = ::time(nullptr);
+}
 
 bool CrashReporterHost::GenerateCrashReport(base::ProcessId aPid) {
   if (!TakeCrashedChildMinidump(aPid, nullptr)) {
@@ -67,10 +81,12 @@ void CrashReporterHost::FinalizeCrashReport() {
   mExtraAnnotations[CrashReporter::Annotation::ProcessType] =
       XRE_ChildProcessTypeToAnnotation(mProcessType);
 
-  char startTime[32];
-  SprintfLiteral(startTime, "%lld", static_cast<long long>(mStartTime));
-  mExtraAnnotations[CrashReporter::Annotation::StartupTime] =
-      nsDependentCString(startTime);
+  if (IsInitialized()) {
+    char startTime[32];
+    SprintfLiteral(startTime, "%lld", static_cast<long long>(mStartTime));
+    mExtraAnnotations[CrashReporter::Annotation::StartupTime] =
+        nsDependentCString(startTime);
+  }
 
   CrashReporter::WriteExtraFile(mDumpID, mExtraAnnotations);
   mFinalized = true;

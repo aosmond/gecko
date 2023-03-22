@@ -226,18 +226,21 @@ typedef HANDLE ProcessHandle;
 typedef DWORD ProcessId;
 typedef DWORD ThreadId;
 typedef HANDLE FileHandle;
+const ThreadId kInvalidThreadId = 0;
 const FileHandle kInvalidFileHandle = INVALID_HANDLE_VALUE;
 #elif defined(XP_MACOSX)
 typedef task_t ProcessHandle;
 typedef pid_t ProcessId;
 typedef mach_port_t ThreadId;
 typedef int FileHandle;
+const ThreadId kInvalidThreadId = MACH_PORT_NULL;
 const FileHandle kInvalidFileHandle = -1;
 #else
 typedef int ProcessHandle;
 typedef pid_t ProcessId;
 typedef int ThreadId;
 typedef int FileHandle;
+const ThreadId kInvalidThreadId = -1;
 const FileHandle kInvalidFileHandle = -1;
 #endif
 

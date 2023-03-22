@@ -26,8 +26,16 @@ class CrashReporterHost {
   typedef CrashReporter::AnnotationTable AnnotationTable;
 
  public:
+  explicit CrashReporterHost(GeckoProcessType aProcessType);
+
   CrashReporterHost(GeckoProcessType aProcessType,
                     CrashReporter::ThreadId aThreadId);
+
+  void Initialize(CrashReporter::ThreadId aThreadId);
+
+  bool IsInitialized() const {
+    return mThreadId != CrashReporter::kInvalidThreadId;
+  }
 
   // Helper function for generating a crash report for a process that probably
   // crashed (i.e., had an AbnormalShutdown in ActorDestroy). Returns true if
@@ -58,6 +66,10 @@ class CrashReporterHost {
   template <typename Toplevel>
   bool GenerateMinidumpAndPair(Toplevel* aToplevelProtocol,
                                const nsACString& aPairName) {
+    if (NS_WARN_IF(!IsInitialized())) {
+      return false;
+    }
+
     ScopedProcessHandle childHandle;
 #ifdef XP_MACOSX
     childHandle = aToplevelProtocol->Process()->GetChildTask();
