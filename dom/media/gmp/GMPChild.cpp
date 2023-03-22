@@ -160,6 +160,9 @@ static bool GetPluginPaths(const nsAString& aPluginPath,
 #endif    // XP_MACOSX
 
 bool GMPChild::Init(const nsAString& aPluginPath,
+                    const nsAString& aPluginFilename,
+                    const nsACString& aPluginName,
+                    const nsACString& aPluginVersion,
                     mozilla::ipc::UntypedEndpoint&& aEndpoint) {
   GMP_CHILD_LOG_DEBUG("%s pluginPath=%s", __FUNCTION__,
                       NS_ConvertUTF16toUTF8(aPluginPath).get());
@@ -177,6 +180,16 @@ bool GMPChild::Init(const nsAString& aPluginPath,
   CrashReporterClient::InitSingleton(this);
 
   mPluginPath = aPluginPath;
+  mPluginFilename = aPluginFilename;
+
+  CrashReporter::AnnotateCrashReport(CrashReporter::Annotation::GMPPlugin,
+                                     true);
+  CrashReporter::AnnotateCrashReport(CrashReporter::Annotation::PluginFilename,
+                                     NS_ConvertUTF16toUTF8(mPluginFilename));
+  CrashReporter::AnnotateCrashReport(CrashReporter::Annotation::PluginName,
+                                     NS_ConvertUTF16toUTF8(aPluginName));
+  CrashReporter::AnnotateCrashReport(CrashReporter::Annotation::PluginVersion,
+                                     NS_ConvertUTF16toUTF8(aPluginVersion));
 
   return true;
 }
@@ -514,12 +527,12 @@ static auto ToCString(const nsTArray<std::pair<nsCString, nsCString>>& aPairs) {
 mozilla::ipc::IPCResult GMPChild::RecvStartPlugin(const nsString& aAdapter) {
   GMP_CHILD_LOG_DEBUG("%s", __FUNCTION__);
 
+  CrashReporter::AutoAnnotateCrashReport autoPluginPath(
+      CrashReporter::Annotation::GMPLibraryPath,
+      NS_ConvertUTF16toUTF8(mPluginPath));
+
   nsCString libPath;
   if (!GetUTF8LibPath(libPath)) {
-    CrashReporter::AnnotateCrashReport(
-        CrashReporter::Annotation::GMPLibraryPath,
-        NS_ConvertUTF16toUTF8(mPluginPath));
-
 #ifdef XP_WIN
     return IPC_FAIL(this,
                     nsPrintfCString("Failed to get lib path with error(%lu).",

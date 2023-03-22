@@ -28,7 +28,8 @@ class GMPChild : public PGMPChild {
   GMPChild();
   virtual ~GMPChild();
 
-  bool Init(const nsAString& aPluginPath,
+  bool Init(const nsAString& aPluginPath, const nsAString& aPluginFilename,
+            const nsACString& aPluginName, const nsACString& aPluginVersion,
             mozilla::ipc::UntypedEndpoint&& aEndpoint);
   MessageLoop* GMPMessageLoop();
 
@@ -89,6 +90,7 @@ class GMPChild : public PGMPChild {
 
   MessageLoop* mGMPMessageLoop;
   nsString mPluginPath;
+  nsString mPluginFilename;
   nsCString mStorageId;
   UniquePtr<GMPLoader> mGMPLoader;
 #ifdef XP_LINUX

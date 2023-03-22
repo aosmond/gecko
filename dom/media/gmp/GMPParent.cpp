@@ -340,7 +340,7 @@ nsresult GMPParent::LoadProcess() {
     mProcess->SetLaunchArchitecture(mChildLaunchArch);
 #endif
 
-    if (!mProcess->Launch(30 * 1000)) {
+    if (!mProcess->Launch(mName, mDisplayName, mVersion, 30 * 1000)) {
       GMP_PARENT_LOG_DEBUG("%s: Failed to launch new child process",
                            __FUNCTION__);
       mProcess->Delete();
@@ -645,23 +645,6 @@ bool GMPParent::EnsureProcessLoaded() {
   return NS_SUCCEEDED(rv);
 }
 
-void GMPParent::AddCrashAnnotations() {
-  if (mCrashReporter) {
-    mCrashReporter->AddAnnotation(CrashReporter::Annotation::GMPPlugin, true);
-    mCrashReporter->AddAnnotation(CrashReporter::Annotation::PluginFilename,
-                                  NS_ConvertUTF16toUTF8(mName));
-    mCrashReporter->AddAnnotation(CrashReporter::Annotation::PluginName,
-                                  mDisplayName);
-    mCrashReporter->AddAnnotation(CrashReporter::Annotation::PluginVersion,
-                                  mVersion);
-  }
-}
-
-void GMPParent::GetCrashID(nsString& aResult) {
-  AddCrashAnnotations();
-  GenerateCrashReport(OtherPid(), &aResult);
-}
-
 static void GMPNotifyObservers(const uint32_t aPluginID,
                                const nsACString& aPluginName,
                                const nsAString& aPluginDumpID) {
@@ -690,7 +673,7 @@ void GMPParent::ActorDestroy(ActorDestroyReason aWhy) {
     Telemetry::Accumulate(Telemetry::SUBPROCESS_ABNORMAL_ABORT, "gmplugin"_ns,
                           1);
     nsString dumpID;
-    GetCrashID(dumpID);
+    GenerateCrashReport(OtherPid(), &dumpID);
     if (dumpID.IsEmpty()) {
       NS_WARNING("GMP crash without crash report");
       dumpID = mName;

@@ -80,7 +80,8 @@ GMPProcessParent::GMPProcessParent(const std::string& aGMPPath)
 
 GMPProcessParent::~GMPProcessParent() { MOZ_COUNT_DTOR(GMPProcessParent); }
 
-bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
+bool GMPProcessParent::Launch(const nsString& aFilename, const nsCString& aName,
+                              const nsCString& aVersion, int32_t aTimeoutMs) {
   vector<string> args;
 
 #ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
@@ -141,6 +142,10 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
 #else
   args.push_back(mGMPPath);
 #endif
+
+  args.push_back(NS_ConvertUTF16toUTF8(aFilename).get());
+  args.push_back(aName.get());
+  args.push_back(aVersion.get());
 
 #ifdef MOZ_WIDGET_ANDROID
   // Add dummy values for pref and pref map to the file descriptors remapping

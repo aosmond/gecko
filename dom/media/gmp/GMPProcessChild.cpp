@@ -17,27 +17,37 @@ namespace mozilla::gmp {
 GMPProcessChild::~GMPProcessChild() = default;
 
 bool GMPProcessChild::Init(int aArgc, char* aArgv[]) {
+  nsAutoString pluginPath;
   nsAutoString pluginFilename;
+  nsAutoCString pluginName;
+  nsAutoCString pluginVersion;
 
 #if defined(OS_POSIX)
   // NB: need to be very careful in ensuring that the first arg
   // (after the binary name) here is indeed the plugin module path.
   // Keep in sync with dom/plugins/PluginModuleParent.
   std::vector<std::string> values = CommandLine::ForCurrentProcess()->argv();
-  MOZ_ASSERT(values.size() >= 2, "not enough args");
-  CopyUTF8toUTF16(nsDependentCString(values[1].c_str()), pluginFilename);
+  MOZ_RELEASE_ASSERT(values.size() >= 5, "not enough args");
+  CopyUTF8toUTF16(nsDependentCString(values[1].c_str()), pluginPath);
+  CopyUTF8toUTF16(nsDependentCString(values[2].c_str()), pluginFilename);
+  pluginName = nsDependentCString(values[3].c_str());
+  pluginVersion = nsDependentCString(values[4].c_str());
 #elif defined(OS_WIN)
   std::vector<std::wstring> values =
       CommandLine::ForCurrentProcess()->GetLooseValues();
-  MOZ_ASSERT(values.size() >= 1, "not enough loose args");
-  pluginFilename = nsDependentString(values[0].c_str());
+  MOZ_RELEASE_ASSERT(values.size() >= 4, "not enough loose args");
+  pluginPath = nsDependentString(values[0].c_str());
+  pluginFilename = nsDependentString(values[1].c_str());
+  pluginName = nsDependentCString(values[2].c_str());
+  pluginVersion = nsDependentCString(values[3].c_str());
 #else
 #  error Not implemented
 #endif
 
   BackgroundHangMonitor::Startup();
 
-  return mPlugin.Init(pluginFilename, TakeInitialEndpoint());
+  return mPlugin.Init(pluginPath, pluginFilename, pluginName, pluginVersion,
+                      TakeInitialEndpoint());
 }
 
 void GMPProcessChild::CleanUp() { BackgroundHangMonitor::Shutdown(); }

@@ -24,7 +24,8 @@ class GMPProcessParent final : public mozilla::ipc::GeckoChildProcessHost {
 
   // Synchronously launch the plugin process. If the process fails to launch
   // after timeoutMs, this method will return false.
-  bool Launch(int32_t aTimeoutMs);
+  bool Launch(const nsString& aFilename, const nsCString& aName,
+              const nsCString& aVersion, int32_t aTimeoutMs);
 
   void Delete(nsCOMPtr<nsIRunnable> aCallback = nullptr);
 

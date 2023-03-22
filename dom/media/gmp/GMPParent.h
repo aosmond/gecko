@@ -153,8 +153,6 @@ class GMPParent final
       const nsAString& aJSON);  // Worker thread.
   RefPtr<GenericPromise> ReadChromiumManifestFile(
       nsIFile* aFile);  // GMP thread.
-  void AddCrashAnnotations();
-  void GetCrashID(nsString& aResult);
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
   mozilla::ipc::IPCResult RecvPGMPStorageConstructor(
