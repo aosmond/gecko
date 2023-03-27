@@ -75,6 +75,7 @@ static bool GetFileBase(const nsAString& aPluginPath,
                         nsCOMPtr<nsIFile>& aLibDirectory,
                         nsCOMPtr<nsIFile>& aFileBase, nsAutoString& aBaseName) {
   nsresult rv = NS_NewLocalFile(aPluginPath, true, getter_AddRefs(aFileBase));
+  MOZ_RELEASE_ASSERT_NS_SUCCEEDED(rv, "test");
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return false;
   }

@@ -58,6 +58,70 @@ static inline bool IsDummy() {
 #endif
 }
 
+#ifdef MOZ_CRASHREPORTER
+#  define MOZ_CRASH_ANNOTATE_NSRESULT(_rv) \
+    CrashReporter::AnnotateCrashReport(    \
+        CrashReporter::Annotation::AssertNsresult, uint32_t(_rv))
+#else
+#  define MOZ_CRASH_ANNOTATE_NSRESULT(_rv)
+#endif
+
+/* First the single-argument form. */
+#define MOZ_ASSERT_NS_SUCCEEDED_HELPER1(kind, expr)                         \
+  do {                                                                      \
+    MOZ_VALIDATE_ASSERT_CONDITION_TYPE(NS_SUCCEEDED(expr));                 \
+    nsresult _rv = (expr);                                                  \
+    if (MOZ_UNLIKELY(!MOZ_CHECK_ASSERT_ASSIGNMENT(NS_SUCCEEDED(_rv)))) {    \
+      MOZ_FUZZING_HANDLE_CRASH_EVENT2(kind, "NS_SUCCEEDED(" #expr ")");     \
+      MOZ_REPORT_ASSERTION_FAILURE("NS_SUCCEEDED(" #expr ") (" explain ")", \
+                                   __FILE__, __LINE__);                     \
+      MOZ_CRASH_ANNOTATE_NSRESULT(_rv);                                     \
+      MOZ_CRASH_ANNOTATE(kind "(NS_SUCCEDED(" #expr ")) (" explain ")");    \
+      MOZ_REALLY_CRASH(__LINE__);                                           \
+    }                                                                       \
+  } while (false)
+/* Now the two-argument form. */
+#define MOZ_ASSERT_NS_SUCCEEDED_HELPER2(kind, expr, explain)                \
+  do {                                                                      \
+    MOZ_VALIDATE_ASSERT_CONDITION_TYPE(NS_SUCCEEDED(expr));                 \
+    nsresult _rv = (expr);                                                  \
+    if (MOZ_UNLIKELY(!MOZ_CHECK_ASSERT_ASSIGNMENT(NS_SUCCEEDED(_rv)))) {    \
+      MOZ_FUZZING_HANDLE_CRASH_EVENT2(kind, "NS_SUCCEEDED(" #expr ")");     \
+      MOZ_REPORT_ASSERTION_FAILURE("NS_SUCCEEDED(" #expr ") (" explain ")", \
+                                   __FILE__, __LINE__);                     \
+      MOZ_CRASH_ANNOTATE_NSRESULT(_rv);                                     \
+      MOZ_CRASH_ANNOTATE(kind "(NS_SUCCEDED(" #expr ")) (" explain ")");    \
+      MOZ_REALLY_CRASH(__LINE__);                                           \
+    }                                                                       \
+  } while (false)
+
+#define MOZ_RELEASE_ASSERT_NS_SUCCEEDED(...)                        \
+  MOZ_ASSERT_GLUE(MOZ_PASTE_PREFIX_AND_ARG_COUNT(                   \
+                      MOZ_ASSERT_NS_SUCCEEDED_HELPER, __VA_ARGS__), \
+                  ("MOZ_RELEASE_ASSERT_NS_SUCCEEDED", __VA_ARGS__))
+
+#ifdef DEBUG
+#  define MOZ_ASSERT_NS_SUCCEEDED(...)                                \
+    MOZ_ASSERT_GLUE(MOZ_PASTE_PREFIX_AND_ARG_COUNT(                   \
+                        MOZ_ASSERT_NS_SUCCEEDED_HELPER, __VA_ARGS__), \
+                    ("MOZ_ASSERT_NS_SUCCEEDED", __VA_ARGS__))
+#else
+#  define MOZ_ASSERT_NS_SUCCEEDED(...) \
+    do {                               \
+    } while (false)
+#endif /* DEBUG */
+
+#if defined(MOZ_DIAGNOSTIC_ASSERT_ENABLED)
+#  define MOZ_DIAGNOSTIC_ASSERT_NS_SUCCEEDED(...)                     \
+    MOZ_ASSERT_GLUE(MOZ_PASTE_PREFIX_AND_ARG_COUNT(                   \
+                        MOZ_ASSERT_NS_SUCCEEDED_HELPER, __VA_ARGS__), \
+                    ("MOZ_DIAGNOSTIC_ASSERT_NS_SUCCEEDED", __VA_ARGS__))
+#else
+#  define MOZ_DIAGNOSTIC_ASSERT_NS_SUCCEEDED(...) \
+    do {                                          \
+    } while (false)
+#endif
+
 nsresult SetExceptionHandler(nsIFile* aXREDirectory, bool force = false);
 nsresult UnsetExceptionHandler();
 
