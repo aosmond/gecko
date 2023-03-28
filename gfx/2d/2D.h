@@ -35,6 +35,7 @@
 
 #include "mozilla/DebugOnly.h"
 
+#include "nsProxyRelease.h"
 #include "nsRegionFwd.h"
 
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GTK)
@@ -702,11 +703,25 @@ class SourceSurface : public SupportsThreadSafeWeakPtr<SourceSurface> {
    */
   virtual void* GetNativeSurface(NativeSurfaceType aType) { return nullptr; }
 
-  void AddUserData(UserDataKey* key, void* userData, void (*destroy)(void*)) {
-    mUserData.Add(key, userData, destroy);
+  void AddUserData(UserDataKey* key, void* userData, void (*destroy)(void*),
+                   UserDataFlags flags = UserDataFlags()) {
+    mUserData.Add(key, userData, destroy, flags);
   }
   void* GetUserData(UserDataKey* key) const { return mUserData.Get(key); }
   void RemoveUserData(UserDataKey* key) { mUserData.RemoveAndDestroy(key); }
+  already_AddRefed<nsISerialEventTarget> GetUserDataCreatorTarget() const {
+    return mUserData.GetCreatorTarget();
+  }
+
+  static void ProxyReleaseOnCreatorTarget(const char* aName,
+                                          RefPtr<SourceSurface>&& aSurface) {
+    if (!aSurface) {
+      return;
+    }
+    RefPtr<SourceSurface> surface(std::move(aSurface));
+    nsCOMPtr<nsISerialEventTarget> target = surface->GetUserDataCreatorTarget();
+    NS_ProxyRelease(aName, target, surface.forget());
+  }
 
   /** Tries to extract an optimal subrect for the surface. This may fail if the
    * request can't be satisfied.
@@ -1264,8 +1279,9 @@ class ScaledFont : public SupportsThreadSafeWeakPtr<ScaledFont> {
 
   virtual bool UseSubpixelPosition() const { return false; }
 
-  void AddUserData(UserDataKey* key, void* userData, void (*destroy)(void*)) {
-    mUserData.Add(key, userData, destroy);
+  void AddUserData(UserDataKey* key, void* userData, void (*destroy)(void*),
+                   UserDataFlags flags = UserDataFlags()) {
+    mUserData.Add(key, userData, destroy, flags);
   }
   void* GetUserData(UserDataKey* key) { return mUserData.Get(key); }
 
@@ -1893,8 +1909,9 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
   virtual bool IsTiledDrawTarget() const { return false; }
   virtual bool SupportsRegionClipping() const { return true; }
 
-  void AddUserData(UserDataKey* key, void* userData, void (*destroy)(void*)) {
-    mUserData.Add(key, userData, destroy);
+  void AddUserData(UserDataKey* key, void* userData, void (*destroy)(void*),
+                   UserDataFlags flags = UserDataFlags()) {
+    mUserData.Add(key, userData, destroy, flags);
   }
   void* GetUserData(UserDataKey* key) const { return mUserData.Get(key); }
   void* RemoveUserData(UserDataKey* key) { return mUserData.Remove(key); }

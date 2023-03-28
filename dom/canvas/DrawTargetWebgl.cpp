@@ -2122,8 +2122,9 @@ bool DrawTargetWebgl::SharedContext::DrawRectAccel(
           *aHandle = handle;
         } else {
           handle->SetSurface(surfacePattern.mSurface);
-          surfacePattern.mSurface->AddUserData(&mTextureHandleKey, handle.get(),
-                                               ReleaseTextureHandle);
+          surfacePattern.mSurface->AddUserData(
+              &mTextureHandleKey, handle.get(), ReleaseTextureHandle,
+              UserDataFlags::DESTROY_ON_CREATOR_TARGET);
         }
       }
 

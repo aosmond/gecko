@@ -1590,7 +1590,8 @@ already_AddRefed<DataSourceSurface> gfxPlatform::GetWrappedDataSourceSurface(
   // data to make sure aSurface stays alive until we are done with the data.
   auto* srcSurfUD = new DependentSourceSurfaceUserData;
   srcSurfUD->mSurface = aSurface;
-  result->AddUserData(&kThebesSurface, srcSurfUD, SourceSurfaceDestroyed);
+  result->AddUserData(&kThebesSurface, srcSurfUD, SourceSurfaceDestroyed,
+                      UserDataFlags::DESTROY_ON_CREATOR_TARGET);
 
   return result.forget();
 }

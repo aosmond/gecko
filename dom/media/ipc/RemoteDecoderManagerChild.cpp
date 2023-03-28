@@ -840,7 +840,8 @@ already_AddRefed<SourceSurface> RemoteDecoderManagerChild::Readback(
   static UserDataKey sSurfaceDescriptor;
   source->AddUserData(&sSurfaceDescriptor,
                       new SurfaceDescriptorUserData(this, sd),
-                      DeleteSurfaceDescriptorUserData);
+                      DeleteSurfaceDescriptorUserData,
+                      UserDataFlags::DESTROY_ON_CREATOR_TARGET);
 
   return source.forget();
 }

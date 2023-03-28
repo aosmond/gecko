@@ -12,6 +12,8 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Mutex.h"
+#include "mozilla/TypedEnumBits.h"
+#include "nsThreadUtils.h"
 
 namespace mozilla {
 namespace gfx {
@@ -19,6 +21,12 @@ namespace gfx {
 struct UserDataKey {
   int unused;
 };
+
+enum class UserDataFlags : uint8_t {
+  DESTROY_ON_CREATOR_TARGET = 1 << 0,
+};
+
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(UserDataFlags)
 
 /* this class is basically a clone of the user data concept from cairo */
 class UserData {
@@ -29,15 +37,23 @@ class UserData {
 
   /* Attaches untyped userData associated with key. destroy is called on
    * destruction */
-  void Add(UserDataKey* key, void* userData, DestroyFunc destroy) {
+  void Add(UserDataKey* key, void* userData, DestroyFunc destroy,
+           UserDataFlags flags) {
+    bool destroyOnTarget =
+        bool(flags & UserDataFlags::DESTROY_ON_CREATOR_TARGET);
     for (int i = 0; i < count; i++) {
       if (key == entries[i].key) {
-        if (entries[i].destroy) {
-          entries[i].destroy(entries[i].userData);
-        }
+        MaybeDestroy(entries[i]);
         entries[i].userData = userData;
         entries[i].destroy = destroy;
-        return;
+        entries[i].flags = flags;
+        if (!destroyOnTarget) {
+          return;
+        }
+        entries[i].creatorTarget = GetCurrentSerialEventTarget();
+      } else if (destroyOnTarget &&
+                 entries[i].flags & UserDataFlags::DESTROY_ON_CREATOR_TARGET) {
+        MOZ_RELEASE_ASSERT(entries[i].creatorTarget->IsOnCurrentThread());
       }
     }
 
@@ -55,6 +71,10 @@ class UserData {
     entries[count].key = key;
     entries[count].userData = userData;
     entries[count].destroy = destroy;
+    entries[count].flags = flags;
+    if (destroyOnTarget) {
+      entries[count].creatorTarget = GetCurrentSerialEventTarget();
+    }
 
     count++;
   }
@@ -79,9 +99,7 @@ class UserData {
   void RemoveAndDestroy(UserDataKey* key) {
     for (int i = 0; i < count; i++) {
       if (key == entries[i].key) {
-        if (entries[i].destroy) {
-          entries[i].destroy(entries[i].userData);
-        }
+        MaybeDestroy(entries[i]);
         // decrement before looping so entries[i+1] doesn't read past the end:
         --count;
         for (; i < count; i++) {
@@ -110,14 +128,21 @@ class UserData {
     return false;
   }
 
+  already_AddRefed<nsISerialEventTarget> GetCreatorTarget() const {
+    for (int i = 0; i < count; i++) {
+      if (entries[i].flags & UserDataFlags::DESTROY_ON_CREATOR_TARGET) {
+        return do_AddRef(entries[i].creatorTarget);
+      }
+    }
+    return nullptr;
+  }
+
   void Destroy() {
     if (!entries) {
       return;
     }
     for (int i = 0; i < count; i++) {
-      if (entries[i].destroy) {
-        entries[i].destroy(entries[i].userData);
-      }
+      MaybeDestroy(entries[i]);
     }
     free(entries);
     entries = nullptr;
@@ -131,7 +156,18 @@ class UserData {
     const UserDataKey* key;
     void* userData;
     DestroyFunc destroy;
+    nsCOMPtr<nsISerialEventTarget> creatorTarget;
+    UserDataFlags flags;
   };
+
+  void MaybeDestroy(Entry& entry) {
+    if (entry.destroy) {
+      if (entry.flags & UserDataFlags::DESTROY_ON_CREATOR_TARGET) {
+        MOZ_RELEASE_ASSERT(entry.creatorTarget->IsOnCurrentThread());
+      }
+      entry.destroy(entry.userData);
+    }
+  }
 
   int count;
   Entry* entries;
@@ -156,10 +192,11 @@ class ThreadSafeUserData {
     }
   }
 
-  void Add(UserDataKey* key, void* value, UserData::DestroyFunc destroy) {
+  void Add(UserDataKey* key, void* value, UserData::DestroyFunc destroy,
+           UserDataFlags flags) {
     LockedUserData* userData = GetUserData();
     MutexAutoLock lock(userData->mLock);
-    userData->Add(key, value, destroy);
+    userData->Add(key, value, destroy, flags);
   }
 
   void* Remove(UserDataKey* key) {
@@ -184,6 +221,12 @@ class ThreadSafeUserData {
     LockedUserData* userData = GetUserData();
     MutexAutoLock lock(userData->mLock);
     return userData->Has(key);
+  }
+
+  already_AddRefed<nsISerialEventTarget> GetCreatorTarget() const {
+    LockedUserData* userData = GetUserData();
+    MutexAutoLock lock(userData->mLock);
+    return userData->GetCreatorTarget();
   }
 
  private:

@@ -56,7 +56,8 @@ static void EnsureSurfaceStoredRecording(DrawEventRecorderPrivate* aRecorder,
   userData->refPtr = aSurface;
   userData->recorder = aRecorder;
   aSurface->AddUserData(reinterpret_cast<UserDataKey*>(aRecorder), userData,
-                        &RecordingSourceSurfaceUserDataFunc);
+                        &RecordingSourceSurfaceUserDataFunc,
+                        UserDataFlags::DESTROY_ON_CREATOR_TARGET);
 }
 
 class SourceSurfaceRecording : public SourceSurface {

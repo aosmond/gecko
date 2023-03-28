@@ -135,11 +135,15 @@ imgFrame::imgFrame()
       mNonPremult(false) {}
 
 imgFrame::~imgFrame() {
-#ifdef DEBUG
   MonitorAutoLock lock(mMonitor);
+#ifdef DEBUG
   MOZ_ASSERT(mAborted || AreAllPixelsWritten());
   MOZ_ASSERT(mAborted || mFinished);
 #endif
+  SourceSurface::ProxyReleaseOnCreatorTarget("imgFrame::mOptSurface",
+                                             std::move(mOptSurface));
+  SourceSurface::ProxyReleaseOnCreatorTarget("imgFrame::mRawSurface",
+                                             std::move(mRawSurface));
 }
 
 nsresult imgFrame::InitForDecoder(const nsIntSize& aImageSize,

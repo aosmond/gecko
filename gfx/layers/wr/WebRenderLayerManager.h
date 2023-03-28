@@ -187,7 +187,7 @@ class WebRenderLayerManager final : public WindowRenderer {
    */
   void SetUserData(void* aKey, LayerUserData* aData) {
     mUserData.Add(static_cast<gfx::UserDataKey*>(aKey), aData,
-                  LayerUserDataDestroy);
+                  LayerUserDataDestroy, gfx::UserDataFlags());
   }
   /**
    * This can be used anytime. Ownership passes to the caller!
