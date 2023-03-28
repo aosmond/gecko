@@ -281,6 +281,11 @@ bool GMPChild::GetUTF8LibPath(nsACString& aOutLibPath) {
   // denied errors.
   rv = libFile->Normalize();
   if (rv != NS_ERROR_FILE_ACCESS_DENIED && NS_WARN_IF(NS_FAILED(rv))) {
+    nsAutoString path;
+    libFile->GetPath(path);
+    NS_ConvertUTF16toUTF8 pathStr(path);
+    printf_stderr("[AO] GMPChild::GetUTF8LibPath -- path '%s' rv 0x%08x\n",
+                  pathStr.get(), uint32_t(rv));
     GMP_DIAGNOSTIC_CRASH("Failed to normalize plugin file");
     return false;
   }

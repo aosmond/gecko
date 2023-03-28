@@ -110,6 +110,9 @@ void InitPrefs() {
     Unused << p.ReadUntil(TTokenizer<char_path_t>::Token::Char(','), path);
     path.Trim(" ");
     if (!path.IsEmpty()) {
+      if (XRE_IsGMPluginProcess()) {
+        printf_stderr("[AO] Forbidden path: '%s'\n", path.get());
+      }
       ForbiddenPaths().AppendElement(path);
     }
     Unused << p.CheckChar(',');
@@ -159,6 +162,15 @@ class TNormalizer : public TTokenizer<TChar> {
 
     while (base::HasInput()) {
       if (!ConsumeName()) {
+        if constexpr (std::is_same_v<char, TChar>) {
+          if (XRE_IsGMPluginProcess()) {
+            for (auto const& name : mStack) {
+              nsAutoCString nameAuto(name);
+              printf_stderr("[AO] TNormalizer::Get -- stack '%s'\n",
+                            nameAuto.get());
+            }
+          }
+        }
         return false;
       }
     }
@@ -183,6 +195,11 @@ class TNormalizer : public TTokenizer<TChar> {
     if (CheckParentDir()) {
       if (!mStack.Length()) {
         // This means there are more \.. than valid names
+        if constexpr (std::is_same_v<char, TChar>) {
+          if (XRE_IsGMPluginProcess()) {
+            printf_stderr("[AO] TNormalizer::ConsumeName -- empty stack\n");
+          }
+        }
         return false;
       }
 
@@ -194,6 +211,13 @@ class TNormalizer : public TTokenizer<TChar> {
     if (base::ReadUntil(mSeparator, name, base::INCLUDE_LAST) &&
         name.Length() == 1) {
       // this means an empty name (a lone slash), which is illegal
+      if constexpr (std::is_same_v<char, TChar>) {
+        if (XRE_IsGMPluginProcess()) {
+          nsAutoCString nameAuto(name);
+          printf_stderr("[AO] TNormalizer::ConsumeName -- empty name '%s'\n",
+                        nameAuto.get());
+        }
+      }
       return false;
     }
     mStack.AppendElement(name);
@@ -328,6 +352,9 @@ bool IsAllowedPath(const nsTSubstring<char_path_t>& aFilePath) {
   if (!Normalizer(aFilePath, Normalizer::Token::Char(kPathSeparator))
            .Get(normalized)) {
     // Broken paths are considered invalid and thus inaccessible
+    if (XRE_IsGMPluginProcess()) {
+      printf_stderr("[AO] IsAllowedPath -- broken path\n");
+    }
     return false;
   }
 
@@ -336,6 +363,11 @@ bool IsAllowedPath(const nsTSubstring<char_path_t>& aFilePath) {
       if (normalized.Length() > prefix.Length() &&
           normalized[prefix.Length()] != kPathSeparator) {
         continue;
+      }
+      if (XRE_IsGMPluginProcess()) {
+        printf_stderr(
+            "[AO] IsAllowedPath -- '%s' matched forbidden path '%s'\n",
+            normalized.get(), prefix.get());
       }
       return false;
     }
