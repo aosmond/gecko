@@ -36,14 +36,20 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
   void DetachResources() {
     // The iteration is a bit awkward here because our iterator will
     // be invalidated by the removal
-    for (auto font = mStoredFonts.begin(); font != mStoredFonts.end();) {
-      auto oldFont = font++;
-      (*oldFont)->RemoveUserData(reinterpret_cast<UserDataKey*>(this));
+    for (auto fontIter = mStoredFonts.begin(); fontIter != mStoredFonts.end();) {
+      RefPtr<ScaledFont> font(*fontIter);
+      ++fontIter;
+      if (font) {
+        font->RemoveUserData(reinterpret_cast<UserDataKey*>(this));
+      }
     }
-    for (auto surface = mStoredSurfaces.begin();
-         surface != mStoredSurfaces.end();) {
-      auto oldSurface = surface++;
-      (*oldSurface)->RemoveUserData(reinterpret_cast<UserDataKey*>(this));
+    for (auto surfaceIter = mStoredSurfaces.begin();
+         surfaceIter != mStoredSurfaces.end();) {
+      RefPtr<SourceSurface> surface(*surfaceIter);
+      ++surfaceIter;
+      if (surface) {
+        surface->RemoveUserData(reinterpret_cast<UserDataKey*>(this));
+      }
     }
     mStoredFonts.clear();
     mStoredSurfaces.clear();
@@ -159,9 +165,9 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
   std::unordered_map<const void*, int32_t> mUnscaledFontRefs;
 
   std::unordered_set<uint64_t> mStoredFontData;
-  std::unordered_set<ScaledFont*> mStoredFonts;
+  std::unordered_set<ThreadSafeWeakPtr<ScaledFont>> mStoredFonts;
   std::vector<RefPtr<ScaledFont>> mScaledFonts;
-  std::unordered_set<SourceSurface*> mStoredSurfaces;
+  std::unordered_set<ThreadSafeWeakPtr<SourceSurface>> mStoredSurfaces;
   std::vector<RefPtr<SourceSurface>> mExternalSurfaces;
   bool mExternalFonts;
 };
