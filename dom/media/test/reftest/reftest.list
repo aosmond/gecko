@@ -13,3 +13,9 @@ skip-if(Android) fuzzy(0-84,0-771156) fails-if(useDrawSnapshot) skip-if(/^Window
 skip-if(Android) pref(media.dormant-on-pause-timeout-ms,-1) fuzzy(0-20,0-500) == frame_order_mp4.html frame_order_mp4-ref.html
 skip-if(Android) fuzzy(0-30,0-270000) == incorrect_display_in_bytestream_vp8.html incorrect_display_in_bytestream_vp8-ref.html
 skip-if(Android) fuzzy(0-22,0-377335) == incorrect_display_in_bytestream_vp9.html incorrect_display_in_bytestream_vp9-ref.html
+
+# Test H264 video decoding
+== h264-rendering-video.html?rainbow-h264-baseline-1.0.mp4 h264-rendering-video-ref.html
+#== h264-rendering-video.html?rainbow-h264-baseline-4.0.mp4 h264-rendering-video-ref.html
+#== h264-rendering-video.html?rainbow-h264-baseline-5.2.mp4 h264-rendering-video-ref.html
+#== h264-rendering-video.html?rainbow-h264-baseline-6.2.mp4 h264-rendering-video-ref.html
