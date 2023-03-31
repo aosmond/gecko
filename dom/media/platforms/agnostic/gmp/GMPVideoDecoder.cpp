@@ -90,8 +90,9 @@ void GMPVideoDecoder::Decoded(GMPVideoi420Frame* aDecodedFrame) {
                                   aStage.SetColorDepth(b.mColorDepth);
                                   aStage.SetColorRange(b.mColorRange);
                                 });
-
     mDecodedData.AppendElement(std::move(v));
+    mDecodePromise.Resolve(std::move(mDecodedData), __func__);
+    mDecodedData = DecodedData();
   } else {
     mDecodedData.Clear();
     mDecodePromise.RejectIfExists(

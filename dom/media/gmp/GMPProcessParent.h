@@ -29,7 +29,8 @@ class GMPProcessParent final : public mozilla::ipc::GeckoChildProcessHost {
   void Delete(nsCOMPtr<nsIRunnable> aCallback = nullptr);
 
   bool CanShutdown() override { return true; }
-  const std::string& GetPluginFilePath() { return mGMPPath; }
+
+  void GetPluginFilePath(nsACString& aPath) const { aPath = mGMPPath.c_str(); }
 
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)
   // Init static members on the main thread
