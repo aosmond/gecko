@@ -3639,7 +3639,7 @@ pref("browser.search.removeEngineInfobar.enabled", true);
 // GMPInstallManager prefs
 
 // User-settable override to media.gmp-manager.url for testing purposes.
-//pref("media.gmp-manager.url.override", "");
+pref("media.gmp-manager.url.override", "http://localhost:8080/update.xml");
 
 // Update service URL for GMP install/updates:
 pref("media.gmp-manager.url", "https://aus5.mozilla.org/update/3/GMP/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");

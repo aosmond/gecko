@@ -506,6 +506,7 @@ var View = {
           break;
         case "gmpPlugin":
           fluentName = "about-processes-gmp-plugin-process";
+          fluentArgs.origin = data.origin;
           break;
         case "gpu":
           fluentName = "about-processes-gpu-process";

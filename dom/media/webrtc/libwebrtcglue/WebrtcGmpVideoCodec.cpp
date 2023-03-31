@@ -700,12 +700,14 @@ void WebrtcGmpVideoDecoder::Configure_g(
     aInitDone->Dispatch(WEBRTC_VIDEO_CODEC_ERROR,
                         "GMP Decode: GetGMPVideoDecoder failed.");
   }
+  GMP_LOG_DEBUG("GMP Decode: GetGMPVideoDecoder succeeded");
 }
 
 int32_t WebrtcGmpVideoDecoder::GmpInitDone(GMPVideoDecoderProxy* aGMP,
                                            GMPVideoHost* aHost,
                                            std::string* aErrorOut) {
   if (!mInitting || !aGMP || !aHost) {
+    GMP_LOG_DEBUG("GMP Decode: GmpInitDone failed");
     *aErrorOut =
         "GMP Decode: Either init was aborted, "
         "or init failed to supply either a GMP decoder or GMP host.";
@@ -717,6 +719,7 @@ int32_t WebrtcGmpVideoDecoder::GmpInitDone(GMPVideoDecoderProxy* aGMP,
     return WEBRTC_VIDEO_CODEC_ERROR;
   }
 
+  GMP_LOG_DEBUG("GMP Decode: GmpInitDone succeeded");
   mInitting = false;
 
   if (mGMP && mGMP != aGMP) {
@@ -738,6 +741,7 @@ int32_t WebrtcGmpVideoDecoder::GmpInitDone(GMPVideoDecoderProxy* aGMP,
   nsTArray<uint8_t> codecSpecific;
   nsresult rv = mGMP->InitDecode(codec, codecSpecific, this, 1);
   if (NS_FAILED(rv)) {
+    GMP_LOG_DEBUG("GMP Decode: GmpInitDone failed");
     *aErrorOut = "GMP Decode: InitDecode failed";
     mQueuedFrames.Clear();
     return WEBRTC_VIDEO_CODEC_ERROR;
@@ -759,7 +763,7 @@ int32_t WebrtcGmpVideoDecoder::GmpInitDone(GMPVideoDecoderProxy* aGMP,
   // happens to arrive for other reasons. Bug 1492852 tracks implementing a
   // proper solution.
   if (mDecoderStatus != GMPNoErr) {
-    GMP_LOG_ERROR("%s: Decoder status is bad (%u)!", __PRETTY_FUNCTION__,
+    GMP_LOG_ERROR("%s: GMP Decoder status is bad (%u)!", __PRETTY_FUNCTION__,
                   static_cast<unsigned>(mDecoderStatus));
     return WEBRTC_VIDEO_CODEC_ERROR;
   }
@@ -768,6 +772,7 @@ int32_t WebrtcGmpVideoDecoder::GmpInitDone(GMPVideoDecoderProxy* aGMP,
 }
 
 void WebrtcGmpVideoDecoder::Close_g() {
+  GMP_LOG_DEBUG("GMP Decode: Closing decoder");
   GMPVideoDecoderProxy* gmp(mGMP);
   mGMP = nullptr;
   mHost = nullptr;
@@ -790,6 +795,7 @@ int32_t WebrtcGmpVideoDecoder::Decode(const webrtc::EncodedImage& aInputImage,
   MOZ_ASSERT(mGMPThread);
   MOZ_ASSERT(!NS_IsMainThread());
   if (!aInputImage.size()) {
+    GMP_LOG_DEBUG("GMP Decode: No size");
     return WEBRTC_VIDEO_CODEC_ERROR;
   }
 
@@ -822,6 +828,7 @@ int32_t WebrtcGmpVideoDecoder::Decode(const webrtc::EncodedImage& aInputImage,
     return WEBRTC_VIDEO_CODEC_ERROR;
   }
 
+  GMP_LOG_DEBUG("GMP Decode: Decoder status success");
   return WEBRTC_VIDEO_CODEC_OK;
 }
 

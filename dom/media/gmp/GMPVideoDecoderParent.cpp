@@ -86,12 +86,12 @@ nsresult GMPVideoDecoderParent::InitDecode(
 
   MOZ_ASSERT(mPlugin->GMPEventTarget()->IsOnCurrentThread());
 
-  if (!aCallback) {
+  if (NS_WARN_IF(!aCallback)) {
     return NS_ERROR_FAILURE;
   }
   mCallback = aCallback;
 
-  if (!SendInitDecode(aCodecSettings, aCodecSpecific, aCoreCount)) {
+  if (NS_WARN_IF(!SendInitDecode(aCodecSettings, aCodecSpecific, aCoreCount))) {
     return NS_ERROR_FAILURE;
   }
   mIsOpen = true;

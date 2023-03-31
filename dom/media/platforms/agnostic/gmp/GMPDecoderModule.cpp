@@ -74,6 +74,10 @@ media::DecodeSupportSet GMPDecoderModule::SupportsMimeType(
     isSupported = HaveGMPFor(api, {"vp8"_ns, aGMP.value()});
   }
 
+  MOZ_LOG(sPDMLog, LogLevel::Debug,
+          ("GMP %s decoder %s requested type '%s'", aGMP.value().get(),
+           isSupported ? "supports" : "rejects", aMimeType.BeginReading()));
+
   // TODO: Note that we do not yet distinguish between SW/HW decode support.
   //       Will be done in bug 1754239.
   if (isSupported) {
@@ -84,7 +88,8 @@ media::DecodeSupportSet GMPDecoderModule::SupportsMimeType(
 
 media::DecodeSupportSet GMPDecoderModule::SupportsMimeType(
     const nsACString& aMimeType, DecoderDoctorDiagnostics* aDiagnostics) const {
-  return media::DecodeSupport::Unsupported;
+  return MP4Decoder::IsH264(aMimeType) ? media::DecodeSupport::SoftwareDecode
+                                       : media::DecodeSupport::Unsupported;
 }
 
 /* static */

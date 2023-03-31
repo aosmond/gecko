@@ -60,6 +60,7 @@
 #include "mozilla/ProfilerMarkers.h"
 #include "nsIException.h"
 #include "VsyncSource.h"
+#include "GMPProcessParent.h"
 
 namespace mozilla::dom {
 
@@ -1250,23 +1251,32 @@ already_AddRefed<Promise> ChromeUtils::RequestProcInfo(GlobalObject& aGlobal,
             break;
         }
 
-        // Attach utility actor information to the process.
+        nsCString origin;
         nsTArray<UtilityInfo> utilityActors;
-        if (aGeckoProcess->GetProcessType() ==
-            GeckoProcessType::GeckoProcessType_Utility) {
-          RefPtr<mozilla::ipc::UtilityProcessManager> upm =
-              mozilla::ipc::UtilityProcessManager::GetSingleton();
-          if (!utilityActors.AppendElements(upm->GetActors(aGeckoProcess),
-                                            fallible)) {
-            NS_WARNING("Error adding actors");
-            return;
-          }
+
+        switch (aGeckoProcess->GetProcessType()) {
+          default:
+            break;
+          case GeckoProcessType::GeckoProcessType_Utility: {
+            // Attach utility actor information to the process.
+            RefPtr<mozilla::ipc::UtilityProcessManager> upm =
+                mozilla::ipc::UtilityProcessManager::GetSingleton();
+            if (!utilityActors.AppendElements(upm->GetActors(aGeckoProcess),
+                                              fallible)) {
+              NS_WARNING("Error adding actors");
+              return;
+            }
+          } break;
+          case GeckoProcessType::GeckoProcessType_GMPlugin:
+            static_cast<gmp::GMPProcessParent*>(aGeckoProcess)
+                ->GetPluginFilePath(origin);
+            break;
         }
 
         requests.EmplaceBack(
             /* aPid = */ childPid,
             /* aProcessType = */ type,
-            /* aOrigin = */ ""_ns,
+            /* aOrigin = */ origin,
             /* aWindowInfo = */ nsTArray<WindowInfo>(),  // Without a
                                                          // ContentProcess, no
                                                          // DOM windows.
