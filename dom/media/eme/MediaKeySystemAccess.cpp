@@ -154,6 +154,9 @@ static KeySystemConfig::EMECodecString ToEMEAPICodecString(
   if (IsH264CodecString(aCodec)) {
     return KeySystemConfig::EME_CODEC_H264;
   }
+  if (IsAV1CodecString(aCodec)) {
+    return KeySystemConfig::EME_CODEC_AV1;
+  }
   if (IsVP8CodecString(aCodec)) {
     return KeySystemConfig::EME_CODEC_VP8;
   }
@@ -332,6 +335,7 @@ static CodecType GetCodecType(const KeySystemConfig::EMECodecString& aCodec) {
     return Audio;
   }
   if (aCodec.Equals(KeySystemConfig::EME_CODEC_H264) ||
+      aCodec.Equals(KeySystemConfig::EME_CODEC_AV1) ||
       aCodec.Equals(KeySystemConfig::EME_CODEC_VP8) ||
       aCodec.Equals(KeySystemConfig::EME_CODEC_VP9) ||
       aCodec.Equals(KeySystemConfig::EME_CODEC_HEVC)) {
