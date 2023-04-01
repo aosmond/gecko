@@ -15,6 +15,10 @@ var manager = new MediaTestManager;
 
 function startTest(test, token)
 {
+  if (manager.checkSkipTest("waitingforkey", test, token)) {
+    return;
+  }
+
   manager.started(token);
 
   let v = document.createElement("video");
