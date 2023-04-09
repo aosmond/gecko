@@ -30,7 +30,9 @@ class WMFCDMImpl final {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(WMFCDMImpl);
 
   explicit WMFCDMImpl(const nsAString& aKeySystem)
-      : mCDM(MakeRefPtr<MFCDMChild>(aKeySystem)) {}
+      : mCDM(MakeRefPtr<MFCDMChild>(aKeySystem)) {
+    mCDM->Initialize();
+  }
 
   static bool Supports(const nsAString& aKeySystem);
   // TODO: make this async?

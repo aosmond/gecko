@@ -22,11 +22,11 @@ MFCDMChild::MFCDMChild(const nsAString& aKeySystem)
     : mKeySystem(aKeySystem),
       mManagerThread(RemoteDecoderManagerChild::GetManagerThread()),
       mState(NS_ERROR_NOT_INITIALIZED),
-      mShutdown(false) {
-  mRemotePromise = EnsureRemote();
-}
+      mShutdown(false) {}
 
 MFCDMChild::~MFCDMChild() {}
+
+void MFCDMChild::Initialize() { mRemotePromise = EnsureRemote(); }
 
 RefPtr<MFCDMChild::RemotePromise> MFCDMChild::EnsureRemote() {
   if (!mManagerThread) {

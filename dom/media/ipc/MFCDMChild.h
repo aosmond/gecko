@@ -72,6 +72,8 @@ class MFCDMChild final : public PMFCDMChild {
       mState = NS_ERROR_NOT_AVAILABLE;
     }
   }
+
+  void Initialize();
   void Shutdown();
 
   nsISerialEventTarget* ManagerThread() { return mManagerThread; }
