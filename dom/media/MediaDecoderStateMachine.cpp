@@ -1119,6 +1119,12 @@ class MediaDecoderStateMachine::LoopingDecodingState
 
   void RequestAudioDataFromReaderAfterEOS() {
     MOZ_ASSERT(mMaster->HasAudio());
+
+    if (mAudioDataRequest.Exists()) {
+      SLOG("no need to request audio, already requesting");
+      return;
+    }
+
     Reader()
         ->RequestAudioData()
         ->Then(
@@ -1172,6 +1178,12 @@ class MediaDecoderStateMachine::LoopingDecodingState
 
   void RequestVideoDataFromReaderAfterEOS() {
     MOZ_ASSERT(mMaster->HasVideo());
+
+    if (mVideoDataRequest.Exists()) {
+      SLOG("no need to request video, already requesting");
+      return;
+    }
+
     Reader()
         ->RequestVideoData(media::TimeUnit(),
                            false /* aRequestNextVideoKeyFrame */)
@@ -3841,8 +3853,13 @@ void MediaDecoderStateMachine::RequestAudioData() {
                       MEDIA_PLAYBACK);
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(IsAudioDecoding());
-  MOZ_ASSERT(!IsRequestingAudioData());
-  MOZ_ASSERT(!IsWaitingAudioData());
+
+  if (IsRequestingAudioData() || IsWaitingAudioData()) {
+    LOGV("No need to request audio, isRequesting=%d, waitingAudio=%d",
+         IsRequestingAudioData(), IsWaitingAudioData());
+    return;
+  }
+
   LOGV("Queueing audio task - queued=%zu, decoder-queued=%zu",
        AudioQueue().GetSize(), mReader->SizeOfAudioQueueInFrames());
 
@@ -3898,8 +3915,13 @@ void MediaDecoderStateMachine::RequestVideoData(
                       MEDIA_PLAYBACK);
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(IsVideoDecoding());
-  MOZ_ASSERT(!IsRequestingVideoData());
-  MOZ_ASSERT(!IsWaitingVideoData());
+
+  if (IsRequestingVideoData() || IsWaitingVideoData()) {
+    LOGV("No need to request video, isRequesting=%d, waitingVideo=%d",
+         IsRequestingVideoData(), IsWaitingVideoData());
+    return;
+  }
+
   LOGV(
       "Queueing video task - queued=%zu, decoder-queued=%zo"
       ", stime=%" PRId64 ", by-pass-skip=%d",
