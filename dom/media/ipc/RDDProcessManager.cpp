@@ -129,7 +129,9 @@ RefPtr<GenericNonExclusivePromise> RDDProcessManager::LaunchRDDProcess() {
                                                        __func__);
   }
 
-  if (mLaunchRDDPromise && mProcess) {
+  if (mProcess) {
+    // If we have a process object, then we know we have a promise.
+    MOZ_ASSERT(mLaunchRDDPromise);
     return mLaunchRDDPromise;
   }
 
@@ -154,7 +156,7 @@ RefPtr<GenericNonExclusivePromise> RDDProcessManager::LaunchRDDProcess() {
               NS_ERROR_NOT_AVAILABLE, __func__);
         }
 
-        if (IsRDDProcessDestroyed()) {
+        if (NS_WARN_IF(!IsRDDProcessLaunching())) {
           return GenericNonExclusivePromise::CreateAndReject(
               NS_ERROR_NOT_AVAILABLE, __func__);
         }
@@ -218,14 +220,14 @@ auto RDDProcessManager::EnsureRDDProcessAndCreateBridge(
       });
 }
 
-bool RDDProcessManager::IsRDDProcessLaunching() {
+bool RDDProcessManager::IsRDDProcessLaunching() const {
   MOZ_ASSERT(NS_IsMainThread());
   return !!mProcess && !mRDDChild;
 }
 
-bool RDDProcessManager::IsRDDProcessDestroyed() const {
+bool RDDProcessManager::IsRDDProcessLaunched() const {
   MOZ_ASSERT(NS_IsMainThread());
-  return !mRDDChild && !mProcess;
+  return mRDDChild && mRDDChild->CanSend() && mProcess;
 }
 
 void RDDProcessManager::OnProcessUnexpectedShutdown(RDDProcessHost* aHost) {
@@ -264,10 +266,15 @@ void RDDProcessManager::DestroyProcess() {
     return;
   }
 
-  mProcess->Shutdown();
-  mProcessToken = 0;
+  // Move onto the stack to ensure we don't re-enter from a chained promise
+  // rejection on the process shutdown.
+  RDDProcessHost* process = mProcess;
   mProcess = nullptr;
+
+  process->Shutdown();
+  mProcessToken = 0;
   mRDDChild = nullptr;
+  mLaunchRDDPromise = nullptr;
   mQueuedPrefs.Clear();
 
   CrashReporter::AnnotateCrashReport(
@@ -279,7 +286,7 @@ bool RDDProcessManager::CreateContentBridge(
     ipc::Endpoint<PRemoteDecoderManagerChild>* aOutRemoteDecoderManager) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (IsRDDProcessDestroyed()) {
+  if (NS_WARN_IF(!IsRDDProcessLaunched())) {
     MOZ_LOG(sPDMLog, LogLevel::Debug,
             ("RDD shutdown before creating content bridge"));
     return false;
@@ -304,6 +311,13 @@ bool RDDProcessManager::CreateContentBridge(
 
 bool RDDProcessManager::CreateVideoBridge() {
   MOZ_ASSERT(NS_IsMainThread());
+
+  if (NS_WARN_IF(!IsRDDProcessLaunched())) {
+    MOZ_LOG(sPDMLog, LogLevel::Debug,
+            ("RDD shutdown before creating video bridge"));
+    return false;
+  }
+
   ipc::Endpoint<PVideoBridgeParent> parentPipe;
   ipc::Endpoint<PVideoBridgeChild> childPipe;
 
