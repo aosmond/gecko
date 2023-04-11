@@ -16,16 +16,6 @@ GMPPlaneImpl::GMPPlaneImpl(GMPVideoHostImpl* aHost)
   mHost->PlaneCreated(this);
 }
 
-GMPPlaneImpl::GMPPlaneImpl(const GMPPlaneData& aPlaneData,
-                           GMPVideoHostImpl* aHost)
-    : mBuffer(aPlaneData.mBuffer()),
-      mSize(aPlaneData.mSize()),
-      mStride(aPlaneData.mStride()),
-      mHost(aHost) {
-  MOZ_ASSERT(mHost);
-  mHost->PlaneCreated(this);
-}
-
 GMPPlaneImpl::~GMPPlaneImpl() {
   DestroyBuffer();
   if (mHost) {
@@ -47,19 +37,6 @@ void GMPPlaneImpl::ActorDestroyed() {
   mBuffer = ipc::Shmem();
   // No more host.
   mHost = nullptr;
-}
-
-bool GMPPlaneImpl::InitPlaneData(GMPPlaneData& aPlaneData) {
-  aPlaneData.mBuffer() = mBuffer;
-  aPlaneData.mSize() = mSize;
-  aPlaneData.mStride() = mStride;
-
-  // This method is called right before Shmem is sent to another process.
-  // We need to effectively zero out our member copy so that we don't
-  // try to delete memory we don't own later.
-  mBuffer = ipc::Shmem();
-
-  return true;
 }
 
 GMPErr GMPPlaneImpl::MaybeResize(int32_t aNewSize) {

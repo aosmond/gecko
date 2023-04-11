@@ -44,7 +44,7 @@ namespace gmp {
 class GMPVideoHostImpl;
 class GMPVideoEncodedFrameData;
 
-class GMPVideoEncodedFrameImpl : public GMPVideoEncodedFrame {
+class GMPVideoEncodedFrameImpl final : public GMPVideoEncodedFrame {
   friend struct IPC::ParamTraits<mozilla::gmp::GMPVideoEncodedFrameImpl>;
 
  public:
@@ -60,6 +60,7 @@ class GMPVideoEncodedFrameImpl : public GMPVideoEncodedFrame {
   void ActorDestroyed();
 
   bool RelinquishFrameData(GMPVideoEncodedFrameData& aFrameData);
+  ipc::Shmem TakeBuffer();
 
   // GMPVideoFrame
   GMPVideoFrameFormat GetFrameFormat() override;

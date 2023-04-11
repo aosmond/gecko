@@ -12,14 +12,12 @@
 namespace mozilla::gmp {
 
 class GMPVideoHostImpl;
-class GMPPlaneData;
 
-class GMPPlaneImpl : public GMPPlane {
+class GMPPlaneImpl final : public GMPPlane {
   friend struct IPC::ParamTraits<mozilla::gmp::GMPPlaneImpl>;
 
  public:
   explicit GMPPlaneImpl(GMPVideoHostImpl* aHost);
-  GMPPlaneImpl(const GMPPlaneData& aPlaneData, GMPVideoHostImpl* aHost);
   virtual ~GMPPlaneImpl();
 
   // This is called during a normal destroy sequence, which is
@@ -29,8 +27,6 @@ class GMPPlaneImpl : public GMPPlane {
   // a child process has crashed. Does not attempt to release Shmem,
   // as the Shmem has already been released.
   void ActorDestroyed();
-
-  bool InitPlaneData(GMPPlaneData& aPlaneData);
 
   // GMPPlane
   GMPErr CreateEmptyPlane(int32_t aAllocatedSize, int32_t aStride,

@@ -15,6 +15,7 @@ namespace mozilla::gmp {
 
 class GMPSharedMemManager;
 class GMPPlaneImpl;
+class GMPVideoi420FrameImpl;
 class GMPVideoEncodedFrameImpl;
 
 class GMPVideoHostImpl : public GMPVideoHost {
@@ -28,6 +29,8 @@ class GMPVideoHostImpl : public GMPVideoHost {
   void ActorDestroyed();
   void PlaneCreated(GMPPlaneImpl* aPlane);
   void PlaneDestroyed(GMPPlaneImpl* aPlane);
+  void DecodedFrameCreated(GMPVideoi420FrameImpl* aFrame);
+  void DecodedFrameDestroyed(GMPVideoi420FrameImpl* aFrame);
   void EncodedFrameCreated(GMPVideoEncodedFrameImpl* aEncodedFrame);
   void EncodedFrameDestroyed(GMPVideoEncodedFrameImpl* aFrame);
 
@@ -46,6 +49,7 @@ class GMPVideoHostImpl : public GMPVideoHost {
   // allocations through us and we need to notify them when they
   // can't use us any more.
   nsTArray<GMPPlaneImpl*> mPlanes;
+  nsTArray<GMPVideoi420FrameImpl*> mDecodedFrames;
   nsTArray<GMPVideoEncodedFrameImpl*> mEncodedFrames;
 };
 

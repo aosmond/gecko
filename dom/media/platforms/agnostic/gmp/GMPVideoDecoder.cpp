@@ -52,52 +52,50 @@ nsCString GMPVideoDecoder::GetCodecName() const {
 
 void GMPVideoDecoder::Decoded(GMPVideoi420Frame* aDecodedFrame) {
   GMP_LOG_DEBUG("GMPVideoDecoder::Decoded");
-
-  GMPUniquePtr<GMPVideoi420Frame> decodedFrame(aDecodedFrame);
   MOZ_ASSERT(IsOnGMPThread());
 
   VideoData::YCbCrBuffer b;
   for (int i = 0; i < kGMPNumOfPlanes; ++i) {
-    b.mPlanes[i].mData = decodedFrame->Buffer(GMPPlaneType(i));
-    b.mPlanes[i].mStride = decodedFrame->Stride(GMPPlaneType(i));
+    b.mPlanes[i].mData = aDecodedFrame->Buffer(GMPPlaneType(i));
+    b.mPlanes[i].mStride = aDecodedFrame->Stride(GMPPlaneType(i));
     if (i == kGMPYPlane) {
-      b.mPlanes[i].mWidth = decodedFrame->Width();
-      b.mPlanes[i].mHeight = decodedFrame->Height();
+      b.mPlanes[i].mWidth = aDecodedFrame->Width();
+      b.mPlanes[i].mHeight = aDecodedFrame->Height();
     } else {
-      b.mPlanes[i].mWidth = (decodedFrame->Width() + 1) / 2;
-      b.mPlanes[i].mHeight = (decodedFrame->Height() + 1) / 2;
+      b.mPlanes[i].mWidth = (aDecodedFrame->Width() + 1) / 2;
+      b.mPlanes[i].mHeight = (aDecodedFrame->Height() + 1) / 2;
     }
     b.mPlanes[i].mSkip = 0;
   }
 
   b.mChromaSubsampling = gfx::ChromaSubsampling::HALF_WIDTH_AND_HEIGHT;
   b.mYUVColorSpace =
-      DefaultColorSpace({decodedFrame->Width(), decodedFrame->Height()});
+      DefaultColorSpace({aDecodedFrame->Width(), aDecodedFrame->Height()});
 
   Maybe<int64_t> streamOffset =
-      mStreamOffsets.Extract(decodedFrame->Timestamp());
+      mStreamOffsets.Extract(aDecodedFrame->Timestamp());
   if (NS_WARN_IF(!streamOffset)) {
     streamOffset.emplace(mLastStreamOffset);
   }
 
-  gfx::IntRect pictureRegion(0, 0, decodedFrame->Width(),
-                             decodedFrame->Height());
+  gfx::IntRect pictureRegion(0, 0, aDecodedFrame->Width(),
+                             aDecodedFrame->Height());
   RefPtr<VideoData> v = VideoData::CreateAndCopyData(
       mConfig, mImageContainer, *streamOffset,
-      media::TimeUnit::FromMicroseconds(decodedFrame->Timestamp()),
-      media::TimeUnit::FromMicroseconds(decodedFrame->Duration()), b, false,
+      media::TimeUnit::FromMicroseconds(aDecodedFrame->Timestamp()),
+      media::TimeUnit::FromMicroseconds(aDecodedFrame->Duration()), b, false,
       media::TimeUnit::FromMicroseconds(-1), pictureRegion, mKnowsCompositor);
   RefPtr<GMPVideoDecoder> self = this;
   if (v) {
-    mPerformanceRecorder.Record(static_cast<int64_t>(decodedFrame->Timestamp()),
-                                [&](DecodeStage& aStage) {
-                                  aStage.SetImageFormat(DecodeStage::YUV420P);
-                                  aStage.SetResolution(decodedFrame->Width(),
-                                                       decodedFrame->Height());
-                                  aStage.SetYUVColorSpace(b.mYUVColorSpace);
-                                  aStage.SetColorDepth(b.mColorDepth);
-                                  aStage.SetColorRange(b.mColorRange);
-                                });
+    mPerformanceRecorder.Record(
+        static_cast<int64_t>(aDecodedFrame->Timestamp()),
+        [&](DecodeStage& aStage) {
+          aStage.SetImageFormat(DecodeStage::YUV420P);
+          aStage.SetResolution(aDecodedFrame->Width(), aDecodedFrame->Height());
+          aStage.SetYUVColorSpace(b.mYUVColorSpace);
+          aStage.SetColorDepth(b.mColorDepth);
+          aStage.SetColorRange(b.mColorRange);
+        });
 
     mDecodedData.AppendElement(std::move(v));
 

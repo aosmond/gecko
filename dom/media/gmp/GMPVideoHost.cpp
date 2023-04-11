@@ -7,6 +7,7 @@
 #include "mozilla/Assertions.h"
 #include "GMPVideoi420FrameImpl.h"
 #include "GMPVideoEncodedFrameImpl.h"
+#include "GMPVideoPlaneImpl.h"
 
 namespace mozilla::gmp {
 
@@ -67,6 +68,10 @@ void GMPVideoHostImpl::ActorDestroyed() {
     mPlanes[i - 1]->DoneWithAPI();
     mPlanes.RemoveElementAt(i - 1);
   }
+  for (uint32_t i = mDecodedFrames.Length(); i > 0; i--) {
+    mDecodedFrames[i - 1]->DoneWithAPI();
+    mDecodedFrames.RemoveElementAt(i - 1);
+  }
   for (uint32_t i = mEncodedFrames.Length(); i > 0; i--) {
     mEncodedFrames[i - 1]->DoneWithAPI();
     mEncodedFrames.RemoveElementAt(i - 1);
@@ -80,6 +85,15 @@ void GMPVideoHostImpl::PlaneCreated(GMPPlaneImpl* aPlane) {
 
 void GMPVideoHostImpl::PlaneDestroyed(GMPPlaneImpl* aPlane) {
   MOZ_ALWAYS_TRUE(mPlanes.RemoveElement(aPlane));
+}
+
+void GMPVideoHostImpl::DecodedFrameCreated(
+    GMPVideoi420FrameImpl* aDecodedFrame) {
+  mDecodedFrames.AppendElement(aDecodedFrame);
+}
+
+void GMPVideoHostImpl::DecodedFrameDestroyed(GMPVideoi420FrameImpl* aFrame) {
+  MOZ_ALWAYS_TRUE(mDecodedFrames.RemoveElement(aFrame));
 }
 
 void GMPVideoHostImpl::EncodedFrameCreated(

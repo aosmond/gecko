@@ -4,44 +4,124 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "GMPVideoi420FrameImpl.h"
+#include "GMPSharedMemManager.h"
+#include "GMPVideoHost.h"
+#include "mozilla/gfx/Tools.h"
 #include "mozilla/gmp/GMPTypes.h"
 #include "mozilla/CheckedInt.h"
 
 namespace mozilla::gmp {
 
+GMPVideoi420FrameImpl::Plane GMPVideoi420FrameImpl::Plane::FromData(
+    const GMPPlaneData& aData) {
+  return {aData.mOffset(), aData.mSize(), aData.mStride()};
+}
+
+GMPPlaneData GMPVideoi420FrameImpl::Plane::ToData(
+    const GMPVideoi420FrameImpl::Plane& aPlane) {
+  return GMPPlaneData(aPlane.mOffset, aPlane.mSize, aPlane.mStride);
+}
+
 GMPVideoi420FrameImpl::GMPVideoi420FrameImpl(GMPVideoHostImpl* aHost)
-    : mYPlane(aHost),
-      mUPlane(aHost),
-      mVPlane(aHost),
-      mWidth(0),
-      mHeight(0),
-      mTimestamp(0ll),
-      mDuration(0ll) {
+    : mHost(aHost) {
   MOZ_ASSERT(aHost);
+  mHost->DecodedFrameCreated(this);
 }
 
 GMPVideoi420FrameImpl::GMPVideoi420FrameImpl(
     const GMPVideoi420FrameData& aFrameData, GMPVideoHostImpl* aHost)
-    : mYPlane(aFrameData.mYPlane(), aHost),
-      mUPlane(aFrameData.mUPlane(), aHost),
-      mVPlane(aFrameData.mVPlane(), aHost),
+    : mHost(aHost),
+      mBuffer(aFrameData.mBuffer()),
+      mYPlane(Plane::FromData(aFrameData.mYPlane())),
+      mUPlane(Plane::FromData(aFrameData.mUPlane())),
+      mVPlane(Plane::FromData(aFrameData.mVPlane())),
       mWidth(aFrameData.mWidth()),
       mHeight(aFrameData.mHeight()),
       mTimestamp(aFrameData.mTimestamp()),
       mDuration(aFrameData.mDuration()) {
   MOZ_ASSERT(aHost);
+  mHost->DecodedFrameCreated(this);
 }
 
-GMPVideoi420FrameImpl::~GMPVideoi420FrameImpl() = default;
+GMPVideoi420FrameImpl::~GMPVideoi420FrameImpl() {
+  DestroyBuffer();
+  if (mHost) {
+    mHost->DecodedFrameDestroyed(this);
+  }
+}
+
+void GMPVideoi420FrameImpl::DoneWithAPI() {
+  DestroyBuffer();
+
+  // Do this after destroying the buffer because destruction
+  // involves deallocation, which requires a host.
+  mHost = nullptr;
+}
+
+int32_t GMPVideoi420FrameImpl::AllocatedSize() const {
+  if (mBuffer.IsWritable()) {
+    return mBuffer.Size<uint8_t>();
+  }
+  return 0;
+}
+
+const uint8_t* GMPVideoi420FrameImpl::BufferPtr() const {
+  return mBuffer.get<uint8_t>();
+}
+
+uint8_t* GMPVideoi420FrameImpl::BufferPtr() { return mBuffer.get<uint8_t>(); }
+
+GMPErr GMPVideoi420FrameImpl::MaybeResize(int32_t aNewSize) {
+  if (aNewSize <= AllocatedSize()) {
+    return GMPNoErr;
+  }
+
+  if (!mHost) {
+    return GMPGenericErr;
+  }
+
+  ipc::Shmem new_mem;
+  if (!mHost->SharedMemMgr()->MgrAllocShmem(GMPSharedMem::kGMPFrameData,
+                                            aNewSize, &new_mem) ||
+      !new_mem.get<uint8_t>()) {
+    return GMPAllocErr;
+  }
+
+  DestroyBuffer();
+
+  mBuffer = new_mem;
+
+  return GMPNoErr;
+}
+
+void GMPVideoi420FrameImpl::DestroyBuffer() {
+  if (mHost && mBuffer.IsWritable()) {
+    mHost->SharedMemMgr()->MgrDeallocShmem(GMPSharedMem::kGMPFrameData,
+                                           mBuffer);
+  }
+  mBuffer = ipc::Shmem();
+}
+
+ipc::Shmem GMPVideoi420FrameImpl::TakeBuffer() {
+  ipc::Shmem buffer = mBuffer;
+  mBuffer = ipc::Shmem();
+  return buffer;
+}
 
 bool GMPVideoi420FrameImpl::InitFrameData(GMPVideoi420FrameData& aFrameData) {
-  mYPlane.InitPlaneData(aFrameData.mYPlane());
-  mUPlane.InitPlaneData(aFrameData.mUPlane());
-  mVPlane.InitPlaneData(aFrameData.mVPlane());
+  aFrameData.mYPlane() = Plane::ToData(mYPlane);
+  aFrameData.mUPlane() = Plane::ToData(mUPlane);
+  aFrameData.mVPlane() = Plane::ToData(mVPlane);
+  aFrameData.mBuffer() = mBuffer;
   aFrameData.mWidth() = mWidth;
   aFrameData.mHeight() = mHeight;
   aFrameData.mTimestamp() = mTimestamp;
   aFrameData.mDuration() = mDuration;
+
+  // This method is called right before Shmem is sent to another process.
+  // We need to effectively zero out our member copy so that we don't
+  // try to delete memory we don't own later.
+  mBuffer = ipc::Shmem();
   return true;
 }
 
@@ -59,18 +139,23 @@ bool GMPVideoi420FrameImpl::CheckFrameData(
   // if so. Note: Size() greater than expected is also an error, but with no
   // negative consequences
   int32_t half_width = (aFrameData.mWidth() + 1) / 2;
+  CheckedInt32 y_end = CheckedInt32(aFrameData.mYPlane().mOffset()) +
+                       aFrameData.mYPlane().mSize();
+  CheckedInt32 u_end = CheckedInt32(aFrameData.mUPlane().mOffset()) +
+                       aFrameData.mUPlane().mSize();
+  CheckedInt32 v_end = CheckedInt32(aFrameData.mVPlane().mOffset()) +
+                       aFrameData.mVPlane().mSize();
   if ((aFrameData.mYPlane().mStride() <= 0) ||
       (aFrameData.mYPlane().mSize() <= 0) ||
       (aFrameData.mUPlane().mStride() <= 0) ||
       (aFrameData.mUPlane().mSize() <= 0) ||
       (aFrameData.mVPlane().mStride() <= 0) ||
-      (aFrameData.mVPlane().mSize() <= 0) ||
-      (aFrameData.mYPlane().mSize() >
-       (int32_t)aFrameData.mYPlane().mBuffer().Size<uint8_t>()) ||
-      (aFrameData.mUPlane().mSize() >
-       (int32_t)aFrameData.mUPlane().mBuffer().Size<uint8_t>()) ||
-      (aFrameData.mVPlane().mSize() >
-       (int32_t)aFrameData.mVPlane().mBuffer().Size<uint8_t>()) ||
+      (aFrameData.mVPlane().mSize() <= 0) || (!y_end.isValid()) ||
+      (!u_end.isValid()) || (!v_end.isValid()) ||
+      (aFrameData.mYPlane().mOffset() < 0) ||
+      (y_end.value() > aFrameData.mUPlane().mOffset()) ||
+      (u_end.value() > aFrameData.mVPlane().mOffset()) ||
+      (v_end.value() > (int32_t)aFrameData.mBuffer().Size<uint8_t>()) ||
       (aFrameData.mYPlane().mStride() < aFrameData.mWidth()) ||
       (aFrameData.mUPlane().mStride() < half_width) ||
       (aFrameData.mVPlane().mStride() < half_width) ||
@@ -101,7 +186,8 @@ bool GMPVideoi420FrameImpl::CheckDimensions(int32_t aWidth, int32_t aHeight,
   return true;
 }
 
-const GMPPlaneImpl* GMPVideoi420FrameImpl::GetPlane(GMPPlaneType aType) const {
+const GMPVideoi420FrameImpl::Plane* GMPVideoi420FrameImpl::GetPlane(
+    GMPPlaneType aType) const {
   switch (aType) {
     case kGMPYPlane:
       return &mYPlane;
@@ -115,7 +201,8 @@ const GMPPlaneImpl* GMPVideoi420FrameImpl::GetPlane(GMPPlaneType aType) const {
   return nullptr;
 }
 
-GMPPlaneImpl* GMPVideoi420FrameImpl::GetPlane(GMPPlaneType aType) {
+GMPVideoi420FrameImpl::Plane* GMPVideoi420FrameImpl::GetPlane(
+    GMPPlaneType aType) {
   switch (aType) {
     case kGMPYPlane:
       return &mYPlane;
@@ -142,19 +229,25 @@ GMPErr GMPVideoi420FrameImpl::CreateEmptyFrame(int32_t aWidth, int32_t aHeight,
   int32_t size_u = aStride_u * half_height;
   int32_t size_v = aStride_v * half_height;
 
-  GMPErr err = mYPlane.CreateEmptyPlane(size_y, aStride_y, size_y);
-  if (err != GMPNoErr) {
-    return err;
+  // Ensure we align our buffers optimally for SIMD operations.
+  constexpr int32_t offset_y = 0;
+  int32_t offset_u = gfx::GetAlignedStride<32>(offset_y + size_y, 1);
+  int32_t offset_v = gfx::GetAlignedStride<32>(offset_u + size_u, 1);
+  int32_t buffer_size = offset_v + size_v;
+
+  if (offset_u <= 0 || offset_v <= 0 || buffer_size <= 0) {
+    return GMPGenericErr;
   }
-  err = mUPlane.CreateEmptyPlane(size_u, aStride_u, size_u);
-  if (err != GMPNoErr) {
-    return err;
-  }
-  err = mVPlane.CreateEmptyPlane(size_v, aStride_v, size_v);
+
+  // Allocate the unified buffer.
+  GMPErr err = MaybeResize(buffer_size);
   if (err != GMPNoErr) {
     return err;
   }
 
+  mYPlane = {offset_y, size_y, aStride_y};
+  mUPlane = {offset_u, size_u, aStride_u};
+  mVPlane = {offset_v, size_v, aStride_v};
   mWidth = aWidth;
   mHeight = aHeight;
   mTimestamp = 0ll;
@@ -180,56 +273,75 @@ GMPErr GMPVideoi420FrameImpl::CreateFrame(
     return GMPGenericErr;
   }
 
-  GMPErr err = mYPlane.Copy(aSize_y, aStride_y, aBuffer_y);
-  if (err != GMPNoErr) {
-    return err;
+  // Ensure we align our buffers optimally for SIMD operations.
+  constexpr int32_t offset_y = 0;
+  int32_t offset_u = gfx::GetAlignedStride<32>(offset_y + aSize_y, 1);
+  int32_t offset_v = gfx::GetAlignedStride<32>(offset_u + aSize_u, 1);
+  int32_t buffer_size = offset_v + aSize_v;
+
+  if (offset_u <= 0 || offset_v <= 0 || buffer_size <= 0) {
+    return GMPGenericErr;
   }
-  err = mUPlane.Copy(aSize_u, aStride_u, aBuffer_u);
-  if (err != GMPNoErr) {
-    return err;
-  }
-  err = mVPlane.Copy(aSize_v, aStride_v, aBuffer_v);
+
+  // Allocate the unified buffer.
+  GMPErr err = MaybeResize(buffer_size);
   if (err != GMPNoErr) {
     return err;
   }
 
+  auto* buffer = BufferPtr();
+  memcpy(buffer + offset_y, aBuffer_y, aSize_y);
+  memcpy(buffer + offset_u, aBuffer_u, aSize_u);
+  memcpy(buffer + offset_v, aBuffer_v, aSize_v);
+
+  mYPlane = {offset_y, aSize_y, aStride_y};
+  mUPlane = {offset_u, aSize_u, aStride_u};
+  mVPlane = {offset_v, aSize_v, aStride_v};
   mWidth = aWidth;
   mHeight = aHeight;
-
   return GMPNoErr;
 }
 
 GMPErr GMPVideoi420FrameImpl::CopyFrame(const GMPVideoi420Frame& aFrame) {
   auto& f = static_cast<const GMPVideoi420FrameImpl&>(aFrame);
 
-  GMPErr err = mYPlane.Copy(f.mYPlane);
+  int32_t size = f.AllocatedSize();
+  if (size <= 0) {
+    return GMPGenericErr;
+  }
+
+  GMPErr err = MaybeResize(size);
   if (err != GMPNoErr) {
     return err;
   }
 
-  err = mUPlane.Copy(f.mUPlane);
-  if (err != GMPNoErr) {
-    return err;
+  const auto* src = f.BufferPtr();
+  auto* dst = BufferPtr();
+  if (!dst || !src) {
+    return GMPGenericErr;
   }
 
-  err = mVPlane.Copy(f.mVPlane);
-  if (err != GMPNoErr) {
-    return err;
-  }
-
+  mYPlane = f.mYPlane;
+  mUPlane = f.mUPlane;
+  mVPlane = f.mVPlane;
   mWidth = f.mWidth;
   mHeight = f.mHeight;
   mTimestamp = f.mTimestamp;
   mDuration = f.mDuration;
 
+  memcpy(dst + mYPlane.mOffset, src + f.mYPlane.mOffset, mYPlane.mSize);
+  memcpy(dst + mUPlane.mOffset, src + f.mUPlane.mOffset, mUPlane.mSize);
+  memcpy(dst + mVPlane.mOffset, src + f.mVPlane.mOffset, mVPlane.mSize);
   return GMPNoErr;
 }
 
 void GMPVideoi420FrameImpl::SwapFrame(GMPVideoi420Frame* aFrame) {
   auto f = static_cast<GMPVideoi420FrameImpl*>(aFrame);
-  mYPlane.Swap(f->mYPlane);
-  mUPlane.Swap(f->mUPlane);
-  mVPlane.Swap(f->mVPlane);
+  std::swap(mHost, f->mHost);
+  std::swap(mBuffer, f->mBuffer);
+  std::swap(mYPlane, f->mYPlane);
+  std::swap(mUPlane, f->mUPlane);
+  std::swap(mVPlane, f->mVPlane);
   std::swap(mWidth, f->mWidth);
   std::swap(mHeight, f->mHeight);
   std::swap(mTimestamp, f->mTimestamp);
@@ -237,40 +349,46 @@ void GMPVideoi420FrameImpl::SwapFrame(GMPVideoi420Frame* aFrame) {
 }
 
 uint8_t* GMPVideoi420FrameImpl::Buffer(GMPPlaneType aType) {
-  GMPPlane* p = GetPlane(aType);
-  if (p) {
-    return p->Buffer();
+  if (mBuffer.IsWritable()) {
+    auto* p = GetPlane(aType);
+    if (p) {
+      return BufferPtr() + p->mOffset;
+    }
   }
   return nullptr;
 }
 
 const uint8_t* GMPVideoi420FrameImpl::Buffer(GMPPlaneType aType) const {
-  const GMPPlane* p = GetPlane(aType);
-  if (p) {
-    return p->Buffer();
+  if (mBuffer.IsReadable()) {
+    const auto* p = GetPlane(aType);
+    if (p) {
+      return BufferPtr() + p->mOffset;
+    }
   }
   return nullptr;
 }
 
 int32_t GMPVideoi420FrameImpl::AllocatedSize(GMPPlaneType aType) const {
-  const GMPPlane* p = GetPlane(aType);
-  if (p) {
-    return p->AllocatedSize();
+  if (mBuffer.IsWritable()) {
+    const auto* p = GetPlane(aType);
+    if (p) {
+      return p->mSize;
+    }
   }
   return -1;
 }
 
 int32_t GMPVideoi420FrameImpl::Stride(GMPPlaneType aType) const {
-  const GMPPlane* p = GetPlane(aType);
+  const auto* p = GetPlane(aType);
   if (p) {
-    return p->Stride();
+    return p->mStride;
   }
   return -1;
 }
 
 GMPErr GMPVideoi420FrameImpl::SetWidth(int32_t aWidth) {
-  if (!CheckDimensions(aWidth, mHeight, mYPlane.Stride(), mUPlane.Stride(),
-                       mVPlane.Stride())) {
+  if (!CheckDimensions(aWidth, mHeight, mYPlane.mStride, mUPlane.mStride,
+                       mVPlane.mStride)) {
     return GMPGenericErr;
   }
   mWidth = aWidth;
@@ -278,8 +396,8 @@ GMPErr GMPVideoi420FrameImpl::SetWidth(int32_t aWidth) {
 }
 
 GMPErr GMPVideoi420FrameImpl::SetHeight(int32_t aHeight) {
-  if (!CheckDimensions(mWidth, aHeight, mYPlane.Stride(), mUPlane.Stride(),
-                       mVPlane.Stride())) {
+  if (!CheckDimensions(mWidth, aHeight, mYPlane.mStride, mUPlane.mStride,
+                       mVPlane.mStride)) {
     return GMPGenericErr;
   }
   mHeight = aHeight;
@@ -303,13 +421,13 @@ void GMPVideoi420FrameImpl::SetDuration(uint64_t aDuration) {
 uint64_t GMPVideoi420FrameImpl::Duration() const { return mDuration; }
 
 bool GMPVideoi420FrameImpl::IsZeroSize() const {
-  return (mYPlane.IsZeroSize() && mUPlane.IsZeroSize() && mVPlane.IsZeroSize());
+  return mYPlane.mSize == 0 && mUPlane.mSize == 0 && mVPlane.mSize == 0;
 }
 
 void GMPVideoi420FrameImpl::ResetSize() {
-  mYPlane.ResetSize();
-  mUPlane.ResetSize();
-  mVPlane.ResetSize();
+  mYPlane.mSize = 0;
+  mUPlane.mSize = 0;
+  mVPlane.mSize = 0;
 }
 
 }  // namespace mozilla::gmp

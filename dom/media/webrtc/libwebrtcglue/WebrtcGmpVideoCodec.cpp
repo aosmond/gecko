@@ -1022,7 +1022,6 @@ void WebrtcGmpVideoDecoder::Decoded(GMPVideoi420Frame* aDecodedFrame) {
       mCallback->Decoded(videoFrame);
     }
   }
-  aDecodedFrame->Destroy();
 }
 
 }  // namespace mozilla

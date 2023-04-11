@@ -289,9 +289,16 @@ mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecoded(
 
   if (mCallback) {
     if (GMPVideoi420FrameImpl::CheckFrameData(aDecodedFrame)) {
-      auto f = new GMPVideoi420FrameImpl(aDecodedFrame, &mVideoHost);
+      GMPVideoi420FrameImpl f(aDecodedFrame, &mVideoHost);
+      mCallback->Decoded(&f);
 
-      mCallback->Decoded(f);
+      // The callback was required to copy the data so we can safely take the
+      // buffer from the frame.
+      ipc::Shmem buffer = f.TakeBuffer();
+      if (!SendChildShmemForPool(std::move(buffer))) {
+        mVideoHost.SharedMemMgr()->MgrDeallocShmem(GMPSharedMem::kGMPFrameData,
+                                                   buffer);
+      }
     } else {
       GMP_LOG_ERROR(
           "GMPVideoDecoderParent[%p]::RecvDecoded() "
@@ -400,6 +407,9 @@ mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvParentShmemForPool(
 
 mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvNeedShmem(
     const uint32_t& aFrameBufferSize, Shmem* aMem) {
+  GMP_LOG_DEBUG("%s: Child requested decoding buffer, size %u", __FUNCTION__,
+                aFrameBufferSize);
+
   ipc::Shmem mem;
 
   if (!mVideoHost.SharedMemMgr()->MgrAllocShmem(GMPSharedMem::kGMPFrameData,

@@ -67,6 +67,12 @@ void GMPVideoEncodedFrameImpl::ActorDestroyed() {
   mHost = nullptr;
 }
 
+ipc::Shmem GMPVideoEncodedFrameImpl::TakeBuffer() {
+  ipc::Shmem buffer = mBuffer;
+  mBuffer = ipc::Shmem();
+  return buffer;
+}
+
 bool GMPVideoEncodedFrameImpl::RelinquishFrameData(
     GMPVideoEncodedFrameData& aFrameData) {
   aFrameData.mEncodedWidth() = mEncodedWidth;

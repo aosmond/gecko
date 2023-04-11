@@ -234,9 +234,16 @@ mozilla::ipc::IPCResult GMPVideoEncoderParent::RecvEncoded(
     const GMPVideoEncodedFrameData& aEncodedFrame,
     nsTArray<uint8_t>&& aCodecSpecificInfo) {
   if (mCallback) {
-    auto f = new GMPVideoEncodedFrameImpl(aEncodedFrame, &mVideoHost);
-    mCallback->Encoded(f, aCodecSpecificInfo);
-    f->Destroy();
+    GMPVideoEncodedFrameImpl f(aEncodedFrame, &mVideoHost);
+    mCallback->Encoded(&f, aCodecSpecificInfo);
+
+    // The callback was required to copy the data so we can safely take the
+    // buffer from the frame.
+    ipc::Shmem buffer = f.TakeBuffer();
+    if (!SendChildShmemForPool(std::move(buffer))) {
+      mVideoHost.SharedMemMgr()->MgrDeallocShmem(GMPSharedMem::kGMPFrameData,
+                                                 buffer);
+    }
   }
   return IPC_OK();
 }
@@ -274,6 +281,9 @@ mozilla::ipc::IPCResult GMPVideoEncoderParent::RecvParentShmemForPool(
 
 mozilla::ipc::IPCResult GMPVideoEncoderParent::RecvNeedShmem(
     const uint32_t& aEncodedBufferSize, Shmem* aMem) {
+  GMP_LOG_DEBUG("%s: Child requested encoding buffer, size %u", __FUNCTION__,
+                aEncodedBufferSize);
+
   ipc::Shmem mem;
 
   // This test may be paranoia now that we don't shut down the VideoHost

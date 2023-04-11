@@ -8,13 +8,13 @@
 
 #include "gmp-video-frame-i420.h"
 #include "mozilla/ipc/Shmem.h"
-#include "GMPVideoPlaneImpl.h"
 
 namespace mozilla::gmp {
 
+class GMPPlaneData;
 class GMPVideoi420FrameData;
 
-class GMPVideoi420FrameImpl : public GMPVideoi420Frame {
+class GMPVideoi420FrameImpl final : public GMPVideoi420Frame {
   friend struct IPC::ParamTraits<mozilla::gmp::GMPVideoi420FrameImpl>;
 
  public:
@@ -24,10 +24,9 @@ class GMPVideoi420FrameImpl : public GMPVideoi420Frame {
   virtual ~GMPVideoi420FrameImpl();
 
   static bool CheckFrameData(const GMPVideoi420FrameData& aFrameData);
-
   bool InitFrameData(GMPVideoi420FrameData& aFrameData);
-  const GMPPlaneImpl* GetPlane(GMPPlaneType aType) const;
-  GMPPlaneImpl* GetPlane(GMPPlaneType aType);
+  ipc::Shmem TakeBuffer();
+  void DoneWithAPI();
 
   // GMPVideoFrame
   GMPVideoFrameFormat GetFrameFormat() override;
@@ -59,16 +58,36 @@ class GMPVideoi420FrameImpl : public GMPVideoi420Frame {
   void ResetSize() override;
 
  private:
+  struct Plane {
+    static Plane FromData(const GMPPlaneData& aData);
+    static GMPPlaneData ToData(const Plane& aPlane);
+
+    int32_t mOffset = 0;
+    int32_t mSize = 0;
+    int32_t mStride = 0;
+  };
+
   bool CheckDimensions(int32_t aWidth, int32_t aHeight, int32_t aStride_y,
                        int32_t aStride_u, int32_t aStride_v);
 
-  GMPPlaneImpl mYPlane;
-  GMPPlaneImpl mUPlane;
-  GMPPlaneImpl mVPlane;
-  int32_t mWidth;
-  int32_t mHeight;
-  uint64_t mTimestamp;
-  uint64_t mDuration;
+  const uint8_t* BufferPtr() const;
+  uint8_t* BufferPtr();
+  int32_t AllocatedSize() const;
+  GMPErr MaybeResize(int32_t aNewSize);
+  void DestroyBuffer();
+
+  const Plane* GetPlane(GMPPlaneType aType) const;
+  Plane* GetPlane(GMPPlaneType aType);
+
+  GMPVideoHostImpl* mHost;
+  ipc::Shmem mBuffer;
+  Plane mYPlane;
+  Plane mUPlane;
+  Plane mVPlane;
+  int32_t mWidth = 0;
+  int32_t mHeight = 0;
+  uint64_t mTimestamp = 0;
+  uint64_t mDuration = 0;
 };
 
 }  // namespace mozilla::gmp
