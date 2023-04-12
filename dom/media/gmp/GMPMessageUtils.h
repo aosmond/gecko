@@ -118,7 +118,8 @@ struct ParamTraits<GMPVideoCodec> {
   static bool Read(MessageReader* aReader, paramType* aResult) {
     // NOTE: make sure this matches any versions supported
     if (!ReadParam(aReader, &(aResult->mGMPApiVersion)) ||
-        aResult->mGMPApiVersion != kGMPVersion33) {
+        (aResult->mGMPApiVersion != kGMPVersion33 &&
+         aResult->mGMPApiVersion != kGMPVersion34)) {
       return false;
     }
     if (!ReadParam(aReader, &(aResult->mCodecType))) {

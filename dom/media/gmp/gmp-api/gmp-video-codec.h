@@ -138,6 +138,9 @@ enum GMPApiVersion {
   kGMPVersion32 =
       1,  // leveraging that V32 had mCodecType first, and only supported H264
   kGMPVersion33 = 33,
+
+  // Adds GMPVideoi420Frame::SetDecodedTimestamp/DecodedTimestamp
+  kGMPVersion34 = 34,
 };
 
 struct GMPVideoCodec {

@@ -84,7 +84,7 @@ void GMPVideoDecoder::Decoded(GMPVideoi420Frame* aDecodedFrame) {
                              decodedFrame->Height());
   RefPtr<VideoData> v = VideoData::CreateAndCopyData(
       mConfig, mImageContainer, *streamOffset,
-      media::TimeUnit::FromMicroseconds(decodedFrame->Timestamp()),
+      media::TimeUnit::FromMicroseconds(decodedFrame->DecodedTimestamp()),
       media::TimeUnit::FromMicroseconds(decodedFrame->Duration()), b, false,
       media::TimeUnit::FromMicroseconds(-1), pictureRegion, mKnowsCompositor);
   RefPtr<GMPVideoDecoder> self = this;
@@ -252,7 +252,7 @@ void GMPVideoDecoder::GMPInitDone(GMPVideoDecoderProxy* aGMP,
   GMPVideoCodec codec;
   memset(&codec, 0, sizeof(codec));
 
-  codec.mGMPApiVersion = kGMPVersion33;
+  codec.mGMPApiVersion = kGMPVersion34;
   nsTArray<uint8_t> codecSpecific;
   if (MP4Decoder::IsH264(mConfig.mMimeType)) {
     codec.mCodecType = kGMPVideoCodecH264;
