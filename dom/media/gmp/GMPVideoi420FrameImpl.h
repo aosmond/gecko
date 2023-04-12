@@ -8,6 +8,7 @@
 
 #include "gmp-video-frame-i420.h"
 #include "mozilla/ipc/Shmem.h"
+#include "mozilla/Maybe.h"
 
 namespace mozilla::gmp {
 
@@ -52,6 +53,8 @@ class GMPVideoi420FrameImpl final : public GMPVideoi420Frame {
   int32_t Height() const override;
   void SetTimestamp(uint64_t aTimestamp) override;
   uint64_t Timestamp() const override;
+  void SetDecodedTimestamp(uint64_t aTimestamp) override;
+  uint64_t DecodedTimestamp() const override;
   void SetDuration(uint64_t aDuration) override;
   uint64_t Duration() const override;
   bool IsZeroSize() const override;
@@ -87,6 +90,7 @@ class GMPVideoi420FrameImpl final : public GMPVideoi420Frame {
   int32_t mWidth = 0;
   int32_t mHeight = 0;
   uint64_t mTimestamp = 0;
+  Maybe<uint64_t> mDecodedTimestamp;
   uint64_t mDuration = 0;
 };
 

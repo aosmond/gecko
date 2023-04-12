@@ -38,6 +38,7 @@ GMPVideoi420FrameImpl::GMPVideoi420FrameImpl(
       mWidth(aFrameData.mWidth()),
       mHeight(aFrameData.mHeight()),
       mTimestamp(aFrameData.mTimestamp()),
+      mDecodedTimestamp(aFrameData.mDecodedTimestamp()),
       mDuration(aFrameData.mDuration()) {
   MOZ_ASSERT(aHost);
   mHost->DecodedFrameCreated(this);
@@ -116,6 +117,7 @@ bool GMPVideoi420FrameImpl::InitFrameData(GMPVideoi420FrameData& aFrameData) {
   aFrameData.mWidth() = mWidth;
   aFrameData.mHeight() = mHeight;
   aFrameData.mTimestamp() = mTimestamp;
+  aFrameData.mDecodedTimestamp() = mDecodedTimestamp;
   aFrameData.mDuration() = mDuration;
 
   // This method is called right before Shmem is sent to another process.
@@ -251,6 +253,7 @@ GMPErr GMPVideoi420FrameImpl::CreateEmptyFrame(int32_t aWidth, int32_t aHeight,
   mWidth = aWidth;
   mHeight = aHeight;
   mTimestamp = 0ll;
+  mDecodedTimestamp.reset();
   mDuration = 0ll;
 
   return GMPNoErr;
@@ -327,6 +330,7 @@ GMPErr GMPVideoi420FrameImpl::CopyFrame(const GMPVideoi420Frame& aFrame) {
   mWidth = f.mWidth;
   mHeight = f.mHeight;
   mTimestamp = f.mTimestamp;
+  mDecodedTimestamp = f.mDecodedTimestamp;
   mDuration = f.mDuration;
 
   memcpy(dst + mYPlane.mOffset, src + f.mYPlane.mOffset, mYPlane.mSize);
@@ -345,6 +349,7 @@ void GMPVideoi420FrameImpl::SwapFrame(GMPVideoi420Frame* aFrame) {
   std::swap(mWidth, f->mWidth);
   std::swap(mHeight, f->mHeight);
   std::swap(mTimestamp, f->mTimestamp);
+  std::swap(mDecodedTimestamp, f->mDecodedTimestamp);
   std::swap(mDuration, f->mDuration);
 }
 
@@ -413,6 +418,14 @@ void GMPVideoi420FrameImpl::SetTimestamp(uint64_t aTimestamp) {
 }
 
 uint64_t GMPVideoi420FrameImpl::Timestamp() const { return mTimestamp; }
+
+void GMPVideoi420FrameImpl::SetDecodedTimestamp(uint64_t aTimestamp) {
+  mDecodedTimestamp = Some(aTimestamp);
+}
+
+uint64_t GMPVideoi420FrameImpl::DecodedTimestamp() const {
+  return mDecodedTimestamp ? *mDecodedTimestamp : mTimestamp;
+}
 
 void GMPVideoi420FrameImpl::SetDuration(uint64_t aDuration) {
   mDuration = aDuration;
