@@ -15,7 +15,7 @@
 #  include "PerformanceRecorder.h"
 #  include "PlatformDecoderModule.h"
 #  include "mozIGeckoMediaPluginService.h"
-#  include "nsHashtablesFwd.h"
+#  include "nsClassHashtable.h"
 
 namespace mozilla {
 
@@ -91,8 +91,15 @@ class GMPVideoDecoder : public MediaDataDecoder,
   MozPromiseHolder<InitPromise> mInitPromise;
   RefPtr<GMPCrashHelper> mCrashHelper;
 
-  int64_t mLastStreamOffset = 0;
-  nsTHashMap<nsUint64HashKey, int64_t> mStreamOffsets;
+  struct SampleMetadata {
+    explicit SampleMetadata(MediaRawData* aSample)
+        : mOffset(aSample->mOffset),
+          mKeyframe(aSample->mKeyframe) {}
+    int64_t mOffset;
+    bool mKeyframe;
+  };
+
+  nsClassHashtable<nsUint64HashKey, SampleMetadata> mSamples;
   RefPtr<layers::ImageContainer> mImageContainer;
   RefPtr<layers::KnowsCompositor> mKnowsCompositor;
   PerformanceRecorderMulti<DecodeStage> mPerformanceRecorder;
