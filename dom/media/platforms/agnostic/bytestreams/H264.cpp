@@ -980,12 +980,12 @@ uint32_t H264::ComputeMaxRefFrames(const mozilla::MediaByteBuffer* aExtraData) {
       RefPtr<mozilla::MediaByteBuffer> decodedNAL = DecodeNALUnit(p, nalLen);
       SEIRecoveryData data;
       if (DecodeRecoverySEI(decodedNAL, data)) {
-        return FrameType::I_FRAME;
+        // return FrameType::I_FRAME;
       }
     } else if (nalType == H264_NAL_SLICE) {
       RefPtr<mozilla::MediaByteBuffer> decodedNAL = DecodeNALUnit(p, nalLen);
       if (DecodeISlice(decodedNAL)) {
-        return FrameType::I_FRAME;
+        // return FrameType::I_FRAME;
       }
     }
   }

@@ -14,10 +14,20 @@
 #  include "MediaInfo.h"
 #  include "PerformanceRecorder.h"
 #  include "PlatformDecoderModule.h"
+#  include "ReorderQueue.h"
 #  include "mozIGeckoMediaPluginService.h"
 #  include "nsHashtablesFwd.h"
 
 namespace mozilla {
+
+struct GMPReorderQueueComparator {
+  bool LessThan(MediaData* const& a, MediaData* const& b) const {
+    return a->mTimecode < b->mTimecode;
+  }
+};
+
+typedef nsTPriorityQueue<RefPtr<MediaData>, GMPReorderQueueComparator>
+    GMPReorderQueue;
 
 struct MOZ_STACK_CLASS GMPVideoDecoderParams {
   explicit GMPVideoDecoderParams(const CreateDecoderParams& aParams);
@@ -92,7 +102,15 @@ class GMPVideoDecoder : public MediaDataDecoder,
   RefPtr<GMPCrashHelper> mCrashHelper;
 
   int64_t mLastStreamOffset = 0;
-  nsTHashMap<nsUint64HashKey, int64_t> mStreamOffsets;
+  uint32_t mMaxRefFrames = 0;
+  GMPReorderQueue mReorderQueue;
+
+  struct ExtraVideoData {
+    int64_t mOffset;
+    bool mKeyframe;
+  };
+
+  nsTHashMap<nsUint64HashKey, ExtraVideoData> mExtraVideoData;
   RefPtr<layers::ImageContainer> mImageContainer;
   RefPtr<layers::KnowsCompositor> mKnowsCompositor;
   PerformanceRecorderMulti<DecodeStage> mPerformanceRecorder;
