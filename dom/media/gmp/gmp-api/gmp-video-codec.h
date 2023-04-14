@@ -166,6 +166,8 @@ struct GMPVideoCodec {
   GMPSimulcastStream mSimulcastStream[kGMPMaxSimulcastStreams];
 
   GMPVideoCodecMode mMode;
+
+  bool mUseThreadedDecode;
 };
 
 // Either single encoded unit, or multiple units separated by 8/16/24/32
