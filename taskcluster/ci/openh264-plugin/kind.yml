@@ -19,8 +19,8 @@ job-defaults:
         symbol: h264
         tier: 2
     run-on-projects: []
-    repo: 'https://github.com/cisco/openh264.git'
-    revision: '0a48f4d2e9be2abb4fb01b4c3be83cf44ce91a6e'
+    repo: 'https://github.com/aosmond/openh264.git'
+    revision: 'ec68dcff8a73151a92b0e604b2f233dbabd873cd'
     worker:
         chain-of-trust: true
 
