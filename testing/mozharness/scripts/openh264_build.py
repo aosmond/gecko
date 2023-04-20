@@ -217,15 +217,15 @@ class OpenH264Build(TransferMixin, VCSScript, TooltoolMixin):
                 retval.append("NDKLEVEL=%s" % self.config["min_sdk"])
                 retval.append("NDKROOT=%s/android-ndk" % os.environ["MOZ_FETCHES_DIR"])
                 retval.append("NDK_TOOLCHAIN_VERSION=clang")
-            if self.config["operating_system"] == "darwin":
+            elif self.config["operating_system"] == "darwin":
                 retval.append("OS=darwin")
-
-        if self._is_windows():
-            retval.append("OS=msvc")
-            retval.append("CC=clang-cl")
-            retval.append("CXX=clang-cl")
-            if self.config["arch"] == "aarch64":
-                retval.append("CXX_LINK_O=-nologo --target=aarch64-windows-msvc -Fe$@")
+            elif self.config["operating_system"] == "msvc":
+                retval.append("CC=clang-cl")
+                retval.append("CXX=clang-cl")
+                if self.config["arch"] == "aarch64":
+                    retval.append(
+                        "CXX_LINK_O=-nologo --target=aarch64-windows-msvc -Fe$@"
+                    )
         else:
             retval.append("CC=clang")
             retval.append("CXX=clang++")
@@ -277,50 +277,6 @@ class OpenH264Build(TransferMixin, VCSScript, TooltoolMixin):
 
         dirs = self.query_abs_dirs()
         repo_dir = os.path.join(dirs["abs_work_dir"], "openh264")
-
-        if self._is_windows():
-            # We don't have git on our windows builders, so download a zip
-            # package instead.
-            path = repo.replace(".git", "/archive/") + rev + ".zip"
-            self.download_file(path)
-            self.unzip(rev + ".zip", dirs["abs_work_dir"])
-            self.move(
-                os.path.join(dirs["abs_work_dir"], "openh264-" + rev),
-                os.path.join(dirs["abs_work_dir"], "openh264"),
-            )
-
-            # Retrieve in-tree version of gmp-api
-            self.copytree(
-                os.path.join(dirs["abs_src_dir"], "dom", "media", "gmp", "gmp-api"),
-                os.path.join(repo_dir, "gmp-api"),
-            )
-
-            # We need gas-preprocessor.pl for arm64 builds
-            if self.config["arch"] == "aarch64":
-                openh264_dir = os.path.join(dirs["abs_work_dir"], "openh264")
-                self.download_file(
-                    (
-                        "https://raw.githubusercontent.com/libav/"
-                        "gas-preprocessor/c2bc63c96678d9739509e58"
-                        "7aa30c94bdc0e636d/gas-preprocessor.pl"
-                    ),
-                    parent_dir=openh264_dir,
-                )
-                self.chmod(os.path.join(openh264_dir, "gas-preprocessor.pl"), 744)
-
-                # gas-preprocessor.pl expects cpp to exist
-                # os.symlink is not available on Windows until we switch to
-                # Python 3.
-                os.system(
-                    "ln -s %s %s"
-                    % (
-                        os.path.join(
-                            os.environ["MOZ_FETCHES_DIR"], "clang", "bin", "clang.exe"
-                        ),
-                        os.path.join(openh264_dir, "cpp"),
-                    )
-                )
-            return 0
 
         self.retry(
             self._git_checkout,

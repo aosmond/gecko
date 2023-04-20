@@ -3,7 +3,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import os
-import sys
 
 import mozharness
 
@@ -12,41 +11,44 @@ external_tools_path = os.path.join(
     "external_tools",
 )
 
-VSPATH = "%(abs_work_dir)s\\vs2017_15.8.4"
+VSPATH = "{}/vs".format(os.environ["MOZ_FETCHES_DIR"])
+VCPATH = "{}/VC/Tools/MSVC/14.29.30133".format(VSPATH)
+SDKPATH = "{}/Windows Kits/10".format(VSPATH)
+SDKVERSION = "10.0.19041.0"
+SDKINCPATH = "{}/Include/{}".format(SDKPATH, SDKVERSION)
+SDKLIBPATH = "{}/Lib/{}".format(SDKPATH, SDKVERSION)
+SDKBINPATH = "{}/Bin/{}".format(SDKPATH, SDKVERSION)
+
 config = {
-    "tooltool_manifest_file": "win.manifest",
     "exes": {
-        "gittool.py": [sys.executable, os.path.join(external_tools_path, "gittool.py")],
-        "python3": "c:\\mozilla-build\\python\\python3.exe",
+        "gittool.py": [os.path.join(external_tools_path, "gittool.py")],
+        "python3": "python3",
     },
-    "dump_syms_binary": "{}/dump_syms/dump_syms.exe".format(
-        os.environ["MOZ_FETCHES_DIR"]
-    ),
+    "dump_syms_binary": "{}/dump_syms/dump_syms".format(os.environ["MOZ_FETCHES_DIR"]),
     "arch": "x86",
+    "operating_system": "msvc",
     "partial_env": {
+        "CFLAGS": ("-m32 -target i686-pc-windows-msvc -winsysroot {}".format(VSPATH)),
+        "LDFLAGS": ("-target i686-pc-windows-msvc -winsysroot {}".format(VSPATH)),
         "PATH": (
-            "{MOZ_FETCHES_DIR}\\clang\\bin\\;"
-            "{MOZ_FETCHES_DIR}\\nasm;"
-            "{_VSPATH}\\VC\\bin\\Hostx64\\x64;%(PATH)s"
-            # 32-bit redist here for our dump_syms.exe
-            "{_VSPATH}/VC/redist/x86/Microsoft.VC141.CRT;"
-            "{_VSPATH}/SDK/Redist/ucrt/DLLs/x86;"
-            "{_VSPATH}/DIA SDK/bin"
-        ).format(_VSPATH=VSPATH, MOZ_FETCHES_DIR=os.environ["MOZ_FETCHES_DIR"]),
+            "{MOZ_FETCHES_DIR}/clang/bin:"
+            "{MOZ_FETCHES_DIR}/binutils/bin:%(PATH)s".format(
+                MOZ_FETCHES_DIR=os.environ["MOZ_FETCHES_DIR"]
+            )
+        ),
         "INCLUDES": (
-            "-I{_VSPATH}\\VC\\include "
-            "-I{_VSPATH}\\VC\\atlmfc\\include "
-            "-I{_VSPATH}\\SDK\\Include\\10.0.17134.0\\ucrt "
-            "-I{_VSPATH}\\SDK\\Include\\10.0.17134.0\\shared "
-            "-I{_VSPATH}\\SDK\\Include\\10.0.17134.0\\um "
-            "-I{_VSPATH}\\SDK\\Include\\10.0.17134.0\\winrt "
-        ).format(_VSPATH=VSPATH),
+            '-I"{_VCPATH}/include" '
+            '-I"{_VCPATH}/atlmfc/include" '
+            '-I"{_SDKINCPATH}/ucrt" '
+            '-I"{_SDKINCPATH}/shared" '
+            '-I"{_SDKINCPATH}/um" '
+            '-I"{_SDKINCPATH}/winrt" '
+        ).format(_VCPATH=VCPATH, _SDKINCPATH=SDKINCPATH),
         "LIB": (
-            "{_VSPATH}/VC/lib/x86;"
-            "{_VSPATH}/VC/atlmfc/lib/x86;"
-            "{_VSPATH}/SDK/lib/10.0.17134.0/ucrt/x86;"
-            "{_VSPATH}/SDK/lib/10.0.17134.0/um/x86;"
-        ).format(_VSPATH=VSPATH),
-        "CFLAGS": ("-m32"),
+            "{_VCPATH}/lib/x86;"
+            "{_VCPATH}/atlmfc/lib/x86;"
+            "{_SDKLIBPATH}/ucrt/x86;"
+            "{_SDKLIBPATH}/um/x86;"
+        ).format(_VCPATH=VCPATH, _SDKLIBPATH=SDKLIBPATH),
     },
 }
