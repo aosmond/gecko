@@ -11,10 +11,12 @@ external_tools_path = os.path.join(
     "external_tools",
 )
 
+VCVERSION = "14.16.27023"
+SDKVERSION = "10.0.17134.0"
+
 VSPATH = "{}/vs".format(os.environ["MOZ_FETCHES_DIR"])
-VCPATH = "{}/VC/Tools/MSVC/14.29.30133".format(VSPATH)
+VCPATH = "{}/VC/Tools/MSVC/{}".format(VSPATH, VCVERSION)
 SDKPATH = "{}/Windows Kits/10".format(VSPATH)
-SDKVERSION = "10.0.19041.0"
 SDKINCPATH = "{}/Include/{}".format(SDKPATH, SDKVERSION)
 SDKLIBPATH = "{}/Lib/{}".format(SDKPATH, SDKVERSION)
 SDKBINPATH = "{}/Bin/{}".format(SDKPATH, SDKVERSION)
