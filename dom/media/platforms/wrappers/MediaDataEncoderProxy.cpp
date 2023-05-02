@@ -57,21 +57,17 @@ RefPtr<ShutdownPromise> MediaDataEncoderProxy::Shutdown() {
   mIsShutdown = true;
 #endif
 
+  RefPtr<MediaDataEncoder> proxyEncoder = std::move(mProxyEncoder);
   if (!mProxyThread || mProxyThread->IsOnCurrentThread()) {
-    RefPtr<MediaDataEncoder> proxyEncoder = std::move(mProxyEncoder);
     return proxyEncoder->Shutdown();
   }
   // We chain another promise to ensure that the proxied encoder gets destructed
   // on the proxy thread.
-  return InvokeAsync(mProxyThread, __func__, [self = RefPtr{this}] {
-    RefPtr<ShutdownPromise> p = self->mProxyEncoder->Shutdown()->Then(
-        self->mProxyThread, __func__,
-        [self](const ShutdownPromise::ResolveOrRejectValue& aResult) {
-          self->mProxyEncoder = nullptr;
-          return ShutdownPromise::CreateAndResolveOrReject(aResult, __func__);
-        });
-    return p;
-  });
+  return InvokeAsync(
+      mProxyThread, __func__,
+      [self = RefPtr{this}, proxyEncoder = std::move(proxyEncoder)] {
+        return proxyEncoder->Shutdown();
+      });
 }
 
 RefPtr<GenericPromise> MediaDataEncoderProxy::SetBitrate(Rate aBitsPerSec) {
