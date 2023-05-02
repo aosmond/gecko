@@ -6,8 +6,10 @@
 
 #include "GMPEncoderModule.h"
 
+#include "GMPService.h"
 #include "GMPUtils.h"
 #include "GMPVideoEncoder.h"
+#include "MediaDataEncoderProxy.h"
 #include "MP4Decoder.h"
 
 namespace mozilla {
@@ -26,9 +28,21 @@ already_AddRefed<MediaDataEncoder> GMPEncoderModule::CreateVideoEncoder(
     return nullptr;
   }
 
+  RefPtr<gmp::GeckoMediaPluginService> s(
+      gmp::GeckoMediaPluginService::GetGeckoMediaPluginService());
+  if (!s) {
+    return nullptr;
+  }
+
+  nsCOMPtr<nsISerialEventTarget> thread(s->GetGMPThread());
+  if (!thread) {
+    return nullptr;
+  }
+
   RefPtr<MediaDataEncoder> encoder(
       new GMPVideoEncoder(aParams.ToH264Config(), aParams.mTaskQueue));
-  return encoder.forget();
+  return do_AddRef(
+      new MediaDataEncoderProxy(encoder.forget(), thread.forget()));
 }
 
 }  // namespace mozilla
