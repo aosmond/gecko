@@ -17,6 +17,8 @@ namespace mozilla {
 
 class MediaDataEncoderProxy final : public MediaDataEncoder {
  public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaDataEncoderProxy, final);
+
   explicit MediaDataEncoderProxy(
       already_AddRefed<MediaDataEncoder> aProxyEncoder,
       already_AddRefed<nsISerialEventTarget> aProxyThread);

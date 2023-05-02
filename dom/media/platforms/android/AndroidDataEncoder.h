@@ -19,6 +19,8 @@ namespace mozilla {
 template <typename ConfigType>
 class AndroidDataEncoder final : public MediaDataEncoder {
  public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AndroidDataEncoder, final);
+
   AndroidDataEncoder(const ConfigType& aConfig, RefPtr<TaskQueue> aTaskQueue)
       : mConfig(aConfig), mTaskQueue(aTaskQueue) {
     MOZ_ASSERT(mConfig.mSize.width > 0 && mConfig.mSize.height > 0);
@@ -49,6 +51,8 @@ class AndroidDataEncoder final : public MediaDataEncoder {
     AndroidDataEncoder* mEncoder;
   };
   friend class CallbacksSupport;
+
+  virtual ~AndroidDataEncoder() = default;
 
   // Methods only called on mTaskQueue.
   RefPtr<InitPromise> ProcessInit();

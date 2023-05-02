@@ -23,6 +23,8 @@ class AppleVTEncoder final : public MediaDataEncoder {
  public:
   using Config = H264Config;
 
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AppleVTEncoder, final);
+
   AppleVTEncoder(const Config& aConfig, RefPtr<TaskQueue> aTaskQueue)
       : mConfig(aConfig),
         mTaskQueue(aTaskQueue),

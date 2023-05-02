@@ -49,7 +49,7 @@ class PlatformEncoderModule {
 
 class MediaDataEncoder {
  public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MediaDataEncoder)
+  NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
   enum class Usage {
     Realtime,  // For WebRTC

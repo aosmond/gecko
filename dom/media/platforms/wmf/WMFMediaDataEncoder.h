@@ -21,6 +21,8 @@ bool CanCreateWMFEncoder(MediaDataEncoder::CodecType aCodec);
 template <typename ConfigType>
 class WMFMediaDataEncoder final : public MediaDataEncoder {
  public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(WMFMediaDataEncoder, final);
+
   WMFMediaDataEncoder(const ConfigType& aConfig, RefPtr<TaskQueue> aTaskQueue)
       : mConfig(aConfig), mTaskQueue(aTaskQueue) {
     MOZ_ASSERT(mTaskQueue);
@@ -76,6 +78,8 @@ class WMFMediaDataEncoder final : public MediaDataEncoder {
   }
 
  private:
+  ~WMFMediaDataEncoder() = default;
+
   // Automatically lock/unlock IMFMediaBuffer.
   class LockBuffer final {
    public:
