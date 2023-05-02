@@ -19,6 +19,29 @@ extern LazyLogModule sPEMLog;
           ("[GMPVideoEncoder] %s: " fmt, __func__, ##__VA_ARGS__))
 
 RefPtr<MediaDataEncoder::InitPromise> GMPVideoEncoder::Init() {
+  MOZ_ASSERT(IsOnGMPThread());
+
+  mMPS = do_GetService("@mozilla.org/gecko-media-plugin-service;1");
+  MOZ_ASSERT(mMPS);
+
+  RefPtr<InitPromise> promise(mInitPromise.Ensure(__func__));
+
+  nsTArray<nsCString> tags;
+  if (MP4Decoder::IsH264(mConfig.mMimeType)) {
+    tags.AppendElement("h264"_ns);
+  } else {
+    mInitPromise.Reject(NS_ERROR_NOT_IMPLEMENTED, __func__);
+    return mInitPromise;
+  }
+
+  UniquePtr<GetGMPVideoEncoderCallback> callback(new GMPInitDoneCallback(this));
+  if (NS_FAILED(mMPS->GetGMPVideoEncoder(mCrashHelper, &tags, GetNodeId(),
+                                         std::move(callback)))) {
+    mInitPromise.Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+  }
+
+  return promise;
+
   if (mConfig.mSize.width == 0 || mConfig.mSize.height == 0) {
     return InitPromise::CreateAndReject(NS_ERROR_ILLEGAL_VALUE, __func__);
   }

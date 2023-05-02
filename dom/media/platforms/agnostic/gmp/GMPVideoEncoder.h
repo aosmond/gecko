@@ -7,12 +7,13 @@
 #ifndef mozilla_GMPVideoEncoder_h_
 #define mozilla_GMPVideoEncoder_h_
 
+#include "GMPVideoEncoderProxy.h"
 #include "PlatformEncoderModule.h"
 #include "TimeUnits.h"
 
 namespace mozilla {
 
-class GMPVideoEncoder final : public MediaDataEncoder {
+class GMPVideoEncoder final : public MediaDataEncoder, public GMPVideoEncoderCallbackProxy {
  public:
   using Config = H264Config;
 
