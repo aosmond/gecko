@@ -26,28 +26,33 @@ RefPtr<MediaDataEncoder::InitPromise> GMPVideoEncoder::Init() {
 
   RefPtr<InitPromise> promise(mInitPromise.Ensure(__func__));
 
-  nsTArray<nsCString> tags;
-  if (MP4Decoder::IsH264(mConfig.mMimeType)) {
-    tags.AppendElement("h264"_ns);
-  } else {
-    mInitPromise.Reject(NS_ERROR_NOT_IMPLEMENTED, __func__);
-    return mInitPromise;
-  }
+  nsTArray<nsCString> tags(1);
+  tags.AppendElement("h264"_ns);
 
-  UniquePtr<GetGMPVideoEncoderCallback> callback(new GMPInitDoneCallback(this));
-  if (NS_FAILED(mMPS->GetGMPVideoEncoder(mCrashHelper, &tags, GetNodeId(),
+  UniquePtr<GetGMPVideoEncoderCallback> callback(new InitDoneCallback(this));
+  if (NS_FAILED(mMPS->GetGMPVideoEncoder(nullptr, &tags, ""_ns,
                                          std::move(callback)))) {
     mInitPromise.Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
   }
 
   return promise;
+}
 
-  if (mConfig.mSize.width == 0 || mConfig.mSize.height == 0) {
-    return InitPromise::CreateAndReject(NS_ERROR_ILLEGAL_VALUE, __func__);
+void GMPVideoEncoder::InitComplete(GMPVideoEncoderProxy* aGMP,
+                                   GMPVideoHost* aHost) {
+  MOZ_ASSERT(IsOnGMPThread());
+
+  if (NS_WARN_IF(!aGMP || !aHost)) {
+    if (aGMP) {
+      aGMP->Close();
+    }
+    mInitPromise.Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+    return;
   }
 
-  return InitPromise::CreateAndResolve(TrackInfo::TrackType::kVideoTrack,
-                                       __func__);
+  mGMP = aGMP;
+  mHost = aHost;
+  mInitPromise.Resolve(TrackInfo::TrackType::kVideoTrack, __func__);
 }
 
 void GMPVideoEncoder::ProcessOutput(RefPtr<MediaRawData>&& aOutput) {
@@ -71,7 +76,24 @@ void GMPVideoEncoder::ProcessOutput(RefPtr<MediaRawData>&& aOutput) {
 RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Encode(
     const MediaData* aSample) {
   MOZ_ASSERT(aSample != nullptr);
-  RefPtr<const VideoData> sample(aSample->As<const VideoData>());
+  MOZ_ASSERT(IsOnGMPThread());
+
+  if (NS_WARN_IF(!IsInitialized())) {
+    return EncodePromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                                          __func__);
+  }
+
+  GMPVideoFrame* ftmp = nullptr;
+  GMPErr err = mHost->CreateFrame(kGMPI420VideoFrame, &ftmp);
+  if (NS_WARN_IF(err != GMPNoErr)) {
+    return EncodePromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR,
+                                          __func__);
+  }
+
+  const VideoData* sample(aSample->As<const VideoData>());
+
+  GMPUniquePtr<GMPVideoi420Frame> frame(static_cast<GMPVideoi420Frame*>(ftmp));
+  err = frame->CreateFrame(
 
   return InvokeAsync<RefPtr<const VideoData>>(mTaskQueue, this, __func__,
                                               &GMPVideoEncoder::ProcessEncode,
@@ -90,7 +112,8 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::ProcessEncode(
 }
 
 RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Drain() {
-  return InvokeAsync(mTaskQueue, this, __func__, &GMPVideoEncoder::ProcessDrain);
+  return InvokeAsync(mTaskQueue, this, __func__,
+                     &GMPVideoEncoder::ProcessDrain);
 }
 
 RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::ProcessDrain() {
@@ -126,8 +149,15 @@ RefPtr<GenericPromise> GMPVideoEncoder::SetBitrate(
     MediaDataEncoder::Rate aBitsPerSec) {
   RefPtr<GMPVideoEncoder> self = this;
   return InvokeAsync(mTaskQueue, __func__, [self, aBitsPerSec]() {
-      return GenericPromise::CreateAndResolve(true, __func__);
+    return GenericPromise::CreateAndResolve(true, __func__);
   });
 }
+
+void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
+                              const nsTArray<uint8_t>& aCodecSpecificInfo) {}
+
+void GMPVideoEncoder::Error(GMPErr aError) {}
+
+void GMPVideoEncoder::Terminated() {}
 
 }  // namespace mozilla
