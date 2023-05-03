@@ -13,9 +13,12 @@
 
 namespace mozilla {
 
-class GMPVideoEncoder final : public MediaDataEncoder, public GMPVideoEncoderCallbackProxy {
+class GMPVideoEncoder final : public MediaDataEncoder,
+                              public GMPVideoEncoderCallbackProxy {
  public:
   using Config = H264Config;
+
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GMPVideoEncoder, final);
 
   GMPVideoEncoder(const Config& aConfig, RefPtr<TaskQueue> aTaskQueue)
       : mConfig(aConfig),
@@ -32,10 +35,33 @@ class GMPVideoEncoder final : public MediaDataEncoder, public GMPVideoEncoderCal
   RefPtr<ShutdownPromise> Shutdown() override;
   RefPtr<GenericPromise> SetBitrate(Rate aBitsPerSec) override;
 
-  nsCString GetDescriptionName() const override { return "gmp video encoder"_ns; }
+  void Encoded(GMPVideoEncodedFrame* aEncodedFrame,
+               const nsTArray<uint8_t>& aCodecSpecificInfo) override;
+  void Error(GMPErr aError) override;
+  void Terminated() override;
+
+  nsCString GetDescriptionName() const override {
+    return "gmp video encoder"_ns;
+  }
 
  private:
+  class InitDoneCallback final : public GetGMPVideoEncoderCallback {
+   public:
+    InitDoneCallback(GMPVideoEncoder* aEncoder) : mEncoder(aEncoder) {}
+
+    void Done(GMPVideoEncoderProxy* aGMP, GMPVideoHost* aHost) override {
+      mEncoder->InitComplete(aGMP, aHost);
+    }
+
+   private:
+    RefPtr<GMPVideoEncoder> mEncoder;
+  };
+
   virtual ~GMPVideoEncoder() = default;
+  void InitComplete(GMPVideoEncoderProxy* aGMP, GMPVideoHost* aHost);
+
+  bool IsInitialized() const { return mGMP && mHost; }
+
   RefPtr<EncodePromise> ProcessEncode(RefPtr<const VideoData> aSample);
   void ProcessOutput(RefPtr<MediaRawData>&& aOutput);
   void ResolvePromise();
@@ -43,6 +69,13 @@ class GMPVideoEncoder final : public MediaDataEncoder, public GMPVideoEncoderCal
   RefPtr<ShutdownPromise> ProcessShutdown();
 
   void AssertOnTaskQueue() { MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn()); }
+
+  nsCOMPtr<mozIGeckoMediaPluginService> mMPS;
+  GMPVideoEncoderProxy* mGMP = nullptr;
+  GMPVideoHost* mHost = nullptr;
+  MozPromiseHolder<InitPromise> mInitPromise;
+  MozPromiseHolder<EncodePromise> mEncodePromise;
+  MozPromiseHolder<EncodePromise> mDrainPromise;
 
   const Config mConfig;
   const RefPtr<TaskQueue> mTaskQueue;
