@@ -253,6 +253,7 @@ void UtilityProcessHost::Shutdown() {
 #ifndef NS_FREE_PERMANENT_DATA
     // No need to communicate shutdown, the Utility process doesn't need to
     // communicate anything back.
+    LOGD("[%p] UtilityProcessHost::KillHard", this);
     KillHard("NormalShutdown");
 #endif
 
@@ -283,18 +284,6 @@ void UtilityProcessHost::OnChannelClosed() {
 
   // Release the actor.
   UtilityProcessParent::Destroy(std::move(mUtilityProcessParent));
-}
-
-void UtilityProcessHost::KillHard(const char* aReason) {
-  MOZ_ASSERT(NS_IsMainThread());
-  LOGD("[%p] UtilityProcessHost::KillHard", this);
-
-  ProcessHandle handle = GetChildProcessHandle();
-  if (!base::KillProcess(handle, base::PROCESS_END_KILLED_BY_USER)) {
-    NS_WARNING("failed to kill subprocess!");
-  }
-
-  SetAlreadyDead();
 }
 
 void UtilityProcessHost::DestroyProcess() {

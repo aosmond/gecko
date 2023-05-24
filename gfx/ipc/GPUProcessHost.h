@@ -128,9 +128,6 @@ class GPUProcessHost final : public mozilla::ipc::GeckoChildProcessHost {
   // Called on the main thread when the mGPUChild actor is shutting down.
   void OnChannelClosed();
 
-  // Kill the remote process, triggering IPC shutdown.
-  void KillHard(const char* aReason);
-
   void DestroyProcess();
 
   DISALLOW_COPY_AND_ASSIGN(GPUProcessHost);

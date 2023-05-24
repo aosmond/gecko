@@ -106,9 +106,6 @@ class RDDProcessHost final : public mozilla::ipc::GeckoChildProcessHost {
   // Called on the main thread when the mRDDChild actor is shutting down.
   void OnChannelClosed();
 
-  // Kill the remote process, triggering IPC shutdown.
-  void KillHard(const char* aReason);
-
   void DestroyProcess();
 
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)

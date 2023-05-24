@@ -243,17 +243,6 @@ void RDDProcessHost::OnChannelClosed() {
   RDDChild::Destroy(std::move(mRDDChild));
 }
 
-void RDDProcessHost::KillHard(const char* aReason) {
-  MOZ_ASSERT(NS_IsMainThread());
-
-  ProcessHandle handle = GetChildProcessHandle();
-  if (!base::KillProcess(handle, base::PROCESS_END_KILLED_BY_USER)) {
-    NS_WARNING("failed to kill subprocess!");
-  }
-
-  SetAlreadyDead();
-}
-
 uint64_t RDDProcessHost::GetProcessToken() const {
   MOZ_ASSERT(NS_IsMainThread());
   return mProcessToken;

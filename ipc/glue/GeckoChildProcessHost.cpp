@@ -916,6 +916,24 @@ void GeckoChildProcessHost::SetAlreadyDead() {
   mChildProcessHandle = 0;
 }
 
+void GeckoChildProcessHost::KillHard(const char* aReason) {
+  ProcessHandle handle;
+  {
+    mozilla::AutoWriteLock handleLock(mHandleLock);
+    handle = mChildProcessHandle;
+    mChildProcessHandle = 0;
+  }
+
+  if (NS_WARN_IF(!handle || handle == base::kInvalidProcessHandle)) {
+    return;
+  }
+
+  if (!base::KillProcess(handle, base::PROCESS_END_KILLED_BY_USER)) {
+    NS_WARNING("failed to kill subprocess!");
+  }
+  base::CloseProcessHandle(handle);
+}
+
 void BaseProcessLauncher::GetChildLogName(const char* origLogName,
                                           nsACString& buffer) {
 #ifdef XP_WIN

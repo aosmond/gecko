@@ -227,15 +227,6 @@ void GPUProcessHost::OnChannelClosed() {
   MOZ_ASSERT(!mGPUChild);
 }
 
-void GPUProcessHost::KillHard(const char* aReason) {
-  ProcessHandle handle = GetChildProcessHandle();
-  if (!base::KillProcess(handle, base::PROCESS_END_KILLED_BY_USER)) {
-    NS_WARNING("failed to kill subprocess!");
-  }
-
-  SetAlreadyDead();
-}
-
 uint64_t GPUProcessHost::GetProcessToken() const { return mProcessToken; }
 
 void GPUProcessHost::KillProcess() { KillHard("DiagnosticKill"); }

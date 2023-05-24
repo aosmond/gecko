@@ -182,6 +182,8 @@ class GeckoChildProcessHost : public ChildProcessHost,
   // For bug 943174: Skip the EnsureProcessTerminated call in the destructor.
   void SetAlreadyDead();
 
+  void KillHard(const char* aReason);
+
 #if defined(MOZ_SANDBOX) && defined(XP_MACOSX)
   // Start the sandbox from the child process.
   static bool StartMacSandbox(int aArgc, char** aArgv,

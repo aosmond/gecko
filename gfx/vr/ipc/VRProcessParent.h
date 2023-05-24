@@ -67,7 +67,6 @@ class VRProcessParent final : public mozilla::ipc::GeckoChildProcessHost {
   DISALLOW_COPY_AND_ASSIGN(VRProcessParent);
 
   bool InitAfterConnect(bool aSucceeded);
-  void KillHard(const char* aReason);
 
   RefPtr<VRChild> mVRChild;
   mozilla::ipc::TaskFactory<VRProcessParent> mTaskFactory;
