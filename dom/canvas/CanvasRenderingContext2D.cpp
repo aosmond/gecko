@@ -2955,7 +2955,7 @@ void CanvasRenderingContext2D::BeginPath() {
 void CanvasRenderingContext2D::Fill(const CanvasWindingRule& aWinding) {
   EnsureUserSpacePath(aWinding);
 
-  if (!mPath) {
+  if (!mPath || mPath->IsEmpty()) {
     return;
   }
 
@@ -2991,7 +2991,7 @@ void CanvasRenderingContext2D::Fill(const CanvasPath& aPath,
   }
 
   RefPtr<gfx::Path> gfxpath = aPath.GetPath(aWinding, mTarget);
-  if (!gfxpath) {
+  if (!gfxpath || gfxpath->IsEmpty()) {
     return;
   }
 
@@ -3022,7 +3022,7 @@ void CanvasRenderingContext2D::Fill(const CanvasPath& aPath,
 void CanvasRenderingContext2D::Stroke() {
   EnsureUserSpacePath();
 
-  if (!mPath) {
+  if (!mPath || mPath->IsEmpty()) {
     return;
   }
 
@@ -3065,7 +3065,7 @@ void CanvasRenderingContext2D::Stroke(const CanvasPath& aPath) {
   RefPtr<gfx::Path> gfxpath =
       aPath.GetPath(CanvasWindingRule::Nonzero, mTarget);
 
-  if (!gfxpath) {
+  if (!gfxpath || gfxpath->IsEmpty()) {
     return;
   }
 
