@@ -135,6 +135,18 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
     return mozilla::gfx::Float(aValue);
   }
 
+  static bool IsNanOrInfinity(double aValue) {
+    return std::isnan(aValue) || std::isinf(aValue);
+  }
+
+  static bool IsNanOrInfinity(float aValue) {
+    return std::isnan(aValue) || std::isinf(aValue);
+  }
+
+  static bool IsNanOrInfinity(const mozilla::gfx::Point& aPoint) {
+    return IsNanOrInfinity(aPoint.x) || IsNanOrInfinity(aPoint.y);
+  }
+
   void SetGlobalAlpha(double aGlobalAlpha) override {
     if (aGlobalAlpha >= 0.0 && aGlobalAlpha <= 1.0) {
       CurrentState().globalAlpha = ToFloat(aGlobalAlpha);
@@ -337,11 +349,15 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   void MoveTo(double aX, double aY) override {
     EnsureWritablePath();
 
+    mozilla::gfx::Point pos(ToFloat(aX), ToFloat(aY));
+    if (IsNanOrInfinity(pos)) {
+      return;
+    }
+
     if (mPathBuilder) {
-      mPathBuilder->MoveTo(mozilla::gfx::Point(ToFloat(aX), ToFloat(aY)));
+      mPathBuilder->MoveTo(pos);
     } else {
-      mDSPathBuilder->MoveTo(mTarget->GetTransform().TransformPoint(
-          mozilla::gfx::Point(ToFloat(aX), ToFloat(aY))));
+      mDSPathBuilder->MoveTo(mTarget->GetTransform().TransformPoint(pos));
     }
   }
 
@@ -355,17 +371,18 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
                         double aY) override {
     EnsureWritablePath();
 
+    mozilla::gfx::Point cp1(ToFloat(aCpx), ToFloat(aCpy));
+    mozilla::gfx::Point cp2(ToFloat(aX), ToFloat(aY));
+    if (IsNanOrInfinity(cp1) || IsNanOrInfinity(cp2) || cp1 == cp2) {
+      return;
+    }
+
     if (mPathBuilder) {
-      mPathBuilder->QuadraticBezierTo(
-          mozilla::gfx::Point(ToFloat(aCpx), ToFloat(aCpy)),
-          mozilla::gfx::Point(ToFloat(aX), ToFloat(aY)));
+      mPathBuilder->QuadraticBezierTo(cp1, cp2);
     } else {
       mozilla::gfx::Matrix transform = mTarget->GetTransform();
-      mDSPathBuilder->QuadraticBezierTo(
-          transform.TransformPoint(
-              mozilla::gfx::Point(ToFloat(aCpx), ToFloat(aCpy))),
-          transform.TransformPoint(
-              mozilla::gfx::Point(ToFloat(aX), ToFloat(aY))));
+      mDSPathBuilder->QuadraticBezierTo(transform.TransformPoint(cp1),
+                                        transform.TransformPoint(cp2));
     }
   }
 
@@ -501,16 +518,30 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   enum class Style : uint8_t { STROKE = 0, FILL, MAX };
 
   void LineTo(const mozilla::gfx::Point& aPoint) {
+    if (IsNanOrInfinity(aPoint)) {
+      return;
+    }
     if (mPathBuilder) {
-      mPathBuilder->LineTo(aPoint);
+      if (mPathBuilder->CurrentPoint() != aPoint) {
+        mPathBuilder->LineTo(aPoint);
+      }
     } else {
-      mDSPathBuilder->LineTo(mTarget->GetTransform().TransformPoint(aPoint));
+      mozilla::gfx::Point transformedPt =
+          mTarget->GetTransform().TransformPoint(aPoint);
+      if (mDSPathBuilder->CurrentPoint() != transformedPt) {
+        mDSPathBuilder->LineTo(transformedPt);
+      }
     }
   }
 
   void BezierTo(const mozilla::gfx::Point& aCP1,
                 const mozilla::gfx::Point& aCP2,
                 const mozilla::gfx::Point& aCP3) {
+    if (IsNanOrInfinity(aCP1) || IsNanOrInfinity(aCP2) ||
+        IsNanOrInfinity(aCP3) || (aCP1 == aCP2 && aCP1 == aCP3)) {
+      return;
+    }
+
     if (mPathBuilder) {
       mPathBuilder->BezierTo(aCP1, aCP2, aCP3);
     } else {

@@ -270,4 +270,20 @@ Maybe<Rect> PathSkia::AsRect() const {
   }
   return Nothing();
 }
+
+bool PathSkia::IsEmpty() const {
+  int countVerbs = mPath.countVerbs();
+  if (countVerbs == 0) {
+    return true;
+  }
+  if (countVerbs > 2) {
+    return false;
+  }
+  uint8_t verbs[2];
+  if (mPath.getVerbs(verbs, 2) != 2) {
+    return false;
+  }
+  return verbs[0] == SkPath::kMove_Verb && verbs[1] == SkPath::kClose_Verb;
+}
+
 }  // namespace mozilla::gfx

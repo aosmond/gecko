@@ -124,6 +124,7 @@ void PathBuilderD2D::MoveTo(const Point& aPoint) {
   if (mFigureActive) {
     mSink->EndFigure(D2D1_FIGURE_END_OPEN);
     mFigureActive = false;
+    mFigureEmpty = false;
   }
   EnsureActive(aPoint);
   mCurrentPoint = aPoint;
@@ -134,6 +135,7 @@ void PathBuilderD2D::LineTo(const Point& aPoint) {
   mSink->AddLine(D2DPoint(aPoint));
 
   mCurrentPoint = aPoint;
+  mFigureEmpty = false;
 }
 
 void PathBuilderD2D::BezierTo(const Point& aCP1, const Point& aCP2,
@@ -143,6 +145,7 @@ void PathBuilderD2D::BezierTo(const Point& aCP1, const Point& aCP2,
       D2D1::BezierSegment(D2DPoint(aCP1), D2DPoint(aCP2), D2DPoint(aCP3)));
 
   mCurrentPoint = aCP3;
+  mFigureEmpty = false;
 }
 
 void PathBuilderD2D::QuadraticBezierTo(const Point& aCP1, const Point& aCP2) {
@@ -151,6 +154,7 @@ void PathBuilderD2D::QuadraticBezierTo(const Point& aCP1, const Point& aCP2) {
       D2D1::QuadraticBezierSegment(D2DPoint(aCP1), D2DPoint(aCP2)));
 
   mCurrentPoint = aCP2;
+  mFigureEmpty = false;
 }
 
 void PathBuilderD2D::Close() {
@@ -248,6 +252,7 @@ void PathBuilderD2D::Arc(const Point& aOrigin, Float aRadius, Float aStartAngle,
   }
 
   mCurrentPoint = endPoint;
+  mFigureEmpty = false;
 }
 
 void PathBuilderD2D::EnsureActive(const Point& aPoint) {
@@ -269,8 +274,8 @@ already_AddRefed<Path> PathBuilderD2D::Finish() {
     return nullptr;
   }
 
-  return MakeAndAddRef<PathD2D>(mGeometry, mFigureActive, mCurrentPoint,
-                                mFillRule, mBackendType);
+  return MakeAndAddRef<PathD2D>(mGeometry, mFigureActive, mFigureEmpty,
+                                mCurrentPoint, mFillRule, mBackendType);
 }
 
 already_AddRefed<PathBuilder> PathD2D::CopyToBuilder(FillRule aFillRule) const {
