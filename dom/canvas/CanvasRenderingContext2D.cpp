@@ -2955,7 +2955,7 @@ void CanvasRenderingContext2D::BeginPath() {
 void CanvasRenderingContext2D::Fill(const CanvasWindingRule& aWinding) {
   EnsureUserSpacePath(aWinding);
 
-  if (!mPath) {
+  if (!mPath || mPath->IsEmpty()) {
     return;
   }
 
@@ -2991,7 +2991,7 @@ void CanvasRenderingContext2D::Fill(const CanvasPath& aPath,
   }
 
   RefPtr<gfx::Path> gfxpath = aPath.GetPath(aWinding, mTarget);
-  if (!gfxpath) {
+  if (!gfxpath || gfxpath->IsEmpty()) {
     return;
   }
 
@@ -3022,7 +3022,7 @@ void CanvasRenderingContext2D::Fill(const CanvasPath& aPath,
 void CanvasRenderingContext2D::Stroke() {
   EnsureUserSpacePath();
 
-  if (!mPath) {
+  if (!mPath || mPath->IsEmpty()) {
     return;
   }
 
@@ -3065,7 +3065,7 @@ void CanvasRenderingContext2D::Stroke(const CanvasPath& aPath) {
   RefPtr<gfx::Path> gfxpath =
       aPath.GetPath(CanvasWindingRule::Nonzero, mTarget);
 
-  if (!gfxpath) {
+  if (!gfxpath || gfxpath->IsEmpty()) {
     return;
   }
 
@@ -3219,6 +3219,10 @@ void CanvasRenderingContext2D::ArcTo(double aX1, double aY1, double aX2,
   Point p1(aX1, aY1);
   Point p2(aX2, aY2);
 
+  if (!p1.IsFinite() || !p2.IsFinite() || !std::isfinite(aRadius)) {
+    return;
+  }
+
   // Execute these calculations in double precision to avoid cumulative
   // rounding errors.
   double dir, a2, b2, c2, cosx, sinx, d, anx, any, bnx, bny, x3, y3, x4, y4, cx,
@@ -3226,7 +3230,7 @@ void CanvasRenderingContext2D::ArcTo(double aX1, double aY1, double aX2,
   bool anticlockwise;
 
   if (p0 == p1 || p1 == p2 || aRadius == 0) {
-    LineTo(p1.x, p1.y);
+    LineTo(p1);
     return;
   }
 
@@ -3234,7 +3238,7 @@ void CanvasRenderingContext2D::ArcTo(double aX1, double aY1, double aX2,
   dir = (p2.x.value - p1.x.value) * (p0.y.value - p1.y.value) +
         (p2.y.value - p1.y.value) * (p1.x.value - p0.x.value);
   if (dir == 0) {
-    LineTo(p1.x, p1.y);
+    LineTo(p1);
     return;
   }
 
@@ -3285,15 +3289,30 @@ void CanvasRenderingContext2D::Rect(double aX, double aY, double aW,
                                     double aH) {
   EnsureWritablePath();
 
+  if (!std::isfinite(aX) || !std::isfinite(aY) || !std::isfinite(aW) ||
+      !std::isfinite(aH)) {
+    return;
+  }
+
   if (mPathBuilder) {
-    mPathBuilder->MoveTo(Point(aX, aY));
+    Point pos(aX, aY);
+    if (pos == mPathBuilder->CurrentPoint() && aW == 0 && aH == 0) {
+      return;
+    }
+
+    mPathBuilder->MoveTo(pos);
     mPathBuilder->LineTo(Point(aX + aW, aY));
     mPathBuilder->LineTo(Point(aX + aW, aY + aH));
     mPathBuilder->LineTo(Point(aX, aY + aH));
     mPathBuilder->Close();
   } else {
-    mDSPathBuilder->MoveTo(
-        mTarget->GetTransform().TransformPoint(Point(aX, aY)));
+    Point transformedPos =
+        mTarget->GetTransform().TransformPoint(Point(aX, aY));
+    if (transformedPos == mPathBuilder->CurrentPoint() && aW == 0 && aH == 0) {
+      return;
+    }
+
+    mDSPathBuilder->MoveTo(transformedPos);
     mDSPathBuilder->LineTo(
         mTarget->GetTransform().TransformPoint(Point(aX + aW, aY)));
     mDSPathBuilder->LineTo(
@@ -6309,21 +6328,30 @@ void CanvasPath::ClosePath() {
 void CanvasPath::MoveTo(double aX, double aY) {
   EnsurePathBuilder();
 
-  mPathBuilder->MoveTo(Point(ToFloat(aX), ToFloat(aY)));
+  Point pos(ToFloat(aX), ToFloat(aY));
+  if (!pos.IsFinite() || pos == mPathBuilder->CurrentPoint()) {
+    return;
+  }
+
+  mPathBuilder->MoveTo(pos);
 }
 
 void CanvasPath::LineTo(double aX, double aY) {
-  EnsurePathBuilder();
-
-  mPathBuilder->LineTo(Point(ToFloat(aX), ToFloat(aY)));
+  LineTo(Point(ToFloat(aX), ToFloat(aY)));
 }
 
 void CanvasPath::QuadraticCurveTo(double aCpx, double aCpy, double aX,
                                   double aY) {
   EnsurePathBuilder();
 
-  mPathBuilder->QuadraticBezierTo(gfx::Point(ToFloat(aCpx), ToFloat(aCpy)),
-                                  gfx::Point(ToFloat(aX), ToFloat(aY)));
+  Point cp1(ToFloat(aCpx), ToFloat(aCpy));
+  Point cp2(ToFloat(aX), ToFloat(aY));
+  if (!cp1.IsFinite() || !cp2.IsFinite() ||
+      (cp1 == mPathBuilder->CurrentPoint() && cp1 == cp2)) {
+    return;
+  }
+
+  mPathBuilder->QuadraticBezierTo(cp1, cp2);
 }
 
 void CanvasPath::BezierCurveTo(double aCp1x, double aCp1y, double aCp2x,
@@ -6346,6 +6374,10 @@ void CanvasPath::ArcTo(double aX1, double aY1, double aX2, double aY2,
   Point p1(aX1, aY1);
   Point p2(aX2, aY2);
 
+  if (!p1.IsFinite() || !p2.IsFinite() || !std::isfinite(aRadius)) {
+    return;
+  }
+
   // Execute these calculations in double precision to avoid cumulative
   // rounding errors.
   double dir, a2, b2, c2, cosx, sinx, d, anx, any, bnx, bny, x3, y3, x4, y4, cx,
@@ -6353,7 +6385,7 @@ void CanvasPath::ArcTo(double aX1, double aY1, double aX2, double aY2,
   bool anticlockwise;
 
   if (p0 == p1 || p1 == p2 || aRadius == 0) {
-    LineTo(p1.x, p1.y);
+    LineTo(p1);
     return;
   }
 
@@ -6361,7 +6393,7 @@ void CanvasPath::ArcTo(double aX1, double aY1, double aX2, double aY2,
   dir = (p2.x.value - p1.x.value) * (p0.y.value - p1.y.value) +
         (p2.y.value - p1.y.value) * (p1.x.value - p0.x.value);
   if (dir == 0) {
-    LineTo(p1.x, p1.y);
+    LineTo(p1);
     return;
   }
 
@@ -6396,6 +6428,15 @@ void CanvasPath::ArcTo(double aX1, double aY1, double aX2, double aY2,
 }
 
 void CanvasPath::Rect(double aX, double aY, double aW, double aH) {
+  EnsurePathBuilder();
+
+  Point pos(ToFloat(aX), ToFloat(aY));
+  if (!std::isfinite(aX) || !std::isfinite(aY) || !std::isfinite(aW) ||
+      !std::isfinite(aH) ||
+      (pos == mPathBuilder->CurrentPoint() && aW == 0 && aH == 0)) {
+    return;
+  }
+
   MoveTo(aX, aY);
   LineTo(aX + aW, aY);
   LineTo(aX + aW, aY + aH);
@@ -6442,12 +6483,21 @@ void CanvasPath::Ellipse(double x, double y, double radiusX, double radiusY,
 void CanvasPath::LineTo(const gfx::Point& aPoint) {
   EnsurePathBuilder();
 
+  if (!aPoint.IsFinite() || aPoint == mPathBuilder->CurrentPoint()) {
+    return;
+  }
+
   mPathBuilder->LineTo(aPoint);
 }
 
 void CanvasPath::BezierTo(const gfx::Point& aCP1, const gfx::Point& aCP2,
                           const gfx::Point& aCP3) {
   EnsurePathBuilder();
+
+  if (!aCP1.IsFinite() || !aCP2.IsFinite() || !aCP3.IsFinite() ||
+      (aCP1 == mPathBuilder->CurrentPoint() && aCP1 == aCP2 && aCP1 == aCP3)) {
+    return;
+  }
 
   mPathBuilder->BezierTo(aCP1, aCP2, aCP3);
 }
