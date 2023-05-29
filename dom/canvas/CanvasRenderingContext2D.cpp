@@ -3593,7 +3593,7 @@ void CanvasRenderingContext2D::EnsureUserSpacePath(
     mPathBuilder = nullptr;
   }
 
-  NS_ASSERTION(mPath, "mPath should exist");
+  // NS_ASSERTION(mPath, "mPath should exist");
 }
 
 void CanvasRenderingContext2D::TransformWillUpdate() {

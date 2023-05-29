@@ -36,6 +36,21 @@ void PathBuilderSkia::SetFillRule(FillRule aFillRule) {
   }
 }
 
+bool PathBuilderSkia::IsEmpty() const {
+  int countVerbs = mPath.countVerbs();
+  if (countVerbs == 0) {
+    return true;
+  }
+  if (countVerbs > 2) {
+    return false;
+  }
+  uint8_t verbs[2];
+  if (mPath.getVerbs(verbs, 2) != 2) {
+    return false;
+  }
+  return verbs[0] == SkPath::kMove_Verb && verbs[1] == SkPath::kClose_Verb;
+}
+
 void PathBuilderSkia::MoveTo(const Point& aPoint) {
   mPath.moveTo(SkFloatToScalar(aPoint.x), SkFloatToScalar(aPoint.y));
   mCurrentPoint = aPoint;
@@ -43,6 +58,10 @@ void PathBuilderSkia::MoveTo(const Point& aPoint) {
 }
 
 void PathBuilderSkia::LineTo(const Point& aPoint) {
+  if (mCurrentPoint == aPoint) {
+    return;
+  }
+
   if (!mPath.countPoints()) {
     MoveTo(aPoint);
   } else {
@@ -53,6 +72,10 @@ void PathBuilderSkia::LineTo(const Point& aPoint) {
 
 void PathBuilderSkia::BezierTo(const Point& aCP1, const Point& aCP2,
                                const Point& aCP3) {
+  if (aCP1 == aCP3) {
+    return;
+  }
+
   if (!mPath.countPoints()) {
     MoveTo(aCP1);
   }
@@ -63,6 +86,10 @@ void PathBuilderSkia::BezierTo(const Point& aCP1, const Point& aCP2,
 }
 
 void PathBuilderSkia::QuadraticBezierTo(const Point& aCP1, const Point& aCP2) {
+  if (aCP1 == aCP2) {
+    return;
+  }
+
   if (!mPath.countPoints()) {
     MoveTo(aCP1);
   }
@@ -79,13 +106,20 @@ void PathBuilderSkia::Close() {
 void PathBuilderSkia::Arc(const Point& aOrigin, float aRadius,
                           float aStartAngle, float aEndAngle,
                           bool aAntiClockwise) {
+  if (aRadius == 0.0 || aStartAngle == aEndAngle) {
+    return;
+  }
+
   ArcToBezier(this, aOrigin, Size(aRadius, aRadius), aStartAngle, aEndAngle,
               aAntiClockwise);
 }
 
 already_AddRefed<Path> PathBuilderSkia::Finish() {
-  RefPtr<Path> path =
-      MakeAndAddRef<PathSkia>(mPath, mFillRule, mCurrentPoint, mBeginPoint);
+  RefPtr<Path> path;
+  if (!IsEmpty()) {
+    path =
+        MakeAndAddRef<PathSkia>(mPath, mFillRule, mCurrentPoint, mBeginPoint);
+  }
   mCurrentPoint = Point(0.0, 0.0);
   mBeginPoint = Point(0.0, 0.0);
   return path.forget();

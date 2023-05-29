@@ -42,6 +42,7 @@ class PathBuilderSkia : public PathBuilder {
  private:
   friend class PathSkia;
 
+  bool IsEmpty() const;
   void SetFillRule(FillRule aFillRule);
 
   SkPath mPath;
