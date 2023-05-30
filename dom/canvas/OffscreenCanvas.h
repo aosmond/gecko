@@ -146,9 +146,17 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   bool MayNeuter() const { return !mNeutered && !mCurrentContext; }
 
-  void SetWriteOnly() { mIsWriteOnly = true; }
+  nsIPrincipal* GetExpandedReader() const { return mExpandedReader; }
+
+  void SetWriteOnly(nsIPrincipal* aExpandedReader = nullptr) {
+    mExpandedReader = aExpandedReader;
+    mIsWriteOnly = true;
+  }
 
   bool IsWriteOnly() const { return mIsWriteOnly; }
+
+  // Determines if the caller should be able to read the content.
+  bool CallerCanRead(nsIPrincipal* aPrincipal) const;
 
   layers::LayersBackend GetCompositorBackendType() const {
     return mCompositorBackendType;
@@ -180,6 +188,7 @@ class OffscreenCanvas final : public DOMEventTargetHelper,
 
   RefPtr<OffscreenCanvasDisplayHelper> mDisplay;
   RefPtr<CancelableRunnable> mPendingCommit;
+  RefPtr<nsIPrincipal> mExpandedReader;
   Maybe<OffscreenCanvasDisplayData> mPendingUpdate;
 };
 

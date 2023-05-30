@@ -463,6 +463,26 @@ already_AddRefed<gfx::SourceSurface> OffscreenCanvas::GetSurfaceSnapshot(
   return mCurrentContext->GetSurfaceSnapshot(aOutAlphaType);
 }
 
+bool OffscreenCanvas::CallerCanRead(nsIPrincipal* aPrincipal) const {
+  if (!mIsWriteOnly) {
+    return true;
+  }
+
+  if (!aPrincipal) {
+    return false;
+  }
+
+  // If mExpandedReader is set, this canvas was tainted only by
+  // mExpandedReader's resources. So allow reading if the subject
+  // principal subsumes mExpandedReader.
+  if (mExpandedReader && aPrincipal->Subsumes(mExpandedReader)) {
+    return true;
+  }
+
+  return nsContentUtils::PrincipalHasPermission(*aPrincipal,
+                                                nsGkAtoms::all_urlsPermission);
+}
+
 bool OffscreenCanvas::ShouldResistFingerprinting(RFPTarget aTarget) const {
   return nsContentUtils::ShouldResistFingerprinting(GetOwnerGlobal(), aTarget);
 }
