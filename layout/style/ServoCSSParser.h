@@ -119,6 +119,17 @@ class ServoCSSParser {
                                        gfx::Matrix4x4& aResult);
 
   /**
+   * Parse a filter method.
+   *
+   * @param aValue The specified value.
+   * @param aUrl The parser url extra data.
+   * @param aFilter The parsed Filter. (output)
+   * @return Whether the value was successfully parsed.
+   */
+  static bool ParseFilter(const nsACString& aValue, URLExtraData* aUrl,
+                          StyleFilter& aFilter);
+
+  /**
    * Parse a font shorthand for FontFaceSet matching, so we only care about
    * FontFamily, FontStyle, FontStretch, and FontWeight.
    *

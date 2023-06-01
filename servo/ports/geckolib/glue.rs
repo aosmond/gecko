@@ -132,6 +132,7 @@ use style::traversal_flags::{self, TraversalFlags};
 use style::use_counters::UseCounters;
 use style::values::animated::{Animate, Procedure, ToAnimatedZero};
 use style::values::computed::easing::ComputedTimingFunction;
+use style::values::computed::effects::Filter;
 use style::values::computed::font::{
     FontFamily, FontFamilyList, FontStretch, FontStyle, FontWeight, GenericFontFamily,
 };
@@ -7193,6 +7194,37 @@ pub extern "C" fn Servo_ParseTransformIntoMatrix(
 
     *result = m.to_array();
     *contain_3d = is_3d;
+    true
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn Servo_ParseFilter(
+    value: &nsACString,
+    data: *mut URLExtraData,
+    filter: &mut Filter,
+) -> bool {
+    use style::values::specified::effects as specified;
+
+    let string = value.as_str_unchecked();
+    let mut input = ParserInput::new(&string);
+    let mut parser = Parser::new(&mut input);
+    let url_data = UrlExtraData::from_ptr_ref(&data);
+    let context = ParserContext::new(
+        Origin::Author,
+        url_data,
+        None,
+        ParsingMode::DEFAULT,
+        QuirksMode::NoQuirks,
+        /* namespaces = */ Default::default(),
+        None,
+        None,
+    );
+
+    filter = match specified::Filter::parse(&context, &mut parser) {
+        Ok(f) => f,
+        Err(..) => return false,
+    };
+
     true
 }
 

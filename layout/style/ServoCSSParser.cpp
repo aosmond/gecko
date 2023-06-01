@@ -57,6 +57,12 @@ bool ServoCSSParser::ParseTransformIntoMatrix(const nsACString& aValue,
 }
 
 /* static */
+bool ServoCSSParser::ParseFilter(const nsACString& aValue, URLExtraData* aUrl,
+                                 StyleFilter& aFilter) {
+  return Servo_ParseFilter(&aValue, aUrl, &aFilter);
+}
+
+/* static */
 bool ServoCSSParser::ParseFontShorthandForMatching(
     const nsACString& aValue, URLExtraData* aUrl, StyleFontFamilyList& aList,
     StyleFontStyle& aStyle, StyleFontStretch& aStretch,
