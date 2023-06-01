@@ -19,9 +19,32 @@ nsICanvasRenderingContextInternal::nsICanvasRenderingContextInternal() =
 nsICanvasRenderingContextInternal::~nsICanvasRenderingContextInternal() =
     default;
 
+mozilla::dom::Document* nsICanvasRenderingContextInternal::GetDocument() {
+  if (mCanvasElement) {
+    return mCanvasElement->OwnerDoc();
+  }
+  if (mOffscreenCanvas) {
+    if (nsIGlobalObject* global = mOffscreenCanvas->GetParentObject()) {
+      if (nsPIDOMWindowInner* window = global->AsInnerWindow()) {
+        return window->GetExtantDoc();
+      }
+    }
+  }
+  return nullptr;
+}
+
 mozilla::PresShell* nsICanvasRenderingContextInternal::GetPresShell() {
   if (mCanvasElement) {
     return mCanvasElement->OwnerDoc()->GetPresShell();
+  }
+  if (mOffscreenCanvas) {
+    if (nsIGlobalObject* global = mOffscreenCanvas->GetParentObject()) {
+      if (nsPIDOMWindowInner* window = global->AsInnerWindow()) {
+        if (mozilla::dom::Document* doc = window->GetExtantDoc()) {
+          return doc->GetPresShell();
+        }
+      }
+    }
   }
   return nullptr;
 }
@@ -86,12 +109,14 @@ void nsICanvasRenderingContextInternal::RemovePostRefreshObserver() {
 }
 
 void nsICanvasRenderingContextInternal::AddPostRefreshObserverIfNecessary() {
-  if (!GetPresShell() || !GetPresShell()->GetPresContext() ||
-      !GetPresShell()->GetPresContext()->RefreshDriver()) {
-    return;
+  if (mozilla::PresShell* presShell = GetPresShell()) {
+    if (nsPresContext* presContext = presShell->GetPresContext()) {
+      if (nsRefreshDriver* refreshDriver = presContext->RefreshDriver()) {
+        mRefreshDriver = refreshDriver;
+        mRefreshDriver->AddPostRefreshObserver(this);
+      }
+    }
   }
-  mRefreshDriver = GetPresShell()->GetPresContext()->RefreshDriver();
-  mRefreshDriver->AddPostRefreshObserver(this);
 }
 
 void nsICanvasRenderingContextInternal::DoSecurityCheck(

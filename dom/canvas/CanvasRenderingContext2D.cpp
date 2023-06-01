@@ -1091,10 +1091,9 @@ JSObject* CanvasRenderingContext2D::WrapObject(
 CanvasRenderingContext2D::ColorStyleCacheEntry
 CanvasRenderingContext2D::ParseColorSlow(const nsACString& aString) {
   ColorStyleCacheEntry result{nsCString(aString)};
-  Document* document = mCanvasElement ? mCanvasElement->OwnerDoc() : nullptr;
+  Document* document = GetDocument();
   css::Loader* loader = document ? document->CSSLoader() : nullptr;
-
-  PresShell* presShell = GetPresShell();
+  PresShell* presShell = document ? document->GetPresShell() : nullptr;
   ServoStyleSet* set = presShell ? presShell->StyleSet() : nullptr;
   bool wasCurrentColor = false;
   nscolor color;
@@ -1677,14 +1676,18 @@ Maybe<SurfaceDescriptor> CanvasRenderingContext2D::GetFrontBuffer(
   return Nothing();
 }
 
-PresShell* CanvasRenderingContext2D::GetPresShell() {
-  if (mCanvasElement) {
-    return mCanvasElement->OwnerDoc()->GetPresShell();
+Document* CanvasRenderingContext2D::GetDocument() {
+  if (mDocShell) {
+    return mDocShell->GetExtantDocument();
   }
+  return nsICanvasRenderingContextInternal::GetDocument();
+}
+
+PresShell* CanvasRenderingContext2D::GetPresShell() {
   if (mDocShell) {
     return mDocShell->GetPresShell();
   }
-  return nullptr;
+  return nsICanvasRenderingContextInternal::GetPresShell();
 }
 
 NS_IMETHODIMP
@@ -2433,7 +2436,7 @@ static already_AddRefed<const ComputedStyle> GetFontStyleForServo(
     MOZ_ASSERT(declarations);
 
     parentStyle =
-        aPresShell->StyleSet()->ResolveForDeclarations(nullptr, declarations);
+        styleSet->ResolveForDeclarations(nullptr, declarations);
   }
 
   MOZ_RELEASE_ASSERT(parentStyle, "Should have a valid parent style");
@@ -3820,6 +3823,8 @@ bool CanvasRenderingContext2D::SetFontInternalDisconnected(
     } else {
       language = mCanvasElement->OwnerDoc()->GetLanguageForStyle();
     }
+  } else if (Document* doc = GetDocument()) {
+    language = doc->GetLanguageForStyle();
   } else {
     // Pass the OS default language, to behave similarly to HTML or canvas-
     // element content with no language tag.
@@ -4867,10 +4872,8 @@ bool CanvasRenderingContext2D::IsPointInPath(
   }
 
   // Check for site-specific permission and return false if no permission.
-  if (mCanvasElement) {
-    nsCOMPtr<Document> ownerDoc = mCanvasElement->OwnerDoc();
-    if (!CanvasUtils::IsImageExtractionAllowed(ownerDoc, aCx,
-                                               aSubjectPrincipal)) {
+  if (Document* doc = GetDocument()) {
+    if (!CanvasUtils::IsImageExtractionAllowed(doc, aCx, aSubjectPrincipal)) {
       return false;
     }
   } else if (mOffscreenCanvas && mOffscreenCanvas->ShouldResistFingerprinting(
@@ -4930,10 +4933,8 @@ bool CanvasRenderingContext2D::IsPointInStroke(
   }
 
   // Check for site-specific permission and return false if no permission.
-  if (mCanvasElement) {
-    nsCOMPtr<Document> ownerDoc = mCanvasElement->OwnerDoc();
-    if (!CanvasUtils::IsImageExtractionAllowed(ownerDoc, aCx,
-                                               aSubjectPrincipal)) {
+  if (Document* doc = GetDocument()) {
+    if (!CanvasUtils::IsImageExtractionAllowed(doc, aCx, aSubjectPrincipal)) {
       return false;
     }
   } else if (mOffscreenCanvas && mOffscreenCanvas->ShouldResistFingerprinting(
@@ -5849,10 +5850,9 @@ nsresult CanvasRenderingContext2D::GetImageDataArray(
   // canvas was created with a docshell (that is only done for special
   // internal uses).
   bool usePlaceholder = false;
-  if (mCanvasElement) {
-    nsCOMPtr<Document> ownerDoc = mCanvasElement->OwnerDoc();
-    usePlaceholder = !CanvasUtils::IsImageExtractionAllowed(ownerDoc, aCx,
-                                                            aSubjectPrincipal);
+  if (Document* doc = GetDocument()) {
+    usePlaceholder =
+        !CanvasUtils::IsImageExtractionAllowed(doc, aCx, aSubjectPrincipal);
   } else if (mOffscreenCanvas) {
     usePlaceholder = mOffscreenCanvas->ShouldResistFingerprinting(
         RFPTarget::CanvasImageExtractionPrompt);

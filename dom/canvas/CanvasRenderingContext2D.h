@@ -446,6 +446,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   /**
    * Gets the pres shell from either the canvas element or the doc shell
    */
+  Document* GetDocument() final;
   PresShell* GetPresShell() final;
   void Initialize() override;
   NS_IMETHOD SetDimensions(int32_t aWidth, int32_t aHeight) override;
