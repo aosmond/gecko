@@ -7203,7 +7203,7 @@ pub unsafe extern "C" fn Servo_ParseFilter(
     data: *mut URLExtraData,
     filter: &mut Filter,
 ) -> bool {
-    use style::values::specified::effects as specified;
+    use style::properties::longhands::filter;
 
     let string = value.as_str_unchecked();
     let mut input = ParserInput::new(&string);
@@ -7212,7 +7212,7 @@ pub unsafe extern "C" fn Servo_ParseFilter(
     let context = ParserContext::new(
         Origin::Author,
         url_data,
-        None,
+        Some(CssRuleType::Style),
         ParsingMode::DEFAULT,
         QuirksMode::NoQuirks,
         /* namespaces = */ Default::default(),
@@ -7220,12 +7220,15 @@ pub unsafe extern "C" fn Servo_ParseFilter(
         None,
     );
 
-    filter = match specified::Filter::parse(&context, &mut parser) {
-        Ok(f) => f,
-        Err(..) => return false,
-    };
-
-    true
+    let result =
+        parser.parse_entirely(|p| filter::single_value::parse(&context, p));
+    match result {
+        Ok(parsed_filter) => {
+            //TODO *filter = parsed_filter.to_computed_value_without_context();
+            true
+        },
+        Err(_) => false,
+    }
 }
 
 #[no_mangle]

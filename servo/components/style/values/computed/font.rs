@@ -789,6 +789,16 @@ where
 {
     type ComputedValue = FontSettings<T::ComputedValue>;
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        let mut v = self
+            .0
+            .iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect::<Vec<_>>();
+        dedup_font_settings(&mut v);
+        Ok(FontSettings(v.into_boxed_slice()))
+    }
+
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         let mut v = self
             .0
@@ -890,6 +900,15 @@ impl From<FontLanguageOverride> for u32 {
 impl ToComputedValue for specified::MozScriptMinSize {
     type ComputedValue = MozScriptMinSize;
 
+    fn to_computed_value_without_context(&self) -> Result<MozScriptMinSize, ()> {
+        let base_size = FontBaseSize::InheritedStyle;
+        match self.0 {
+            NoCalcLength::FontRelative(value) => value.to_computed_value_without_context(base_size),
+            NoCalcLength::ServoCharacterWidth(value) => Err(()),
+            ref l => l.to_computed_value_without_context(),
+        }
+    }
+
     fn to_computed_value(&self, cx: &Context) -> MozScriptMinSize {
         // this value is used in the computation of font-size, so
         // we use the parent size
@@ -914,6 +933,18 @@ pub type MathDepth = i8;
 #[cfg(feature = "gecko")]
 impl ToComputedValue for specified::MathDepth {
     type ComputedValue = MathDepth;
+
+    fn to_computed_value_without_context(&self) -> Result<i8, ()> {
+        use crate::properties::longhands::math_style::SpecifiedValue as MathStyleValue;
+        use std::{cmp, i8};
+
+        let int = match *self {
+            specified::MathDepth::AutoAdd => Err(()),
+            specified::MathDepth::Add(rel) => Err(()),
+            specified::MathDepth::Absolute(abs) => abs.to_computed_value_without_context(),
+        }?;
+        Ok(cmp::min(int, i8::MAX as i32) as i8)
+    }
 
     fn to_computed_value(&self, cx: &Context) -> i8 {
         use crate::properties::longhands::math_style::SpecifiedValue as MathStyleValue;

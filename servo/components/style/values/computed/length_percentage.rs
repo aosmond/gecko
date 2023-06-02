@@ -496,6 +496,16 @@ impl Clone for LengthPercentage {
 impl ToComputedValue for specified::LengthPercentage {
     type ComputedValue = LengthPercentage;
 
+    fn to_computed_value_without_context(&self) -> Result<LengthPercentage, ()> {
+        match *self {
+            specified::LengthPercentage::Length(ref value) => {
+                Ok(LengthPercentage::new_length(value.to_computed_value_without_context()?))
+            },
+            specified::LengthPercentage::Percentage(value) => Ok(LengthPercentage::new_percent(value)),
+            specified::LengthPercentage::Calc(ref calc) => (**calc).to_computed_value_without_context(),
+        }
+    }
+
     fn to_computed_value(&self, context: &Context) -> LengthPercentage {
         match *self {
             specified::LengthPercentage::Length(ref value) => {
@@ -752,6 +762,34 @@ impl PartialEq for CalcLengthPercentage {
 }
 
 impl specified::CalcLengthPercentage {
+    fn to_computed_value_with_zoom_without_context<F>(
+        &self,
+        zoom_fn: F,
+        base_size: FontBaseSize,
+    ) -> LengthPercentage
+    where
+        F: Fn(Length) -> Length,
+    {
+        use crate::values::specified::calc::Leaf;
+
+        let node = self.node.map_leaves(|leaf| match *leaf {
+            Leaf::Percentage(p) => CalcLengthPercentageLeaf::Percentage(Percentage(p)),
+            Leaf::Length(l) => CalcLengthPercentageLeaf::Length({
+                let result = l.to_computed_value_with_base_size_without_context(base_size)?;
+                if l.should_zoom_text() {
+                    zoom_fn(result)
+                } else {
+                    result
+                }
+            }),
+            Leaf::Number(..) | Leaf::Angle(..) | Leaf::Time(..) | Leaf::Resolution(..) => {
+                unreachable!("Shouldn't have parsed")
+            },
+        });
+
+        Ok(LengthPercentage::new_calc(node, self.clamping_mode))
+    }
+
     /// Compute the value, zooming any absolute units by the zoom function.
     fn to_computed_value_with_zoom<F>(
         &self,
@@ -803,6 +841,10 @@ impl specified::CalcLengthPercentage {
             calc::CalcNode::Leaf(Leaf::Length(NoCalcLength::Absolute(ref l))) => Ok(l.to_px()),
             _ => Err(()),
         }
+    }
+
+    pub fn to_computed_value_without_context(&self) -> Result<LengthPercentage, ()> {
+        self.to_computed_value_with_zoom_without_context(|abs| abs, FontBaseSize::CurrentStyle)
     }
 
     /// Compute the calc using the current font-size (and without text-zoom).

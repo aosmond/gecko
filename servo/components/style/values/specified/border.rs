@@ -148,6 +148,11 @@ impl ToComputedValue for BorderSideWidth {
     type ComputedValue = app_units::Au;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         let width = match *self {
             // https://drafts.csswg.org/css-backgrounds-3/#line-width

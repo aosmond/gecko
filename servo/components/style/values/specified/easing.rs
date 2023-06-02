@@ -192,41 +192,37 @@ impl LinearStop {
     }
 }
 
-// We need this for converting the specified TimingFunction into computed TimingFunction without
-// Context (for some FFIs in glue.rs). In fact, we don't really need Context to get the computed
-// value of TimingFunction.
-impl TimingFunction {
+impl ToComputedValue for TimingFunction {
+    type ComputedValue = ComputedTimingFunction;
+
     /// Generate the ComputedTimingFunction without Context.
-    pub fn to_computed_value_without_context(&self) -> ComputedTimingFunction {
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
         match &self {
             GenericTimingFunction::Steps(steps, pos) => {
-                GenericTimingFunction::Steps(steps.value(), *pos)
+                Ok(GenericTimingFunction::Steps(steps.value(), *pos))
             },
             GenericTimingFunction::CubicBezier { x1, y1, x2, y2 } => {
-                GenericTimingFunction::CubicBezier {
+                Ok(GenericTimingFunction::CubicBezier {
                     x1: x1.get(),
                     y1: y1.get(),
                     x2: x2.get(),
                     y2: y2.get(),
-                }
+                })
             },
-            GenericTimingFunction::Keyword(keyword) => GenericTimingFunction::Keyword(*keyword),
+            GenericTimingFunction::Keyword(keyword) => Ok(GenericTimingFunction::Keyword(*keyword)),
             GenericTimingFunction::LinearFunction(steps) => {
-                GenericTimingFunction::LinearFunction(PiecewiseLinearFunction::from_iter(
+                Ok(GenericTimingFunction::LinearFunction(PiecewiseLinearFunction::from_iter(
                     steps
                         .entries
                         .iter()
                         .map(|e| LinearStop::to_piecewise_linear_build_parameters(e)),
-                ))
+                )))
             },
         }
     }
-}
 
-impl ToComputedValue for TimingFunction {
-    type ComputedValue = ComputedTimingFunction;
     fn to_computed_value(&self, _: &Context) -> Self::ComputedValue {
-        self.to_computed_value_without_context()
+        self.to_computed_value_without_context().unwrap()
     }
 
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {

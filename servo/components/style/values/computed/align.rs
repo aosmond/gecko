@@ -65,7 +65,7 @@ impl ToComputedValue for specified::JustifyItems {
     type ComputedValue = JustifyItems;
 
     /// <https://drafts.csswg.org/css-align/#valdef-justify-items-legacy>
-    fn to_computed_value(&self, _context: &Context) -> JustifyItems {
+    fn to_computed_value_without_context(&self) -> Result<JustifyItems, ()> {
         use crate::values::specified::align;
         let specified = *self;
         let computed = if self.0 != align::AlignFlags::LEGACY {
@@ -78,10 +78,14 @@ impl ToComputedValue for specified::JustifyItems {
             Self::normal()
         };
 
-        JustifyItems {
+        Ok(JustifyItems {
             specified,
             computed,
-        }
+        })
+    }
+
+    fn to_computed_value(&self, _context: &Context) -> JustifyItems {
+        self.to_computed_value_without_context().unwrap()
     }
 
     #[inline]

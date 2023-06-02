@@ -23,6 +23,14 @@ impl ToComputedValue for specified::AnimationIterationCount {
     type ComputedValue = AnimationIterationCount;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(AnimationIterationCount(match *self {
+            specified::AnimationIterationCount::Number(n) => n.to_computed_value_without_context()?.0,
+            specified::AnimationIterationCount::Infinite => f32::INFINITY,
+        }))
+    }
+
+    #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         AnimationIterationCount(match *self {
             specified::AnimationIterationCount::Number(n) => n.to_computed_value(context).0,

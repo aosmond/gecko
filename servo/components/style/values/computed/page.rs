@@ -35,6 +35,22 @@ pub enum PageSize {
 impl ToComputedValue for specified::PageSize {
     type ComputedValue = PageSize;
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match &*self {
+            Self::Size(s) => Ok(PageSize::Size(s.to_computed_value_without_context()?)),
+            Self::PaperSize(p, PageSizeOrientation::Landscape) => Ok(PageSize::Size(Size2D {
+                width: p.long_edge().to_computed_value_without_context()?,
+                height: p.short_edge().to_computed_value_without_context()?,
+            })),
+            Self::PaperSize(p, PageSizeOrientation::Portrait) => Ok(PageSize::Size(Size2D {
+                width: p.short_edge().to_computed_value_without_context()?,
+                height: p.long_edge().to_computed_value_without_context()?,
+            })),
+            Self::Orientation(o) => Ok(PageSize::Orientation(*o)),
+            Self::Auto => Ok(PageSize::Auto),
+        }
+    }
+
     fn to_computed_value(&self, ctx: &Context) -> Self::ComputedValue {
         match &*self {
             Self::Size(s) => PageSize::Size(s.to_computed_value(ctx)),

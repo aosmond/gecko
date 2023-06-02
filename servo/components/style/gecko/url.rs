@@ -267,6 +267,11 @@ impl ToComputedValue for SpecifiedUrl {
     type ComputedValue = ComputedUrl;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedUrl(self.clone()))
+    }
+
+    #[inline]
     fn to_computed_value(&self, _: &Context) -> Self::ComputedValue {
         ComputedUrl(self.clone())
     }
@@ -311,6 +316,11 @@ impl Parse for SpecifiedImageUrl {
 
 impl ToComputedValue for SpecifiedImageUrl {
     type ComputedValue = ComputedImageUrl;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedImageUrl(self.0.to_computed_value_without_context()?))
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {

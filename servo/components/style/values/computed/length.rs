@@ -29,6 +29,11 @@ impl ToComputedValue for specified::NoCalcLength {
     type ComputedValue = Length;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        self.to_computed_value_with_base_size_without_context(FontBaseSize::CurrentStyle)
+    }
+
+    #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         self.to_computed_value_with_base_size(context, FontBaseSize::CurrentStyle)
     }
@@ -40,6 +45,20 @@ impl ToComputedValue for specified::NoCalcLength {
 }
 
 impl specified::NoCalcLength {
+    /// Computes a length with a given font-relative base size without context.
+    pub fn to_computed_value_with_base_size_without_context(
+        &self,
+        base_size: FontBaseSize,
+    ) -> Result<Length, ()> {
+        match *self {
+            Self::Absolute(length) => length.to_computed_value_without_context(),
+            Self::FontRelative(length) => length.to_computed_value_without_context(base_size),
+            Self::ViewportPercentage(length) => length.to_computed_value_without_context(),
+            Self::ContainerRelative(length) => length.to_computed_value_without_context(),
+            Self::ServoCharacterWidth(length) => Err(()),
+        }
+    }
+
     /// Computes a length with a given font-relative base size.
     pub fn to_computed_value_with_base_size(
         &self,
@@ -59,6 +78,14 @@ impl specified::NoCalcLength {
 
 impl ToComputedValue for specified::Length {
     type ComputedValue = Length;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match *self {
+            Self::NoCalc(l) => l.to_computed_value_without_context(),
+            Self::Calc(ref calc) => calc.to_computed_value_without_context()?.to_length().ok_or(Err()),
+        }
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {

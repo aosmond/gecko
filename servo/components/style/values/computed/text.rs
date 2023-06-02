@@ -78,6 +78,13 @@ impl ToCss for LetterSpacing {
 
 impl ToComputedValue for specified::LetterSpacing {
     type ComputedValue = LetterSpacing;
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match *self {
+            Spacing::Normal => Ok(LetterSpacing(Length::zero())),
+            Spacing::Value(ref v) => Ok(LetterSpacing(v.to_computed_value_without_context()?)),
+        }
+    }
+
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         match *self {
             Spacing::Normal => LetterSpacing(Length::zero()),
@@ -98,6 +105,13 @@ pub type WordSpacing = LengthPercentage;
 
 impl ToComputedValue for specified::WordSpacing {
     type ComputedValue = WordSpacing;
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match *self {
+            Spacing::Normal => Ok(LengthPercentage::zero()),
+            Spacing::Value(ref v) => v.to_computed_value_without_context()?,
+        }
+    }
 
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         match *self {

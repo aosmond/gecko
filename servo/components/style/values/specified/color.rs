@@ -887,6 +887,10 @@ impl Color {
 impl ToComputedValue for Color {
     type ComputedValue = ComputedColor;
 
+    fn to_computed_value_without_context(&self) -> Result<ComputedColor, ()> {
+        self.to_computed_color(None).ok_or(Err(()))
+    }
+
     fn to_computed_value(&self, context: &Context) -> ComputedColor {
         self.to_computed_color(Some(context)).unwrap()
     }
@@ -922,6 +926,12 @@ impl Parse for MozFontSmoothingBackgroundColor {
 
 impl ToComputedValue for MozFontSmoothingBackgroundColor {
     type ComputedValue = AbsoluteColor;
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self.0
+            .to_computed_value_without_context()?
+            .resolve_to_absolute(&AbsoluteColor::transparent()))
+    }
 
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         self.0
@@ -969,6 +979,11 @@ pub struct ColorPropertyValue(pub Color);
 
 impl ToComputedValue for ColorPropertyValue {
     type ComputedValue = AbsoluteColor;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {

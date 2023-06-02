@@ -79,6 +79,18 @@ impl ToComputedValue for SpecifiedFloat {
     type ComputedValue = Float;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        // https://drafts.csswg.org/css-logical-props/#float-clear
+        match *self {
+            SpecifiedFloat::InlineStart => Err(()),
+            SpecifiedFloat::InlineEnd => Err(()),
+            SpecifiedFloat::Left => Ok(Float::Left),
+            SpecifiedFloat::Right => Ok(Float::Right),
+            SpecifiedFloat::None => Ok(Float::None),
+        }
+    }
+
+    #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         let ltr = context.style().writing_mode.is_bidi_ltr();
         // https://drafts.csswg.org/css-logical-props/#float-clear
@@ -150,6 +162,19 @@ impl ToComputedValue for SpecifiedClear {
     type ComputedValue = Clear;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        // https://drafts.csswg.org/css-logical-props/#float-clear
+        match *self {
+            SpecifiedClear::InlineStart => Err(()),
+            SpecifiedClear::InlineEnd => Err(()),
+            SpecifiedClear::None => Ok(Clear::None),
+            SpecifiedClear::Left => Ok(Clear::Left),
+            SpecifiedClear::Right => Ok(Clear::Right),
+            SpecifiedClear::Both => Ok(Clear::Both),
+        }
+    }
+
+    #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         let ltr = context.style().writing_mode.is_bidi_ltr();
         // https://drafts.csswg.org/css-logical-props/#float-clear
@@ -208,6 +233,18 @@ pub enum Resize {
 
 impl ToComputedValue for specified::Resize {
     type ComputedValue = Resize;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Resize, ()> {
+        match self {
+            specified::Resize::Inline => Err(()),
+            specified::Resize::Block => Err(()),
+            specified::Resize::None => Ok(Resize::None),
+            specified::Resize::Both => Ok(Resize::Both),
+            specified::Resize::Horizontal => Ok(Resize::Horizontal),
+            specified::Resize::Vertical => Ok(Resize::Vertical),
+        }
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Resize {

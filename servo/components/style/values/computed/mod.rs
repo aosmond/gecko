@@ -457,6 +457,10 @@ pub trait ToComputedValue {
     /// The computed value type we're going to be converted to.
     type ComputedValue;
 
+    /// Convert a specified value to a computed value, without a context. Panics
+    /// if not possible.
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()>;
+
     /// Convert a specified value to a computed value, using itself and the data
     /// inside the `Context`.
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue;
@@ -487,6 +491,14 @@ where
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok((
+            self.0.to_computed_value_without_context()?,
+            self.1.to_computed_value_without_context()?,
+        ))
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         (
             A::from_computed_value(&computed.0),
@@ -504,6 +516,11 @@ where
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         self.as_ref().map(|item| item.to_computed_value(context))
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        self.as_ref().map(|item| item.to_computed_value_without_context())
     }
 
     #[inline]
@@ -527,6 +544,14 @@ where
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(Size2D::new(
+            self.width.to_computed_value_without_context()?,
+            self.height.to_computed_value_without_context()?,
+        ))
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Size2D::new(
             T::from_computed_value(&computed.width),
@@ -540,6 +565,13 @@ where
     T: ToComputedValue,
 {
     type ComputedValue = Vec<<T as ToComputedValue>::ComputedValue>;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self.iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect())
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
@@ -561,6 +593,11 @@ where
     type ComputedValue = Box<<T as ToComputedValue>::ComputedValue>;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(Box::new(T::to_computed_value_without_context(self)?))
+    }
+
+    #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         Box::new(T::to_computed_value(self, context))
     }
@@ -576,6 +613,14 @@ where
     T: ToComputedValue,
 {
     type ComputedValue = Box<[<T as ToComputedValue>::ComputedValue]>;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self.iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect::<Vec<_>>()
+            .into_boxed_slice())
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
@@ -599,7 +644,14 @@ impl<T> ToComputedValue for crate::OwnedSlice<T>
 where
     T: ToComputedValue,
 {
-    type ComputedValue = crate::OwnedSlice<<T as ToComputedValue>::ComputedValue>;
+    type ComputedValue = crate::OwnedSlice<Option<<T as ToComputedValue>::ComputedValue>>;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self.iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect())
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
@@ -626,6 +678,11 @@ where
     type ComputedValue = Self;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
+
+    #[inline]
     fn to_computed_value(&self, _: &Context) -> Self {
         self.clone()
     }
@@ -642,6 +699,11 @@ where
     T: ToComputedValue<ComputedValue = T>,
 {
     type ComputedValue = Self;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
 
     #[inline]
     fn to_computed_value(&self, _: &Context) -> Self {

@@ -74,6 +74,10 @@ pub type ImageSet = generic::GenericImageSet<Image, Resolution>;
 impl ToComputedValue for specified::ImageSet {
     type ComputedValue = ImageSet;
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         let items = self.items.to_computed_value(context);
         let dpr = context.device().device_pixel_ratio().get();
@@ -184,6 +188,17 @@ impl generic::LineDirection for LineDirection {
 
 impl ToComputedValue for specified::LineDirection {
     type ComputedValue = LineDirection;
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match *self {
+            specified::LineDirection::Angle(ref angle) => {
+                Ok(LineDirection::Angle(angle.to_computed_value_without_context()?))
+            },
+            specified::LineDirection::Horizontal(x) => Ok(LineDirection::Horizontal(x)),
+            specified::LineDirection::Vertical(y) => Ok(LineDirection::Vertical(y)),
+            specified::LineDirection::Corner(x, y) => Ok(LineDirection::Corner(x, y)),
+        }
+    }
 
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         match *self {

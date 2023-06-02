@@ -118,11 +118,16 @@ impl ToComputedValue for Angle {
     type ComputedValue = ComputedAngle;
 
     #[inline]
-    fn to_computed_value(&self, _context: &Context) -> Self::ComputedValue {
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
         let degrees = self.degrees();
 
         // NaN and +-infinity should degenerate to 0: https://github.com/w3c/csswg-drafts/issues/6105
-        ComputedAngle::from_degrees(if degrees.is_finite() { degrees } else { 0.0 })
+        Ok(ComputedAngle::from_degrees(if degrees.is_finite() { degrees } else { 0.0 }))
+    }
+
+    #[inline]
+    fn to_computed_value(&self, _context: &Context) -> Self::ComputedValue {
+        self.to_computed_value_without_context().unwrap()
     }
 
     #[inline]

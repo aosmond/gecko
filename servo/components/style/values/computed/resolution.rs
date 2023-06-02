@@ -35,6 +35,11 @@ impl ToComputedValue for specified::Resolution {
     type ComputedValue = Resolution;
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(Resolution(self.dppx()))
+    }
+
+    #[inline]
     fn to_computed_value(&self, _: &Context) -> Self::ComputedValue {
         Resolution(self.dppx())
     }

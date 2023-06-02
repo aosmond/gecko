@@ -388,6 +388,10 @@ pub mod system_font {
     impl ToComputedValue for SystemFont {
         type ComputedValue = ComputedSystemFont;
 
+        fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+            Err(())
+        }
+
         fn to_computed_value(&self, cx: &Context) -> Self::ComputedValue {
             use crate::gecko_bindings::bindings;
             use crate::gecko_bindings::structs::nsFont;

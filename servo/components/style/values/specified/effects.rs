@@ -84,6 +84,15 @@ macro_rules! factor_impl_common {
             type ComputedValue = $computed_ty;
 
             #[inline]
+            fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+                use crate::values::computed::NumberOrPercentage;
+                match self.0.to_computed_value_without_context()? {
+                    NumberOrPercentage::Number(n) => Ok(n.into()),
+                    NumberOrPercentage::Percentage(p) => Ok(p.0.into()),
+                }
+            }
+
+            #[inline]
             fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
                 use crate::values::computed::NumberOrPercentage;
                 match self.0.to_computed_value(context) {
@@ -193,6 +202,19 @@ impl Parse for BoxShadow {
 
 impl ToComputedValue for BoxShadow {
     type ComputedValue = ComputedBoxShadow;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedBoxShadow {
+            base: self.base.to_computed_value_without_context()?,
+            spread: self
+                .spread
+                .as_ref()
+                .unwrap_or(&Length::zero())
+                .to_computed_value_without_context()?,
+            inset: self.inset,
+        })
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
@@ -331,6 +353,24 @@ impl Parse for SimpleShadow {
 
 impl ToComputedValue for SimpleShadow {
     type ComputedValue = ComputedSimpleShadow;
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedSimpleShadow {
+            color: self
+                .color
+                .as_ref()
+                .unwrap_or(&Color::currentcolor())
+                .to_computed_value_without_context()?,
+            horizontal: self.horizontal.to_computed_value_without_context()?,
+            vertical: self.vertical.to_computed_value_without_context()?,
+            blur: self
+                .blur
+                .as_ref()
+                .unwrap_or(&NonNegativeLength::zero())
+                .to_computed_value_without_context()?,
+        })
+    }
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
