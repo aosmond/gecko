@@ -199,7 +199,7 @@ impl ToComputedValue for TimingFunction {
     }
 
     /// Generate the ComputedTimingFunction without Context.
-    pub fn to_computed_value_without_context(&self) -> Result<ComputedTimingFunction, ()> {
+    fn to_computed_value_without_context(&self) -> Result<ComputedTimingFunction, ()> {
         // We need this for converting the specified TimingFunction into computed TimingFunction without
         // Context (for some FFIs in glue.rs). In fact, we don't really need Context to get the computed
         // value of TimingFunction.

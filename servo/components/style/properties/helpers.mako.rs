@@ -383,12 +383,7 @@
 
             #[inline]
             fn to_computed_value_without_context(&self) -> Result<computed_value::T, ()> {
-                % if not is_shared_list:
-                use std::iter::FromIterator;
-                % endif
-                Ok(computed_value::List(computed_value::UnderlyingList::from_iter(
-                    self.0.iter().map(|i| i.to_computed_value_without_context()?)
-                )))
+                Err(())
             }
 
             #[inline]

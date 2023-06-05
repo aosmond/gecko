@@ -4464,7 +4464,7 @@ pub extern "C" fn Servo_ParseEasing(
         parser.parse_entirely(|p| transition_timing_function::single_value::parse(&context, p));
     match result {
         Ok(parsed_easing) => {
-            *output = parsed_easing.to_computed_value_without_context();
+            *output = parsed_easing.to_computed_value_without_context().unwrap();
             true
         },
         Err(_) => false,
@@ -6379,7 +6379,7 @@ pub unsafe extern "C" fn Servo_StyleSet_GetKeyframesForName(
 
         // Override timing_function if the keyframe has an animation-timing-function.
         let timing_function = match step.get_animation_timing_function(&guard) {
-            Some(val) => val.to_computed_value_without_context(),
+            Some(val) => val.to_computed_value_without_context().unwrap(),
             None => (*inherited_timing_function).clone(),
         };
 

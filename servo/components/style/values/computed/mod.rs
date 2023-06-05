@@ -520,9 +520,10 @@ where
 
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
-        Ok(self
+        Err(())
+        /*Ok(self
             .as_ref()
-            .map(|item| item.to_computed_value_without_context()?))
+            .map(|item| item.to_computed_value_without_context()?))*/
     }
 
     #[inline]
@@ -577,10 +578,11 @@ where
 
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
-        Ok(self
+        Err(())
+        /*Ok(self
             .iter()
             .map(|item| item.to_computed_value_without_context()?)
-            .collect())
+            .collect())*/
     }
 
     #[inline]
@@ -622,11 +624,12 @@ where
 
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
-        Ok(self
+        Err(())
+        /*Ok(self
             .iter()
             .map(|item| item.to_computed_value_without_context()?)
             .collect::<Vec<_>>()
-            .into_boxed_slice())
+            .into_boxed_slice())*/
     }
 
     #[inline]
@@ -654,10 +657,11 @@ where
 
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
-        Ok(self
+        Err(())
+        /*Ok(self
             .iter()
             .map(|item| item.to_computed_value_without_context()?)
-            .collect())
+            .collect())*/
     }
 
     #[inline]

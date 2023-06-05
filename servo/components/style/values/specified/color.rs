@@ -893,7 +893,7 @@ impl ToComputedValue for Color {
 
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
-        self.to_computed_color(None).ok_or(Err(()))
+        self.to_computed_color(None).ok_or(())
     }
 
     fn from_computed_value(computed: &ComputedColor) -> Self {
