@@ -771,12 +771,12 @@ impl ToComputedValue for specified::AngleOrPercentage {
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<AngleOrPercentage, ()> {
         match *self {
-            specified::AngleOrPercentage::Percentage(percentage) => {
-                Ok(AngleOrPercentage::Percentage(percentage.to_computed_value_without_context()?))
-            },
-            specified::AngleOrPercentage::Angle(angle) => {
-                Ok(AngleOrPercentage::Angle(angle.to_computed_value_without_context()?))
-            },
+            specified::AngleOrPercentage::Percentage(percentage) => Ok(
+                AngleOrPercentage::Percentage(percentage.to_computed_value_without_context()?),
+            ),
+            specified::AngleOrPercentage::Angle(angle) => Ok(AngleOrPercentage::Angle(
+                angle.to_computed_value_without_context()?,
+            )),
         }
     }
     #[inline]
@@ -953,12 +953,12 @@ impl ToComputedValue for specified::NumberOrPercentage {
     #[inline]
     fn to_computed_value_without_context(&self) -> Result<NumberOrPercentage, ()> {
         match *self {
-            specified::NumberOrPercentage::Percentage(percentage) => {
-                Ok(NumberOrPercentage::Percentage(percentage.to_computed_value_without_context()?))
-            },
-            specified::NumberOrPercentage::Number(number) => {
-                Ok(NumberOrPercentage::Number(number.to_computed_value_without_context()?))
-            },
+            specified::NumberOrPercentage::Percentage(percentage) => Ok(
+                NumberOrPercentage::Percentage(percentage.to_computed_value_without_context()?),
+            ),
+            specified::NumberOrPercentage::Number(number) => Ok(NumberOrPercentage::Number(
+                number.to_computed_value_without_context()?,
+            )),
         }
     }
     #[inline]

@@ -80,7 +80,10 @@ impl ToComputedValue for specified::Length {
     fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
         match *self {
             Self::NoCalc(l) => l.to_computed_value_without_context(),
-            Self::Calc(ref calc) => Ok(calc.to_computed_value_without_context()?.to_length().unwrap()),
+            Self::Calc(ref calc) => Ok(calc
+                .to_computed_value_without_context()?
+                .to_length()
+                .unwrap()),
         }
     }
 
@@ -204,11 +207,11 @@ impl Size {
             Self::Auto => false,
             Self::LengthPercentage(ref lp) => lp.is_definitely_zero(),
             #[cfg(feature = "gecko")]
-            Self::MinContent |
-            Self::MaxContent |
-            Self::FitContent |
-            Self::MozAvailable |
-            Self::FitContentFunction(_) => false,
+            Self::MinContent
+            | Self::MaxContent
+            | Self::FitContent
+            | Self::MozAvailable
+            | Self::FitContentFunction(_) => false,
         }
     }
 }
