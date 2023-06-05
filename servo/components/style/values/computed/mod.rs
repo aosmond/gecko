@@ -461,6 +461,10 @@ pub trait ToComputedValue {
     /// inside the `Context`.
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue;
 
+    /// Convert a specified value to a computed value, if possible, without any
+    /// context data.
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()>;
+
     /// Convert a computed value to specified value form.
     ///
     /// This will be used for recascading during animation.
@@ -487,6 +491,14 @@ where
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(
+            self.0.to_computed_value_without_context()?,
+            self.1.to_computed_value_without_context()?,
+        )
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         (
             A::from_computed_value(&computed.0),
@@ -504,6 +516,13 @@ where
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         self.as_ref().map(|item| item.to_computed_value(context))
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self
+            .as_ref()
+            .map(|item| item.to_computed_value_without_context()?))
     }
 
     #[inline]
@@ -527,6 +546,14 @@ where
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(Size2D::new(
+            self.width.to_computed_value_without_context()?,
+            self.height.to_computed_value_without_context()?,
+        ))
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Size2D::new(
             T::from_computed_value(&computed.width),
@@ -546,6 +573,14 @@ where
         self.iter()
             .map(|item| item.to_computed_value(context))
             .collect()
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self
+            .iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect())
     }
 
     #[inline]
@@ -586,6 +621,15 @@ where
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self
+            .iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect::<Vec<_>>()
+            .into_boxed_slice())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         computed
             .iter()
@@ -606,6 +650,14 @@ where
         self.iter()
             .map(|item| item.to_computed_value(context))
             .collect()
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self
+            .iter()
+            .map(|item| item.to_computed_value_without_context()?)
+            .collect())
     }
 
     #[inline]
@@ -631,6 +683,11 @@ where
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self.clone())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self) -> Self {
         computed.clone()
     }
@@ -646,6 +703,11 @@ where
     #[inline]
     fn to_computed_value(&self, _: &Context) -> Self {
         self.clone()
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(self.clone())
     }
 
     #[inline]
@@ -703,6 +765,17 @@ impl ToComputedValue for specified::AngleOrPercentage {
             },
             specified::AngleOrPercentage::Angle(angle) => {
                 AngleOrPercentage::Angle(angle.to_computed_value(context))
+            },
+        }
+    }
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<AngleOrPercentage, ()> {
+        match *self {
+            specified::AngleOrPercentage::Percentage(percentage) => {
+                Ok(AngleOrPercentage::Percentage(percentage.to_computed_value_without_context()?))
+            },
+            specified::AngleOrPercentage::Angle(angle) => {
+                Ok(AngleOrPercentage::Angle(angle.to_computed_value_without_context()?))
             },
         }
     }
@@ -874,6 +947,17 @@ impl ToComputedValue for specified::NumberOrPercentage {
             },
             specified::NumberOrPercentage::Number(number) => {
                 NumberOrPercentage::Number(number.to_computed_value(context))
+            },
+        }
+    }
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<NumberOrPercentage, ()> {
+        match *self {
+            specified::NumberOrPercentage::Percentage(percentage) => {
+                Ok(NumberOrPercentage::Percentage(percentage.to_computed_value_without_context()?))
+            },
+            specified::NumberOrPercentage::Number(number) => {
+                Ok(NumberOrPercentage::Number(number.to_computed_value_without_context()?))
             },
         }
     }

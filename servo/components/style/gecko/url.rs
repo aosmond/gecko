@@ -272,6 +272,11 @@ impl ToComputedValue for SpecifiedUrl {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedUrl(self.clone()))
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         computed.0.clone()
     }
@@ -315,6 +320,11 @@ impl ToComputedValue for SpecifiedImageUrl {
     #[inline]
     fn to_computed_value(&self, context: &Context) -> Self::ComputedValue {
         ComputedImageUrl(self.0.to_computed_value(context))
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     #[inline]

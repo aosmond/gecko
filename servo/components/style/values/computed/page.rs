@@ -51,6 +51,10 @@ impl ToComputedValue for specified::PageSize {
         }
     }
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         match *computed {
             PageSize::Size(s) => Self::Size(ToComputedValue::from_computed_value(&s)),

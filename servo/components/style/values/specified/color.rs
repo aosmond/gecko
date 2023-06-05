@@ -891,6 +891,11 @@ impl ToComputedValue for Color {
         self.to_computed_color(Some(context)).unwrap()
     }
 
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        self.to_computed_color(None).ok_or(Err(()))
+    }
+
     fn from_computed_value(computed: &ComputedColor) -> Self {
         match *computed {
             ComputedColor::Absolute(ref color) => Self::from_absolute_color(color.clone()),
@@ -927,6 +932,10 @@ impl ToComputedValue for MozFontSmoothingBackgroundColor {
         self.0
             .to_computed_value(context)
             .resolve_to_absolute(&AbsoluteColor::transparent())
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
@@ -976,6 +985,11 @@ impl ToComputedValue for ColorPropertyValue {
         self.0
             .to_computed_value(context)
             .resolve_to_absolute(&current_color)
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     #[inline]

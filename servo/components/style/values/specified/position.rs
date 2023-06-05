@@ -324,6 +324,11 @@ impl<S: Side> ToComputedValue for PositionComponent<S> {
         }
     }
 
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         PositionComponent::Length(ToComputedValue::from_computed_value(computed))
     }

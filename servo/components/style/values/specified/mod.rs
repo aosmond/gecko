@@ -303,6 +303,11 @@ impl ToComputedValue for Number {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<CSSFloat, ()> {
+        self.get()
+    }
+
+    #[inline]
     fn from_computed_value(computed: &CSSFloat) -> Self {
         Number {
             value: *computed,
@@ -546,13 +551,18 @@ impl ToComputedValue for Opacity {
 
     #[inline]
     fn to_computed_value(&self, context: &Context) -> CSSFloat {
+        self.to_computed_value_without_context().unwrap()
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<CSSFloat, ()> {
         let value = self.0.to_computed_value(context);
         if context.for_smil_animation {
             // SMIL expects to be able to interpolate between out-of-range
             // opacity values.
-            value
+            Ok(value)
         } else {
-            value.min(1.0).max(0.0)
+            Ok(value.min(1.0).max(0.0))
         }
     }
 
@@ -686,6 +696,11 @@ impl ToComputedValue for Integer {
     #[inline]
     fn to_computed_value(&self, _: &Context) -> i32 {
         self.value
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<i32, ()> {
+        Ok(self.value)
     }
 
     #[inline]

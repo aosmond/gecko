@@ -34,6 +34,14 @@ impl ToComputedValue for specified::NoCalcLength {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match *self {
+            Self::Absolute(length) => length.to_computed_value_without_context(),
+            _ => Err(()),
+        }
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Self::Absolute(AbsoluteLength::Px(computed.px()))
     }
@@ -65,6 +73,14 @@ impl ToComputedValue for specified::Length {
         match *self {
             Self::NoCalc(l) => l.to_computed_value(context),
             Self::Calc(ref calc) => calc.to_computed_value(context).to_length().unwrap(),
+        }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        match *self {
+            Self::NoCalc(l) => l.to_computed_value_without_context(),
+            Self::Calc(ref calc) => Ok(calc.to_computed_value_without_context()?.to_length().unwrap()),
         }
     }
 

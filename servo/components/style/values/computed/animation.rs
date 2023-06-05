@@ -31,6 +31,11 @@ impl ToComputedValue for specified::AnimationIterationCount {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         use crate::values::specified::NonNegativeNumber;
         if computed.0.is_infinite() {

@@ -139,6 +139,11 @@ impl ToComputedValue for Time {
         ComputedTime::from_seconds(crate::values::normalize(seconds))
     }
 
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Time {
             seconds: computed.seconds(),

@@ -171,10 +171,14 @@ impl ToComputedValue for SpecifiedUrl {
     // If we can't resolve the URL from the specified one, we fall back to the original
     // but still return it as a ComputedUrl::Invalid
     fn to_computed_value(&self, _: &Context) -> Self::ComputedValue {
+        self.to_computed_value_without_context().unwrap()
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
         match self.resolved {
-            Some(ref url) => ComputedUrl::Valid(url.clone()),
+            Some(ref url) => Ok(ComputedUrl::Valid(url.clone())),
             None => match self.original {
-                Some(ref url) => ComputedUrl::Invalid(url.clone()),
+                Some(ref url) => Ok(ComputedUrl::Invalid(url.clone())),
                 None => {
                     unreachable!("Found specified url with neither resolved or original URI!");
                 },

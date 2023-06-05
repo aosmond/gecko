@@ -133,6 +133,11 @@ impl ToComputedValue for LineHeight {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         match *computed {
             GenericLineHeight::Normal => GenericLineHeight::Normal,
@@ -212,6 +217,11 @@ impl ToComputedValue for TextOverflow {
                 sides_are_logical: true,
             }
         }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     #[inline]
@@ -568,6 +578,11 @@ impl ToComputedValue for TextAlign {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         TextAlign::Keyword(*computed)
     }
@@ -692,6 +707,11 @@ impl ToComputedValue for TextEmphasisStyle {
                 ComputedTextEmphasisStyle::String(s.into())
             },
         }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     #[inline]

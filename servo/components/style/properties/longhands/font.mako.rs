@@ -423,6 +423,10 @@ pub mod system_font {
             ret
         }
 
+        fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+            Err(())
+        }
+
         fn from_computed_value(_: &ComputedSystemFont) -> Self {
             unreachable!()
         }

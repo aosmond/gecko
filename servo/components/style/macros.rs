@@ -40,6 +40,10 @@ macro_rules! trivial_to_computed_value {
                 self.clone()
             }
 
+            fn to_computed_value_without_context(&self) -> Result<Self, ()> {
+                Ok(self.clone())
+            }
+
             fn from_computed_value(other: &Self) -> Self {
                 other.clone()
             }

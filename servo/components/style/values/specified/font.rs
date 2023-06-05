@@ -168,6 +168,11 @@ impl ToComputedValue for FontWeight {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &computed::FontWeight) -> Self {
         FontWeight::Absolute(AbsoluteFontWeight::Weight(Number::from_computed_value(
             &computed.value(),
@@ -278,6 +283,11 @@ impl ToComputedValue for SpecifiedFontStyle {
         }
     }
 
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         if *computed == computed::FontStyle::NORMAL {
             return Self::Normal;
@@ -369,6 +379,11 @@ impl ToComputedValue for FontStyle {
         }
     }
 
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         FontStyle::Specified(SpecifiedFontStyle::from_computed_value(computed))
     }
@@ -439,6 +454,11 @@ impl ToComputedValue for FontStretch {
             FontStretch::Keyword(ref kw) => kw.compute(),
             FontStretch::System(_) => self.compute_system(context),
         }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
@@ -629,6 +649,10 @@ impl ToComputedValue for FontFamily {
             },
             FontFamily::System(_) => self.compute_system(context),
         }
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     fn from_computed_value(other: &computed::FontFamily) -> Self {
@@ -930,6 +954,11 @@ impl ToComputedValue for FontSize {
     #[inline]
     fn to_computed_value(&self, context: &Context) -> computed::FontSize {
         self.to_computed_value_against(context, FontBaseSize::InheritedStyle)
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     #[inline]

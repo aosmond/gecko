@@ -85,6 +85,10 @@ impl ToComputedValue for specified::LetterSpacing {
         }
     }
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         if computed.0.is_zero() {
             return Spacing::Normal;
@@ -104,6 +108,10 @@ impl ToComputedValue for specified::WordSpacing {
             Spacing::Normal => LengthPercentage::zero(),
             Spacing::Value(ref v) => v.to_computed_value(context),
         }
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {

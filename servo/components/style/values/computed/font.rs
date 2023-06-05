@@ -799,6 +799,10 @@ where
         FontSettings(v.into_boxed_slice())
     }
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Self(
             computed
@@ -903,6 +907,10 @@ impl ToComputedValue for specified::MozScriptMinSize {
         }
     }
 
+    fn to_computed_value_without_context(&self) -> Result<MozScriptMinSize, ()> {
+        Err(())
+    }
+
     fn from_computed_value(other: &MozScriptMinSize) -> Self {
         specified::MozScriptMinSize(ToComputedValue::from_computed_value(other))
     }
@@ -936,6 +944,10 @@ impl ToComputedValue for specified::MathDepth {
             specified::MathDepth::Absolute(abs) => abs.to_computed_value(cx),
         };
         cmp::min(int, i8::MAX as i32) as i8
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<i8, ()> {
+        Err(())
     }
 
     fn from_computed_value(other: &i8) -> Self {

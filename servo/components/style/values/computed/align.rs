@@ -84,6 +84,10 @@ impl ToComputedValue for specified::JustifyItems {
         }
     }
 
+    fn to_computed_value_without_context(&self) -> Result<JustifyItems, ()> {
+        Err(())
+    }
+
     #[inline]
     fn from_computed_value(computed: &JustifyItems) -> Self {
         computed.specified

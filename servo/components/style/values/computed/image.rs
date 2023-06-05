@@ -122,6 +122,10 @@ impl ToComputedValue for specified::ImageSet {
         }
     }
 
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Self {
             selected_index: std::usize::MAX,
@@ -194,6 +198,10 @@ impl ToComputedValue for specified::LineDirection {
             specified::LineDirection::Vertical(y) => LineDirection::Vertical(y),
             specified::LineDirection::Corner(x, y) => LineDirection::Corner(x, y),
         }
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
     }
 
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {

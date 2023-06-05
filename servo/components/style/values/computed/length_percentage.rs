@@ -506,6 +506,10 @@ impl ToComputedValue for specified::LengthPercentage {
         }
     }
 
+    fn to_computed_value_without_context(&self) -> Result<LengthPercentage, ()> {
+        Err(())
+    }
+
     fn from_computed_value(computed: &LengthPercentage) -> Self {
         match computed.unpack() {
             Unpacked::Length(ref l) => {
@@ -808,6 +812,10 @@ impl specified::CalcLengthPercentage {
     /// Compute the calc using the current font-size (and without text-zoom).
     pub fn to_computed_value(&self, context: &Context) -> LengthPercentage {
         self.to_computed_value_with_zoom(context, |abs| abs, FontBaseSize::CurrentStyle)
+    }
+
+    fn to_computed_value_without_context(&self) -> Result<LengthPercentage, ()> {
+        Err(())
     }
 
     #[inline]

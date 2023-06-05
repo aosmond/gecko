@@ -112,6 +112,11 @@ impl ToComputedValue for SpecifiedFloat {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> SpecifiedFloat {
         match *computed {
             Float::Left => SpecifiedFloat::Left,
@@ -184,6 +189,11 @@ impl ToComputedValue for SpecifiedClear {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Err(())
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> SpecifiedClear {
         match *computed {
             Clear::None => SpecifiedClear::None,
@@ -240,6 +250,11 @@ impl ToComputedValue for specified::Resize {
             specified::Resize::Horizontal => Resize::Horizontal,
             specified::Resize::Vertical => Resize::Vertical,
         }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Resize, ()> {
+        Err(())
     }
 
     #[inline]

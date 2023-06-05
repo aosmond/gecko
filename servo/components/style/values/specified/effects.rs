@@ -93,6 +93,15 @@ macro_rules! factor_impl_common {
             }
 
             #[inline]
+            fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+                use crate::values::computed::NumberOrPercentage;
+                match self.0.to_computed_value_without_context()? {
+                    NumberOrPercentage::Number(n) => Ok(n.into()),
+                    NumberOrPercentage::Percentage(p) => Ok(p.0.into()),
+                }
+            }
+
+            #[inline]
             fn from_computed_value(computed: &Self::ComputedValue) -> Self {
                 Self(NumberOrPercentage::Number(
                     ToComputedValue::from_computed_value(&computed.0),
@@ -205,6 +214,19 @@ impl ToComputedValue for BoxShadow {
                 .to_computed_value(context),
             inset: self.inset,
         }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedBoxShadow {
+            base: self.base.to_computed_value_without_context()?,
+            spread: self
+                .spread
+                .as_ref()
+                .unwrap_or(&Length::zero())
+                .to_computed_value_without_context()?,
+            inset: self.inset,
+        })
     }
 
     #[inline]
@@ -348,6 +370,24 @@ impl ToComputedValue for SimpleShadow {
                 .unwrap_or(&NonNegativeLength::zero())
                 .to_computed_value(context),
         }
+    }
+
+    #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        Ok(ComputedSimpleShadow {
+            color: self
+                .color
+                .as_ref()
+                .unwrap_or(&Color::currentcolor())
+                .to_computed_value_without_context()?,
+            horizontal: self.horizontal.to_computed_value_without_context()?,
+            vertical: self.vertical.to_computed_value_without_context()?,
+            blur: self
+                .blur
+                .as_ref()
+                .unwrap_or(&NonNegativeLength::zero())
+                .to_computed_value_without_context()?,
+        })
     }
 
     #[inline]

@@ -176,6 +176,11 @@ impl ToComputedValue for Percentage {
     }
 
     #[inline]
+    fn to_computed_value_without_context(&self) -> Result<Self::ComputedValue, ()> {
+        ComputedPercentage(normalize(self.get()))
+    }
+
+    #[inline]
     fn from_computed_value(computed: &Self::ComputedValue) -> Self {
         Percentage::new(computed.0)
     }

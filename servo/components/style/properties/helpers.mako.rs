@@ -382,6 +382,16 @@
             }
 
             #[inline]
+            fn to_computed_value_without_context(&self) -> Result<computed_value::T, ()> {
+                % if not is_shared_list:
+                use std::iter::FromIterator;
+                % endif
+                Ok(computed_value::List(computed_value::UnderlyingList::from_iter(
+                    self.0.iter().map(|i| i.to_computed_value_without_context()?)
+                )))
+            }
+
+            #[inline]
             fn from_computed_value(computed: &computed_value::T) -> Self {
                 let iter = computed.0.iter().map(ToComputedValue::from_computed_value);
                 SpecifiedValue(iter.collect())
