@@ -1396,7 +1396,7 @@ already_AddRefed<WebRenderLayerManager> nsBaseWidget::CreateCompositorSession(
     MOZ_ASSERT(supportsAcceleration);
     options.SetAllowSoftwareWebRenderOGL(
         StaticPrefs::gfx_webrender_software_opengl_AtStartup());
-#elif defined(MOZ_WIDGET_GTK)
+#elif defined(MOZ_WIDGET_GTK) && (defined(NIGHTLY_BUILD) || defined(DEBUG))
     if (supportsAcceleration) {
       options.SetAllowSoftwareWebRenderOGL(
           StaticPrefs::gfx_webrender_software_opengl_AtStartup());

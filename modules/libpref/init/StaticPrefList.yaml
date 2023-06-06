@@ -150,6 +150,12 @@
 #define IS_NIGHTLY_OR_DEV_EDITION false
 #endif
 
+#if defined(NIGHTLY_BUILD) || defined(DEBUG)
+#define IS_NIGHTLY_OR_DEBUG true
+#else
+#define IS_NIGHTLY_OR_DEBUG false
+#endif
+
 #ifdef MOZILLA_OFFICIAL
 #define IS_NOT_MOZILLA_OFFICIAL false
 #else
@@ -6762,25 +6768,29 @@
   value: false
   mirror: once
 
+#ifdef XP_WIN
 # Whether to use the D3D11 RenderCompositor when using WebRender software backend
 - name: gfx.webrender.software.d3d11
   type: bool
   value: true
   mirror: once
+#endif
 
+# (When reading the next line, know that preprocessor.py doesn't
+# understand parentheses, but && is higher precedence than ||.)
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GTK) && IS_NIGHTLY_OR_DEBUG == true
 - name: gfx.webrender.software.opengl
   type: bool
-#if defined(MOZ_WIDGET_ANDROID)
-  value: true
-#else
-  value: false
-#endif
+  value: @IS_ANDROID@
   mirror: once
+#endif
 
+#ifdef XP_WIN
 - name: gfx.webrender.software.d3d11.upload-mode
   type: RelaxedAtomicInt32
   value: 4
   mirror: always
+#endif
 
 # Whether to force widgets to don't support acceleration to use WebRender
 # despite that
