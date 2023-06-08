@@ -345,9 +345,8 @@ impl Parse for Filter {
                 "grayscale" => {
                     // Values of amount over 100% are allowed but UAs must clamp the values to 1.
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-grayscale
-                    let factor = i.try_parse(|i| ZeroToOneFactor::parse(context, i));
-                    if factor.is_ok() {
-                        Ok(GenericFilter::Grayscale(factor.unwrap()))
+                    if let Ok(factor) = i.try_parse(|i| ZeroToOneFactor::parse(context, i)) {
+                        Ok(GenericFilter::Grayscale(factor))
                     } else {
                         Ok(GenericFilter::Grayscale(ZeroToOneFactor::one()))
                     }
@@ -363,9 +362,8 @@ impl Parse for Filter {
                 "invert" => {
                     // Values of amount over 100% are allowed but UAs must clamp the values to 1.
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-invert
-                    let factor = i.try_parse(|i| ZeroToOneFactor::parse(context, i));
-                    if factor.is_ok() {
-                        Ok(GenericFilter::Invert(factor.unwrap()))
+                    if let Ok(factor) = i.try_parse(|i| ZeroToOneFactor::parse(context, i)) {
+                        Ok(GenericFilter::Invert(factor))
                     } else {
                         Ok(GenericFilter::Invert(ZeroToOneFactor::one()))
                     }
@@ -373,9 +371,8 @@ impl Parse for Filter {
                 "opacity" => {
                     // Values of amount over 100% are allowed but UAs must clamp the values to 1.
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-opacity
-                    let factor = i.try_parse(|i| ZeroToOneFactor::parse(context, i));
-                    if factor.is_ok() {
-                        Ok(GenericFilter::Opacity(factor.unwrap()))
+                    if let Ok(factor) = i.try_parse(|i| ZeroToOneFactor::parse(context, i)) {
+                        Ok(GenericFilter::Opacity(factor))
                     } else {
                         Ok(GenericFilter::Opacity(ZeroToOneFactor::one()))
                     }
@@ -387,9 +384,8 @@ impl Parse for Filter {
                 "sepia" => {
                     // Values of amount over 100% are allowed but UAs must clamp the values to 1.
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-sepia
-                    let factor = i.try_parse(|i| ZeroToOneFactor::parse(context, i));
-                    if factor.is_ok() {
-                        Ok(GenericFilter::Sepia(factor.unwrap()))
+                    if let Ok(factor) = i.try_parse(|i| ZeroToOneFactor::parse(context, i)) {
+                        Ok(GenericFilter::Sepia(factor))
                     } else {
                         Ok(GenericFilter::Sepia(ZeroToOneFactor::one()))
                     }
