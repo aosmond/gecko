@@ -80,8 +80,8 @@ fn clamp_to_one(number: NumberOrPercentage) -> NumberOrPercentage {
 
 macro_rules! factor_impl_common {
     ($ty:ty, $computed_ty:ty) => {
-        impl $ty {
-            fn one() -> Self {
+        impl Default for $ty {
+            fn default() -> Self {
                 Self(NumberOrPercentage::Number(Number::new(1.)))
             }
         }
@@ -336,18 +336,18 @@ impl Parse for Filter {
                 )),
                 "brightness" => Ok(GenericFilter::Brightness(
                     i.try_parse(|i| NonNegativeFactor::parse(context, i))
-                     .unwrap_or(NonNegativeFactor::one()),
+                     .unwrap_or_default(),
                 )),
                 "contrast" => Ok(GenericFilter::Contrast(
                     i.try_parse(|i| NonNegativeFactor::parse(context, i))
-                     .unwrap_or(NonNegativeFactor::one()),
+                     .unwrap_or_default(),
                 )),
                 "grayscale" => {
                     // Values of amount over 100% are allowed but UAs must clamp the values to 1.
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-grayscale
                     Ok(GenericFilter::Grayscale(
                         i.try_parse(|i| ZeroToOneFactor::parse(context, i))
-                         .unwrap_or(ZeroToOneFactor::one()),
+                         .unwrap_or_default(),
                     ))
                 },
                 "hue-rotate" => {
@@ -363,7 +363,7 @@ impl Parse for Filter {
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-invert
                     Ok(GenericFilter::Invert(
                         i.try_parse(|i| ZeroToOneFactor::parse(context, i))
-                         .unwrap_or(ZeroToOneFactor::one()),
+                         .unwrap_or_default(),
                     ))
                 },
                 "opacity" => {
@@ -371,19 +371,19 @@ impl Parse for Filter {
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-opacity
                     Ok(GenericFilter::Opacity(
                         i.try_parse(|i| ZeroToOneFactor::parse(context, i))
-                         .unwrap_or(ZeroToOneFactor::one()),
+                         .unwrap_or_default(),
                     ))
                 },
                 "saturate" => Ok(GenericFilter::Saturate(
                     i.try_parse(|i| NonNegativeFactor::parse(context, i))
-                     .unwrap_or(NonNegativeFactor::one()),
+                     .unwrap_or_default(),
                 )),
                 "sepia" => {
                     // Values of amount over 100% are allowed but UAs must clamp the values to 1.
                     // https://drafts.fxtf.org/filter-effects/#funcdef-filter-sepia
                     Ok(GenericFilter::Sepia(
                         i.try_parse(|i| ZeroToOneFactor::parse(context, i))
-                         .unwrap_or(ZeroToOneFactor::one()),
+                         .unwrap_or_default(),
                     ))
                 },
                 "drop-shadow" => Ok(GenericFilter::DropShadow(Parse::parse(context, i)?)),
