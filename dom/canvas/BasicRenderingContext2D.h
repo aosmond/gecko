@@ -11,8 +11,8 @@
 namespace mozilla::dom {
 
 class
-    HTMLImageElementOrSVGImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvasOrImageBitmap;
-typedef HTMLImageElementOrSVGImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvasOrImageBitmap
+    HTMLImageElementOrSVGImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvasOrImageBitmapOrVideoFrame;
+typedef HTMLImageElementOrSVGImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvasOrImageBitmapOrVideoFrame
     CanvasImageSource;
 
 /*
