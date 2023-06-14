@@ -34,7 +34,8 @@ typedef (HTMLOrSVGImageElement or
          HTMLCanvasElement or
          HTMLVideoElement or
          OffscreenCanvas or
-         ImageBitmap) CanvasImageSource;
+         ImageBitmap or
+         VideoFrame) CanvasImageSource;
 
 [Exposed=Window]
 interface CanvasRenderingContext2D {
