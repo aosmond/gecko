@@ -2198,7 +2198,9 @@ class nsLayoutUtils {
      * we don't rescale during decode. */
     SFE_EXACT_SIZE_SURFACE = 1 << 6,
     /* Use orientation from image */
-    SFE_ORIENTATION_FROM_IMAGE = 1 << 7
+    SFE_ORIENTATION_FROM_IMAGE = 1 << 7,
+    /* Caller handles SFER::mCropRect.isSome() */
+    SFE_ALLOW_UNCROPPED_UNSCALED = 1 << 8,
   };
 
   // This function can be called on any thread.

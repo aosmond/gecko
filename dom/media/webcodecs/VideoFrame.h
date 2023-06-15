@@ -183,7 +183,9 @@ class VideoFrame final : public nsISupports, public nsWrapperCache {
                                                       TransferredData* aData);
 
   // Native only methods.
-  gfx::IntSize GetDisplaySize() const { return mDisplaySize; }
+  const gfx::IntSize& NativeCodedSize() const { return mCodedSize; }
+  const gfx::IntSize& NativeDisplaySize() const { return mDisplaySize; }
+  const gfx::IntRect& NativeVisibleRect() const { return mVisibleRect; }
   already_AddRefed<layers::Image> GetImage() const;
 
  public:
