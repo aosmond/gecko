@@ -7437,12 +7437,15 @@ SurfaceFromElementResult nsLayoutUtils::SurfaceFromElement(
     if (!result.mSourceSurface) {
       return result;
     }
-    if (exactSize && result.mSourceSurface->GetSize() != result.mSize) {
+    IntSize surfSize = result.mSourceSurface->GetSize();
+    if (exactSize && surfSize != result.mSize) {
       result.mSourceSurface =
           ScaleSourceSurface(*result.mSourceSurface, result.mSize);
       if (!result.mSourceSurface) {
         return result;
       }
+    } else {
+      result.mSize = surfSize;
     }
     // The surface we return is likely to be cached. We don't want to have to
     // convert to a surface that's compatible with aTarget each time it's used
