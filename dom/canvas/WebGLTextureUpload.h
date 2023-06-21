@@ -18,9 +18,10 @@ class OffscreenCanvas;
 
 namespace webgl {
 
-Maybe<TexUnpackBlobDesc> FromImageBitmap(GLenum target, Maybe<uvec3> size,
+Maybe<TexUnpackBlobDesc> FromImageBitmap(const ClientWebGLContext&,
+                                         GLenum target, Maybe<uvec3> size,
                                          const dom::ImageBitmap& imageBitmap,
-                                         ErrorResult* const out_rv);
+                                         ErrorResult* const out_error);
 
 Maybe<TexUnpackBlobDesc> FromOffscreenCanvas(const ClientWebGLContext&,
                                              GLenum target, Maybe<uvec3> size,

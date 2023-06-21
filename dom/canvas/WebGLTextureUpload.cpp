@@ -44,42 +44,22 @@ namespace webgl {
 static constexpr uint32_t kDefaultSurfaceFromElementFlags =
     nsLayoutUtils::SFE_WANT_FIRST_FRAME_IF_IMAGE |
     nsLayoutUtils::SFE_USE_ELEMENT_SIZE_IF_VECTOR |
-    nsLayoutUtils::SFE_EXACT_SIZE_SURFACE |
-    nsLayoutUtils::SFE_ALLOW_NON_PREMULT;
+    nsLayoutUtils::SFE_ALLOW_NON_PREMULT |
+    nsLayoutUtils::SFE_ALLOW_UNCROPPED_UNSCALED;
 
-Maybe<TexUnpackBlobDesc> FromImageBitmap(const GLenum target, Maybe<uvec3> size,
+Maybe<TexUnpackBlobDesc> FromImageBitmap(const ClientWebGLContext& webgl,
+                                         const GLenum target, Maybe<uvec3> size,
                                          const dom::ImageBitmap& imageBitmap,
-                                         ErrorResult* const out_rv) {
+                                         ErrorResult* const out_error) {
   if (imageBitmap.IsWriteOnly()) {
-    out_rv->Throw(NS_ERROR_DOM_SECURITY_ERR);
+    out_error->Throw(NS_ERROR_DOM_SECURITY_ERR);
     return {};
   }
 
-  const auto cloneData = imageBitmap.ToCloneData();
-  if (!cloneData) {
-    return {};
-  }
-
-  const RefPtr<gfx::DataSourceSurface> surf = cloneData->mSurface;
-  const auto imageSize = *uvec2::FromSize(surf->GetSize());
-  if (!size) {
-    size.emplace(imageSize.x, imageSize.y, 1);
-  }
-
-  // WhatWG "HTML Living Standard" (30 October 2015):
-  // "The getImageData(sx, sy, sw, sh) method [...] Pixels must be returned as
-  // non-premultiplied alpha values."
-  return Some(TexUnpackBlobDesc{target,
-                                size.value(),
-                                cloneData->mAlphaType,
-                                {},
-                                {},
-                                Some(imageSize),
-                                nullptr,
-                                {},
-                                surf,
-                                {},
-                                false});
+  auto sfer = nsLayoutUtils::SurfaceFromImageBitmap(
+      const_cast<dom::ImageBitmap*>(&imageBitmap),
+      kDefaultSurfaceFromElementFlags);
+  return FromSurfaceFromElementResult(webgl, target, size, sfer, out_error);
 }
 
 static layers::SurfaceDescriptor Flatten(const layers::SurfaceDescriptor& sd) {
@@ -174,6 +154,7 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
     const ClientWebGLContext& webgl, const GLenum target, Maybe<uvec3> size,
     SurfaceFromElementResult& sfer, ErrorResult* const out_error) {
   uvec2 elemSize;
+  PixelUnpackStateWebgl unpacking;
 
   const auto& layersImage = sfer.mLayersImage;
   Maybe<layers::SurfaceDescriptor> sd;
@@ -201,7 +182,8 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
   //////
 
   if (!size) {
-    size.emplace(elemSize.x, elemSize.y, 1);
+    const auto displaySize = *uvec2::FromSize(sfer.mIntrinsicSize);
+    size.emplace(displaySize.y, displaySize.y, 1);
   }
 
   ////
@@ -213,6 +195,18 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
     }
     return Some(
         TexUnpackBlobDesc{target, size.value(), gfxAlphaType::NonPremult});
+  }
+
+  //////
+
+  if (sfer.mCropRect) {
+    const auto& cropRect = sfer.mCropRect.ref();
+    const auto cropOrigin = *uvec2::From(cropRect.X(), cropRect.Y());
+    const auto cropSize = *uvec2::FromSize(cropRect.Size());
+    unpacking.rowLength = cropSize.x;
+    unpacking.imageHeight = cropSize.y;
+    unpacking.skipPixels = cropOrigin.x;
+    unpacking.skipRows = cropOrigin.y;
   }
 
   //////
@@ -251,7 +245,8 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
                                 Some(elemSize),
                                 layersImage,
                                 sd,
-                                dataSurf});
+                                dataSurf,
+                                unpacking});
 }
 
 }  // namespace webgl

@@ -4230,8 +4230,8 @@ void ClientWebGLContext::TexImage(uint8_t funcDims, GLenum imageTarget,
     }
 
     if (src.mImageBitmap) {
-      return webgl::FromImageBitmap(imageTarget, size, *(src.mImageBitmap),
-                                    src.mOut_error);
+      return webgl::FromImageBitmap(*this, imageTarget, size,
+                                    *(src.mImageBitmap), src.mOut_error);
     }
 
     if (src.mImageData) {
