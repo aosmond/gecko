@@ -154,6 +154,7 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
     const ClientWebGLContext& webgl, const GLenum target, Maybe<uvec3> size,
     SurfaceFromElementResult& sfer, ErrorResult* const out_error) {
   uvec2 elemSize;
+  Maybe<uvec2> structuredSrcSize;
   PixelUnpackStateWebgl unpacking;
 
   const auto& layersImage = sfer.mLayersImage;
@@ -182,8 +183,7 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
   //////
 
   if (!size) {
-    const auto displaySize = *uvec2::FromSize(sfer.mIntrinsicSize);
-    size.emplace(displaySize.y, displaySize.y, 1);
+    size.emplace(elemSize.y, elemSize.y, 1);
   }
 
   ////
@@ -203,10 +203,12 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
     const auto& cropRect = sfer.mCropRect.ref();
     const auto cropOrigin = *uvec2::From(cropRect.X(), cropRect.Y());
     const auto cropSize = *uvec2::FromSize(cropRect.Size());
-    unpacking.rowLength = cropSize.x;
-    unpacking.imageHeight = cropSize.y;
+    unpacking.rowLength = cropOrigin.x + cropSize.x;
+    unpacking.imageHeight = cropOrigin.y + cropSize.y;
     unpacking.skipPixels = cropOrigin.x;
     unpacking.skipRows = cropOrigin.y;
+  } else {
+    structuredSrcSize.emplace(elemSize);
   }
 
   //////
@@ -242,7 +244,7 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
                                 sfer.mAlphaType,
                                 {},
                                 {},
-                                Some(elemSize),
+                                structuredSrcSize,
                                 layersImage,
                                 sd,
                                 dataSurf,
