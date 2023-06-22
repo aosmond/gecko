@@ -1675,6 +1675,10 @@ void RecordedEvent::RecordPatternData(S& aStream,
                                 &aPattern.mStorage));
       return;
     }
+    case PatternType::LAYERS_IMAGE: {
+      MOZ_ASSERT_UNREACHABLE("Should not be used with recording!");
+      return;
+    }
     default:
       return;
   }
@@ -1721,6 +1725,10 @@ void RecordedEvent::ReadPatternData(S& aStream,
           sps->mSamplingFilter >= SamplingFilter::SENTINEL) {
         aStream.SetIsBad();
       }
+      return;
+    }
+    case PatternType::LAYERS_IMAGE: {
+      MOZ_ASSERT_UNREACHABLE("Should not be used with recording!");
       return;
     }
     default:
@@ -1787,6 +1795,10 @@ inline void RecordedEvent::StorePattern(PatternStorage& aDestination,
       store->mMatrix = pat->mMatrix;
       store->mSurface = pat->mSurface;
       store->mSamplingRect = pat->mSamplingRect;
+      return;
+    }
+    case PatternType::LAYERS_IMAGE: {
+      MOZ_ASSERT_UNREACHABLE("Should not be used with recording!");
       return;
     }
   }
@@ -1917,6 +1929,10 @@ inline void RecordedEvent::OutputSimplePatternInfo(
       const SurfacePatternStorage* store =
           reinterpret_cast<const SurfacePatternStorage*>(&aStorage.mStorage);
       aOutput << "Surface (0x" << store->mSurface << ")";
+      return;
+    }
+    case PatternType::LAYERS_IMAGE: {
+      MOZ_ASSERT_UNREACHABLE("Should not be used with recording!");
       return;
     }
   }
@@ -2279,6 +2295,10 @@ struct GenericPattern {
                             : nullptr,
             storage->mMatrix);
         return mPattern;
+      }
+      case PatternType::LAYERS_IMAGE: {
+        MOZ_ASSERT_UNREACHABLE("Should not be used with recording!");
+        return new (mColPat) ColorPattern(DeviceColor());
       }
       default:
         return new (mColPat) ColorPattern(DeviceColor());

@@ -60,6 +60,10 @@ class GeneralPattern final {
         mPattern = new (mSurfacePattern.addr())
             SurfacePattern(static_cast<const SurfacePattern&>(aPattern));
         break;
+      case PatternType::LAYERS_IMAGE:
+        mPattern = new (mLayersImagePattern.addr()) LayersImagePattern(
+            static_cast<const LayersImagePattern&>(aPattern));
+        break;
       default:
         MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("Unknown pattern type");
     }
@@ -113,6 +117,17 @@ class GeneralPattern final {
     return mSurfacePattern.addr();
   }
 
+  LayersImagePattern* InitLayersImagePattern(
+      layers::Image* aLayersImage, ExtendMode aExtendMode,
+      const Matrix& aMatrix = Matrix(),
+      SamplingFilter aSamplingFilter = SamplingFilter::GOOD,
+      const IntRect& aSamplingRect = IntRect()) {
+    MOZ_ASSERT(!mPattern);
+    mPattern = new (mLayersImagePattern.addr()) LayersImagePattern(
+        aLayersImage, aExtendMode, aMatrix, aSamplingFilter, aSamplingRect);
+    return mLayersImagePattern.addr();
+  }
+
   Pattern* GetPattern() { return mPattern; }
 
   const Pattern* GetPattern() const { return mPattern; }
@@ -131,6 +146,7 @@ class GeneralPattern final {
     AlignedStorage2<RadialGradientPattern> mRadialGradientPattern;
     AlignedStorage2<ConicGradientPattern> mConicGradientPattern;
     AlignedStorage2<SurfacePattern> mSurfacePattern;
+    AlignedStorage2<LayersImagePattern> mLayersImagePattern;
   };
   Pattern* mPattern = nullptr;
 };

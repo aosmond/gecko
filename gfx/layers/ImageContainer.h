@@ -97,10 +97,10 @@ class DMABUFSurfaceImage;
  * When resampling an Image, only pixels within the buffer should be
  * sampled. For example, cairo images should be sampled in EXTEND_PAD mode.
  */
-class Image {
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(Image)
-
+class Image : public SupportsThreadSafeWeakPtr<Image> {
  public:
+  MOZ_DECLARE_REFCOUNTED_TYPENAME(Image)
+
   ImageFormat GetFormat() const { return mFormat; }
   void* GetImplData() const { return mImplData; }
 
@@ -155,6 +155,8 @@ class Image {
 
   virtual Maybe<SurfaceDescriptor> GetDesc();
 
+  virtual ~Image() = default;
+
  protected:
   Maybe<SurfaceDescriptor> GetDescFromTexClient(
       TextureClient* tcOverride = nullptr);
@@ -164,9 +166,6 @@ class Image {
         mSerial(++sSerialCounter),
         mFormat(aFormat),
         mIsDRM(false) {}
-
-  // Protected destructor, to discourage deletion outside of Release():
-  virtual ~Image() = default;
 
   mozilla::EnumeratedArray<mozilla::layers::LayersBackend,
                            mozilla::layers::LayersBackend::LAYERS_LAST,

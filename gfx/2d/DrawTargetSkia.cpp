@@ -619,6 +619,10 @@ static void SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern,
       }
       break;
     }
+    case PatternType::LAYERS_IMAGE: {
+      MOZ_ASSERT_UNREACHABLE("Should not be used with Skia!");
+      break;
+    }
   }
 }
 
