@@ -785,6 +785,10 @@ void DrawTargetRecording::EnsurePatternDependenciesStored(
                                    "EnsurePatternDependenciesStored");
       return;
     }
+    case PatternType::LAYERS_IMAGE: {
+      MOZ_ASSERT_UNREACHABLE("Should not be used with recording!");
+      return;
+    }
   }
 }
 

@@ -84,6 +84,7 @@ namespace mozilla {
 class Mutex;
 
 namespace layers {
+class Image;
 class TextureData;
 }
 
@@ -578,6 +579,70 @@ class SurfacePatternT : public Pattern {
 typedef SurfacePatternT<> SurfacePattern;
 
 class StoredPattern;
+
+/**
+ * This class is used for Surface Patterns, they wrap a surface and a
+ * repetition mode for the surface. This may be used on the stack.
+ */
+template <template <typename> typename REF = RefPtr>
+class LayersImagePatternT : public Pattern {
+  typedef LayersImagePatternT<ThreadSafeWeakPtr> Weak;
+
+ public:
+  /// For constructor parameter description, see member data documentation.
+  LayersImagePatternT(RefPtr<layers::Image> aImage, ExtendMode aExtendMode,
+                      const Matrix& aMatrix = Matrix(),
+                      SamplingFilter aSamplingFilter = SamplingFilter::GOOD,
+                      const IntRect& aSamplingRect = IntRect())
+      : mImage(std::move(aImage)),
+        mExtendMode(aExtendMode),
+        mSamplingFilter(aSamplingFilter),
+        mMatrix(aMatrix),
+        mSamplingRect(aSamplingRect) {}
+
+  PatternType GetType() const override { return PatternType::LAYERS_IMAGE; }
+
+  Pattern* CloneWeak() const override {
+    return new Weak(do_AddRef(mImage), mExtendMode, mMatrix, mSamplingFilter,
+                    mSamplingRect);
+  }
+
+  bool IsWeak() const override {
+    return std::is_same<decltype(*this), Weak>::value;
+  }
+
+  bool IsValid() const override { return IsRefValid(mImage); }
+
+  template <template <typename> typename T>
+  bool operator==(const LayersImagePatternT<T>& aOther) const {
+    return mImage == aOther.mImage && mExtendMode == aOther.mExtendMode &&
+           mSamplingFilter == aOther.mSamplingFilter &&
+           mMatrix.ExactlyEquals(aOther.mMatrix) &&
+           mSamplingRect.IsEqualEdges(aOther.mSamplingRect);
+  }
+
+  bool operator==(const Pattern& aOther) const override {
+    if (aOther.GetType() != PatternType::LAYERS_IMAGE) {
+      return false;
+    }
+    return aOther.IsWeak()
+               ? *this == static_cast<const Weak&>(aOther)
+               : *this == static_cast<const LayersImagePatternT<>&>(aOther);
+  }
+
+  REF<layers::Image> mImage;  //!< Image to use for drawing
+  ExtendMode mExtendMode;     /**< This determines how the image is extended
+                                   outside the bounds of the image */
+  SamplingFilter
+      mSamplingFilter;  //!< Resampling filter for resampling the image.
+  Matrix mMatrix;       //!< Transforms the pattern into user space
+
+  IntRect mSamplingRect; /**< Rect that must not be sampled outside of,
+                              or an empty rect if none has been
+                              specified. */
+};
+
+typedef LayersImagePatternT<> LayersImagePattern;
 
 static const int32_t kReasonableSurfaceSize = 8192;
 
@@ -1412,6 +1477,26 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
       const DrawOptions& aOptions = DrawOptions()) = 0;
 
   /**
+   * Draw a layers image to the draw target. Possibly doing partial drawing or
+   * applying scaling. No sampling happens outside the source.
+   *
+   * @param aLayersImage Layers image to draw
+   * @param aDest Destination rectangle that this drawing operation should draw
+   *              to
+   * @param aSource Source rectangle in aLayersImage coordinates, this area of
+   *                aSurface
+   *                will be stretched to the size of aDest.
+   * @param aOptions General draw options that are applied to the operation
+   * @param aSurfOptions DrawSurface options that are applied
+   */
+  virtual void DrawLayersImage(
+      layers::Image* aLayersImage, const Rect& aDest, const Rect& aSource,
+      const DrawSurfaceOptions& aSurfOptions = DrawSurfaceOptions(),
+      const DrawOptions& aOptions = DrawOptions()) {
+    MOZ_CRASH("Not supported!");
+  }
+
+  /**
    * Draw a surface to the draw target, when the surface will be available
    * at a later time. This is only valid for recording DrawTargets.
    *
@@ -1971,6 +2056,11 @@ class DrawTarget : public external::AtomicRefCounted<DrawTarget> {
    * Remove all clips in the DrawTarget.
    */
   virtual bool RemoveAllClips() { return false; }
+
+  /**
+   *
+   */
+  virtual bool SupportsDrawLayersImage() const { return false; }
 
  protected:
   UserData mUserData;

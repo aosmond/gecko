@@ -1776,6 +1776,14 @@ void DrawTargetWebgl::DrawRectFallback(const Rect& aRect,
     mSkia->CopySurface(surfacePattern.mSurface,
                        surfacePattern.mSurface->GetRect(),
                        IntPoint::Round(aRect.TopLeft()));
+  } else if (aPattern.GetType() == PatternType::LAYERS_IMAGE) {
+    // No transform nor clipping was requested, so it is essentially just a
+    // copy.
+    auto layersImagePattern = static_cast<const LayersImagePattern&>(aPattern);
+    RefPtr<SourceSurface> surface = layersImagePattern->GetAsSourceSurface();
+    mSkia->CopySurface(surface,
+                       surface->GetRect(),
+                       IntPoint::Round(aRect.TopLeft()));
   } else {
     MOZ_ASSERT(false);
   }
@@ -1977,9 +1985,14 @@ DrawTargetWebgl::SharedContext::AllocateTextureHandle(SurfaceFormat aFormat,
 }
 
 static inline SamplingFilter GetSamplingFilter(const Pattern& aPattern) {
-  return aPattern.GetType() == PatternType::SURFACE
-             ? static_cast<const SurfacePattern&>(aPattern).mSamplingFilter
-             : SamplingFilter::GOOD;
+  switch (aPattern.GetType()) {
+    case PatternType::SURFACE:
+      return static_cast<const SurfacePattern&>(aPattern).mSamplingFilter;
+    case PatternType::LAYERS_IMAGE:
+      return static_cast<const LayersImagePattern&>(aPattern).mSamplingFilter;
+    default:
+      return SamplingFilter::GOOD;
+  }
 }
 
 static inline bool UseNearestFilter(const Pattern& aPattern) {
@@ -2042,7 +2055,8 @@ bool DrawTargetWebgl::SharedContext::DrawRectAccel(
       aClipped &&
       (HasClipMask() || !currentTransform.PreservesAxisAlignedRectangles() ||
        !currentTransform.TransformBounds(aRect).Contains(Rect(mClipAARect)) ||
-       (aPattern.GetType() == PatternType::SURFACE &&
+       ((aPattern.GetType() == PatternType::SURFACE ||
+         aPattern.GetType() == PatternType::LAYERS_IMAGE) &&
         !IsAlignedRect(aTransformed, currentTransform, aRect)))) {
     // Clear outside the mask region for masks that are not bounded by clip.
     return DrawRectAccel(Rect(mClipRect), ColorPattern(DeviceColor(0, 0, 0, 0)),
@@ -2057,7 +2071,8 @@ bool DrawTargetWebgl::SharedContext::DrawRectAccel(
                          aVertexRange);
   }
   if (aOptions.mCompositionOp == CompositionOp::OP_CLEAR &&
-      aPattern.GetType() == PatternType::SURFACE && !aMaskColor) {
+      (aPattern.GetType() == PatternType::SURFACE ||
+      aPattern.GetType() == PatternType::LAYERS_IMAGE) && !aMaskColor) {
     // If the surface being drawn with clear is not a mask, then its contents
     // needs to be ignored. Just use a color pattern instead.
     return DrawRectAccel(aRect, ColorPattern(DeviceColor(1, 1, 1, 1)), aOptions,
@@ -3490,10 +3505,24 @@ void DrawTargetWebgl::DrawSurface(SourceSurface* aSurface, const Rect& aDest,
   DrawRect(aDest, pattern, aOptions);
 }
 
+void DrawTargetWebgl::DrawLayersImage(layers::Image* aLayersImage,
+                                      const Rect& aDest, const Rect& aSource,
+                                      const DrawSurfaceOptions& aSurfOptions,
+                                      const DrawOptions& aOptions) {
+  Matrix matrix = Matrix::Scaling(aDest.width / aSource.width,
+                                  aDest.height / aSource.height);
+  matrix.PreTranslate(-aSource.x, -aSource.y);
+  matrix.PostTranslate(aDest.x, aDest.y);
+  LayersImagePattern pattern(aLayersImage, ExtendMode::CLAMP, matrix,
+                             aSurfOptions.mSamplingFilter);
+  DrawRect(aDest, pattern, aOptions);
+}
+
 void DrawTargetWebgl::Mask(const Pattern& aSource, const Pattern& aMask,
                            const DrawOptions& aOptions) {
   if (!SupportsDrawOptions(aOptions) ||
-      aMask.GetType() != PatternType::SURFACE ||
+      (aMask.GetType() != PatternType::SURFACE &&
+       aMask.GetType() != PatternType::LAYERS_IMAGE) ||
       aSource.GetType() != PatternType::COLOR) {
     MarkSkiaChanged(aOptions);
     mSkia->Mask(aSource, aMask, aOptions);

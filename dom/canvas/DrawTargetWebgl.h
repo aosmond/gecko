@@ -419,6 +419,10 @@ class DrawTargetWebgl : public DrawTarget, public SupportsWeakPtr {
       SourceSurface* aSurface, const Rect& aDest, const Rect& aSource,
       const DrawSurfaceOptions& aSurfOptions = DrawSurfaceOptions(),
       const DrawOptions& aOptions = DrawOptions()) override;
+  void DrawLayersImage(
+      layers::Image* aLayersImage, const Rect& aDest, const Rect& aSource,
+      const DrawSurfaceOptions& aSurfOptions = DrawSurfaceOptions(),
+      const DrawOptions& aOptions = DrawOptions()) override;
   void DrawFilter(FilterNode* aNode, const Rect& aSourceRect,
                   const Point& aDestPoint,
                   const DrawOptions& aOptions = DrawOptions()) override;
