@@ -31,6 +31,7 @@ class WebGLUniformLocationJS;
 class WebGLVertexArrayJS;
 
 namespace layers {
+class Image;
 class SurfaceDescriptor;
 }
 
@@ -325,9 +326,10 @@ class DrawTargetWebgl : public DrawTarget, public SupportsWeakPtr {
         SourceSurface* aSurface) const;
     bool IsCompatibleSurface(SourceSurface* aSurface) const;
 
-    bool UploadSurface(DataSourceSurface* aData, SurfaceFormat aFormat,
-                       const IntRect& aSrcRect, const IntPoint& aDstOffset,
-                       bool aInit, bool aZero = false,
+    bool UploadSurface(DataSourceSurface* aData, layers::Image* aLayersImage,
+                       SurfaceFormat aFormat, const IntRect& aSrcRect,
+                       const IntPoint& aDstOffset, bool aInit,
+                       bool aZero = false,
                        const RefPtr<WebGLTextureJS>& aTex = nullptr);
     already_AddRefed<TextureHandle> AllocateTextureHandle(
         SurfaceFormat aFormat, const IntSize& aSize, bool aAllowShared = true,

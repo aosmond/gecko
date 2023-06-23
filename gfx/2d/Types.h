@@ -43,6 +43,7 @@ enum class SurfaceType : int8_t {
   BLOB_IMAGE,             /* Recorded blob image */
   DATA_MAPPED,            /* Data surface wrapping a ScopedMap */
   WEBGL,                  /* Surface wrapping a DrawTargetWebgl texture */
+  LAYERS_IMAGE,           /* Surface wrapping layers::Image */
 };
 
 enum class SurfaceFormat : int8_t {

@@ -19,10 +19,13 @@
 #include "mozilla/gfx/PathSkia.h"
 #include "mozilla/gfx/Swizzle.h"
 #include "mozilla/layers/ImageDataSerializer.h"
+#include "mozilla/layers/SourceSurfaceLayersImage.h"
 #include "skia/include/core/SkPixmap.h"
 
 #include "ClientWebGLContext.h"
+#include "ImageContainer.h"
 #include "WebGLChild.h"
+#include "WebGLTextureUpload.h"
 
 #include "gfxPlatform.h"
 
@@ -704,11 +707,11 @@ bool DrawTargetWebgl::GenerateComplexClipMask() {
   // Finally, upload the texture data and initialize texture storage if
   // necessary.
   if (init && mClipBounds.Size() != mSize) {
-    mSharedContext->UploadSurface(nullptr, SurfaceFormat::A8, GetRect(),
-                                  IntPoint(), true, true);
+    mSharedContext->UploadSurface(nullptr, nullptr, SurfaceFormat::A8,
+                                  GetRect(), IntPoint(), true, true);
     init = false;
   }
-  mSharedContext->UploadSurface(data, SurfaceFormat::A8,
+  mSharedContext->UploadSurface(data, nullptr, SurfaceFormat::A8,
                                 IntRect(IntPoint(), mClipBounds.Size()),
                                 mClipBounds.TopLeft(), init);
   webgl->ActiveTexture(LOCAL_GL_TEXTURE0);
@@ -1813,9 +1816,9 @@ inline bool DrawTargetWebgl::SharedContext::IsCompatibleSurface(
 }
 
 bool DrawTargetWebgl::SharedContext::UploadSurface(
-    DataSourceSurface* aData, SurfaceFormat aFormat, const IntRect& aSrcRect,
-    const IntPoint& aDstOffset, bool aInit, bool aZero,
-    const RefPtr<WebGLTextureJS>& aTex) {
+    DataSourceSurface* aData, layers::Image* aLayersImage,
+    SurfaceFormat aFormat, const IntRect& aSrcRect, const IntPoint& aDstOffset,
+    bool aInit, bool aZero, const RefPtr<WebGLTextureJS>& aTex) {
   webgl::TexUnpackBlobDesc texDesc = {
       LOCAL_GL_TEXTURE_2D,
       {uint32_t(aSrcRect.width), uint32_t(aSrcRect.height), 1}};
@@ -1853,6 +1856,15 @@ bool DrawTargetWebgl::SharedContext::UploadSurface(
     // default to byte alignment.
     texDesc.unpacking.alignmentInTypeElems = stride % 4 ? 1 : 4;
     texDesc.unpacking.rowLength = stride / bpp;
+  } else if (aLayersImage) {
+    Maybe<layers::SurfaceDescriptor> sd = aLayersImage->GetDesc();
+    if (!sd) {
+      return false;
+    }
+    texDesc.sd = Some(webgl::Flatten(*sd));
+    texDesc.structuredSrcSize = uvec2::FromSize(aLayersImage->GetSize());
+    texDesc.unpacking.skipPixels = aSrcRect.x;
+    texDesc.unpacking.skipRows = aSrcRect.y;
   } else if (aZero) {
     // Create a PBO filled with zero data to initialize the texture data and
     // avoid slow initialization inside WebGL.
@@ -2238,6 +2250,7 @@ bool DrawTargetWebgl::SharedContext::DrawRectAccel(
       IntRect bounds;
       IntSize backingSize;
       RefPtr<DataSourceSurface> data;
+      RefPtr<layers::Image> layersImage;
       if (handle) {
         if (aForceUpdate) {
           data = surfacePattern.mSurface->GetDataSurface();
@@ -2259,10 +2272,19 @@ bool DrawTargetWebgl::SharedContext::DrawRectAccel(
         // Count reusing a snapshot texture (no readback) as a cache hit.
         mCurrentTarget->mProfile.OnCacheHit();
       } else {
-        // If we get here, we need a data surface for a texture upload.
-        data = surfacePattern.mSurface->GetDataSurface();
-        if (!data) {
-          break;
+        if (surfacePattern.mSurface->GetType() == SurfaceType::LAYERS_IMAGE) {
+          auto* surface = static_cast<SourceSurfaceLayersImage*>(
+              surfacePattern.mSurface.get());
+          layersImage = surface->GetLayersImage();
+          if (!layersImage) {
+            break;
+          }
+        } else {
+          // If we get here, we need a data surface for a texture upload.
+          data = surfacePattern.mSurface->GetDataSurface();
+          if (!data) {
+            break;
+          }
         }
         // There is no existing handle. Try to allocate a new one. If the
         // surface size may change via a forced update, then don't allocate
@@ -2375,17 +2397,18 @@ bool DrawTargetWebgl::SharedContext::DrawRectAccel(
           // If this is a shared texture handle whose actual backing texture is
           // larger than it, then we need to allocate the texture page to the
           // full backing size before we can do a partial upload of the surface.
-          UploadSurface(nullptr, format, IntRect(IntPoint(), backingSize),
-                        IntPoint(), true, true);
+          UploadSurface(nullptr, nullptr, format,
+                        IntRect(IntPoint(), backingSize), IntPoint(), true,
+                        true);
         }
       }
 
-      if (data) {
-        UploadSurface(data, format, IntRect(offset, texSize), bounds.TopLeft(),
-                      texSize == backingSize);
+      if (layersImage || data) {
+        UploadSurface(data, layersImage, format, IntRect(offset, texSize),
+                      bounds.TopLeft(), texSize == backingSize);
         // Signal that we had to upload new data to the texture cache.
         mCurrentTarget->mProfile.OnCacheMiss();
-      } else {
+      } else if (!layersImage) {
         // Signal that we are reusing data from the texture cache.
         mCurrentTarget->mProfile.OnCacheHit();
       }
@@ -4403,8 +4426,8 @@ bool DrawTargetWebgl::FlushFromSkia() {
     if (!mSkiaLayer) {
       if (PrepareContext(false) && MarkChanged()) {
         if (RefPtr<DataSourceSurface> data = skiaSnapshot->GetDataSurface()) {
-          mSharedContext->UploadSurface(data, mFormat, GetRect(), IntPoint(),
-                                        false, false, mTex);
+          mSharedContext->UploadSurface(data, nullptr, mFormat, GetRect(),
+                                        IntPoint(), false, false, mTex);
           return true;
         }
       }

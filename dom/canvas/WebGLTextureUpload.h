@@ -16,6 +16,10 @@ class Element;
 class OffscreenCanvas;
 }  // namespace dom
 
+namespace layers {
+class SurfaceDescriptor;
+}  // namespace layers
+
 namespace webgl {
 
 Maybe<TexUnpackBlobDesc> FromImageBitmap(GLenum target, Maybe<uvec3> size,
@@ -39,6 +43,8 @@ Maybe<TexUnpackBlobDesc> FromDomElem(const ClientWebGLContext&, GLenum target,
 Maybe<TexUnpackBlobDesc> FromSurfaceFromElementResult(
     const ClientWebGLContext&, GLenum target, Maybe<uvec3> size,
     SurfaceFromElementResult& src, ErrorResult* const out_error);
+
+layers::SurfaceDescriptor Flatten(const layers::SurfaceDescriptor& sd);
 
 }  // namespace webgl
 }  // namespace mozilla

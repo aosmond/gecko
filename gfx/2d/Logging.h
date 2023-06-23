@@ -699,6 +699,9 @@ class Log final {
         case SurfaceType::WEBGL:
           mMessage << "SurfaceType::WEBGL";
           break;
+        case SurfaceType::LAYERS_IMAGE:
+          mMessage << "SurfaceType::LAYERS_IMAGE";
+          break;
         default:
           mMessage << "Invalid SurfaceType (" << (int)aType << ")";
           break;
