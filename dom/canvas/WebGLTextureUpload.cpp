@@ -82,7 +82,7 @@ Maybe<TexUnpackBlobDesc> FromImageBitmap(const GLenum target, Maybe<uvec3> size,
                                 false});
 }
 
-static layers::SurfaceDescriptor Flatten(const layers::SurfaceDescriptor& sd) {
+layers::SurfaceDescriptor Flatten(const layers::SurfaceDescriptor& sd) {
   const auto sdType = sd.type();
   if (sdType != layers::SurfaceDescriptor::TSurfaceDescriptorGPUVideo) {
     return sd;

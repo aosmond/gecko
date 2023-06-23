@@ -125,6 +125,7 @@
 #include "mozilla/ServoStyleSet.h"
 #include "mozilla/SVGContentUtils.h"
 #include "mozilla/layers/CanvasClient.h"
+#include "mozilla/layers/SourceSurfaceLayersImage.h"
 #include "mozilla/layers/WebRenderUserData.h"
 #include "mozilla/layers/WebRenderCanvasRenderer.h"
 #include "WindowRenderer.h"
@@ -5269,7 +5270,31 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       }
     }
 
-    srcSurf = res.GetSourceSurface();
+    // When using DrawTargetWebgl, we may be able to avoid a readback in the
+    // content process for certain image types which have a cheap way to get a
+    // SurfaceDescriptor.
+    if (res.mLayersImage && mTarget->GetBackendType() == BackendType::WEBGL) {
+      switch (res.mLayersImage->GetFormat()) {
+        case ImageFormat::MAC_IOSURFACE:
+        case ImageFormat::SHARED_RGB:
+        case ImageFormat::SURFACE_TEXTURE:
+        case ImageFormat::D3D9_RGB32_TEXTURE:
+        case ImageFormat::D3D11_SHARE_HANDLE_TEXTURE:
+        case ImageFormat::D3D11_TEXTURE_IMF_SAMPLE:
+        case ImageFormat::TEXTURE_WRAPPER:
+        case ImageFormat::D3D11_YCBCR_IMAGE:
+        case ImageFormat::GPU_VIDEO:
+        case ImageFormat::DMABUF:
+        case ImageFormat::DCOMP_SURFACE:
+          srcSurf = new SourceSurfaceLayersImage(std::move(res.mLayersImage));
+          break;
+        default:
+          srcSurf = res.GetSourceSurface();
+          break;
+      }
+    } else {
+      srcSurf = res.GetSourceSurface();
+    }
     if (!srcSurf && !res.mDrawInfo.mImgContainer) {
       // https://html.spec.whatwg.org/#check-the-usability-of-the-image-argument:
       //
@@ -5439,7 +5464,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
     tempTarget.DrawSurface(
         srcSurf, destRect, sourceRect,
-        DrawSurfaceOptions(samplingFilter, SamplingBounds::UNBOUNDED),
+        DrawSurfaceOptions(samplingFilter, SamplingBounds::BOUNDED),
         DrawOptions(CurrentState().globalAlpha, op, antialiasMode));
 
     tempTarget->SetTransform(currentTransform);
