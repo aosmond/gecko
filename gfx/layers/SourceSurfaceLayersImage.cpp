@@ -12,7 +12,7 @@ namespace mozilla::gfx {
 SourceSurfaceLayersImage::SourceSurfaceLayersImage(
     RefPtr<layers::Image>&& aLayersImage)
     : mLayersImage(std::move(aLayersImage)),
-      mSize(aLayersImage->GetSize()),
+      mSize(mLayersImage->GetSize()),
       mFormat(SurfaceFormat::B8G8R8A8) {}
 
 already_AddRefed<DataSourceSurface> SourceSurfaceLayersImage::GetDataSurface() {

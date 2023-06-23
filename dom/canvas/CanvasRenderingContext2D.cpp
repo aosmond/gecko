@@ -5274,6 +5274,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     // content process for certain image types which have a cheap way to get a
     // SurfaceDescriptor.
     if (res.mLayersImage && mTarget->GetBackendType() == BackendType::WEBGL) {
+#if 0
       switch (res.mLayersImage->GetFormat()) {
         case ImageFormat::MAC_IOSURFACE:
         case ImageFormat::SHARED_RGB:
@@ -5292,6 +5293,9 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
           srcSurf = res.GetSourceSurface();
           break;
       }
+#else
+      srcSurf = new SourceSurfaceLayersImage(std::move(res.mLayersImage));
+#endif
     } else {
       srcSurf = res.GetSourceSurface();
     }
@@ -5464,7 +5468,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
     tempTarget.DrawSurface(
         srcSurf, destRect, sourceRect,
-        DrawSurfaceOptions(samplingFilter, SamplingBounds::BOUNDED),
+        DrawSurfaceOptions(samplingFilter, SamplingBounds::UNBOUNDED),
         DrawOptions(CurrentState().globalAlpha, op, antialiasMode));
 
     tempTarget->SetTransform(currentTransform);
