@@ -5274,28 +5274,20 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     // content process for certain image types which have a cheap way to get a
     // SurfaceDescriptor.
     if (res.mLayersImage && mTarget->GetBackendType() == BackendType::WEBGL) {
-#if 0
       switch (res.mLayersImage->GetFormat()) {
         case ImageFormat::MAC_IOSURFACE:
-        case ImageFormat::SHARED_RGB:
-        case ImageFormat::SURFACE_TEXTURE:
         case ImageFormat::D3D9_RGB32_TEXTURE:
         case ImageFormat::D3D11_SHARE_HANDLE_TEXTURE:
         case ImageFormat::D3D11_TEXTURE_IMF_SAMPLE:
-        case ImageFormat::TEXTURE_WRAPPER:
         case ImageFormat::D3D11_YCBCR_IMAGE:
         case ImageFormat::GPU_VIDEO:
         case ImageFormat::DMABUF:
-        case ImageFormat::DCOMP_SURFACE:
           srcSurf = new SourceSurfaceLayersImage(std::move(res.mLayersImage));
           break;
         default:
           srcSurf = res.GetSourceSurface();
           break;
       }
-#else
-      srcSurf = new SourceSurfaceLayersImage(std::move(res.mLayersImage));
-#endif
     } else {
       srcSurf = res.GetSourceSurface();
     }
