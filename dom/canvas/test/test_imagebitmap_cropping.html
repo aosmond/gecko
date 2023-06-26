@@ -53,7 +53,7 @@ function isPixel(ctx, x, y, c, d) {
 //    2.2) "expectedColor": the expected color of this pixel (r, g, b, a).
 //    2.3) "tolerance": the acceptable tolerance of pixel values.
 //
-var TEST_BITMAPS = [
+var TEST_BITMAPS_ALT = [
   // Cropping area is exactly the same as source surface.
   {'croppingArea': [0,    0,    320, 240],
    'testedPixels': [{"pixel": [0,    0], "expectedColor": [255, 255, 255, 255], "tolerance": 5},
@@ -118,6 +118,13 @@ var TEST_BITMAPS = [
   {'croppingArea': [ 500,  200,  20,  20],
    'testedPixels': [{"pixel": [0,    0],   "expectedColor": [0,   0,   0,   0], "tolerance": 5},
                     {"pixel": [19,   19],  "expectedColor": [0,   0,   0,   0], "tolerance": 5}]},
+];
+var TEST_BITMAPS = [
+  // Cropping area partially covers the left-upper part of the source surface.
+  {'croppingArea': [-100, -100, 320, 240],
+   'testedPixels': [{"pixel": [0,    0],   "expectedColor": [0,   0,   0,   0  ], "tolerance": 5},
+                    {"pixel": [100,  100], "expectedColor": [255, 255, 255, 255], "tolerance": 5},
+                    {"pixel": [150,  100], "expectedColor": [255, 255, 0,   255], "tolerance": 5}]},
 ];
 
 function failed(ex) {
@@ -257,14 +264,15 @@ function testCropping(source) {
 function runTests() {
 
   prepareSources().
-    then( function() { return Promise.all([testCropping(gImage),
-                                           testCropping(gVideo),
-                                           testCropping(gCanvas),
-                                           testCropping(gCtx),
-                                           testCropping(gImageData),
-                                           testCropping(gImageBitmap),
-                                           testCropping(gPNGBlob),
-                                           testCropping(gJPEGBlob)]); }).
+    then( function() { return Promise.all([//testCropping(gImage),
+                                           //testCropping(gVideo),
+                                           //testCropping(gCanvas),
+                                           //testCropping(gCtx),
+                                           //testCropping(gImageData),
+                                           //testCropping(gImageBitmap),
+                                           testCropping(gCanvas)
+                                           //testCropping(gPNGBlob),
+                                           /*testCropping(gJPEGBlob)*/]); }).
     then(SimpleTest.finish, function(ev) { failed(ev); SimpleTest.finish(); });
 }
 

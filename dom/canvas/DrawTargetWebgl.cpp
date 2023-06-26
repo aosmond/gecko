@@ -1815,6 +1815,90 @@ inline bool DrawTargetWebgl::SharedContext::IsCompatibleSurface(
   return bool(RefPtr<WebGLTextureJS>(GetCompatibleSnapshot(aSurface)));
 }
 
+static void DumpSurfDesc(const layers::SurfaceDescriptor& sd) {
+    switch (sd.type()) {
+      case layers::SurfaceDescriptor::TSurfaceDescriptorBuffer:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd buffer\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorD3D10:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd d3d10\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorDXGIYCbCr:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd dxgiycbcr\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorDMABuf:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd dmabuf\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceTextureDescriptor:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd texture desc\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorAndroidHardwareBuffer:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd android hw buf\n");
+        break;
+      case layers::SurfaceDescriptor::TEGLImageDescriptor:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd egl image\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorMacIOSurface:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd mac io surf\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorSharedGLTexture:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd sharedgltexture\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorGPUVideo: {
+	const auto& sdgp = sd.get_SurfaceDescriptorGPUVideo();
+	switch (sdgp.type()) {
+          case layers::SurfaceDescriptorGPUVideo::T__None:
+	    printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo none\n");
+            break;
+          case layers::SurfaceDescriptorGPUVideo::TSurfaceDescriptorRemoteDecoder: {
+	    const auto& sdrd = sdgp.get_SurfaceDescriptorRemoteDecoder();
+	    const auto& sdsub = sdrd.subdesc();
+	    printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder handle %lu videoSource %d\n", sdrd.handle(), sdrd.source() ? int(sdrd.source().value()) : -1);
+	    switch (sdsub.type()) {
+              case layers::RemoteDecoderVideoSubDescriptor::T__None:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder none\n");
+                break;
+              case layers::RemoteDecoderVideoSubDescriptor::Tnull_t:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder null\n");
+                break;
+              case layers::RemoteDecoderVideoSubDescriptor::TSurfaceDescriptorD3D10:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder d3d10\n");
+                break;
+              case layers::RemoteDecoderVideoSubDescriptor::TSurfaceDescriptorDXGIYCbCr:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder dxgiycbcr\n");
+                break;
+              case layers::RemoteDecoderVideoSubDescriptor::TSurfaceDescriptorDMABuf:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder dmabuf\n");
+                break;
+              case layers::RemoteDecoderVideoSubDescriptor::TSurfaceDescriptorMacIOSurface:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder mac io surf\n");
+                break;
+              case layers::RemoteDecoderVideoSubDescriptor::TSurfaceDescriptorDcompSurface:
+                printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd gpuvideo remotedecoder dcomp surf\n");
+                break;
+	    }
+            break;
+          }
+	}
+        break;
+      } case layers::SurfaceDescriptor::TSurfaceDescriptorRecorded:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd recorded\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorRemoteTexture:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd remote\n");
+        break;
+      case layers::SurfaceDescriptor::TSurfaceDescriptorDcompSurface:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd dcmp\n");
+        break;
+      case layers::SurfaceDescriptor::T__None:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- sd none\n");
+        break;
+      default:
+	printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- unknown sd type\n");
+        break;
+    }
+}
+
 bool DrawTargetWebgl::SharedContext::UploadSurface(
     DataSourceSurface* aData, layers::Image* aLayersImage,
     SurfaceFormat aFormat, const IntRect& aSrcRect, const IntPoint& aDstOffset,
@@ -1858,10 +1942,15 @@ bool DrawTargetWebgl::SharedContext::UploadSurface(
     texDesc.unpacking.rowLength = stride / bpp;
   } else if (aLayersImage) {
     Maybe<layers::SurfaceDescriptor> sd = aLayersImage->GetDesc();
+    printf_stderr("[AO] DrawTargetWebgl::SharedContext::UploadSurface -- image=%p size=%dx%d sd=%d, srcRect=(%d,%d) %dx%d, dstOffset=(%d,%d)\n",
+		    aLayersImage, aLayersImage->GetSize().width, aLayersImage->GetSize().height, sd.isSome(),
+		    aSrcRect.x, aSrcRect.y, aSrcRect.width, aSrcRect.height, int(aDstOffset.x), int(aDstOffset.y));
     if (!sd) {
       return false;
     }
     texDesc.sd = Some(webgl::Flatten(*sd));
+    DumpSurfDesc(sd.ref());
+    DumpSurfDesc(texDesc.sd.ref());
     texDesc.structuredSrcSize = uvec2::FromSize(aLayersImage->GetSize());
     texDesc.unpacking.skipPixels = aSrcRect.x;
     texDesc.unpacking.skipRows = aSrcRect.y;

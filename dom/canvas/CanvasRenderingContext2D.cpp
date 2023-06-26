@@ -5320,6 +5320,12 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     imgSize = res.mSize;
     intrinsicImgSize = res.mIntrinsicSize;
     cropRect = res.mCropRect;
+    printf_stderr("[AO] DrawImage -- imgSize %dx%d intrinsicImgSize %dx%d\n", imgSize.width, imgSize.height, intrinsicImgSize.width, intrinsicImgSize.height);
+    if (cropRect) {
+      printf_stderr("[AO] DrawImage -- cropRect (%d,%d) %dx%d\n", cropRect->x, cropRect->y, cropRect->width, cropRect->height);
+    } else {
+      printf_stderr("[AO] DrawImage -- no cropRect\n");
+    }
     DoSecurityCheck(res.mPrincipal, res.mIsWriteOnly, res.mCORSUsed);
 
     if (srcSurf) {
@@ -5344,6 +5350,8 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     clipWidth = imgSize.width;
     clipHeight = imgSize.height;
   }
+
+  printf_stderr("[AO] DrawImage -- original sourceRect=(%f,%f) %fx%f, destRect=(%f,%f) %fx%f\n", aSx, aSy, aSw, aSh, aDx, aDy, aDw, aDh);
 
   // Any provided coordinates are in the display space, or the same as the
   // intrinsic size. In order to get to the surface coordinate space, we may
@@ -5372,12 +5380,16 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     aSh = aSh * scaleYToCrop;
   }
 
+  printf_stderr("[AO] DrawImage -- adjusted sourceRect=(%f,%f) %fx%f, destRect=(%f,%f) %fx%f\n", aSx, aSy, aSw, aSh, aDx, aDy, aDw, aDh);
+
   if (aSw == 0.0 || aSh == 0.0) {
     return;
   }
 
   ClipImageDimension(aSx, aSw, clipOriginX, clipWidth, aDx, aDw);
   ClipImageDimension(aSy, aSh, clipOriginY, clipHeight, aDy, aDh);
+
+  printf_stderr("[AO] DrawImage -- clipped sourceRect=(%f,%f) %fx%f, destRect=(%f,%f) %fx%f\n", aSx, aSy, aSw, aSh, aDx, aDy, aDw, aDh);
 
   if (aSw <= 0.0 || aSh <= 0.0 || aDw <= 0.0 || aDh <= 0.0) {
     // source and/or destination are fully clipped, so nothing is painted
@@ -5466,6 +5478,9 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
     tempTarget->SetTransform(transform);
 
+    printf_stderr("[AO] DrawImage -- surface %p, sourceRect=(%f,%f) %fx%f, destRect=(%f,%f) %fx%f\n", srcSurf.get(),
+		    sourceRect.x, sourceRect.y, sourceRect.width, sourceRect.height,
+		    destRect.x, destRect.y, destRect.width, destRect.height);
     tempTarget.DrawSurface(
         srcSurf, destRect, sourceRect,
         DrawSurfaceOptions(samplingFilter, SamplingBounds::UNBOUNDED),

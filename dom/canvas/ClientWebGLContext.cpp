@@ -4501,23 +4501,14 @@ void ClientWebGLContext::RawTexImage(uint32_t level, GLenum respecFormat,
   if (desc.sd) {
     // Shmems are stored in Buffer surface descriptors. We need to ensure first
     // that all queued commands are flushed and then send the Shmem over IPDL.
-    const auto& sd = *(desc.sd);
-    if (sd.type() == layers::SurfaceDescriptor::TSurfaceDescriptorBuffer &&
-        sd.get_SurfaceDescriptorBuffer().data().type() ==
-            layers::MemoryOrShmem::TShmem) {
-      const auto& inProcess = mNotLost->inProcess;
-      if (inProcess) {
-        inProcess->TexImage(level, respecFormat, offset, pi, desc);
-      } else {
-        const auto& child = mNotLost->outOfProcess;
-        child->FlushPendingCmds();
-        (void)child->SendTexImage(level, respecFormat, offset, pi,
-                                  std::move(desc));
-      }
+    const auto& inProcess = mNotLost->inProcess;
+    if (inProcess) {
+      inProcess->TexImage(level, respecFormat, offset, pi, desc);
     } else {
-      NS_WARNING(
-          "RawTexImage with SurfaceDescriptor only supports "
-          "SurfaceDescriptorBuffer with Shmem");
+      const auto& child = mNotLost->outOfProcess;
+      child->FlushPendingCmds();
+      (void)child->SendTexImage(level, respecFormat, offset, pi,
+                                std::move(desc));
     }
     return;
   }
