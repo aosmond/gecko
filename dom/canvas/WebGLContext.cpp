@@ -1902,6 +1902,8 @@ void WebGLContext::GenerateErrorImpl(const GLenum errOrWarning,
     isPerfWarning = true;
   }
 
+  printf_stderr("[AO] WebGLContext::GenerateErrorImpl -- %s\n", text.c_str());
+
   if (err && mFuncScope && mFuncScope->mBindFailureGuard) {
     gfxCriticalError() << "mBindFailureGuard failure: Generating error "
                        << EnumString(err) << ": " << text;
