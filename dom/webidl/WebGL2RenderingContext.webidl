@@ -361,122 +361,38 @@ interface mixin WebGL2RenderingContextBase
     undefined texImage2D(GLenum target, GLint level, GLint internalformat,
                          GLsizei width, GLsizei height, GLint border, GLenum format,
                          GLenum type, [AllowShared] ArrayBufferView? pixels);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, HTMLCanvasElement source); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, HTMLImageElement source); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, HTMLVideoElement source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, ImageBitmap source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, ImageData source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, OffscreenCanvas source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, VideoFrame source);
+                         GLenum format, GLenum type, TexImageSource source);
 
     [Throws] // Another overhead throws.
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
                             GLsizei width, GLsizei height,
                             GLenum format, GLenum type, [AllowShared] ArrayBufferView? pixels);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, HTMLCanvasElement source); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, HTMLImageElement source); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, HTMLVideoElement source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, ImageBitmap source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, ImageData source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, OffscreenCanvas source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, VideoFrame source);
+                            GLenum format, GLenum type, TexImageSource source);
 
     // WebGL2 entrypoints:
     [Throws] // Another overhead throws.
     undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLint border, GLenum format, GLenum type, GLintptr pboOffset);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLint border, GLenum format, GLenum type,
-                         HTMLCanvasElement source); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type,
-                         HTMLImageElement source); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type,
-                         HTMLVideoElement source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type,
-                         ImageBitmap source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type,
-                         ImageData source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type,
-                         OffscreenCanvas source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type,
-                         VideoFrame source);
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type, [AllowShared] ArrayBufferView srcData,
-                         GLuint srcOffset);
+                         TexImageSource source);
 
     [Throws] // Another overhead throws.
     undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLsizei depth, GLint border, GLenum format, GLenum type, GLintptr pboOffset);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLsizei depth, GLint border, GLenum format, GLenum type,
-                         HTMLCanvasElement source); // May throw DOMException
-    [Throws]
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type,
-                         HTMLImageElement source); // May throw DOMException
-    [Throws]
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type,
-                         HTMLVideoElement source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type,
-                         ImageBitmap source);
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type,
-                         ImageData source);
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type,
-                         OffscreenCanvas source);
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type,
-                         VideoFrame source);
+                         TexImageSource source);
     [Throws] // Another overhead throws.
     undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLsizei depth, GLint border, GLenum format, GLenum type, [AllowShared] ArrayBufferView? srcData);
@@ -488,34 +404,11 @@ interface mixin WebGL2RenderingContextBase
     [Throws] // Another overhead throws.
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
                             GLsizei height, GLenum format, GLenum type, GLintptr pboOffset);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
                             GLsizei height, GLenum format, GLenum type,
-                            HTMLCanvasElement source); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type,
-                            HTMLImageElement source); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type,
-                            HTMLVideoElement source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type,
-                            ImageBitmap source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type,
-                            ImageData source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type,
-                            OffscreenCanvas source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type,
-                            VideoFrame source);
+                            TexImageSource source); // May throw DOMException
     [Throws] // Another overhead throws.
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
                             GLsizei height, GLenum format, GLenum type, [AllowShared] ArrayBufferView srcData,
@@ -525,34 +418,11 @@ interface mixin WebGL2RenderingContextBase
     undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
                             GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
                             GLintptr pboOffset);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
                             GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            HTMLCanvasElement source); // May throw DOMException
-    [Throws]
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            HTMLImageElement source); // May throw DOMException
-    [Throws]
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            HTMLVideoElement source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            ImageBitmap source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            ImageData source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            OffscreenCanvas source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            VideoFrame source);
+                            TexImageSource source);
     [Throws] // Another overhead throws.
     undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
                             GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,

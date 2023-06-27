@@ -32,6 +32,14 @@ typedef unrestricted float GLfloat;
 typedef unrestricted float GLclampf;
 typedef unsigned long long GLuint64EXT;
 
+typedef (ImageBitmap or
+         ImageData or
+         HTMLImageElement or
+         HTMLCanvasElement or
+         HTMLVideoElement or
+         OffscreenCanvas or
+         VideoFrame) TexImageSource;
+
 // The power preference settings are documented in the WebGLContextAttributes
 // section of the specification.
 enum WebGLPowerPreference { "default", "low-power", "high-performance" };
@@ -752,54 +760,20 @@ interface WebGLRenderingContext {
     undefined texImage2D(GLenum target, GLint level, GLint internalformat,
                          GLsizei width, GLsizei height, GLint border, GLenum format,
                          GLenum type, [AllowShared] ArrayBufferView? pixels);
-    [Throws] // Can't actually throw.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, ImageBitmap pixels);
-    [Throws] // Can't actually throw.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, ImageData pixels);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, HTMLImageElement image); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, HTMLCanvasElement canvas); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, HTMLVideoElement video); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, OffscreenCanvas canvas); // May throw DOMException
-    [Throws]
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, VideoFrame videoFrame); // May throw DOMException
+                         GLenum format, GLenum type, TexImageSource source);
 
     // texSubImage2D has WebGL2 overloads.
     [Throws] // Can't actually throw.
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
                             GLsizei width, GLsizei height,
                             GLenum format, GLenum type, [AllowShared] ArrayBufferView? pixels);
-    [Throws] // Can't actually throw.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, ImageBitmap pixels);
-    [Throws] // Can't actually throw.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, ImageData pixels);
+    // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, HTMLImageElement image); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, HTMLCanvasElement canvas); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, HTMLVideoElement video); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, OffscreenCanvas canvas); // May throw DOMException
-    [Throws]
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, VideoFrame videoFrame); // May throw DOMException
+                            GLenum format, GLenum type, TexImageSource source);
 
     // uniform*fv have WebGL2 overloads, or rather extensions, that are not
     // distinguishable from the WebGL1 versions when called with two arguments.

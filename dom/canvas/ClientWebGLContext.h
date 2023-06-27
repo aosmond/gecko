@@ -12,6 +12,8 @@
 #include "mozilla/RefCounted.h"
 #include "nsICanvasRenderingContextInternal.h"
 #include "nsWrapperCache.h"
+#include "mozilla/dom/HTMLImageElement.h"
+#include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "mozilla/dom/WebGL2RenderingContextBinding.h"
 #include "mozilla/layers/LayersSurfaces.h"
@@ -36,6 +38,11 @@ class HostWebGLContext;
 namespace dom {
 class OwningHTMLCanvasElementOrOffscreenCanvas;
 class WebGLChild;
+
+class
+    ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvasOrVideoFrame;
+using DOMTexImageSource =
+    ImageBitmapOrImageDataOrHTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrOffscreenCanvasOrVideoFrame;
 }  // namespace dom
 
 namespace gfx {
@@ -682,32 +689,26 @@ struct TexImageSourceAdapter final : public TexImageSource {
     mPboOffset = pboOffset;
   }
 
-  TexImageSourceAdapter(const dom::ImageBitmap* imageBitmap,
+  TexImageSourceAdapter(const dom::DOMTexImageSource* aSource,
                         ErrorResult* out_error) {
-    mImageBitmap = imageBitmap;
     mOut_error = out_error;
-  }
-
-  TexImageSourceAdapter(const dom::ImageData* imageData, ErrorResult*) {
-    mImageData = imageData;
-  }
-
-  TexImageSourceAdapter(const dom::OffscreenCanvas* offscreenCanvas,
-                        ErrorResult* const out_error) {
-    mOffscreenCanvas = offscreenCanvas;
-    mOut_error = out_error;
-  }
-
-  TexImageSourceAdapter(const dom::VideoFrame* videoFrame,
-                        ErrorResult* const out_error) {
-    mVideoFrame = videoFrame;
-    mOut_error = out_error;
-  }
-
-  TexImageSourceAdapter(const dom::Element* domElem,
-                        ErrorResult* const out_error) {
-    mDomElem = domElem;
-    mOut_error = out_error;
+    if (aSource->IsImageBitmap()) {
+      mImageBitmap = &aSource->GetAsImageBitmap();
+    } else if (aSource->IsImageData()) {
+      mImageData = &aSource->GetAsImageData();
+    } else if (aSource->IsHTMLImageElement()) {
+      mDomElem = &aSource->GetAsHTMLImageElement();
+    } else if (aSource->IsHTMLCanvasElement()) {
+      mDomElem = &aSource->GetAsHTMLCanvasElement();
+    } else if (aSource->IsHTMLVideoElement()) {
+      mDomElem = &aSource->GetAsHTMLVideoElement();
+    } else if (aSource->IsOffscreenCanvas()) {
+      mOffscreenCanvas = &aSource->GetAsOffscreenCanvas();
+    } else if (aSource->IsVideoFrame()) {
+      mVideoFrame = &aSource->GetAsVideoFrame();
+    } else {
+      MOZ_CRASH("Unsupported TexImageSource!");
+    }
   }
 };
 
@@ -1619,7 +1620,7 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
 
   // -
 
-  template <typename T>  // TexImageSource or WebGLintptr
+  template <typename T>  // DOMTexImageSource or WebGLintptr
   void TexSubImage2D(GLenum target, GLint level, GLint xOffset, GLint yOffset,
                      GLsizei width, GLsizei height, GLenum unpackFormat,
                      GLenum unpackType, const T& anySrc,
