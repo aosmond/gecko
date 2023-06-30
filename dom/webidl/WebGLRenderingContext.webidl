@@ -38,7 +38,7 @@ typedef (ImageBitmap or
          HTMLCanvasElement or
          HTMLVideoElement or
          OffscreenCanvas or
-         VideoFrame) TexImageSource;
+         VideoFrame) WebGLTexImageSource;
 
 // The power preference settings are documented in the WebGLContextAttributes
 // section of the specification.
@@ -763,7 +763,7 @@ interface WebGLRenderingContext {
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, TexImageSource source);
+                         GLenum format, GLenum type, WebGLTexImageSource source);
 
     // texSubImage2D has WebGL2 overloads.
     [Throws] // Can't actually throw.
@@ -773,7 +773,7 @@ interface WebGLRenderingContext {
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, TexImageSource source);
+                            GLenum format, GLenum type, WebGLTexImageSource source);
 
     // uniform*fv have WebGL2 overloads, or rather extensions, that are not
     // distinguishable from the WebGL1 versions when called with two arguments.

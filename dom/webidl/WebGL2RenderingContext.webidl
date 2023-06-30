@@ -10,6 +10,10 @@
 typedef long long GLint64;
 typedef unsigned long long GLuint64;
 
+typedef (WebGLTexImageSource or
+         [AllowShared] ArrayBufferView? or
+         GLintptr) WebGL2TexImageSource;
+
 [Pref="webgl.enable-webgl2",
  Func="mozilla::dom::OffscreenCanvas::PrefEnabledOnWorkerThread",
  Exposed=(Window,Worker)]
@@ -357,76 +361,40 @@ interface mixin WebGL2RenderingContextBase
                            GLsizei height, GLsizei depth);
 
     // WebGL1 legacy entrypoints:
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLsizei width, GLsizei height, GLint border, GLenum format,
-                         GLenum type, [AllowShared] ArrayBufferView? pixels);
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage2D(GLenum target, GLint level, GLint internalformat,
-                         GLenum format, GLenum type, TexImageSource source);
+                         GLenum format, GLenum type, WebGLTexImageSource source);
 
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLsizei width, GLsizei height,
-                            GLenum format, GLenum type, [AllowShared] ArrayBufferView? pixels);
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset,
-                            GLenum format, GLenum type, TexImageSource source);
+                            GLenum format, GLenum type, WebGLTexImageSource source);
 
     // WebGL2 entrypoints:
-    [Throws] // Another overhead throws.
-    undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLint border, GLenum format, GLenum type, GLintptr pboOffset);
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLint border, GLenum format, GLenum type,
-                         TexImageSource source);
+                         WebGL2TexImageSource source);
 
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type, GLintptr pboOffset);
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
                          GLsizei depth, GLint border, GLenum format, GLenum type,
-                         TexImageSource source);
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type, [AllowShared] ArrayBufferView? srcData);
-    [Throws] // Another overhead throws.
-    undefined texImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height,
-                         GLsizei depth, GLint border, GLenum format, GLenum type, [AllowShared] ArrayBufferView srcData,
-                         GLuint srcOffset);
+                         WebGL2TexImageSource source);
 
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type, GLintptr pboOffset);
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
                             GLsizei height, GLenum format, GLenum type,
-                            TexImageSource source); // May throw DOMException
-    [Throws] // Another overhead throws.
-    undefined texSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width,
-                            GLsizei height, GLenum format, GLenum type, [AllowShared] ArrayBufferView srcData,
-                            GLuint srcOffset);
+                            WebGL2TexImageSource source);
 
-    [Throws] // Another overhead throws.
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            GLintptr pboOffset);
     // ImageData and ImageBitmap can't actually throw. Others may throw DOMException.
     [Throws]
     undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
                             GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            TexImageSource source);
-    [Throws] // Another overhead throws.
-    undefined texSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
-                            GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type,
-                            [AllowShared] ArrayBufferView? srcData, optional GLuint srcOffset = 0);
+                            WebGL2TexImageSource source, optional GLuint srcOffset = 0);
 
     undefined copyTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
                                 GLint x, GLint y, GLsizei width, GLsizei height);
