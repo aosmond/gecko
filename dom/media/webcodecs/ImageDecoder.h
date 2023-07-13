@@ -1,0 +1,73 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim:set ts=2 sw=2 sts=2 et cindent: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#ifndef mozilla_dom_ImageDecoder_h
+#define mozilla_dom_ImageDecoder_h
+
+#include "mozilla/Attributes.h"
+#include "mozilla/ErrorResult.h"
+#include "mozilla/NotNull.h"
+#include "mozilla/dom/ImageDecoderBinding.h"
+#include "nsCycleCollectionParticipant.h"
+#include "nsWrapperCache.h"
+
+class nsIGlobalObject;
+
+namespace mozilla::dom {
+
+class Promise;
+
+class ImageDecoder final : public nsISupports, public nsWrapperCache {
+ public:
+  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageDecoder)
+
+ public:
+  explicit ImageDecoder(nsIGlobalObject* aParent);
+
+ protected:
+  ~ImageDecoder();
+
+ public:
+  nsIGlobalObject* GetParentObject() const { return mParent; }
+
+  JSObject* WrapObject(JSContext* aCx,
+                       JS::Handle<JSObject*> aGivenProto) override;
+
+  static already_AddRefed<ImageDecoder> Constructor(
+      const GlobalObject& aGlobal, const ImageDecoderInit& aInit,
+      ErrorResult& aRv);
+
+  static already_AddRefed<Promise> IsTypeSupported(const GlobalObject& aGlobal,
+                                                   const nsAString& aType);
+
+  void GetType(nsAString& aType) const;
+
+  bool Complete() const { return mComplete; }
+
+  Promise* Completed() const { return mCompletePromise; }
+
+  ImageTrackList* Tracks() const { return mTracks; }
+
+  already_AddRefed<Promise> Decode(const ImageDecodeOptions& aOptions);
+
+  void Reset();
+
+  void Close();
+
+ private:
+  // VideoFrame can run on either main thread or worker thread.
+  void AssertIsOnOwningThread() const { NS_ASSERT_OWNINGTHREAD(ImageDecoder); }
+
+  nsCOMPtr<nsIGlobalObject> mParent;
+  RefPtr<ImageTrackList> mTracks;
+  RefPtr<Promise> mCompletePromise;
+  bool mComplete = false;
+};
+
+}  // namespace mozilla::dom
+
+#endif  // mozilla_dom_ImageDecoder_h
