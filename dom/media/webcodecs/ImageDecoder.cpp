@@ -5,13 +5,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/ImageDecoder.h"
+#include "imgITools.h"
+#include "nsComponentManagerUtils.h"
 #include "nsTHashSet.h"
 #include "mozilla/dom/ReadableStream.h"
 
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageDecoder, mParent, mTracks,
-                                      mCompletePromise)
+                                      mCompletePromise, mDecodePromise)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ImageDecoder)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ImageDecoder)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoder)
@@ -19,7 +21,14 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoder)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-ImageDecoder::ImageDecoder(nsIGlobalObject* aParent) : mParent(aParent) {}
+ImageDecoder::ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent,
+                           RefPtr<Promise>&& aCompletePromise,
+                           RefPtr<Promise>&& aDecodePromise,
+                           const nsAString& aType)
+    : mParent(std::move(aParent)),
+      mCompletePromise(std::move(aCompletePromise)),
+      mDecodePromise(std::move(aDecodePromise)),
+      mType(aType) {}
 
 ImageDecoder::~ImageDecoder() = default;
 
@@ -110,7 +119,23 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
     transferSet.Insert(transferDataContents);
   }
 
-  return nullptr;
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+
+  RefPtr<Promise> completePromise = Promise::Create(global, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  RefPtr<Promise> decodePromise = Promise::Create(global, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  auto imageDecoder =
+      MakeRefPtr<ImageDecoder>(std::move(global), std::move(completePromise),
+                               std::move(decodePromise), aInit.mType);
+  imageDecoder->Initialize(aInit, dataContents, dataSize);
+  return imageDecoder.forget();
 }
 
 /* static */ already_AddRefed<Promise> ImageDecoder::IsTypeSupported(
@@ -118,7 +143,43 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
   return nullptr;
 }
 
-void ImageDecoder::GetType(nsAString& aType) const {}
+void ImageDecoder::Initialize(const ImageDecoderInit& aInit,
+                              const uint8_t* aData, size_t aLength) {
+  nsCOMPtr<imgITools> imgTools =
+      do_CreateInstance("@mozilla.org/image/tools;1");
+
+  nsresult rv;
+  NS_ConvertUTF16toUTF8 mimeType(aInit.mType);
+
+  if (aData) {
+    MOZ_ASSERT(aLength > 0);
+
+    nsCOMPtr<imgIContainer> image;
+    rv = imgTools->DecodeImageFromBuffer(reinterpret_cast<const char*>(aData),
+                                         aLength, mimeType,
+                                         getter_AddRefs(image));
+  } else {
+    MOZ_ASSERT(aInit.mData.IsReadableStream());
+
+    const auto& stream = aInit.mData.GetAsReadableStream();
+    nsIInputStream* inputStream = stream->MaybeGetInputStreamIfUnread();
+    imgIContainerCallback* callback = nullptr;
+    rv = imgTools->DecodeImageAsync(inputStream, mimeType, callback,
+                                    GetCurrentSerialEventTarget());
+  }
+
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    mCompletePromise->MaybeRejectWithInvalidStateError(
+        "Failed to create image decoder");
+    mDecodePromise->MaybeRejectWithInvalidStateError(
+        "Failed to create image decoder");
+  } else if (aData) {
+    mComplete = true;
+    mCompletePromise->MaybeResolveWithUndefined();
+  }
+}
+
+void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
 
 already_AddRefed<Promise> ImageDecoder::Decode(
     const ImageDecodeOptions& aOptions) {

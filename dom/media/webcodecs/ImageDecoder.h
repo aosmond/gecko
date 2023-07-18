@@ -26,9 +26,13 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageDecoder)
 
  public:
-  explicit ImageDecoder(nsIGlobalObject* aParent);
+  ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent,
+               RefPtr<Promise>&& aCompletePromise,
+               RefPtr<Promise>&& aDecodePromise, const nsAString& aType);
 
  protected:
+  void Initialize(const ImageDecoderInit& aInit, const uint8_t* aData,
+                  size_t aLength);
   ~ImageDecoder();
 
  public:
@@ -65,6 +69,8 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   nsCOMPtr<nsIGlobalObject> mParent;
   RefPtr<ImageTrackList> mTracks;
   RefPtr<Promise> mCompletePromise;
+  RefPtr<Promise> mDecodePromise;
+  nsAutoString mType;
   bool mComplete = false;
 };
 
