@@ -7,6 +7,7 @@
 
 #include "nsThreadUtils.h"
 #include "mozilla/AppShutdown.h"
+#include "mozilla/gfx/2D.h"
 
 #include "Decoder.h"
 #include "DecodePool.h"
@@ -189,6 +190,7 @@ void AnonymousDecodingTask::Run() {
     LexerResult result = mDecoder->Decode(WrapNotNull(this));
 
     if (result.is<TerminalState>()) {
+      CheckForNewFrame();
       return;  // We're done.
     }
 
@@ -198,10 +200,44 @@ void AnonymousDecodingTask::Run() {
       return;
     }
 
-    // Right now we don't do anything special for other kinds of yields, so just
-    // keep working.
-    MOZ_ASSERT(result.is<Yield>());
+    MOZ_ASSERT(result == LexerResult(Yield::OUTPUT_AVAILABLE));
+    CheckForNewFrame();
+    MOZ_ASSERT(!mFrames.IsEmpty());
+
+    if (mFramesToDecode < mFrames.Length()) {
+      return;
+    }
   }
+}
+
+void AnonymousDecodingTask::CheckForNewFrame() {
+  RefPtr<imgFrame> frame = mDecoder->GetCurrentFrame();
+  if (!frame) {
+    return;
+  }
+
+  if (!mFrames.IsEmpty() && mFrames.LastElement() == frame) {
+    return;
+  }
+
+  mFrames.AppendElement(WrapNotNull(std::move(frame)));
+}
+
+void AnonymousDecodingTask::TakeSurfaces(
+    nsTArray<RefPtr<gfx::SourceSurface>>& aSurfaces) {
+  aSurfaces.SetCapacity(aSurfaces.Length() + mFrames.Length());
+
+  for (const auto& frame : mFrames) {
+    RefPtr<gfx::SourceSurface> surface = frame->GetSourceSurface();
+    if (NS_WARN_IF(!surface)) {
+      MOZ_ASSERT_UNREACHABLE("Must have surface for anonymous decoding!");
+      continue;
+    }
+
+    aSurfaces.AppendElement(std::move(surface));
+  }
+
+  mFrames.Clear();
 }
 
 void AnonymousDecodingTask::Resume() {

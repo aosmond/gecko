@@ -15,9 +15,14 @@
 #include "mozilla/NotNull.h"
 #include "mozilla/RefPtr.h"
 #include "nsIEventTarget.h"
+#include "nsTArray.h"
 #include "SourceBuffer.h"
 
 namespace mozilla {
+namespace gfx {
+class SourceSurface;
+}
+
 namespace image {
 
 class Decoder;
@@ -105,14 +110,22 @@ class AnonymousDecodingTask final : public IDecodingTask {
 
   bool ShouldPreferSyncRun() const override { return true; }
   TaskPriority Priority() const override { return TaskPriority::eLow; }
+  void SetFramesToDecode(size_t aFramesToDecode) {
+    mFramesToDecode = aFramesToDecode;
+  }
 
   void Resume() override;
 
+  void TakeSurfaces(nsTArray<RefPtr<gfx::SourceSurface>>& aSurfaces);
+
  private:
   virtual ~AnonymousDecodingTask() {}
+  void CheckForNewFrame();
 
   NotNull<RefPtr<Decoder>> mDecoder;
+  nsTArray<NotNull<RefPtr<imgFrame>>> mFrames;
   bool mResumable;
+  size_t mFramesToDecode = 0;
 };
 
 }  // namespace image
