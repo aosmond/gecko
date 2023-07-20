@@ -315,26 +315,33 @@ void DoDrawImageSecurityCheck(dom::HTMLCanvasElement* aCanvasElement,
   }
 
   if (aCanvasElement->IsWriteOnly() && !aCanvasElement->mExpandedReader) {
+    printf_stderr("[AO] [elm=%p] %s -- already write only\n", aCanvasElement, __func__);
     return;
   }
 
   // If we explicitly set WriteOnly just do it and get out
   if (forceWriteOnly) {
+    printf_stderr("[AO] [elm=%p] %s -- forced write only\n", aCanvasElement, __func__);
     aCanvasElement->SetWriteOnly();
     return;
   }
 
   // No need to do a security check if the image used CORS for the load
-  if (CORSUsed) return;
+  if (CORSUsed) {
+    printf_stderr("[AO] [%p] %s -- cors used\n", aCanvasElement, __func__);
+    return;
+  }
 
   if (NS_WARN_IF(!aPrincipal)) {
     MOZ_ASSERT_UNREACHABLE("Must have a principal here");
+    printf_stderr("[AO] [elm=%p] %s -- no principal\n", aCanvasElement, __func__);
     aCanvasElement->SetWriteOnly();
     return;
   }
 
   if (aCanvasElement->NodePrincipal()->Subsumes(aPrincipal)) {
     // This canvas has access to that image anyway
+    printf_stderr("[AO] [elm=%p] %s -- subsumes\n", aCanvasElement, __func__);
     return;
   }
 
@@ -344,11 +351,13 @@ void DoDrawImageSecurityCheck(dom::HTMLCanvasElement* aCanvasElement,
     if (aCanvasElement->mExpandedReader &&
         aCanvasElement->mExpandedReader->Subsumes(aPrincipal)) {
       // This canvas already allows reading from this principal.
+      printf_stderr("[AO] [elm=%p] %s -- subsumes expanded\n", aCanvasElement, __func__);
       return;
     }
 
     if (!aCanvasElement->mExpandedReader) {
       // Allow future reads from this same princial only.
+      printf_stderr("[AO] [elm=%p] %s -- write only w/ expanded reader\n", aCanvasElement, __func__);
       aCanvasElement->SetWriteOnly(aPrincipal);
       return;
     }
@@ -357,6 +366,7 @@ void DoDrawImageSecurityCheck(dom::HTMLCanvasElement* aCanvasElement,
     // the canvas.  Fall through to mark it WriteOnly for everyone.
   }
 
+  printf_stderr("[AO] [elm=%p] %s -- write only by default\n", aCanvasElement, __func__);
   aCanvasElement->SetWriteOnly();
 }
 
@@ -377,17 +387,20 @@ void DoDrawImageSecurityCheck(dom::OffscreenCanvas* aOffscreenCanvas,
 
   nsIPrincipal* expandedReader = aOffscreenCanvas->GetExpandedReader();
   if (aOffscreenCanvas->IsWriteOnly() && !expandedReader) {
+    printf_stderr("[AO] [%p] %s -- already write only\n", aOffscreenCanvas, __func__);
     return;
   }
 
   // If we explicitly set WriteOnly just do it and get out
   if (aForceWriteOnly) {
+    printf_stderr("[AO] [%p] %s -- forced write only\n", aOffscreenCanvas, __func__);
     aOffscreenCanvas->SetWriteOnly();
     return;
   }
 
   // No need to do a security check if the image used CORS for the load
   if (aCORSUsed) {
+    printf_stderr("[AO] [%p] %s -- cors used\n", aOffscreenCanvas, __func__);
     return;
   }
 
@@ -395,12 +408,14 @@ void DoDrawImageSecurityCheck(dom::OffscreenCanvas* aOffscreenCanvas,
   nsIGlobalObject* global = aOffscreenCanvas->GetOwnerGlobal();
   nsIPrincipal* canvasPrincipal = global ? global->PrincipalOrNull() : nullptr;
   if (!aPrincipal || !canvasPrincipal) {
+    printf_stderr("[AO] [%p] %s -- no principal\n", aOffscreenCanvas, __func__);
     aOffscreenCanvas->SetWriteOnly();
     return;
   }
 
   if (canvasPrincipal->Subsumes(aPrincipal)) {
     // This canvas has access to that image anyway
+    printf_stderr("[AO] [%p] %s -- subsumes\n", aOffscreenCanvas, __func__);
     return;
   }
 
@@ -409,11 +424,13 @@ void DoDrawImageSecurityCheck(dom::OffscreenCanvas* aOffscreenCanvas,
 
     if (expandedReader && expandedReader->Subsumes(aPrincipal)) {
       // This canvas already allows reading from this principal.
+      printf_stderr("[AO] [%p] %s -- subsumes expanded\n", aOffscreenCanvas, __func__);
       return;
     }
 
     if (!expandedReader) {
       // Allow future reads from this same princial only.
+      printf_stderr("[AO] [%p] %s -- write only w/ expanded reader\n", aOffscreenCanvas, __func__);
       aOffscreenCanvas->SetWriteOnly(aPrincipal);
       return;
     }
@@ -422,6 +439,7 @@ void DoDrawImageSecurityCheck(dom::OffscreenCanvas* aOffscreenCanvas,
     // the canvas.  Fall through to mark it WriteOnly for everyone.
   }
 
+  printf_stderr("[AO] [%p] %s -- write only by default\n", aOffscreenCanvas, __func__);
   aOffscreenCanvas->SetWriteOnly();
 }
 

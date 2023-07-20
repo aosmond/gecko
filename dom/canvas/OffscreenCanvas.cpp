@@ -476,6 +476,7 @@ void OffscreenCanvas::SetWriteOnly(RefPtr<nsIPrincipal>&& aExpandedReader) {
                          mExpandedReader.forget());
   mExpandedReader = std::move(aExpandedReader);
   mIsWriteOnly = true;
+  printf_stderr("[AO] [%p] %s -- write only\n", this, __func__);
 }
 
 bool OffscreenCanvas::CallerCanRead(nsIPrincipal* aPrincipal) const {
@@ -513,6 +514,7 @@ already_AddRefed<OffscreenCanvas> OffscreenCanvas::CreateFromCloneData(
     wc->SetNeutered();
   }
   if (aData->mIsWriteOnly) {
+    printf_stderr("[AO] [%p] %s -- write only\n", wc.get(), __func__);
     wc->SetWriteOnly(std::move(aData->mExpandedReader));
   }
   return wc.forget();

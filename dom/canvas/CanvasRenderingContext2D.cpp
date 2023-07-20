@@ -267,6 +267,7 @@ class CanvasGeneralPattern {
 
   Pattern& ForStyle(CanvasRenderingContext2D* aCtx, Style aStyle,
                     DrawTarget* aRT) {
+    printf_stderr("[AO] [pat=%p] %s -- enter\n", this, __func__);
     // This should only be called once or the mPattern destructor will
     // not be executed.
     NS_ASSERTION(
@@ -329,6 +330,7 @@ class CanvasGeneralPattern {
                                   samplingFilter);
     }
 
+    printf_stderr("[AO] [pat=%p] %s -- exit\n", this, __func__);
     return *mPattern.GetPattern();
   }
 
@@ -465,8 +467,10 @@ class AdjustedTargetForFilter {
     MOZ_RELEASE_ASSERT(!filter.mPrimitives.IsEmpty());
     if (filter.mPrimitives.LastElement().IsTainted()) {
       if (mCtx->mCanvasElement) {
+        printf_stderr("[AO] [elm=%p] %s -- write only\n", mCtx->mCanvasElement.get(), __func__);
         mCtx->mCanvasElement->SetWriteOnly();
       } else if (mCtx->mOffscreenCanvas) {
+        printf_stderr("[AO] [%p] %s -- write only\n", mCtx->mOffscreenCanvas.get(), __func__);
         mCtx->mOffscreenCanvas->SetWriteOnly();
       }
     }
@@ -2123,6 +2127,7 @@ void CanvasRenderingContext2D::SetStyleFromUnion(
     CanvasPattern& pattern = aValue.GetAsCanvasPattern();
     SetStyleFromPattern(pattern, aWhichStyle);
     if (pattern.mForceWriteOnly) {
+      printf_stderr("[AO] [pat=%p] %s -- forced write only by pattern\n", &pattern, __func__);
       SetWriteOnly();
     }
     return;
@@ -2237,6 +2242,7 @@ already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(
       RefPtr<CanvasPattern> pat =
           new CanvasPattern(this, srcSurf, repeatMode, element->NodePrincipal(),
                             canvas->IsWriteOnly(), false);
+      printf_stderr("[AO] [pat=%p] %s -- created, write only %d from elm=%p\n", pat.get(), __func__, canvas->IsWriteOnly(), canvas);
 
       return pat.forget();
     }
@@ -2278,6 +2284,7 @@ already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(
       RefPtr<CanvasPattern> pat = new CanvasPattern(
           this, srcSurf, repeatMode, srcCanvas->PrincipalOrNull(),
           offscreenCanvas->IsWriteOnly(), false);
+      printf_stderr("[AO] [pat=%p] %s -- created, write only %d from off=%p\n", pat.get(), __func__, offscreenCanvas->IsWriteOnly(), offscreenCanvas);
 
       return pat.forget();
     }
@@ -2301,6 +2308,7 @@ already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(
     // CanvasUtils::DoDrawImageSecurityCheck().
     RefPtr<CanvasPattern> pat = new CanvasPattern(
         this, srcSurf, repeatMode, nullptr, imgBitmap.IsWriteOnly(), true);
+    printf_stderr("[AO] [pat=%p] %s -- created, write only %d from bm=%p\n", pat.get(), __func__, imgBitmap.IsWriteOnly(), &imgBitmap);
 
     return pat.forget();
   }
@@ -2348,6 +2356,7 @@ already_AddRefed<CanvasPattern> CanvasRenderingContext2D::CreatePattern(
   RefPtr<CanvasPattern> pat =
       new CanvasPattern(this, surface, repeatMode, res.mPrincipal,
                         res.mIsWriteOnly, res.mCORSUsed);
+  printf_stderr("[AO] [pat=%p] %s -- created, write only %d from other elm=%p off=%p\n", pat.get(), __func__, res.mIsWriteOnly, element, offscreenCanvas);
   return pat.forget();
 }
 
@@ -5172,6 +5181,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
                                          double aDw, double aDh,
                                          uint8_t aOptional_argc,
                                          ErrorResult& aError) {
+  printf_stderr("[AO] [%p] %s -- enter\n", this, __func__);
   MOZ_ASSERT(aOptional_argc == 0 || aOptional_argc == 2 || aOptional_argc == 6);
 
   if (!ValidateRect(aDx, aDy, aDw, aDh, true)) {
@@ -5203,6 +5213,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     }
 
     if (canvas->IsWriteOnly()) {
+      printf_stderr("[AO] [elm=%p] %s -- input is write only\n", canvas, __func__);
       SetWriteOnly();
     }
   } else if (aImage.IsOffscreenCanvas()) {
@@ -5218,6 +5229,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     }
 
     if (offscreenCanvas->IsWriteOnly()) {
+      printf_stderr("[AO] [%p] %s -- input is write only\n", offscreenCanvas, __func__);
       SetWriteOnly();
     }
   } else if (aImage.IsImageBitmap()) {
@@ -5232,6 +5244,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     }
 
     if (imageBitmap.IsWriteOnly()) {
+      printf_stderr("[AO] [bm=%p] %s -- input is write only\n", &imageBitmap, __func__);
       SetWriteOnly();
     }
 
@@ -5426,6 +5439,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
   }
 
   RedrawUser(gfxRect(aDx, aDy, aDw, aDh));
+  printf_stderr("[AO] [%p] %s -- exit, drew\n", this, __func__);
 }
 
 void CanvasRenderingContext2D::DrawDirectlyToCanvas(
@@ -6283,8 +6297,10 @@ void CanvasRenderingContext2D::GetAppUnitsValues(int32_t* aPerDevPixel,
 void CanvasRenderingContext2D::SetWriteOnly() {
   mWriteOnly = true;
   if (mCanvasElement) {
+    printf_stderr("[AO] [elm=%p] %s -- write only\n", mCanvasElement.get(), __func__);
     mCanvasElement->SetWriteOnly();
   } else if (mOffscreenCanvas) {
+    printf_stderr("[AO] [%p] %s -- write only\n", mOffscreenCanvas.get(), __func__);
     mOffscreenCanvas->SetWriteOnly();
   }
 }

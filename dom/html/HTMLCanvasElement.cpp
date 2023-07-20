@@ -1023,6 +1023,7 @@ void HTMLCanvasElement::SetWriteOnly(
   mExpandedReader = aExpandedReader;
   mWriteOnly = true;
   if (mOffscreenCanvas) {
+    printf_stderr("[AO] [%p] %s -- write only\n", mOffscreenCanvas.get(), __func__);
     mOffscreenCanvas->SetWriteOnly(aExpandedReader);
   }
 }
