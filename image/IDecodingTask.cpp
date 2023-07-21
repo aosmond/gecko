@@ -185,7 +185,13 @@ AnonymousDecodingTask::AnonymousDecodingTask(NotNull<Decoder*> aDecoder,
                                              bool aResumable)
     : mDecoder(aDecoder), mResumable(aResumable) {}
 
+bool AnonymousDecodingTask::IsFinished() const {
+  return mDecoder->GetDecodeDone();
+}
+
 void AnonymousDecodingTask::Run() {
+  MOZ_ASSERT(!IsFinished());
+
   while (true) {
     LexerResult result = mDecoder->Decode(WrapNotNull(this));
 

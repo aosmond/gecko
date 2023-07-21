@@ -110,11 +110,13 @@ class AnonymousDecodingTask final : public IDecodingTask {
 
   bool ShouldPreferSyncRun() const override { return true; }
   TaskPriority Priority() const override { return TaskPriority::eLow; }
+  void Resume() override;
+
   void SetFramesToDecode(size_t aFramesToDecode) {
     mFramesToDecode = aFramesToDecode;
   }
 
-  void Resume() override;
+  bool IsFinished() const;
 
   void TakeSurfaces(nsTArray<RefPtr<gfx::SourceSurface>>& aSurfaces);
 
