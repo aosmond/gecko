@@ -12,6 +12,7 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/NotNull.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/image/ImageTypes.h"
 #include "nsCOMPtr.h"
 #include "Orientation.h"
 #include "SurfaceFlags.h"
@@ -24,24 +25,6 @@ class nsICODecoder;
 class RasterImage;
 class SourceBuffer;
 class SourceBufferIterator;
-
-/**
- * The type of decoder; this is usually determined from a MIME type using
- * DecoderFactory::GetDecoderType().
- */
-enum class DecoderType {
-  PNG,
-  GIF,
-  JPEG,
-  BMP,
-  BMP_CLIPBOARD,
-  ICO,
-  ICON,
-  WEBP,
-  AVIF,
-  JXL,
-  UNKNOWN
-};
 
 class DecoderFactory {
  public:
