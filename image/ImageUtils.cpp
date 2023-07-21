@@ -8,8 +8,7 @@
 
 namespace mozilla::image {
 
-DecodeImageResult::DecodeImageResult()
-    : mMutex("mozilla::image::DecodeImageResult::mMutex") {}
+DecodeImageResult::DecodeImageResult() = default;
 
 DecodeImageResult::~DecodeImageResult() = default;
 
