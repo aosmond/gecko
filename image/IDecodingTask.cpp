@@ -189,29 +189,29 @@ bool AnonymousDecodingTask::IsFinished() const {
   return mDecoder->GetDecodeDone();
 }
 
-void AnonymousDecodingTask::Run() {
-  MOZ_ASSERT(!IsFinished());
+void AnonymousDecodingTask::Run() { DoDecode(/* aFramesToDecode */ 1); }
 
+bool AnonymousDecodingTask::DoDecode(size_t aFramesToDecode) {
   while (true) {
     LexerResult result = mDecoder->Decode(WrapNotNull(this));
 
     if (result.is<TerminalState>()) {
       CheckForNewFrame();
-      return;  // We're done.
+      return true;  // We're done.
     }
 
     if (result == LexerResult(Yield::NEED_MORE_DATA)) {
       // We can't make any more progress right now. Let the caller decide how to
       // handle it.
-      return;
+      return false;
     }
 
     MOZ_ASSERT(result == LexerResult(Yield::OUTPUT_AVAILABLE));
     CheckForNewFrame();
     MOZ_ASSERT(!mFrames.IsEmpty());
 
-    if (mFramesToDecode < mFrames.Length()) {
-      return;
+    if (aFramesToDecode <= mFrames.Length()) {
+      return false;
     }
   }
 }

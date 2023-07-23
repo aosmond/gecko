@@ -23,7 +23,7 @@ class SourceSurface;
 namespace image {
 
 struct DecodeFramesResult {
-  nsTArray<RefPtr<gfx::SourceSurface>> mFrames;
+  nsTArray<RefPtr<gfx::SourceSurface>> mSurfaces;
   bool mFinished = false;
 };
 

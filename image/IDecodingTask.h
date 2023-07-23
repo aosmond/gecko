@@ -100,7 +100,7 @@ class MetadataDecodingTask final : public IDecodingTask {
  * An IDecodingTask implementation for anonymous decoders - that is, decoders
  * with no associated Image object.
  */
-class AnonymousDecodingTask final : public IDecodingTask {
+class AnonymousDecodingTask : public IDecodingTask {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AnonymousDecodingTask, override)
 
@@ -112,22 +112,20 @@ class AnonymousDecodingTask final : public IDecodingTask {
   TaskPriority Priority() const override { return TaskPriority::eLow; }
   void Resume() override;
 
-  void SetFramesToDecode(size_t aFramesToDecode) {
-    mFramesToDecode = aFramesToDecode;
-  }
-
   bool IsFinished() const;
 
   void TakeSurfaces(nsTArray<RefPtr<gfx::SourceSurface>>& aSurfaces);
 
- private:
-  virtual ~AnonymousDecodingTask() {}
+ protected:
+  virtual ~AnonymousDecodingTask() = default;
+
+  bool DoDecode(size_t aFramesToDecode);
+
   void CheckForNewFrame();
 
   NotNull<RefPtr<Decoder>> mDecoder;
   nsTArray<NotNull<RefPtr<imgFrame>>> mFrames;
   bool mResumable;
-  size_t mFramesToDecode = 0;
 };
 
 }  // namespace image
