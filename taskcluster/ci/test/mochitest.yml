@@ -815,7 +815,7 @@ mochitest-webgl1-core:
             default:
                 by-test-platform:
                     android.*: []
-                    .*-(tsan|wayland).*: []
+                    .*-wayland.*: []
                     default: built-projects
     # Bug 1296733: llvmpipe with mesa 9.2.1 lacks thread safety
     allow-software-gl-layers: false
@@ -846,7 +846,7 @@ mochitest-webgl1-ext:
         by-variant:
             webgl-ipc:
                 by-test-platform:
-                    .*-(ccov|tsan|wayland).*/.*: []
+                    .*-(ccov|wayland).*/.*: []
                     linux.*-64.*: ["trunk"]
                     mac.*: ["trunk"]
                     win.*: ["trunk"]
@@ -870,7 +870,7 @@ mochitest-webgl1-ext:
             default:
                 by-test-platform:
                     android.*: []
-                    .*-(tsan|wayland).*: []
+                    .*-wayland.*: []
                     default: built-projects
     # Bug 1296733: llvmpipe with mesa 9.2.1 lacks thread safety
     allow-software-gl-layers: false
@@ -902,7 +902,7 @@ mochitest-webgl2-core:
         by-variant:
             webgl-ipc:
                 by-test-platform:
-                    .*-(ccov|tsan|wayland).*/.*: []
+                    .*-(ccov|wayland).*/.*: []
                     android.*: []
                     linux.*-64.*: ["trunk"]
                     mac.*: ["trunk"]
@@ -927,7 +927,7 @@ mochitest-webgl2-core:
             default:
                 by-test-platform:
                     android.*: []
-                    .*-(tsan|wayland).*: []
+                    .*-wayland.*: []
                     default: built-projects
     # Bug 1296733: llvmpipe with mesa 9.2.1 lacks thread safety
     allow-software-gl-layers: false
@@ -949,7 +949,7 @@ mochitest-webgl2-ext:
         by-variant:
             webgl-ipc:
                 by-test-platform:
-                    .*(ccov|tsan|wayland).*/.*: []
+                    .*(ccov|wayland).*/.*: []
                     linux.*-64.*: ["trunk"]
                     mac.*: ["trunk"]
                     win.*: ["trunk"]
@@ -971,7 +971,7 @@ mochitest-webgl2-ext:
             default:
                 by-test-platform:
                     android.*: []
-                    .*-(tsan|wayland).*: []
+                    .*-wayland.*: []
                     default: built-projects
     chunks: 4
     test-manifest-loader: null  # don't load tests in the taskgraph
