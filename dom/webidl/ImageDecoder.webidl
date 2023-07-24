@@ -56,9 +56,11 @@ interface ImageDecoder {
   readonly attribute Promise<undefined> completed;
   readonly attribute ImageTrackList tracks;
 
+  [Throws]
   Promise<ImageDecodeResult> decode(optional ImageDecodeOptions options = {});
   undefined reset();
   undefined close();
 
+  [Throws]
   static Promise<boolean> isTypeSupported(DOMString type);
 };

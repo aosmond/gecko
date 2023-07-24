@@ -16,8 +16,12 @@
 
 class nsIGlobalObject;
 
-namespace mozilla::dom {
+namespace mozilla {
+namespace image {
+class SourceBuffer;
+}
 
+namespace dom {
 class Promise;
 
 class ImageDecoder final : public nsISupports, public nsWrapperCache {
@@ -46,7 +50,8 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
       ErrorResult& aRv);
 
   static already_AddRefed<Promise> IsTypeSupported(const GlobalObject& aGlobal,
-                                                   const nsAString& aType);
+                                                   const nsAString& aType,
+                                                   ErrorResult& aRv);
 
   void GetType(nsAString& aType) const;
 
@@ -56,7 +61,8 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
 
   ImageTrackList* Tracks() const { return mTracks; }
 
-  already_AddRefed<Promise> Decode(const ImageDecodeOptions& aOptions);
+  already_AddRefed<Promise> Decode(const ImageDecodeOptions& aOptions,
+                                   ErrorResult& aRv);
 
   void Reset();
 
@@ -70,10 +76,12 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   RefPtr<ImageTrackList> mTracks;
   RefPtr<Promise> mCompletePromise;
   RefPtr<Promise> mDecodePromise;
+  RefPtr<image::SourceBuffer> mSourceBuffer;
   nsAutoString mType;
   bool mComplete = false;
 };
 
-}  // namespace mozilla::dom
+}  // namespace dom
+}  // namespace mozilla
 
 #endif  // mozilla_dom_ImageDecoder_h

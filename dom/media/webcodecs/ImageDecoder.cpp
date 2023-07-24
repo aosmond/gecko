@@ -9,6 +9,8 @@
 #include "nsComponentManagerUtils.h"
 #include "nsTHashSet.h"
 #include "mozilla/dom/ReadableStream.h"
+#include "mozilla/image/ImageUtils.h"
+#include "mozilla/image/SourceBuffer.h"
 
 namespace mozilla::dom {
 
@@ -139,50 +141,93 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 }
 
 /* static */ already_AddRefed<Promise> ImageDecoder::IsTypeSupported(
-    const GlobalObject& aGlobal, const nsAString& aType) {
-  return nullptr;
+    const GlobalObject& aGlobal, const nsAString& aType, ErrorResult& aRv) {
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+  RefPtr<Promise> promise = Promise::Create(global, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  const auto subType = Substring(aType, 6);
+  if (!subType.Equals(u"image/"_ns)) {
+    promise->MaybeRejectWithTypeError("Invalid MIME type, must be 'image'");
+    return promise.forget();
+  }
+
+  NS_ConvertUTF16toUTF8 mimeType(aType);
+  image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
+  promise->MaybeResolve(type != image::DecoderType::UNKNOWN);
+  return promise.forget();
 }
 
 void ImageDecoder::Initialize(const ImageDecoderInit& aInit,
                               const uint8_t* aData, size_t aLength) {
-  nsCOMPtr<imgITools> imgTools =
-      do_CreateInstance("@mozilla.org/image/tools;1");
-
-  nsresult rv;
-  NS_ConvertUTF16toUTF8 mimeType(aInit.mType);
-
+  RefPtr<image::CreateBufferPromise> bufferPromise;
   if (aData) {
     MOZ_ASSERT(aLength > 0);
-
-    nsCOMPtr<imgIContainer> image;
-    rv = imgTools->DecodeImageFromBuffer(reinterpret_cast<const char*>(aData),
-                                         aLength, mimeType,
-                                         getter_AddRefs(image));
+    bufferPromise = image::ImageUtils::CreateSourceBuffer(aData, aLength);
   } else {
     MOZ_ASSERT(aInit.mData.IsReadableStream());
-
     const auto& stream = aInit.mData.GetAsReadableStream();
     nsIInputStream* inputStream = stream->MaybeGetInputStreamIfUnread();
-    imgIContainerCallback* callback = nullptr;
-    rv = imgTools->DecodeImageAsync(inputStream, mimeType, callback,
-                                    GetCurrentSerialEventTarget());
+    bufferPromise = image::ImageUtils::CreateSourceBuffer(inputStream);
   }
 
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    mCompletePromise->MaybeRejectWithInvalidStateError(
-        "Failed to create image decoder");
-    mDecodePromise->MaybeRejectWithInvalidStateError(
-        "Failed to create image decoder");
-  } else if (aData) {
+  if (NS_WARN_IF(!bufferPromise)) {
     mComplete = true;
-    mCompletePromise->MaybeResolveWithUndefined();
+    mCompletePromise->MaybeRejectWithInvalidStateError(
+        "Failed to create image encoded buffer");
+    return;
   }
+
+  bufferPromise->Then(
+      GetCurrentSerialEventTarget(), __func__,
+      [self = RefPtr{this}](const RefPtr<image::SourceBuffer>& aSourceBuffer) {
+        self->mSourceBuffer = aSourceBuffer;
+        self->mComplete = true;
+        self->mCompletePromise->MaybeResolveWithUndefined();
+      },
+      [self = RefPtr{this}](const nsresult& aErr) {
+        self->mComplete = true;
+        self->mCompletePromise->MaybeRejectWithInvalidStateError(
+            "Failed to buffer encoded data");
+      });
 }
 
 void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
 
 already_AddRefed<Promise> ImageDecoder::Decode(
-    const ImageDecodeOptions& aOptions) {
+    const ImageDecodeOptions& aOptions, ErrorResult& aRv) {
+  RefPtr<Promise> promise = Promise::Create(mParent, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  if (NS_WARN_IF(!mSourceBuffer)) {
+    promise->MaybeRejectWithInvalidStateError("No buffered encoded data");
+    return promise.forget();
+  }
+
+#if 0
+  if (!mDecoder) {
+    NS_ConvertUTF16toUTF8 mimeType(mType);
+    image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
+    if (NS_WARN_IF(type == image::DecoderType::UNKNOWN)) {
+      promise->MaybeRejectWithNotSupportedError("MIME type not supported");
+      return promise.forget();
+    }
+
+    // FIXME
+    image::SurfaceFlags surfaceFlags = image::DefaultSurfaceFlags();
+    mDecoder =
+        image::ImageUtils::CreateDecoder(mSourceBuffer, type, surfaceFlags);
+    if (NS_WARN_IF(!mDecoder)) {
+      promise->MaybeRejectWithInvalidStateError("Failed to create decoder");
+      return promise.forget();
+    }
+  }
+#endif
+
   return nullptr;
 }
 
