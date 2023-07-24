@@ -19,6 +19,8 @@ class nsIGlobalObject;
 namespace mozilla {
 namespace image {
 class SourceBuffer;
+enum class DecoderType;
+enum class SurfaceFlags : uint8_t;
 }
 
 namespace dom {
@@ -30,14 +32,7 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageDecoder)
 
  public:
-  ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent,
-               RefPtr<Promise>&& aCompletePromise,
-               RefPtr<Promise>&& aDecodePromise, const nsAString& aType);
-
- protected:
-  void Initialize(const ImageDecoderInit& aInit, const uint8_t* aData,
-                  size_t aLength);
-  ~ImageDecoder();
+  ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent, const nsAString& aType);
 
  public:
   nsIGlobalObject* GetParentObject() const { return mParent; }
@@ -69,13 +64,21 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   void Close();
 
  private:
+  ~ImageDecoder();
+
   // VideoFrame can run on either main thread or worker thread.
   void AssertIsOnOwningThread() const { NS_ASSERT_OWNINGTHREAD(ImageDecoder); }
+
+  void Initialize(const ImageDecoderInit& aInit, const uint8_t* aData,
+                  size_t aLength, ErrorResult& aRv);
+
+  void OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
+                           image::DecoderType aType,
+                           image::SurfaceFlags aSurfaceFlags);
 
   nsCOMPtr<nsIGlobalObject> mParent;
   RefPtr<ImageTrackList> mTracks;
   RefPtr<Promise> mCompletePromise;
-  RefPtr<Promise> mDecodePromise;
   RefPtr<image::SourceBuffer> mSourceBuffer;
   nsAutoString mType;
   bool mComplete = false;

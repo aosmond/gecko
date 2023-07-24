@@ -17,6 +17,7 @@
 class nsIGlobalObject;
 
 namespace mozilla::dom {
+class ImageTrackList;
 
 class ImageTrack final : public nsISupports, public nsWrapperCache {
  public:
@@ -24,8 +25,8 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageTrack)
 
  public:
-  ImageTrack(nsIGlobalObject* aParent, bool aAnimated, uint32_t aFrameCount,
-             float aRepetitionCount);
+  ImageTrack(ImageTrackList* aTrackList, int32_t aIndex, bool aSelected,
+             bool aAnimated, uint32_t aFrameCount, float aRepetitionCount);
 
  protected:
   ~ImageTrack();
@@ -44,13 +45,18 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
 
   bool Selected() const { return mSelected; }
 
-  void SetSelected(bool aSelected) { mSelected = aSelected; }
+  void SetSelected(bool aSelected);
+
+  void ClearSelected() { mSelected = false; }
+  void MarkSelected() { mSelected = true; }
 
  private:
   // ImageTrack can run on either main thread or worker thread.
   void AssertIsOnOwningThread() const { NS_ASSERT_OWNINGTHREAD(ImageTrack); }
 
   nsCOMPtr<nsIGlobalObject> mParent;
+  RefPtr<ImageTrackList> mTrackList;
+  int32_t mIndex = 0;
   float mRepetitionCount = 0.0f;
   uint32_t mFrameCount = 0;
   bool mAnimated = false;

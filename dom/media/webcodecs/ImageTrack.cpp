@@ -8,7 +8,7 @@
 
 namespace mozilla::dom {
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrack, mParent)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrack, mParent, mTrackList)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ImageTrack)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ImageTrack)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageTrack)
@@ -16,12 +16,16 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageTrack)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-ImageTrack::ImageTrack(nsIGlobalObject* aParent, bool aAnimated,
-                       uint32_t aFrameCount, float aRepetitionCount)
-    : mParent(aParent),
+ImageTrack::ImageTrack(ImageTrackList* aTrackList, int32_t aIndex,
+                       bool aSelected, bool aAnimated, uint32_t aFrameCount,
+                       float aRepetitionCount)
+    : mParent(aTrackList->GetParentObject()),
+      mTrackList(aTrackList),
+      mIndex(aIndex),
       mRepetitionCount(aRepetitionCount),
       mFrameCount(aFrameCount),
-      mAnimated(aAnimated) {}
+      mAnimated(aAnimated),
+      mSelected(aSelected) {}
 
 ImageTrack::~ImageTrack() = default;
 
@@ -29,6 +33,16 @@ JSObject* ImageTrack::WrapObject(JSContext* aCx,
                                  JS::Handle<JSObject*> aGivenProto) {
   AssertIsOnOwningThread();
   return ImageTrack_Binding::Wrap(aCx, this, aGivenProto);
+}
+
+void ImageTrack::SetSelected(bool aSelected) {
+  if (mSelected == aSelected) {
+    return;
+  }
+
+  if (mTrackList) {
+    mTrackList->SetSelectedIndex(mIndex, aSelected);
+  }
 }
 
 }  // namespace mozilla::dom

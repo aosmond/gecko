@@ -8,6 +8,7 @@
 #include "imgITools.h"
 #include "nsComponentManagerUtils.h"
 #include "nsTHashSet.h"
+#include "mozilla/dom/ImageTrackList.h"
 #include "mozilla/dom/ReadableStream.h"
 #include "mozilla/image/ImageUtils.h"
 #include "mozilla/image/SourceBuffer.h"
@@ -15,7 +16,7 @@
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageDecoder, mParent, mTracks,
-                                      mCompletePromise, mDecodePromise)
+                                      mCompletePromise)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ImageDecoder)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ImageDecoder)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoder)
@@ -24,13 +25,8 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoder)
 NS_INTERFACE_MAP_END
 
 ImageDecoder::ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent,
-                           RefPtr<Promise>&& aCompletePromise,
-                           RefPtr<Promise>&& aDecodePromise,
                            const nsAString& aType)
-    : mParent(std::move(aParent)),
-      mCompletePromise(std::move(aCompletePromise)),
-      mDecodePromise(std::move(aDecodePromise)),
-      mType(aType) {}
+    : mParent(std::move(aParent)), mType(aType) {}
 
 ImageDecoder::~ImageDecoder() = default;
 
@@ -122,21 +118,12 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
   }
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
-
-  RefPtr<Promise> completePromise = Promise::Create(global, aRv);
+  auto imageDecoder = MakeRefPtr<ImageDecoder>(std::move(global), aInit.mType);
+  imageDecoder->Initialize(aInit, dataContents, dataSize, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
-  RefPtr<Promise> decodePromise = Promise::Create(global, aRv);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return nullptr;
-  }
-
-  auto imageDecoder =
-      MakeRefPtr<ImageDecoder>(std::move(global), std::move(completePromise),
-                               std::move(decodePromise), aInit.mType);
-  imageDecoder->Initialize(aInit, dataContents, dataSize);
   return imageDecoder.forget();
 }
 
@@ -161,7 +148,19 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 }
 
 void ImageDecoder::Initialize(const ImageDecoderInit& aInit,
-                              const uint8_t* aData, size_t aLength) {
+                              const uint8_t* aData, size_t aLength,
+                              ErrorResult& aRv) {
+  mCompletePromise = Promise::Create(mParent, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
+  mTracks = MakeAndAddRef<ImageTrackList>(mParent);
+  mTracks->Initialize(aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return;
+  }
+
   RefPtr<image::CreateBufferPromise> bufferPromise;
   if (aData) {
     MOZ_ASSERT(aLength > 0);
@@ -180,18 +179,46 @@ void ImageDecoder::Initialize(const ImageDecoderInit& aInit,
     return;
   }
 
+  NS_ConvertUTF16toUTF8 mimeType(mType);
+  image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
+
+  // FIXME configuration from aInit
+  image::SurfaceFlags surfaceFlags = image::DefaultSurfaceFlags();
+
   bufferPromise->Then(
       GetCurrentSerialEventTarget(), __func__,
-      [self = RefPtr{this}](const RefPtr<image::SourceBuffer>& aSourceBuffer) {
-        self->mSourceBuffer = aSourceBuffer;
-        self->mComplete = true;
-        self->mCompletePromise->MaybeResolveWithUndefined();
+      [self = RefPtr{this}, type,
+       surfaceFlags](const RefPtr<image::SourceBuffer>& aSourceBuffer) {
+        self->OnSourceBufferReady(aSourceBuffer, type, surfaceFlags);
       },
       [self = RefPtr{this}](const nsresult& aErr) {
         self->mComplete = true;
         self->mCompletePromise->MaybeRejectWithInvalidStateError(
             "Failed to buffer encoded data");
       });
+}
+
+void ImageDecoder::OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
+                                       image::DecoderType aType,
+                                       image::SurfaceFlags aSurfaceFlags) {
+  mSourceBuffer = aSourceBuffer;
+  mComplete = true;
+
+  RefPtr<image::DecodeImageResult> decoder =
+      image::ImageUtils::CreateDecoder(aSourceBuffer, aType, aSurfaceFlags);
+  if (NS_WARN_IF(!decoder)) {
+  }
+
+  decoder->Initialize()->Then(
+      GetCurrentSerialEventTarget(), __func__,
+      [self = RefPtr{this}](const image::DecodeMetadataResult& aMetadata) {
+        self->mTracks->OnMetadataSuccess(aMetadata);
+      },
+      [self = RefPtr{this}](const nsresult& aErr) {
+        self->mTracks->OnMetadataFailed(aErr);
+      });
+
+  mCompletePromise->MaybeResolveWithUndefined();
 }
 
 void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }

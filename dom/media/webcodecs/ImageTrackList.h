@@ -14,7 +14,12 @@
 
 class nsIGlobalObject;
 
-namespace mozilla::dom {
+namespace mozilla {
+namespace image {
+struct DecodeMetadataResult;
+}
+
+namespace dom {
 
 class ImageTrack;
 class Promise;
@@ -26,6 +31,11 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
 
  public:
   ImageTrackList(nsIGlobalObject* aParent);
+
+  void Initialize(ErrorResult& aRv);
+  void OnMetadataSuccess(const image::DecodeMetadataResult& aMetadata);
+  void OnMetadataFailed(nsresult aErr);
+  void SetSelectedIndex(int32_t aIndex, bool aSelected);
 
  protected:
   ~ImageTrackList();
@@ -42,7 +52,12 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
 
   int32_t SelectedIndex() const { return mSelectedIndex; }
 
-  ImageTrack* GetSelectedTrack() const { return mTracks[mSelectedIndex]; }
+  ImageTrack* GetSelectedTrack() const {
+    if (mSelectedIndex < 0) {
+      return nullptr;
+    }
+    return mTracks[mSelectedIndex];
+  }
 
   ImageTrack* IndexedGetter(uint32_t aIndex, bool& aFound) const {
     if (aIndex >= mTracks.Length()) {
@@ -62,12 +77,13 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   }
 
   nsCOMPtr<nsIGlobalObject> mParent;
-  nsTArray<RefPtr<ImageTrack>> mTracks;
+  AutoTArray<RefPtr<ImageTrack>, 1> mTracks;
   RefPtr<Promise> mReadyPromise;
   uint32_t mLength = 0;
-  int32_t mSelectedIndex = 0;
+  int32_t mSelectedIndex = -1;
 };
 
-}  // namespace mozilla::dom
+}  // namespace dom
+}  // namespace mozilla
 
 #endif  // mozilla_dom_ImageTrackList_h
