@@ -23,17 +23,17 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
         AnonymousDecodingTask(aDecoder, /* aResumable */ true),
         mMutex("mozilla::image::AnonymousDecodeImageResult::mMutex") {}
 
-  already_AddRefed<DecodeMetadataPromise> Initialize() override {
+  RefPtr<DecodeMetadataPromise> Initialize() override {
     MutexAutoLock lock(mMutex);
 
     MOZ_ASSERT(mMetadataPromise.IsEmpty());
 
     RefPtr<DecodeMetadataPromise> p = mMetadataPromise.Ensure(__func__);
     DecodePool::Singleton()->AsyncRun(this);
-    return p.forget();
+    return p;
   }
 
-  already_AddRefed<DecodeFramesPromise> DecodeFrames(size_t aCount) override {
+  RefPtr<DecodeFramesPromise> DecodeFrames(size_t aCount) override {
     RefPtr<DecodeFramesPromise> p;
     bool dispatch;
 
@@ -48,7 +48,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
       DecodePool::Singleton()->AsyncRun(this);
     }
 
-    return p.forget();
+    return p;
   }
 
   void Run() override {
@@ -81,7 +81,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
       const auto& mdIn = metadataDecoder->GetImageMetadata();
       const auto size = mdIn.GetSize();
       DecodeMetadataResult mdOut{size.width, size.height, mdIn.GetLoopCount(),
-                                 mdIn.HasAnimation()};
+                                 /* FIXME mFrames */ 1, mdIn.HasAnimation()};
       mMetadataPromise.Resolve(mdOut, __func__);
     }
 

@@ -45,6 +45,7 @@ struct DecodeMetadataResult {
   int32_t mWidth = 0;
   int32_t mHeight = 0;
   int32_t mRepetitions = -1;
+  int32_t mFrames = 0;
   bool mAnimated = false;
 };
 
@@ -60,9 +61,9 @@ class DecodeImageResult {
  public:
   NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
-  virtual already_AddRefed<DecodeMetadataPromise> Initialize() = 0;
+  virtual RefPtr<DecodeMetadataPromise> Initialize() = 0;
 
-  virtual already_AddRefed<DecodeFramesPromise> DecodeFrames(size_t aCount) = 0;
+  virtual RefPtr<DecodeFramesPromise> DecodeFrames(size_t aCount) = 0;
 
  protected:
   DecodeImageResult();
