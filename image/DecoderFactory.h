@@ -102,6 +102,15 @@ class DecoderFactory {
   static already_AddRefed<Decoder> CloneAnimationDecoder(Decoder* aDecoder);
 
   /**
+   * Creates and initializes a metadata decoder for an anonymous image, cloned
+   * from the given decoder.
+   *
+   * @param aDecoder Decoder to clone.
+   */
+  static already_AddRefed<Decoder> CloneAnonymousMetadataDecoder(
+      Decoder* aDecoder);
+
+  /**
    * Creates and initializes a metadata decoder of type @aType. This decoder
    * will only decode the image's header, extracting metadata like the size of
    * the image. No actual image data will be decoded and no surfaces will be

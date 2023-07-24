@@ -23,8 +23,14 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
         AnonymousDecodingTask(aDecoder, /* aResumable */ true),
         mMutex("mozilla::image::AnonymousDecodeImageResult::mMutex") {}
 
-  already_AddRefed<DecodeMetadataPromise> DecodeMetadata() override {
-    return nullptr;
+  already_AddRefed<DecodeMetadataPromise> Initialize() override {
+    MutexAutoLock lock(mMutex);
+
+    MOZ_ASSERT(mMetadataPromise.IsEmpty());
+
+    RefPtr<DecodeMetadataPromise> p = mMetadataPromise.Ensure(__func__);
+    DecodePool::Singleton()->AsyncRun(this);
+    return p.forget();
   }
 
   already_AddRefed<DecodeFramesPromise> DecodeFrames(size_t aCount) override {
@@ -34,7 +40,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
     {
       MutexAutoLock lock(mMutex);
       mFramesToDecode = std::max(mFramesToDecode, aCount);
-      dispatch = mFramesPromise.IsEmpty();
+      dispatch = !mMetadataPromise.IsEmpty() && mFramesPromise.IsEmpty();
       p = mFramesPromise.Ensure(__func__);
     }
 
@@ -46,13 +52,41 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
   }
 
   void Run() override {
+    bool decodeMetadata;
+    bool decodeFrames;
     size_t framesToDecode;
+
     {
       MutexAutoLock lock(mMutex);
-      if (NS_WARN_IF(mFramesPromise.IsEmpty())) {
+      decodeMetadata = !mMetadataPromise.IsEmpty();
+      decodeFrames = !mFramesPromise.IsEmpty();
+      framesToDecode = mFramesToDecode;
+    }
+
+    if (decodeMetadata) {
+      RefPtr<Decoder> metadataDecoder =
+          DecoderFactory::CloneAnonymousMetadataDecoder(mDecoder);
+      MOZ_ASSERT(metadataDecoder);
+      LexerResult result = metadataDecoder->Decode(WrapNotNull(this));
+      MOZ_RELEASE_ASSERT(result.is<TerminalState>());
+
+      MutexAutoLock lock(mMutex);
+
+      if (result == LexerResult(TerminalState::FAILURE)) {
+        mMetadataPromise.Reject(NS_ERROR_FAILURE, __func__);
+        mFramesPromise.RejectIfExists(NS_ERROR_ABORT, __func__);
         return;
       }
-      framesToDecode = mFramesToDecode;
+
+      const auto& mdIn = metadataDecoder->GetImageMetadata();
+      const auto size = mdIn.GetSize();
+      DecodeMetadataResult mdOut{size.width, size.height, mdIn.GetLoopCount(),
+                                 mdIn.HasAnimation()};
+      mMetadataPromise.Resolve(mdOut, __func__);
+    }
+
+    if (!decodeFrames) {
+      return;
     }
 
     DecodeFramesResult result;
@@ -81,6 +115,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
   }
 
   Mutex mMutex;
+  MozPromiseHolder<DecodeMetadataPromise> mMetadataPromise;
   MozPromiseHolder<DecodeFramesPromise> mFramesPromise MOZ_GUARDED_BY(mMutex);
   size_t mFramesToDecode MOZ_GUARDED_BY(mMutex) = 1;
 };

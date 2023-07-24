@@ -42,6 +42,9 @@ enum class DecoderType {
 };
 
 struct DecodeMetadataResult {
+  int32_t mWidth = 0;
+  int32_t mHeight = 0;
+  int32_t mRepetitions = -1;
   bool mAnimated = false;
 };
 
@@ -57,7 +60,7 @@ class DecodeImageResult {
  public:
   NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
-  virtual already_AddRefed<DecodeMetadataPromise> DecodeMetadata() = 0;
+  virtual already_AddRefed<DecodeMetadataPromise> Initialize() = 0;
 
   virtual already_AddRefed<DecodeFramesPromise> DecodeFrames(size_t aCount) = 0;
 
