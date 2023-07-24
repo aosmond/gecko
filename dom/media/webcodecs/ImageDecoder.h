@@ -18,13 +18,16 @@ class nsIGlobalObject;
 
 namespace mozilla {
 namespace image {
+class AnonymousDecoder;
 class SourceBuffer;
 enum class DecoderType;
 enum class SurfaceFlags : uint8_t;
+struct DecodeFramesResult;
 }
 
 namespace dom {
 class Promise;
+class VideoFrame;
 
 class ImageDecoder final : public nsISupports, public nsWrapperCache {
  public:
@@ -66,6 +69,11 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
  private:
   ~ImageDecoder();
 
+  struct OutstandingDecode {
+    RefPtr<Promise> mPromise;
+    uint32_t mFrameIndex;
+  };
+
   // VideoFrame can run on either main thread or worker thread.
   void AssertIsOnOwningThread() const { NS_ASSERT_OWNINGTHREAD(ImageDecoder); }
 
@@ -76,10 +84,16 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
                            image::DecoderType aType,
                            image::SurfaceFlags aSurfaceFlags);
 
+  void OnDecodeFramesSuccess(const image::DecodeFramesResult& aResult);
+  void OnDecodeFramesFailed(const nsresult& aErr);
+
   nsCOMPtr<nsIGlobalObject> mParent;
   RefPtr<ImageTrackList> mTracks;
   RefPtr<Promise> mCompletePromise;
   RefPtr<image::SourceBuffer> mSourceBuffer;
+  RefPtr<image::AnonymousDecoder> mDecoder;
+  AutoTArray<OutstandingDecode, 1> mOutstandingDecodes;
+  AutoTArray<RefPtr<VideoFrame>, 1> mDecodedFrames;
   nsAutoString mType;
   bool mComplete = false;
 };

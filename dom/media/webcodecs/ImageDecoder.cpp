@@ -5,11 +5,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/ImageDecoder.h"
-#include "imgITools.h"
+#include <algorithm>
+#include <cstdint>
+#include "ImageContainer.h"
 #include "nsComponentManagerUtils.h"
 #include "nsTHashSet.h"
 #include "mozilla/dom/ImageTrackList.h"
 #include "mozilla/dom/ReadableStream.h"
+#include "mozilla/dom/VideoFrame.h"
+#include "mozilla/dom/VideoFrameBinding.h"
 #include "mozilla/image/ImageUtils.h"
 #include "mozilla/image/SourceBuffer.h"
 
@@ -204,12 +208,15 @@ void ImageDecoder::OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
   mSourceBuffer = aSourceBuffer;
   mComplete = true;
 
-  RefPtr<image::DecodeImageResult> decoder =
+  mDecoder =
       image::ImageUtils::CreateDecoder(aSourceBuffer, aType, aSurfaceFlags);
-  if (NS_WARN_IF(!decoder)) {
+  if (NS_WARN_IF(!mDecoder)) {
+    mCompletePromise->MaybeResolveWithUndefined();
+    mTracks->OnMetadataFailed(NS_ERROR_FAILURE);
+    return;
   }
 
-  decoder->Initialize()->Then(
+  mDecoder->Initialize()->Then(
       GetCurrentSerialEventTarget(), __func__,
       [self = RefPtr{this}](const image::DecodeMetadataResult& aMetadata) {
         self->mTracks->OnMetadataSuccess(aMetadata);
@@ -235,27 +242,92 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return promise.forget();
   }
 
-#if 0
-  if (!mDecoder) {
-    NS_ConvertUTF16toUTF8 mimeType(mType);
-    image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
-    if (NS_WARN_IF(type == image::DecoderType::UNKNOWN)) {
-      promise->MaybeRejectWithNotSupportedError("MIME type not supported");
-      return promise.forget();
-    }
+  if (NS_WARN_IF(!mDecoder)) {
+    promise->MaybeRejectWithInvalidStateError("No buffered encoded data");
+    return promise.forget();
+  }
 
-    // FIXME
-    image::SurfaceFlags surfaceFlags = image::DefaultSurfaceFlags();
-    mDecoder =
-        image::ImageUtils::CreateDecoder(mSourceBuffer, type, surfaceFlags);
-    if (NS_WARN_IF(!mDecoder)) {
-      promise->MaybeRejectWithInvalidStateError("Failed to create decoder");
-      return promise.forget();
+  if (aOptions.mFrameIndex < mDecodedFrames.Length()) {
+    ImageDecodeResult result;
+    result.mImage = mDecodedFrames[aOptions.mFrameIndex];
+    result.mComplete = true;
+    promise->MaybeResolve(result);
+    return promise.forget();
+  }
+
+  if (mOutstandingDecodes.IsEmpty()) {
+    mDecoder->DecodeFrames(aOptions.mFrameIndex + 1 - mDecodedFrames.Length())
+        ->Then(
+            GetCurrentSerialEventTarget(), __func__,
+            [self = RefPtr{this}](const image::DecodeFramesResult& aResult) {
+              self->OnDecodeFramesSuccess(aResult);
+            },
+            [self = RefPtr{this}](const nsresult& aErr) {
+              self->OnDecodeFramesFailed(aErr);
+            });
+  }
+
+  mOutstandingDecodes.AppendElement(
+      OutstandingDecode{promise, aOptions.mFrameIndex});
+  return promise.forget();
+}
+
+void ImageDecoder::OnDecodeFramesSuccess(
+    const image::DecodeFramesResult& aResult) {
+  mDecodedFrames.SetCapacity(mDecodedFrames.Length() +
+                             aResult.mSurfaces.Length());
+  for (const auto& surface : aResult.mSurfaces) {
+    VideoColorSpaceInit colorSpace;
+    gfx::IntSize size = surface->GetSize();
+    gfx::IntRect rect(gfx::IntPoint(0, 0), size);
+    auto image = MakeRefPtr<layers::SourceSurfaceImage>(size, surface);
+    // FIXME animation duration, time
+    auto frame =
+        MakeRefPtr<VideoFrame>(mParent, image, Some(VideoPixelFormat::BGRA),
+                               size, rect, size, Nothing(), 0, colorSpace);
+    mDecodedFrames.AppendElement(std::move(frame));
+  }
+
+  uint32_t minFrameIndex = UINT32_MAX;
+  AutoTArray<OutstandingDecode, 1> resolved;
+  uint32_t i = mOutstandingDecodes.Length();
+  while (i > 0) {
+    --i;
+
+    const auto frameIndex = mOutstandingDecodes[i].mFrameIndex;
+    if (frameIndex < mDecodedFrames.Length()) {
+      resolved.AppendElement(std::move(mOutstandingDecodes[i]));
+      mOutstandingDecodes.RemoveElementAt(i);
+    } else {
+      minFrameIndex = std::min(minFrameIndex, frameIndex);
     }
   }
-#endif
 
-  return nullptr;
+  if (!mOutstandingDecodes.IsEmpty()) {
+    mDecoder->DecodeFrames(minFrameIndex + 1 - mDecodedFrames.Length())
+        ->Then(
+            GetCurrentSerialEventTarget(), __func__,
+            [self = RefPtr{this}](const image::DecodeFramesResult& aResult) {
+              self->OnDecodeFramesSuccess(aResult);
+            },
+            [self = RefPtr{this}](const nsresult& aErr) {
+              self->OnDecodeFramesFailed(aErr);
+            });
+  }
+
+  for (const auto& i : resolved) {
+    ImageDecodeResult result;
+    result.mImage = mDecodedFrames[i.mFrameIndex];
+    result.mComplete = true;
+    i.mPromise->MaybeResolve(result);
+  }
+}
+
+void ImageDecoder::OnDecodeFramesFailed(const nsresult& aErr) {
+  AutoTArray<OutstandingDecode, 1> resolved = std::move(mOutstandingDecodes);
+  for (const auto& i : resolved) {
+    i.mPromise->MaybeRejectWithInvalidStateError("Failed to decode frame");
+  }
 }
 
 void ImageDecoder::Reset() {}

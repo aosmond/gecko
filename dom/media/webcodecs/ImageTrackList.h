@@ -48,7 +48,7 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
 
   Promise* Ready() const { return mReadyPromise; }
 
-  uint32_t Length() const { return mLength; }
+  uint32_t Length() const { return mTracks.Length(); }
 
   int32_t SelectedIndex() const { return mSelectedIndex; }
 
@@ -79,7 +79,6 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   nsCOMPtr<nsIGlobalObject> mParent;
   AutoTArray<RefPtr<ImageTrack>, 1> mTracks;
   RefPtr<Promise> mReadyPromise;
-  uint32_t mLength = 0;
   int32_t mSelectedIndex = -1;
 };
 
