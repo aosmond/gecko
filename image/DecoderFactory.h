@@ -12,7 +12,7 @@
 #include "mozilla/Maybe.h"
 #include "mozilla/NotNull.h"
 #include "mozilla/gfx/2D.h"
-#include "mozilla/image/ImageTypes.h"
+#include "mozilla/image/ImageUtils.h"
 #include "nsCOMPtr.h"
 #include "Orientation.h"
 #include "SurfaceFlags.h"

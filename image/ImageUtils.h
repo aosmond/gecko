@@ -9,7 +9,6 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/MozPromise.h"
 #include "mozilla/RefPtr.h"
-#include "mozilla/image/ImageTypes.h"
 #include "nsString.h"
 #include "nsTArray.h"
 
@@ -21,6 +20,24 @@ class SourceSurface;
 }
 
 namespace image {
+
+/**
+ * The type of decoder; this is usually determined from a MIME type using
+ * DecoderFactory::GetDecoderType() or ImageUtils::GetDecoderType().
+ */
+enum class DecoderType {
+  PNG,
+  GIF,
+  JPEG,
+  BMP,
+  BMP_CLIPBOARD,
+  ICO,
+  ICON,
+  WEBP,
+  AVIF,
+  JXL,
+  UNKNOWN
+};
 
 struct DecodeFramesResult {
   nsTArray<RefPtr<gfx::SourceSurface>> mSurfaces;

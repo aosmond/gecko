@@ -64,7 +64,6 @@ EXPORTS.mozilla.image += [
     "encoders/png/nsPNGEncoder.h",
     "ICOFileHeaders.h",
     "ImageMemoryReporter.h",
-    "ImageTypes.h",
     "ImageUtils.h",
     "Resolution.h",
     "WebRenderImageProvider.h",
