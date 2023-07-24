@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/image/ImageUtils.h"
+#include "DecodePool.h"
 #include "mozilla/gfx/2D.h"
 
 namespace mozilla::image {
@@ -15,10 +16,16 @@ DecodeImageResult::~DecodeImageResult() = default;
 class AnonymousDecodeImageResult final : public DecodeImageResult,
                                          public AnonymousDecodingTask {
  public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AnonymousDecodeImageResult, override)
+
   AnonymousDecodeImageResult(NotNull<Decoder*> aDecoder)
       : DecodeImageResult(),
         AnonymousDecodingTask(aDecoder, /* aResumable */ true),
         mMutex("mozilla::image::AnonymousDecodeImageResult::mMutex") {}
+
+  already_AddRefed<DecodeMetadataPromise> DecodeMetadata() override {
+    return nullptr;
+  }
 
   already_AddRefed<DecodeFramesPromise> DecodeFrames(size_t aCount) override {
     RefPtr<DecodeFramesPromise> p;
@@ -35,7 +42,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
       DecodePool::Singleton()->AsyncRun(this);
     }
 
-    return p;
+    return p.forget();
   }
 
   void Run() override {
@@ -78,10 +85,115 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
   size_t mFramesToDecode MOZ_GUARDED_BY(mMutex) = 1;
 };
 
-/* static */ already_AddRefed<DecodeImagePromise>
-ImageUtils::DecodeAnonymousImage(const nsACString& aMimeType,
-                                 ErrorResult& aRv) {
-  return nullptr;
+/* static */ RefPtr<CreateBufferPromise> ImageUtils::CreateSourceBuffer(
+    nsIInputStream* aStream) {
+  if (NS_WARN_IF(!aStream)) {
+    return CreateBufferPromise::CreateAndReject(NS_ERROR_INVALID_ARG, __func__);
+  }
+
+  nsCOMPtr<nsISerialEventTarget> target =
+      DecodePool::Singleton()->GetIOEventTarget();
+  if (NS_WARN_IF(!target)) {
+    return CreateBufferPromise::CreateAndReject(NS_ERROR_NOT_AVAILABLE,
+                                                __func__);
+  }
+
+  // Ensure the stream is buffered before dispatching.
+  nsCOMPtr<nsIInputStream> stream(aStream);
+  if (!NS_InputStreamIsBuffered(stream)) {
+    nsCOMPtr<nsIInputStream> bufStream;
+    nsresult rv = NS_NewBufferedInputStream(getter_AddRefs(bufStream),
+                                            stream.forget(), 1024);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return CreateBufferPromise::CreateAndReject(NS_ERROR_INVALID_ARG,
+                                                  __func__);
+    }
+    stream = std::move(bufStream);
+  }
+
+  class ReadStreamRunnable final : public Runnable {
+   public:
+    ReadStreamRunnable(nsCOMPtr<nsIInputStream>&& aStream)
+        : Runnable("mozilla::image::ImageUtils::ReadStreamRunnable"),
+          mSourceBuffer(new SourceBuffer()),
+          mStream(std::move(aStream)) {}
+
+    ~ReadStreamRunnable() override {
+      mPromise.RejectIfExists(NS_ERROR_ABORT, __func__);
+    }
+
+    RefPtr<CreateBufferPromise> Promise() { return mPromise.Ensure(__func__); }
+
+    NS_IMETHODIMP Run() override {
+      MOZ_ASSERT(mSourceBuffer);
+
+      uint64_t length;
+      nsresult rv = mStream->Available(&length);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        mPromise.Reject(rv, __func__);
+        return NS_OK;
+      }
+
+      rv = mSourceBuffer->AppendFromInputStream(mStream, length);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        mPromise.Reject(rv, __func__);
+        return NS_OK;
+      }
+
+      mPromise.Resolve(std::move(mSourceBuffer), __func__);
+      return NS_OK;
+    }
+
+   private:
+    MozPromiseHolder<CreateBufferPromise> mPromise;
+    RefPtr<SourceBuffer> mSourceBuffer;
+    nsCOMPtr<nsIInputStream> mStream;
+  };
+
+  auto runnable = MakeRefPtr<ReadStreamRunnable>(aStream);
+  auto p = runnable->Promise();
+  MOZ_ASSERT(p);
+  MOZ_ALWAYS_SUCCEEDS(target->Dispatch(runnable.forget()));
+  return p;
+}
+
+/* static */ RefPtr<CreateBufferPromise> ImageUtils::CreateSourceBuffer(
+    const uint8_t* aData, size_t aLength) {
+  if (NS_WARN_IF(!aData || aLength == 0)) {
+    return CreateBufferPromise::CreateAndReject(NS_ERROR_INVALID_ARG, __func__);
+  }
+
+  auto sourceBuffer = MakeRefPtr<SourceBuffer>();
+  nsresult rv =
+      sourceBuffer->Append(reinterpret_cast<const char*>(aData), aLength);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return CreateBufferPromise::CreateAndReject(NS_ERROR_OUT_OF_MEMORY,
+                                                __func__);
+  }
+
+  return CreateBufferPromise::CreateAndResolve(std::move(sourceBuffer),
+                                               __func__);
+}
+
+/* static */ already_AddRefed<DecodeImageResult> ImageUtils::CreateDecoder(
+    SourceBuffer* aSourceBuffer, DecoderType aType,
+    SurfaceFlags aSurfaceFlags) {
+  if (NS_WARN_IF(!aSourceBuffer)) {
+    return nullptr;
+  }
+
+  if (NS_WARN_IF(aType == DecoderType::UNKNOWN)) {
+    return nullptr;
+  }
+
+  RefPtr<Decoder> decoder = DecoderFactory::CreateAnonymousDecoder(
+      aType, WrapNotNull(aSourceBuffer), Nothing(),
+      DecoderFlags::IMAGE_IS_TRANSIENT, aSurfaceFlags);
+  if (NS_WARN_IF(!decoder)) {
+    return nullptr;
+  }
+
+  return MakeAndAddRef<AnonymousDecodeImageResult>(WrapNotNull(decoder));
 }
 
 /* static */ DecoderType ImageUtils::GetDecoderType(
