@@ -57,7 +57,7 @@ struct DecodeFramesResult {
 using DecodeMetadataPromise = MozPromise<DecodeMetadataResult, nsresult, true>;
 using DecodeFramesPromise = MozPromise<DecodeFramesResult, nsresult, true>;
 
-class DecodeImageResult {
+class AnonymousDecoder {
  public:
   NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
 
@@ -66,8 +66,8 @@ class DecodeImageResult {
   virtual RefPtr<DecodeFramesPromise> DecodeFrames(size_t aCount) = 0;
 
  protected:
-  DecodeImageResult();
-  virtual ~DecodeImageResult();
+  AnonymousDecoder();
+  virtual ~AnonymousDecoder();
 };
 
 using CreateBufferPromise = MozPromise<RefPtr<SourceBuffer>, nsresult, true>;
@@ -80,7 +80,7 @@ class ImageUtils {
   static RefPtr<CreateBufferPromise> CreateSourceBuffer(const uint8_t* aData,
                                                         size_t aLength);
 
-  static already_AddRefed<DecodeImageResult> CreateDecoder(
+  static already_AddRefed<AnonymousDecoder> CreateDecoder(
       SourceBuffer* aSourceBuffer, DecoderType aType,
       SurfaceFlags aSurfaceFlags);
 

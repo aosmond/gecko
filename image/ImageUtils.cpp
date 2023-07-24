@@ -9,19 +9,19 @@
 
 namespace mozilla::image {
 
-DecodeImageResult::DecodeImageResult() = default;
+AnonymousDecoder::AnonymousDecoder() = default;
 
-DecodeImageResult::~DecodeImageResult() = default;
+AnonymousDecoder::~AnonymousDecoder() = default;
 
-class AnonymousDecodeImageResult final : public DecodeImageResult,
-                                         public AnonymousDecodingTask {
+class AnonymousDecoderImpl final : public AnonymousDecoder,
+                                   public AnonymousDecodingTask {
  public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AnonymousDecodeImageResult, override)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AnonymousDecoderImpl, override)
 
-  AnonymousDecodeImageResult(NotNull<Decoder*> aDecoder)
-      : DecodeImageResult(),
+  AnonymousDecoderImpl(NotNull<Decoder*> aDecoder)
+      : AnonymousDecoder(),
         AnonymousDecodingTask(aDecoder, /* aResumable */ true),
-        mMutex("mozilla::image::AnonymousDecodeImageResult::mMutex") {}
+        mMutex("mozilla::image::AnonymousDecoderImpl::mMutex") {}
 
   RefPtr<DecodeMetadataPromise> Initialize() override {
     MutexAutoLock lock(mMutex);
@@ -109,7 +109,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
   }
 
  private:
-  virtual ~AnonymousDecodeImageResult() {
+  virtual ~AnonymousDecoderImpl() {
     MutexAutoLock lock(mMutex);
     mFramesPromise.RejectIfExists(NS_ERROR_ABORT, __func__);
   }
@@ -210,7 +210,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
                                                __func__);
 }
 
-/* static */ already_AddRefed<DecodeImageResult> ImageUtils::CreateDecoder(
+/* static */ already_AddRefed<AnonymousDecoder> ImageUtils::CreateDecoder(
     SourceBuffer* aSourceBuffer, DecoderType aType,
     SurfaceFlags aSurfaceFlags) {
   if (NS_WARN_IF(!aSourceBuffer)) {
@@ -228,7 +228,7 @@ class AnonymousDecodeImageResult final : public DecodeImageResult,
     return nullptr;
   }
 
-  return MakeAndAddRef<AnonymousDecodeImageResult>(WrapNotNull(decoder));
+  return MakeAndAddRef<AnonymousDecoderImpl>(WrapNotNull(decoder));
 }
 
 /* static */ DecoderType ImageUtils::GetDecoderType(
