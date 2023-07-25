@@ -185,6 +185,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
+
   if (aData) {
     nsresult rv = mSourceBuffer->ExpectLength(aLength);
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -209,6 +210,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     }
   }
 
+  printf_stderr("[AO] [%p] %s %d -- source buffer %p decoder %p read request %p\n", this, __func__, __LINE__, mSourceBuffer.get(), mDecoder.get(), mReadRequest.get());
   mDecoder->Initialize()->Then(
       GetCurrentSerialEventTarget(), __func__,
       [self = RefPtr{this}](const image::DecodeMetadataResult& aMetadata) {
@@ -270,6 +272,7 @@ void ImageDecoder::OnMetadataSuccess(
     minFrameIndex = std::min(minFrameIndex, frameIndex);
   }
 
+  printf_stderr("[AO] [%p] %s %d -- decode frames to %u\n", this, __func__, __LINE__, minFrameIndex);
   mDecoder->DecodeFrames(minFrameIndex + 1 - mDecodedFrames.Length())
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
@@ -291,33 +294,39 @@ void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
 
 already_AddRefed<Promise> ImageDecoder::Decode(
     const ImageDecodeOptions& aOptions, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] %s %d -- request decode frames to %u\n", this, __func__, __LINE__, aOptions.mFrameIndex);
   RefPtr<Promise> promise = Promise::Create(mParent, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
-  if (!mComplete) {
+  if (!mTracks->IsReady()) {
+    printf_stderr("[AO] [%p] %s %d -- queue as track not ready\n", this, __func__, __LINE__);
     mOutstandingDecodes.AppendElement(
         OutstandingDecode{promise, aOptions.mFrameIndex});
     return promise.forget();
   }
 
   if (!mTracks->GetSelectedTrack()) {
+    printf_stderr("[AO] [%p] %s %d -- no track\n", this, __func__, __LINE__);
     promise->MaybeRejectWithInvalidStateError("No track selected");
     return promise.forget();
   }
 
   if (NS_WARN_IF(!mSourceBuffer)) {
+    printf_stderr("[AO] [%p] %s %d -- no source buffer\n", this, __func__, __LINE__);
     promise->MaybeRejectWithInvalidStateError("No buffered encoded data");
     return promise.forget();
   }
 
   if (NS_WARN_IF(!mDecoder)) {
+    printf_stderr("[AO] [%p] %s %d -- no decoder\n", this, __func__, __LINE__);
     promise->MaybeRejectWithInvalidStateError("No buffered encoded data");
     return promise.forget();
   }
 
   if (aOptions.mFrameIndex < mDecodedFrames.Length()) {
+    printf_stderr("[AO] [%p] %s %d -- already has\n", this, __func__, __LINE__);
     ImageDecodeResult result;
     result.mImage = mDecodedFrames[aOptions.mFrameIndex];
     result.mComplete = true;
@@ -326,6 +335,7 @@ already_AddRefed<Promise> ImageDecoder::Decode(
   }
 
   if (mOutstandingDecodes.IsEmpty()) {
+    printf_stderr("[AO] [%p] %s %d -- decode frames to %u\n", this, __func__, __LINE__, aOptions.mFrameIndex);
     mDecoder->DecodeFrames(aOptions.mFrameIndex + 1 - mDecodedFrames.Length())
         ->Then(
             GetCurrentSerialEventTarget(), __func__,
@@ -335,6 +345,8 @@ already_AddRefed<Promise> ImageDecoder::Decode(
             [self = RefPtr{this}](const nsresult& aErr) {
               self->OnDecodeFramesFailed(aErr);
             });
+  } else {
+    printf_stderr("[AO] [%p] %s %d -- queue as pending\n", this, __func__, __LINE__);
   }
 
   mOutstandingDecodes.AppendElement(
@@ -392,6 +404,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
   }
 
   if (!mOutstandingDecodes.IsEmpty()) {
+    printf_stderr("[AO] [%p] %s %d -- decode frames to %u\n", this, __func__, __LINE__, minFrameIndex);
     mDecoder->DecodeFrames(minFrameIndex + 1 - mDecodedFrames.Length())
         ->Then(
             GetCurrentSerialEventTarget(), __func__,
@@ -404,6 +417,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
   }
 
   for (const auto& i : resolved) {
+    printf_stderr("[AO] [%p] %s %d -- resolve decode frames for %u\n", this, __func__, __LINE__, i.mFrameIndex);
     ImageDecodeResult result;
     result.mImage = mDecodedFrames[i.mFrameIndex];
     result.mComplete = aResult.mFinished;
@@ -414,6 +428,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
 void ImageDecoder::OnDecodeFramesFailed(const nsresult& aErr) {
   AutoTArray<OutstandingDecode, 1> resolved = std::move(mOutstandingDecodes);
   for (const auto& i : resolved) {
+    printf_stderr("[AO] [%p] %s %d -- reject decode frames for %u\n", this, __func__, __LINE__, i.mFrameIndex);
     i.mPromise->MaybeRejectWithInvalidStateError("Failed to decode frame");
   }
 }

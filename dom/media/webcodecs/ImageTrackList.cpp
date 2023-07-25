@@ -44,11 +44,13 @@ void ImageTrackList::OnMetadataSuccess(
   mTracks.AppendElement(std::move(track));
   mSelectedIndex = 0;
   mIsReady = true;
+  printf_stderr("[AO] [%p] %s %u -- ready\n", this, __func__, __LINE__);
   mReadyPromise->MaybeResolveWithUndefined();
 }
 
 void ImageTrackList::OnMetadataFailed(nsresult aErr) {
   mIsReady = true;
+  printf_stderr("[AO] [%p] %s %u -- ready failed\n", this, __func__, __LINE__);
   mReadyPromise->MaybeRejectWithInvalidStateError("Metadata decoding failed");
 }
 

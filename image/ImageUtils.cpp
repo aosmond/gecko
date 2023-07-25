@@ -93,6 +93,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     LexerResult result = aDecoder->Decode(WrapNotNull(this));
     if (!result.is<TerminalState>()) {
       MOZ_ASSERT(result == LexerResult(Yield::NEED_MORE_DATA));
+      printf_stderr("[AO] [%p] %s %d -- need more data\n", this, __func__, __LINE__);
       return false;
     }
 
@@ -103,6 +104,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
       mFramesPromise.RejectIfExists(NS_ERROR_ABORT, __func__);
       mFullDecoder = nullptr;
       mMetadataDecoder = nullptr;
+      printf_stderr("[AO] [%p] %s %d -- terminal failure\n", this, __func__, __LINE__);
       return false;
     }
 
@@ -112,6 +114,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
                                /* FIXME mFrames */ 1, mdIn.HasAnimation()};
     mMetadataPromise.Resolve(mdOut, __func__);
     mMetadataDecoder = nullptr;
+    printf_stderr("[AO] [%p] %s %d -- success\n", this, __func__, __LINE__);
     return true;
   }
 
@@ -124,6 +127,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
       if (result == LexerResult(Yield::NEED_MORE_DATA)) {
         MutexAutoLock lock(mMutex);
         mPendingFramesResult = std::move(aResult);
+        printf_stderr("[AO] [%p] %s %d -- need more data\n", this, __func__, __LINE__);
         break;
       }
 
@@ -150,6 +154,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
         MutexAutoLock lock(mMutex);
         mFramesToDecode = 0;
         mFramesPromise.Resolve(std::move(aResult), __func__);
+        printf_stderr("[AO] [%p] %s %d -- terminal\n", this, __func__, __LINE__);
         break;
       }
 
@@ -160,6 +165,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
       if (mFramesToDecode >= aResult.mFrames.Length()) {
         mFramesToDecode = 0;
         mFramesPromise.Resolve(std::move(aResult), __func__);
+        printf_stderr("[AO] [%p] %s %d -- got required frames\n", this, __func__, __LINE__);
         break;
       }
     }

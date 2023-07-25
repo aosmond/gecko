@@ -64,6 +64,7 @@ void ImageDecoderReadRequest::QueueRead() {
     return;
   }
 
+  printf_stderr("[AO] [%p] %s %d -- queue read\n", this, __func__, __LINE__);
   auto task = MakeRefPtr<ReadMicroTask>(this);
   context->DispatchToMicroTask(task.forget());
 }
@@ -75,6 +76,7 @@ void ImageDecoderReadRequest::Read() {
     return;
   }
 
+  printf_stderr("[AO] [%p] %s %d -- read\n", this, __func__, __LINE__);
   RefPtr<ImageDecoderReadRequest> self(this);
   RefPtr<ReadableStreamDefaultReader> reader(mReader);
 
@@ -87,6 +89,8 @@ void ImageDecoderReadRequest::Read() {
 }
 
 void ImageDecoderReadRequest::Complete(nsresult aErr) {
+  printf_stderr("[AO] [%p] %s %d -- complete %d\n", this, __func__, __LINE__, NS_SUCCEEDED(aErr));
+
   if (mSourceBuffer && !mSourceBuffer->IsComplete()) {
     mSourceBuffer->Complete(aErr);
   }
@@ -107,6 +111,7 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
   }
   chunk.ComputeState();
 
+  printf_stderr("[AO] [%p] %s %d -- append chunk %u\n", this, __func__, __LINE__, chunk.Length());
   nsresult rv = mSourceBuffer->Append(
       reinterpret_cast<const char*>(chunk.Data()), chunk.Length());
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -118,12 +123,14 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] %s %d -- close\n", this, __func__, __LINE__);
   Complete(NS_OK);
 }
 
 void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aError,
                                          ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] %s %d -- error\n", this, __func__, __LINE__);
   Complete(NS_ERROR_FAILURE);
 }
 
