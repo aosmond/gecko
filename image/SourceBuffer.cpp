@@ -295,23 +295,27 @@ void SourceBuffer::AddWaitingConsumer(IResumable* aConsumer) {
 
   MOZ_ASSERT(!mStatus, "Waiting when we're complete?");
 
-  if (aConsumer) {
+  if (aConsumer && !mWaitingConsumers.Contains(aConsumer)) {
     mWaitingConsumers.AppendElement(aConsumer);
   }
 }
 
-void SourceBuffer::ResumeWaitingConsumers() {
+void SourceBuffer::TakeWaitingConsumers(
+    nsTArray<RefPtr<IResumable>>& aWaitingConsumers) {
   mMutex.AssertCurrentThreadOwns();
 
-  if (mWaitingConsumers.Length() == 0) {
-    return;
+  aWaitingConsumers = std::move(mWaitingConsumers);
+}
+
+void SourceBuffer::ResumeWaitingConsumers(
+    nsTArray<RefPtr<IResumable>>& aWaitingConsumers) {
+  mMutex.AssertNotCurrentThreadOwns();
+
+  for (uint32_t i = 0; i < aWaitingConsumers.Length(); ++i) {
+    aWaitingConsumers[i]->Resume();
   }
 
-  for (uint32_t i = 0; i < mWaitingConsumers.Length(); ++i) {
-    mWaitingConsumers[i]->Resume();
-  }
-
-  mWaitingConsumers.Clear();
+  aWaitingConsumers.Clear();
 }
 
 nsresult SourceBuffer::ExpectLength(size_t aExpectedLength) {
@@ -412,6 +416,7 @@ nsresult SourceBuffer::Append(const char* aData, size_t aLength) {
   }
 
   // Update shared data structures.
+  nsTArray<RefPtr<IResumable>> consumers;
   {
     MutexAutoLock lock(mMutex);
 
@@ -434,9 +439,11 @@ nsresult SourceBuffer::Append(const char* aData, size_t aLength) {
       }
     }
 
-    // Resume any waiting readers now that there's new data.
-    ResumeWaitingConsumers();
+    TakeWaitingConsumers(consumers);
   }
+
+  // Resume any waiting readers now that there's new data.
+  ResumeWaitingConsumers(consumers);
 
   return NS_OK;
 }
@@ -511,8 +518,15 @@ void SourceBuffer::Complete(nsresult aStatus) {
 
   mStatus = Some(aStatus);
 
-  // Resume any waiting consumers now that we're complete.
-  ResumeWaitingConsumers();
+  // Take any waiting consumers now that we're complete.
+  nsTArray<RefPtr<IResumable>> consumers;
+  TakeWaitingConsumers(consumers);
+
+  // Resume said consumers if we have any.
+  if (!consumers.IsEmpty()) {
+    MutexAutoUnlock lock(mMutex);
+    ResumeWaitingConsumers(consumers);
+  }
 
   // If we still have active consumers, just return.
   if (mConsumerCount > 0) {
