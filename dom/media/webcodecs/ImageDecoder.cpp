@@ -275,12 +275,12 @@ already_AddRefed<Promise> ImageDecoder::Decode(
 void ImageDecoder::OnDecodeFramesSuccess(
     const image::DecodeFramesResult& aResult) {
   mDecodedFrames.SetCapacity(mDecodedFrames.Length() +
-                             aResult.mSurfaces.Length());
-  for (const auto& surface : aResult.mSurfaces) {
+                             aResult.mFrames.Length());
+  for (const auto& f : aResult.mFrames) {
     VideoColorSpaceInit colorSpace;
-    gfx::IntSize size = surface->GetSize();
+    gfx::IntSize size = f.mSurface->GetSize();
     gfx::IntRect rect(gfx::IntPoint(0, 0), size);
-    auto image = MakeRefPtr<layers::SourceSurfaceImage>(size, surface);
+    auto image = MakeRefPtr<layers::SourceSurfaceImage>(size, f.mSurface);
     // FIXME animation duration, time
     auto frame =
         MakeRefPtr<VideoFrame>(mParent, image, Some(VideoPixelFormat::BGRA),
