@@ -209,26 +209,59 @@ void ImageDecoder::OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
                                        image::DecoderType aType,
                                        image::SurfaceFlags aSurfaceFlags) {
   mSourceBuffer = aSourceBuffer;
-  mComplete = true;
 
   mDecoder =
       image::ImageUtils::CreateDecoder(aSourceBuffer, aType, aSurfaceFlags);
   if (NS_WARN_IF(!mDecoder)) {
-    mCompletePromise->MaybeResolveWithUndefined();
-    mTracks->OnMetadataFailed(NS_ERROR_FAILURE);
+    OnMetadataFailed(NS_ERROR_FAILURE);
     return;
   }
 
   mDecoder->Initialize()->Then(
       GetCurrentSerialEventTarget(), __func__,
       [self = RefPtr{this}](const image::DecodeMetadataResult& aMetadata) {
-        self->mTracks->OnMetadataSuccess(aMetadata);
+        self->OnMetadataSuccess(aMetadata);
       },
       [self = RefPtr{this}](const nsresult& aErr) {
-        self->mTracks->OnMetadataFailed(aErr);
+        self->OnMetadataFailed(aErr);
       });
+}
 
+void ImageDecoder::OnMetadataSuccess(
+    const image::DecodeMetadataResult& aMetadata) {
+  mTracks->OnMetadataSuccess(aMetadata);
+  mComplete = true;
   mCompletePromise->MaybeResolveWithUndefined();
+
+  if (mOutstandingDecodes.IsEmpty()) {
+    return;
+  }
+
+  uint32_t minFrameIndex = UINT32_MAX;
+  uint32_t i = mOutstandingDecodes.Length();
+  while (i > 0) {
+    --i;
+
+    const auto frameIndex = mOutstandingDecodes[i].mFrameIndex;
+    minFrameIndex = std::min(minFrameIndex, frameIndex);
+  }
+
+  mDecoder->DecodeFrames(minFrameIndex + 1 - mDecodedFrames.Length())
+      ->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [self = RefPtr{this}](const image::DecodeFramesResult& aResult) {
+            self->OnDecodeFramesSuccess(aResult);
+          },
+          [self = RefPtr{this}](const nsresult& aErr) {
+            self->OnDecodeFramesFailed(aErr);
+          });
+}
+
+void ImageDecoder::OnMetadataFailed(const nsresult& aErr) {
+  mTracks->OnMetadataFailed(aErr);
+  mComplete = true;
+  mCompletePromise->MaybeResolveWithUndefined();
+  OnDecodeFramesFailed(aErr);
 }
 
 void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
@@ -238,6 +271,12 @@ already_AddRefed<Promise> ImageDecoder::Decode(
   RefPtr<Promise> promise = Promise::Create(mParent, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
+  }
+
+  if (!mComplete) {
+    mOutstandingDecodes.AppendElement(
+        OutstandingDecode{promise, aOptions.mFrameIndex});
+    return promise.forget();
   }
 
   if (NS_WARN_IF(!mSourceBuffer)) {

@@ -24,6 +24,7 @@ class SourceBuffer;
 enum class DecoderType;
 enum class SurfaceFlags : uint8_t;
 struct DecodeFramesResult;
+struct DecodeMetadataResult;
 }
 
 namespace dom {
@@ -84,6 +85,9 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   void OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
                            image::DecoderType aType,
                            image::SurfaceFlags aSurfaceFlags);
+
+  void OnMetadataSuccess(const image::DecodeMetadataResult& aMetadata);
+  void OnMetadataFailed(const nsresult& aErr);
 
   void OnDecodeFramesSuccess(const image::DecodeFramesResult& aResult);
   void OnDecodeFramesFailed(const nsresult& aErr);
