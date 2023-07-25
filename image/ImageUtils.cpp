@@ -40,7 +40,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     {
       MutexAutoLock lock(mMutex);
       mFramesToDecode = std::max(mFramesToDecode, aCount);
-      dispatch = !mMetadataPromise.IsEmpty() && mFramesPromise.IsEmpty();
+      dispatch = mMetadataPromise.IsEmpty() && mFramesPromise.IsEmpty();
       p = mFramesPromise.Ensure(__func__);
     }
 
@@ -188,6 +188,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
         return NS_OK;
       }
 
+      mSourceBuffer->Complete(NS_OK);
       mPromise.Resolve(std::move(mSourceBuffer), __func__);
       return NS_OK;
     }
@@ -219,6 +220,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
                                                 __func__);
   }
 
+  sourceBuffer->Complete(NS_OK);
   return CreateBufferPromise::CreateAndResolve(std::move(sourceBuffer),
                                                __func__);
 }
