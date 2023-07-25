@@ -128,7 +128,7 @@ imgFrame::imgFrame()
       mAborted(false),
       mFinished(false),
       mShouldRecycle(false),
-      mTimeout(FrameTimeout::FromRawMilliseconds(100)),
+      mTimeout(FrameTimeout::Forever()),
       mDisposalMethod(DisposalMethod::NOT_SPECIFIED),
       mBlendMethod(BlendMethod::OVER),
       mFormat(SurfaceFormat::UNKNOWN),
