@@ -7,6 +7,7 @@
 #ifndef mozilla_dom_ImageDecoder_h
 #define mozilla_dom_ImageDecoder_h
 
+#include "FrameTimeout.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/NotNull.h"
@@ -95,6 +96,7 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   AutoTArray<OutstandingDecode, 1> mOutstandingDecodes;
   AutoTArray<RefPtr<VideoFrame>, 1> mDecodedFrames;
   nsAutoString mType;
+  image::FrameTimeout mFramesTimestamp;
   bool mComplete = false;
 };
 

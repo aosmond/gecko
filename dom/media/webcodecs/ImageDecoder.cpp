@@ -14,6 +14,7 @@
 #include "mozilla/dom/ReadableStream.h"
 #include "mozilla/dom/VideoFrame.h"
 #include "mozilla/dom/VideoFrameBinding.h"
+#include "mozilla/dom/WebCodecsUtils.h"
 #include "mozilla/image/ImageUtils.h"
 #include "mozilla/image/SourceBuffer.h"
 
@@ -30,7 +31,9 @@ NS_INTERFACE_MAP_END
 
 ImageDecoder::ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent,
                            const nsAString& aType)
-    : mParent(std::move(aParent)), mType(aType) {}
+    : mParent(std::move(aParent)),
+      mType(aType),
+      mFramesTimestamp(image::FrameTimeout::Zero()) {}
 
 ImageDecoder::~ImageDecoder() = default;
 
@@ -45,7 +48,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
     ErrorResult& aRv) {
   // 10.2.2.1 If init is not valid ImageDecoderInit, throw a TypeError.
   // 10.3.1 If type is not a valid image MIME type, return false.
-  const auto mimeType = Substring(aInit.mType, 6);
+  const auto mimeType = Substring(aInit.mType, 0, 6);
   if (!mimeType.Equals(u"image/"_ns)) {
     aRv.ThrowTypeError("Invalid MIME type, must be 'image'");
     return nullptr;
@@ -139,7 +142,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
     return nullptr;
   }
 
-  const auto subType = Substring(aType, 6);
+  const auto subType = Substring(aType, 0, 6);
   if (!subType.Equals(u"image/"_ns)) {
     promise->MaybeRejectWithTypeError("Invalid MIME type, must be 'image'");
     return promise.forget();
@@ -276,15 +279,33 @@ void ImageDecoder::OnDecodeFramesSuccess(
     const image::DecodeFramesResult& aResult) {
   mDecodedFrames.SetCapacity(mDecodedFrames.Length() +
                              aResult.mFrames.Length());
+
   for (const auto& f : aResult.mFrames) {
     VideoColorSpaceInit colorSpace;
     gfx::IntSize size = f.mSurface->GetSize();
     gfx::IntRect rect(gfx::IntPoint(0, 0), size);
+
+    Maybe<VideoPixelFormat> format =
+        SurfaceFormatToVideoPixelFormat(f.mSurface->GetFormat());
+    MOZ_ASSERT(format, "Unexpected format for image!");
+
+    Maybe<uint64_t> duration;
+    if (f.mTimeout != image::FrameTimeout::Forever()) {
+      duration =
+          Some(static_cast<uint64_t>(f.mTimeout.AsMilliseconds()) * 1000);
+    }
+
+    uint64_t timestamp = UINT64_MAX;
+    if (mFramesTimestamp != image::FrameTimeout::Forever()) {
+      timestamp =
+          static_cast<uint64_t>(mFramesTimestamp.AsMilliseconds()) * 1000;
+    }
+
+    mFramesTimestamp += f.mTimeout;
+
     auto image = MakeRefPtr<layers::SourceSurfaceImage>(size, f.mSurface);
-    // FIXME animation duration, time
-    auto frame =
-        MakeRefPtr<VideoFrame>(mParent, image, Some(VideoPixelFormat::BGRA),
-                               size, rect, size, Nothing(), 0, colorSpace);
+    auto frame = MakeRefPtr<VideoFrame>(mParent, image, format, size, rect,
+                                        size, duration, timestamp, colorSpace);
     mDecodedFrames.AppendElement(std::move(frame));
   }
 
@@ -318,7 +339,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
   for (const auto& i : resolved) {
     ImageDecodeResult result;
     result.mImage = mDecodedFrames[i.mFrameIndex];
-    result.mComplete = true;
+    result.mComplete = aResult.mFinished;
     i.mPromise->MaybeResolve(result);
   }
 }
