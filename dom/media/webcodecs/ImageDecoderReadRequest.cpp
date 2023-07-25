@@ -6,34 +6,43 @@
 
 #include "ImageDecoderReadRequest.h"
 #include "mozilla/CycleCollectedJSContext.h"
+#include "mozilla/dom/ImageDecoder.h"
 #include "mozilla/dom/ReadableStreamDefaultReader.h"
 #include "mozilla/image/SourceBuffer.h"
 
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ImageDecoderReadRequest, ReadRequest,
-                                   mReader)
+                                   mDecoder, mReader)
 NS_IMPL_ADDREF_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_IMPL_RELEASE_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoderReadRequest)
 NS_INTERFACE_MAP_END_INHERITING(ReadRequest)
 
 ImageDecoderReadRequest::ImageDecoderReadRequest(
-    RefPtr<image::SourceBuffer>&& aSourceBuffer)
+    image::SourceBuffer* aSourceBuffer)
     : mSourceBuffer(std::move(aSourceBuffer)) {}
 
 ImageDecoderReadRequest::~ImageDecoderReadRequest() = default;
 
-void ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
+bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
+                                         ImageDecoder* aDecoder,
                                          ReadableStream& aStream) {
   IgnoredErrorResult rv;
   mReader = ReadableStreamDefaultReader::Constructor(aGlobal, aStream, rv);
   if (NS_WARN_IF(rv.Failed())) {
     mSourceBuffer->Complete(NS_ERROR_FAILURE);
-    return;
+    return false;
   }
 
+  mDecoder = aDecoder;
   QueueRead();
+  return true;
+}
+
+void ImageDecoderReadRequest::Destroy() {
+  mDecoder = nullptr;
+  Complete(NS_ERROR_ABORT);
 }
 
 void ImageDecoderReadRequest::QueueRead() {
@@ -51,7 +60,7 @@ void ImageDecoderReadRequest::QueueRead() {
 
   CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
   if (NS_WARN_IF(!context)) {
-    mSourceBuffer->Complete(NS_ERROR_FAILURE);
+    Complete(NS_ERROR_FAILURE);
     return;
   }
 
@@ -62,17 +71,29 @@ void ImageDecoderReadRequest::QueueRead() {
 void ImageDecoderReadRequest::Read() {
   CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
   if (NS_WARN_IF(!context)) {
-    mSourceBuffer->Complete(NS_ERROR_FAILURE);
+    Complete(NS_ERROR_FAILURE);
     return;
   }
 
+  RefPtr<ImageDecoderReadRequest> self(this);
+  RefPtr<ReadableStreamDefaultReader> reader(mReader);
+
   IgnoredErrorResult err;
   JSContext* cx = context->Context();
-  mReader->ReadChunk(cx, *this, err);
+  reader->ReadChunk(cx, *self, err);
   if (NS_WARN_IF(err.Failed())) {
-    if (!mSourceBuffer->IsComplete()) {
-      mSourceBuffer->Complete(NS_ERROR_FAILURE);
-    }
+    Complete(NS_ERROR_FAILURE);
+  }
+}
+
+void ImageDecoderReadRequest::Complete(nsresult aErr) {
+  if (mSourceBuffer && !mSourceBuffer->IsComplete()) {
+    mSourceBuffer->Complete(aErr);
+  }
+
+  if (mDecoder) {
+    mDecoder->OnSourceBufferComplete(aErr);
+    mDecoder = nullptr;
   }
 }
 
@@ -81,7 +102,7 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
                                          ErrorResult& aRv) {
   RootedSpiderMonkeyInterface<Uint8Array> chunk(aCx);
   if (!aChunk.isObject() || !chunk.Init(&aChunk.toObject())) {
-    mSourceBuffer->Complete(NS_ERROR_FAILURE);
+    Complete(NS_ERROR_FAILURE);
     return;
   }
   chunk.ComputeState();
@@ -89,8 +110,7 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
   nsresult rv = mSourceBuffer->Append(
       reinterpret_cast<const char*>(chunk.Data()), chunk.Length());
   if (NS_WARN_IF(NS_FAILED(rv))) {
-    // FIXME notify AnonymousDecoderImpl to cancel out promises because Append
-    // failures clear out the waiting consumers annoyingly??
+    Complete(NS_ERROR_FAILURE);
     return;
   }
 
@@ -98,13 +118,13 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
-  mSourceBuffer->Complete(NS_OK);
+  Complete(NS_OK);
 }
 
 void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aError,
                                          ErrorResult& aRv) {
-  mSourceBuffer->Complete(NS_ERROR_FAILURE);
+  Complete(NS_ERROR_FAILURE);
 }
 
 }  // namespace mozilla::dom

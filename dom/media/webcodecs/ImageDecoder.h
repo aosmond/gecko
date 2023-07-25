@@ -30,6 +30,7 @@ struct DecodeMetadataResult;
 namespace dom {
 class Promise;
 class VideoFrame;
+struct ImageDecoderReadRequest;
 
 class ImageDecoder final : public nsISupports, public nsWrapperCache {
  public:
@@ -68,6 +69,8 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
 
   void Close();
 
+  void OnSourceBufferComplete(nsresult aErr);
+
  private:
   ~ImageDecoder();
 
@@ -79,12 +82,11 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
   // VideoFrame can run on either main thread or worker thread.
   void AssertIsOnOwningThread() const { NS_ASSERT_OWNINGTHREAD(ImageDecoder); }
 
-  void Initialize(const ImageDecoderInit& aInit, const uint8_t* aData,
-                  size_t aLength, ErrorResult& aRv);
+  void Initialize(const GlobalObject& aGLobal, const ImageDecoderInit& aInit,
+                  const uint8_t* aData, size_t aLength, ErrorResult& aRv);
 
-  void OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
-                           image::DecoderType aType,
-                           image::SurfaceFlags aSurfaceFlags);
+  void OnCompleteSuccess();
+  void OnCompleteFailed(nsresult aErr);
 
   void OnMetadataSuccess(const image::DecodeMetadataResult& aMetadata);
   void OnMetadataFailed(const nsresult& aErr);
@@ -94,6 +96,7 @@ class ImageDecoder final : public nsISupports, public nsWrapperCache {
 
   nsCOMPtr<nsIGlobalObject> mParent;
   RefPtr<ImageTrackList> mTracks;
+  RefPtr<ImageDecoderReadRequest> mReadRequest;
   RefPtr<Promise> mCompletePromise;
   RefPtr<image::SourceBuffer> mSourceBuffer;
   RefPtr<image::AnonymousDecoder> mDecoder;

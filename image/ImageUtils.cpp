@@ -18,7 +18,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(AnonymousDecoderImpl, override)
 
-  AnonymousDecoderImpl(RefPtr<Decoder>&& aDecoder)
+  explicit AnonymousDecoderImpl(RefPtr<Decoder>&& aDecoder)
       : AnonymousDecoder(),
         mMutex("mozilla::image::AnonymousDecoderImpl::mMutex"),
         mFullDecoder(std::move(aDecoder)),
@@ -207,7 +207,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
 
   class ReadStreamRunnable final : public Runnable {
    public:
-    ReadStreamRunnable(nsCOMPtr<nsIInputStream>&& aStream)
+    explicit ReadStreamRunnable(nsCOMPtr<nsIInputStream>&& aStream)
         : Runnable("mozilla::image::ImageUtils::ReadStreamRunnable"),
           mSourceBuffer(new SourceBuffer()),
           mStream(std::move(aStream)) {}

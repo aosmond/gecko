@@ -15,6 +15,7 @@ class SourceBuffer;
 }
 
 namespace dom {
+class ImageDecoder;
 class ReadableStreamDefaultReader;
 
 struct ImageDecoderReadRequest final : public ReadRequest {
@@ -23,9 +24,11 @@ struct ImageDecoderReadRequest final : public ReadRequest {
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(ImageDecoderReadRequest, ReadRequest)
 
  public:
-  explicit ImageDecoderReadRequest(RefPtr<image::SourceBuffer>&& aSourceBuffer);
+  explicit ImageDecoderReadRequest(image::SourceBuffer* aSourceBuffer);
 
-  void Initialize(const GlobalObject& aGlobal, ReadableStream& aStream);
+  bool Initialize(const GlobalObject& aGlobal, ImageDecoder* aDecoder,
+                  ReadableStream& aStream);
+  void Destroy();
 
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void ChunkSteps(JSContext* aCx,
                                               JS::Handle<JS::Value> aChunk,
@@ -42,8 +45,10 @@ struct ImageDecoderReadRequest final : public ReadRequest {
   ~ImageDecoderReadRequest() override;
 
   void QueueRead();
-  void Read();
+  MOZ_CAN_RUN_SCRIPT_BOUNDARY void Read();
+  void Complete(nsresult aErr);
 
+  RefPtr<ImageDecoder> mDecoder;
   RefPtr<ReadableStreamDefaultReader> mReader;
   RefPtr<image::SourceBuffer> mSourceBuffer;
 };

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdint>
 #include "ImageContainer.h"
+#include "ImageDecoderReadRequest.h"
 #include "nsComponentManagerUtils.h"
 #include "nsTHashSet.h"
 #include "mozilla/dom/ImageTrackList.h"
@@ -21,7 +22,7 @@
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageDecoder, mParent, mTracks,
-                                      mCompletePromise)
+                                      mReadRequest, mCompletePromise)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ImageDecoder)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ImageDecoder)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoder)
@@ -56,6 +57,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 
   const uint8_t* dataContents = nullptr;
   size_t dataSize = 0;
+  RefPtr<ImageDecoderReadRequest> readRequest;
 
   if (aInit.mData.IsReadableStream()) {
     const auto& stream = aInit.mData.GetAsReadableStream();
@@ -126,7 +128,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
   auto imageDecoder = MakeRefPtr<ImageDecoder>(std::move(global), aInit.mType);
-  imageDecoder->Initialize(aInit, dataContents, dataSize, aRv);
+  imageDecoder->Initialize(aGlobal, aInit, dataContents, dataSize, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
@@ -154,7 +156,8 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
   return promise.forget();
 }
 
-void ImageDecoder::Initialize(const ImageDecoderInit& aInit,
+void ImageDecoder::Initialize(const GlobalObject& aGlobal,
+                              const ImageDecoderInit& aInit,
                               const uint8_t* aData, size_t aLength,
                               ErrorResult& aRv) {
   mCompletePromise = Promise::Create(mParent, aRv);
@@ -168,53 +171,42 @@ void ImageDecoder::Initialize(const ImageDecoderInit& aInit,
     return;
   }
 
-  RefPtr<image::CreateBufferPromise> bufferPromise;
-  if (aData) {
-    MOZ_ASSERT(aLength > 0);
-    bufferPromise = image::ImageUtils::CreateSourceBuffer(aData, aLength);
-  } else {
-    MOZ_ASSERT(aInit.mData.IsReadableStream());
-    const auto& stream = aInit.mData.GetAsReadableStream();
-    nsIInputStream* inputStream = stream->MaybeGetInputStreamIfUnread();
-    bufferPromise = image::ImageUtils::CreateSourceBuffer(inputStream);
-  }
-
-  if (NS_WARN_IF(!bufferPromise)) {
-    mComplete = true;
-    mCompletePromise->MaybeRejectWithInvalidStateError(
-        "Failed to create image encoded buffer");
-    return;
-  }
-
   NS_ConvertUTF16toUTF8 mimeType(mType);
   image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
 
   // FIXME configuration from aInit
   image::SurfaceFlags surfaceFlags = image::DefaultSurfaceFlags();
 
-  bufferPromise->Then(
-      GetCurrentSerialEventTarget(), __func__,
-      [self = RefPtr{this}, type,
-       surfaceFlags](const RefPtr<image::SourceBuffer>& aSourceBuffer) {
-        self->OnSourceBufferReady(aSourceBuffer, type, surfaceFlags);
-      },
-      [self = RefPtr{this}](const nsresult& aErr) {
-        self->mComplete = true;
-        self->mCompletePromise->MaybeRejectWithInvalidStateError(
-            "Failed to buffer encoded data");
-      });
-}
-
-void ImageDecoder::OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
-                                       image::DecoderType aType,
-                                       image::SurfaceFlags aSurfaceFlags) {
-  mSourceBuffer = aSourceBuffer;
-
+  mSourceBuffer = MakeRefPtr<image::SourceBuffer>();
   mDecoder =
-      image::ImageUtils::CreateDecoder(aSourceBuffer, aType, aSurfaceFlags);
+      image::ImageUtils::CreateDecoder(mSourceBuffer, type, surfaceFlags);
   if (NS_WARN_IF(!mDecoder)) {
     OnMetadataFailed(NS_ERROR_FAILURE);
     return;
+  }
+
+  if (aData) {
+    nsresult rv = mSourceBuffer->ExpectLength(aLength);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      aRv.ThrowRangeError("Could not allocate for encoded source buffer");
+      return;
+    }
+
+    rv = mSourceBuffer->Append(reinterpret_cast<const char*>(aData), aLength);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      aRv.ThrowRangeError("Could not allocate for encoded source buffer");
+      return;
+    }
+
+    mSourceBuffer->Complete(NS_OK);
+  } else {
+    MOZ_ASSERT(aInit.mData.IsReadableStream());
+    const auto& stream = aInit.mData.GetAsReadableStream();
+    mReadRequest = MakeAndAddRef<ImageDecoderReadRequest>(mSourceBuffer);
+    if (NS_WARN_IF(!mReadRequest->Initialize(aGlobal, this, stream))) {
+      aRv.ThrowInvalidStateError("Could not create reader for ReadableStream");
+      return;
+    }
   }
 
   mDecoder->Initialize()->Then(
@@ -227,11 +219,43 @@ void ImageDecoder::OnSourceBufferReady(image::SourceBuffer* aSourceBuffer,
       });
 }
 
+void ImageDecoder::OnSourceBufferComplete(nsresult aErr) {
+  MOZ_ASSERT(mSourceBuffer->IsComplete());
+
+  if (NS_WARN_IF(NS_FAILED(aErr))) {
+    OnCompleteFailed(aErr);
+    return;
+  }
+
+  OnCompleteSuccess();
+}
+
+void ImageDecoder::OnCompleteSuccess() {
+  if (mComplete) {
+    return;
+  }
+
+  if (!mSourceBuffer->IsComplete() || !mTracks->IsReady()) {
+    return;
+  }
+
+  mComplete = true;
+  mCompletePromise->MaybeResolveWithUndefined();
+}
+
+void ImageDecoder::OnCompleteFailed(nsresult aErr) {
+  if (mComplete) {
+    return;
+  }
+
+  mComplete = true;
+  mCompletePromise->MaybeRejectWithInvalidStateError("");
+}
+
 void ImageDecoder::OnMetadataSuccess(
     const image::DecodeMetadataResult& aMetadata) {
   mTracks->OnMetadataSuccess(aMetadata);
-  mComplete = true;
-  mCompletePromise->MaybeResolveWithUndefined();
+  OnCompleteSuccess();
 
   if (mOutstandingDecodes.IsEmpty()) {
     return;
@@ -259,8 +283,7 @@ void ImageDecoder::OnMetadataSuccess(
 
 void ImageDecoder::OnMetadataFailed(const nsresult& aErr) {
   mTracks->OnMetadataFailed(aErr);
-  mComplete = true;
-  mCompletePromise->MaybeResolveWithUndefined();
+  OnCompleteFailed(aErr);
   OnDecodeFramesFailed(aErr);
 }
 
@@ -276,6 +299,11 @@ already_AddRefed<Promise> ImageDecoder::Decode(
   if (!mComplete) {
     mOutstandingDecodes.AppendElement(
         OutstandingDecode{promise, aOptions.mFrameIndex});
+    return promise.forget();
+  }
+
+  if (!mTracks->GetSelectedTrack()) {
+    promise->MaybeRejectWithInvalidStateError("No track selected");
     return promise.forget();
   }
 

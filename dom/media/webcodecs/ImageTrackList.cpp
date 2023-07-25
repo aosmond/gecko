@@ -43,10 +43,12 @@ void ImageTrackList::OnMetadataSuccess(
       aMetadata.mRepetitions, aMetadata.mFrames);
   mTracks.AppendElement(std::move(track));
   mSelectedIndex = 0;
+  mIsReady = true;
   mReadyPromise->MaybeResolveWithUndefined();
 }
 
 void ImageTrackList::OnMetadataFailed(nsresult aErr) {
+  mIsReady = true;
   mReadyPromise->MaybeRejectWithInvalidStateError("Metadata decoding failed");
 }
 

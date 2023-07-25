@@ -30,7 +30,7 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageTrackList)
 
  public:
-  ImageTrackList(nsIGlobalObject* aParent);
+  explicit ImageTrackList(nsIGlobalObject* aParent);
 
   void Initialize(ErrorResult& aRv);
   void OnMetadataSuccess(const image::DecodeMetadataResult& aMetadata);
@@ -47,6 +47,8 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
                        JS::Handle<JSObject*> aGivenProto) override;
 
   Promise* Ready() const { return mReadyPromise; }
+
+  bool IsReady() const { return mIsReady; }
 
   uint32_t Length() const { return mTracks.Length(); }
 
@@ -80,6 +82,7 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   AutoTArray<RefPtr<ImageTrack>, 1> mTracks;
   RefPtr<Promise> mReadyPromise;
   int32_t mSelectedIndex = -1;
+  bool mIsReady = false;
 };
 
 }  // namespace dom
