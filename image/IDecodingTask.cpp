@@ -229,21 +229,9 @@ void AnonymousDecodingTask::CheckForNewFrame() {
   mFrames.AppendElement(WrapNotNull(std::move(frame)));
 }
 
-void AnonymousDecodingTask::TakeSurfaces(
-    nsTArray<RefPtr<gfx::SourceSurface>>& aSurfaces) {
-  aSurfaces.SetCapacity(aSurfaces.Length() + mFrames.Length());
-
-  for (const auto& frame : mFrames) {
-    RefPtr<gfx::SourceSurface> surface = frame->GetSourceSurface();
-    if (NS_WARN_IF(!surface)) {
-      MOZ_ASSERT_UNREACHABLE("Must have surface for anonymous decoding!");
-      continue;
-    }
-
-    aSurfaces.AppendElement(std::move(surface));
-  }
-
-  mFrames.Clear();
+void AnonymousDecodingTask::TakeFrames(
+    nsTArray<NotNull<RefPtr<imgFrame>>>& aFrames) {
+  aFrames = std::move(mFrames);
 }
 
 void AnonymousDecodingTask::Resume() {

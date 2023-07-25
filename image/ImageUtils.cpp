@@ -93,13 +93,26 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
 
     while (true) {
       result.mFinished = DoDecode(framesToDecode);
-      TakeSurfaces(result.mSurfaces);
+
+      nsTArray<NotNull<RefPtr<imgFrame>>> frames;
+      TakeFrames(frames);
+
+      for (auto& frame : frames) {
+        RefPtr<gfx::SourceSurface> surface = frame->GetSourceSurface();
+        if (NS_WARN_IF(!surface)) {
+          MOZ_ASSERT_UNREACHABLE("Must have surface for anonymous decoding!");
+          continue;
+        }
+
+        result.mFrames.AppendElement(
+            DecodedFrame{std::move(surface), frame->GetTimeout()});
+      }
 
       {
         MutexAutoLock lock(mMutex);
         MOZ_ASSERT(!mFramesPromise.IsEmpty());
 
-        if (result.mFinished || mFramesToDecode >= result.mSurfaces.Length()) {
+        if (result.mFinished || mFramesToDecode >= result.mFrames.Length()) {
           mFramesToDecode = 0;
           mFramesPromise.Resolve(std::move(result), __func__);
           return;

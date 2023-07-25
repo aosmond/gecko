@@ -6,6 +6,7 @@
 #ifndef mozilla_image_ImageUtils_h
 #define mozilla_image_ImageUtils_h
 
+#include "FrameTimeout.h"
 #include "mozilla/image/SurfaceFlags.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/MozPromise.h"
@@ -49,8 +50,13 @@ struct DecodeMetadataResult {
   bool mAnimated = false;
 };
 
+struct DecodedFrame {
+  RefPtr<gfx::SourceSurface> mSurface;
+  FrameTimeout mTimeout;
+};
+
 struct DecodeFramesResult {
-  nsTArray<RefPtr<gfx::SourceSurface>> mSurfaces;
+  nsTArray<DecodedFrame> mFrames;
   bool mFinished = false;
 };
 

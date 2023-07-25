@@ -114,7 +114,7 @@ class AnonymousDecodingTask : public IDecodingTask {
 
   bool IsFinished() const;
 
-  void TakeSurfaces(nsTArray<RefPtr<gfx::SourceSurface>>& aSurfaces);
+  void TakeFrames(nsTArray<NotNull<RefPtr<imgFrame>>>& aFrames);
 
  protected:
   virtual ~AnonymousDecodingTask() = default;
