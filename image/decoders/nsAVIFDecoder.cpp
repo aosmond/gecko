@@ -217,6 +217,33 @@ Mp4parseStatus AVIFParser::Create(const Mp4parseIo* aIo, ByteStream* aBuffer,
   return status;
 }
 
+uint32_t AVIFParser::GetFrameCount() {
+  MOZ_ASSERT(mParser);
+
+  if (!IsAnimated()) {
+    return 0;
+  }
+
+  uint32_t frameCount = 0;
+  while (true) {
+    RefPtr<MediaRawData> header = mColorSampleIter->GetNextHeader();
+    if (!header) {
+      break;
+    }
+
+    if (mAlphaSampleIter) {
+      header = mAlphaSampleIter->GetNextHeader();
+      if (!header) {
+        break;
+      }
+    }
+
+    ++frameCount;
+  }
+
+  return frameCount;
+}
+
 nsAVIFDecoder::DecodeResult AVIFParser::GetImage(AVIFImage& aImage) {
   MOZ_ASSERT(mParser);
 
@@ -1496,6 +1523,12 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::DoDecodeInternal(
              mIsAnimated ? parsedInfo.alpha_track_bit_depth
                          : parsedInfo.alpha_item_bit_depth));
     PostSize(ispeImageSize->width, ispeImageSize->height, orientation);
+    if (WantsFrameCount()) {
+      // Note that this consumes the frame iterators, so this can only be
+      // requested for metadata decodes. Since we had to partially decode the
+      // first frame to determine the size, we need to add one to the result.
+      PostFrameCount(mParser->GetFrameCount() + 1);
+    }
     if (IsMetadataDecode()) {
       MOZ_LOG(
           sAVIFLog, LogLevel::Debug,
@@ -1556,6 +1589,12 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::DoDecodeInternal(
          decodedData->mPictureRect.width, decodedData->mPictureRect.height));
     PostSize(decodedData->mPictureRect.width, decodedData->mPictureRect.height,
              orientation);
+    if (WantsFrameCount()) {
+      // Note that this consumes the frame iterators, so this can only be
+      // requested for metadata decodes. Since we had to partially decode the
+      // first frame to determine the size, we need to add one to the result.
+      PostFrameCount(mParser->GetFrameCount() + 1);
+    }
     AccumulateCategorical(LABELS_AVIF_ISPE::absent);
   } else {
     // Verify that the bitstream hasn't changed the image size compared to
