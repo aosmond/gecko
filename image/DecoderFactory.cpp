@@ -420,7 +420,8 @@ already_AddRefed<Decoder> DecoderFactory::CreateAnonymousDecoder(
 
 /* static */
 already_AddRefed<Decoder> DecoderFactory::CreateAnonymousMetadataDecoder(
-    DecoderType aType, NotNull<SourceBuffer*> aSourceBuffer) {
+    DecoderType aType, NotNull<SourceBuffer*> aSourceBuffer,
+    DecoderFlags aDecoderFlags) {
   if (aType == DecoderType::UNKNOWN) {
     return nullptr;
   }
@@ -432,7 +433,7 @@ already_AddRefed<Decoder> DecoderFactory::CreateAnonymousMetadataDecoder(
   // Initialize the decoder.
   decoder->SetMetadataDecode(true);
   decoder->SetIterator(aSourceBuffer->Iterator());
-  decoder->SetDecoderFlags(DecoderFlags::FIRST_FRAME_ONLY);
+  decoder->SetDecoderFlags(aDecoderFlags);
 
   if (NS_FAILED(decoder->Init())) {
     return nullptr;
