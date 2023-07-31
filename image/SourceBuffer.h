@@ -450,7 +450,10 @@ class SourceBuffer final {
   //////////////////////////////////////////////////////////////////////////////
 
   void AddWaitingConsumer(IResumable* aConsumer) MOZ_REQUIRES(mMutex);
-  void ResumeWaitingConsumers() MOZ_REQUIRES(mMutex);
+  void TakeWaitingConsumers(nsTArray<RefPtr<IResumable>>& aWaitingConsumers)
+      MOZ_REQUIRES(mMutex);
+  void ResumeWaitingConsumers(nsTArray<RefPtr<IResumable>>& aWaitingConsumers)
+      MOZ_EXCLUDES(mMutex);
 
   typedef SourceBufferIterator::State State;
 
