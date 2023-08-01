@@ -307,7 +307,7 @@ class Decoder {
   /// useless?
   bool GetDecodeDone() const {
     return mReachedTerminalState || mDecodeDone ||
-           (mMetadataDecode && HasSize()) || HasError();
+           (mMetadataDecode && HasSize() && !WantsFrameCount()) || HasError();
   }
 
   /// Are we in the middle of a frame right now? Used for assertions only.
