@@ -46,6 +46,8 @@ void ImageTrackList::MaybeResolveReady() {
   if (!track || (track->FrameCount() == 0 && !track->FrameCountComplete())) {
     return;
   }
+  printf_stderr("[AO] track %p count %u complete %d\n", track,
+                track->FrameCount(), track->FrameCountComplete());
   if (mReadyPromise->State() != Promise::PromiseState::Pending) {
     mReadyPromise = Promise::CreateInfallible(mParent);
   }
