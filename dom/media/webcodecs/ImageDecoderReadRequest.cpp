@@ -46,6 +46,7 @@ void ImageDecoderReadRequest::Destroy() {
 
   if (mSourceBuffer) {
     if (!mSourceBuffer->IsComplete()) {
+      printf_stderr("[AO] [%p] %s -- close\n", this, __func__);
       mSourceBuffer->Complete(NS_ERROR_ABORT);
     }
     mSourceBuffer = nullptr;
@@ -119,6 +120,7 @@ void ImageDecoderReadRequest::Read() {
 }
 
 void ImageDecoderReadRequest::Complete(nsresult aErr) {
+  printf_stderr("[AO] [%p] %s -- complete\n", this, __func__);
   if (mSourceBuffer && !mSourceBuffer->IsComplete()) {
     mSourceBuffer->Complete(aErr);
   }
@@ -138,6 +140,7 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
     return;
   }
   chunk.ProcessData([&](const Span<uint8_t>& aData, JS::AutoCheckCannotGC&&) {
+    printf_stderr("[AO] [%p] %s -- append %u bytes\n", this, __func__, uint32_t(aData.Length()));
     nsresult rv = mSourceBuffer->Append(
         reinterpret_cast<const char*>(aData.Elements()), aData.Length());
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -150,12 +153,14 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] %s -- close\n", this, __func__);
   Complete(NS_OK);
 }
 
 void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aError,
                                          ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] %s -- error\n", this, __func__);
   Complete(NS_ERROR_FAILURE);
 }
 

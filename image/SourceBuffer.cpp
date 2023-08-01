@@ -24,6 +24,8 @@ namespace image {
 //////////////////////////////////////////////////////////////////////////////
 
 SourceBufferIterator::~SourceBufferIterator() {
+  printf_stderr("[AO] [%p] SourceBufferIterator::~SourceBufferIterator\n",
+                this);
   if (mOwner) {
     mOwner->OnIteratorRelease();
   }
@@ -47,6 +49,10 @@ SourceBufferIterator& SourceBufferIterator::operator=(
 
 SourceBufferIterator::State SourceBufferIterator::AdvanceOrScheduleResume(
     size_t aRequestedBytes, IResumable* aConsumer) {
+  printf_stderr(
+      "[AO] [%p] SourceBufferIterator::AdvanceOrScheduleResume -- "
+      "aRequestedBytes %zu, aConsumer %p, mState %d\n",
+      this, aRequestedBytes, aConsumer, int(mState));
   MOZ_ASSERT(mOwner);
 
   if (MOZ_UNLIKELY(!HasMore())) {
@@ -122,9 +128,12 @@ const size_t SourceBuffer::MIN_CHUNK_CAPACITY;
 const size_t SourceBuffer::MAX_CHUNK_CAPACITY;
 
 SourceBuffer::SourceBuffer()
-    : mMutex("image::SourceBuffer"), mConsumerCount(0), mCompacted(false) {}
+    : mMutex("image::SourceBuffer"), mConsumerCount(0), mCompacted(false) {
+  printf_stderr("[AO] [%p] SourceBuffer::SourceBuffer\n", this);
+}
 
 SourceBuffer::~SourceBuffer() {
+  printf_stderr("[AO] [%p] SourceBuffer::~SourceBuffer\n", this);
   MOZ_ASSERT(mConsumerCount == 0,
              "SourceBuffer destroyed with active consumers");
 }
@@ -144,12 +153,14 @@ nsresult SourceBuffer::AppendChunk(Maybe<Chunk>&& aChunk) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
+  printf_stderr("[AO] [%p] SourceBuffer::AppendChunk -- success\n", this);
   return NS_OK;
 }
 
 Maybe<SourceBuffer::Chunk> SourceBuffer::CreateChunk(
     size_t aCapacity, size_t aExistingCapacity /* = 0 */,
     bool aRoundUp /* = true */) {
+  printf_stderr("[AO] [%p] SourceBuffer::CreateChunk\n", this);
   if (MOZ_UNLIKELY(aCapacity == 0)) {
     MOZ_ASSERT_UNREACHABLE("Appending a chunk of zero size?");
     return Nothing();
@@ -172,6 +183,7 @@ Maybe<SourceBuffer::Chunk> SourceBuffer::CreateChunk(
 }
 
 nsresult SourceBuffer::Compact() {
+  printf_stderr("[AO] [%p] SourceBuffer::Compact\n", this);
   mMutex.AssertCurrentThreadOwns();
 
   MOZ_ASSERT(mConsumerCount == 0, "Should have no consumers here");
@@ -291,6 +303,8 @@ size_t SourceBuffer::FibonacciCapacityWithMinimum(size_t aMinCapacity) {
 }
 
 void SourceBuffer::AddWaitingConsumer(IResumable* aConsumer) {
+  printf_stderr("[AO] [%p] SourceBuffer::AddWaitingConsumer -- aConsumer %p\n",
+                this, aConsumer);
   mMutex.AssertCurrentThreadOwns();
 
   MOZ_ASSERT(!mStatus, "Waiting when we're complete?");
@@ -349,6 +363,8 @@ nsresult SourceBuffer::ExpectLength(size_t aExpectedLength) {
 }
 
 nsresult SourceBuffer::Append(const char* aData, size_t aLength) {
+  printf_stderr("[AO] [%p] SourceBuffer::Append -- aData %p aLength %zu\n",
+                this, aData, aLength);
   MOZ_ASSERT(aData, "Should have a buffer");
   MOZ_ASSERT(aLength > 0, "Writing a zero-sized chunk");
 
@@ -470,6 +486,10 @@ static nsresult AppendToSourceBuffer(nsIInputStream*, void* aClosure,
 
 nsresult SourceBuffer::AppendFromInputStream(nsIInputStream* aInputStream,
                                              uint32_t aCount) {
+  printf_stderr(
+      "[AO] [%p] SourceBuffer::AppendFromInputStream -- aInputStream %p, "
+      "aCount %u\n",
+      this, aInputStream, aCount);
   uint32_t bytesRead;
   nsresult rv = aInputStream->ReadSegments(AppendToSourceBuffer, this, aCount,
                                            &bytesRead);
@@ -499,6 +519,8 @@ nsresult SourceBuffer::AppendFromInputStream(nsIInputStream* aInputStream,
 }
 
 void SourceBuffer::Complete(nsresult aStatus) {
+  printf_stderr("[AO] [%p] SourceBuffer::Complete -- aStatus 0x%08x\n", this,
+                uint32_t(aStatus));
   MutexAutoLock lock(mMutex);
 
   // When an error occurs internally (e.g. due to an OOM), we save the status.
@@ -627,6 +649,10 @@ SourceBufferIterator::State SourceBuffer::AdvanceIteratorOrScheduleResume(
     SourceBufferIterator& aIterator, size_t aRequestedBytes,
     IResumable* aConsumer) {
   MutexAutoLock lock(mMutex);
+  printf_stderr(
+      "[AO] [%p] SourceBuffer::AdvanceIteratorOrScheduleResume -- aRequestedBytes %zu, "
+      "aConsumer %p, mStatus 0x%08x\n",
+      this, aRequestedBytes, aConsumer, mStatus ? *mStatus : 0);
 
   MOZ_ASSERT(aIterator.HasMore(),
              "Advancing a completed iterator and "

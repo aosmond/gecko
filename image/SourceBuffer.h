@@ -199,6 +199,10 @@ class SourceBufferIterator final {
   bool HasMore() const { return mState != COMPLETE; }
 
   State AdvanceFromLocalBuffer(size_t aRequestedBytes) {
+    printf_stderr(
+        "[AO] [%p] SourceBufferIterator::AdvanceFromLocalBuffer -- "
+        "aRequestedBytes %zu, mState %d\n",
+        this, aRequestedBytes, int(mState));
     MOZ_ASSERT(mState == READY, "Advancing in the wrong state");
     MOZ_ASSERT(mData.mIterating.mAvailableLength > 0,
                "The local buffer shouldn't be empty");
@@ -213,6 +217,11 @@ class SourceBufferIterator final {
 
   State SetReady(uint32_t aChunk, const char* aData, size_t aOffset,
                  size_t aAvailableLength, size_t aRequestedBytes) {
+    printf_stderr(
+        "[AO] [%p] SourceBufferIterator::SetReady -- aChunk %u, aData %p, "
+        "aOffset %zu, aAvailableLength %zu, aRequestedBytes %zu, mState %d\n",
+        this, aChunk, aData, aOffset, aAvailableLength, aRequestedBytes,
+        int(mState));
     MOZ_ASSERT(mState != COMPLETE);
     mState = READY;
 
@@ -236,6 +245,10 @@ class SourceBufferIterator final {
   }
 
   State SetWaiting(bool aHasConsumer) {
+    printf_stderr(
+        "[AO] [%p] SourceBufferIterator::SetWaiting -- aHasConsumer %d, mState "
+        "%d\n",
+        this, aHasConsumer, int(mState));
     MOZ_ASSERT(mState != COMPLETE);
     // Without a consumer, we won't know when to wake up precisely. Caller
     // convention should mean that we don't try to advance unless we have
@@ -246,6 +259,10 @@ class SourceBufferIterator final {
   }
 
   State SetComplete(nsresult aStatus) {
+    printf_stderr(
+        "[AO] [%p] SourceBufferIterator::SetComplete -- aStatus 0x%08x, mState "
+        "%d\n",
+        this, uint32_t(aStatus), int(mState));
     mData.mAtEnd.mStatus = aStatus;
     return mState = COMPLETE;
   }
