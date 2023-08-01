@@ -165,10 +165,12 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     MutexAutoLock lock(mMutex);
 
     if (result == LexerResult(TerminalState::FAILURE)) {
+      printf_stderr("[AO] [%p] %s -- first metdata decoder %p failed\n", this, __func__, aDecoder);
       mMetadataPromise.Reject(NS_ERROR_FAILURE, __func__);
       mFrameCountPromise.RejectIfExists(NS_ERROR_FAILURE, __func__);
       mFramesPromise.RejectIfExists(NS_ERROR_FAILURE, __func__);
       mFullDecoder = nullptr;
+      mFrameCountDecoder = nullptr;
       mMetadataDecoder = nullptr;
       return false;
     }
@@ -177,6 +179,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     const auto size = mdIn.GetSize();
     DecodeMetadataResult mdOut{size.width, size.height, mdIn.GetLoopCount(),
                                mdIn.HasAnimation()};
+    printf_stderr("[AO] [%p] %s -- first metdata decoder %p\n", this, __func__, aDecoder);
     mMetadataPromise.Resolve(mdOut, __func__);
     mMetadataDecoder = nullptr;
     return true;
@@ -199,11 +202,10 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     if (mFrameCount < frameCount) {
       mFrameCount = frameCount;
       resolve = true;
-    } else if (mFrameCount > 0 && finished) {
-      resolve = true;
     }
 
     if (resolve) {
+      printf_stderr("[AO] [%p] %s -- frame count %u (%u), finished success %d fail %d decoder %p wantsFrameCount %d sourceBuffer %p complete %d\n", this, __func__, frameCount, mFrameCount, result == LexerResult(TerminalState::SUCCESS), result == LexerResult(TerminalState::FAILURE), aDecoder, aDecoder->WantsFrameCount(), aDecoder->GetSourceBuffer(), aDecoder->GetSourceBuffer()->IsComplete());
       mFrameCountPromise.ResolveIfExists(
           DecodeFrameCountResult{frameCount, finished}, __func__);
     } else {

@@ -42,6 +42,12 @@ void ImageTrackList::Destroy() {
 }
 
 void ImageTrackList::MaybeResolveReady() {
+  ImageTrack* track = GetSelectedTrack();
+  if (!track || (track->FrameCount() == 0 && !track->FrameCountComplete())) {
+    return;
+  }
+  printf_stderr("[AO] track %p count %u complete %d\n", track,
+                track->FrameCount(), track->FrameCountComplete());
   if (mReadyPromise->State() != Promise::PromiseState::Pending) {
     mReadyPromise = Promise::CreateInfallible(mParent);
   }
@@ -64,7 +70,6 @@ void ImageTrackList::OnMetadataSuccess(
       /* aFrameCount */ 0, aMetadata.mRepetitions);
   mTracks.AppendElement(std::move(track));
   mSelectedIndex = 0;
-  MaybeResolveReady();
 }
 
 void ImageTrackList::OnMetadataFailed(nsresult aErr) {
@@ -78,6 +83,10 @@ void ImageTrackList::OnFrameCountSuccess(
   }
 
   mTracks.LastElement()->OnFrameCountSuccess(aResult);
+
+  if (!mIsReady) {
+    MaybeResolveReady();
+  }
 }
 
 void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {

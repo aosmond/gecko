@@ -168,6 +168,7 @@ LexerResult Decoder::Decode(IResumable* aOnResume /* = nullptr */) {
 
   // If we're already done, don't attempt to keep decoding.
   if (GetDecodeDone()) {
+    printf_stderr("[AO] EARLY FUCKING EXIT\n");
     return LexerResult(HasError() ? TerminalState::FAILURE
                                   : TerminalState::SUCCESS);
   }
@@ -199,6 +200,7 @@ LexerResult Decoder::Decode(IResumable* aOnResume /* = nullptr */) {
   // Perform final cleanup.
   CompleteDecode();
 
+  printf_stderr("[AO] LATE FUCKING EXIT\n");
   return LexerResult(HasError() ? TerminalState::FAILURE
                                 : TerminalState::SUCCESS);
 }

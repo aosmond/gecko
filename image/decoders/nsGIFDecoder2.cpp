@@ -253,8 +253,12 @@ nsresult nsGIFDecoder2::BeginImageFrame(const OrientedIntRect& aFrameRect,
 //******************************************************************************
 void nsGIFDecoder2::EndImageFrame() {
   if (WantsFrameCount()) {
+    mGIFStruct.pixels_remaining = 0;
     mGIFStruct.images_decoded++;
     mCurrentFrameIndex = -1;
+
+    // Keep updating the count every time we find a frame.
+    PostFrameCount(mGIFStruct.images_decoded);
     return;
   }
 
@@ -467,6 +471,7 @@ void nsGIFDecoder2::ConvertColormap(uint32_t* aColormap, uint32_t aColors) {
 
 LexerResult nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator,
                                     IResumable* aOnResume) {
+  printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode\n", this);
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
 
   return mLexer.Lex(
@@ -474,50 +479,72 @@ LexerResult nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator,
       [=](State aState, const char* aData, size_t aLength) {
         switch (aState) {
           case State::GIF_HEADER:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- header\n", this);
             return ReadGIFHeader(aData);
           case State::SCREEN_DESCRIPTOR:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- screen desc\n", this);
             return ReadScreenDescriptor(aData);
           case State::GLOBAL_COLOR_TABLE:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- global color\n", this);
             return ReadGlobalColorTable(aData, aLength);
           case State::FINISHED_GLOBAL_COLOR_TABLE:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- finished global color\n", this);
             return FinishedGlobalColorTable();
           case State::BLOCK_HEADER:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- block header\n", this);
             return ReadBlockHeader(aData);
           case State::EXTENSION_HEADER:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- ext header\n", this);
             return ReadExtensionHeader(aData);
           case State::GRAPHIC_CONTROL_EXTENSION:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- graphic control ext\n", this);
             return ReadGraphicControlExtension(aData);
           case State::APPLICATION_IDENTIFIER:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- app id\n", this);
             return ReadApplicationIdentifier(aData);
           case State::NETSCAPE_EXTENSION_SUB_BLOCK:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- netscape ext sub block\n", this);
             return ReadNetscapeExtensionSubBlock(aData);
           case State::NETSCAPE_EXTENSION_DATA:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- netscape ext data\n", this);
             return ReadNetscapeExtensionData(aData);
           case State::IMAGE_DESCRIPTOR:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- image desc\n", this);
             return ReadImageDescriptor(aData);
           case State::FINISH_IMAGE_DESCRIPTOR:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- finish image desc\n", this);
             return FinishImageDescriptor(aData);
           case State::LOCAL_COLOR_TABLE:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- local color\n", this);
             return ReadLocalColorTable(aData, aLength);
           case State::FINISHED_LOCAL_COLOR_TABLE:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- finished local color\n", this);
             return FinishedLocalColorTable();
           case State::IMAGE_DATA_BLOCK:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- image data block\n", this);
             return ReadImageDataBlock(aData);
           case State::IMAGE_DATA_SUB_BLOCK:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- image data sub block\n", this);
             return ReadImageDataSubBlock(aData);
           case State::LZW_DATA:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- lzw\n", this);
             return ReadLZWData(aData, aLength);
           case State::SKIP_LZW_DATA:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- skip lzw\n", this);
             return Transition::ContinueUnbuffered(State::SKIP_LZW_DATA);
           case State::FINISHED_LZW_DATA:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- finished lzw\n", this);
             return Transition::To(State::IMAGE_DATA_SUB_BLOCK,
                                   SUB_BLOCK_HEADER_LEN);
           case State::SKIP_SUB_BLOCKS:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- skip sub blocks\n", this);
             return SkipSubBlocks(aData);
           case State::SKIP_DATA_THEN_SKIP_SUB_BLOCKS:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- skip data then sub blocks\n", this);
             return Transition::ContinueUnbuffered(
                 State::SKIP_DATA_THEN_SKIP_SUB_BLOCKS);
           case State::FINISHED_SKIPPING_DATA:
+            printf_stderr("[AO] [%p] nsGIFDecoder2::DoDecode -- finished skipping\n", this);
             return Transition::To(State::SKIP_SUB_BLOCKS, SUB_BLOCK_HEADER_LEN);
           default:
             MOZ_CRASH("Unknown State");
@@ -606,6 +633,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadBlockHeader(
 
     case GIF_TRAILER:
       FinishInternal();
+      printf_stderr("[AO] [%p] trailer block header terminate\n", this);
       return Transition::TerminateSuccess();
 
     default:
@@ -619,6 +647,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadBlockHeader(
         // The file is corrupt, but we successfully decoded some frames, so we
         // may as well consider the decode successful and display them.
         FinishInternal();
+        printf_stderr("[AO] [%p] default block header terminate\n", this);
         return Transition::TerminateSuccess();
       }
 
@@ -783,6 +812,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadImageDescriptor(
     // We're about to get a second frame, but we only want the first. Stop
     // decoding now.
     FinishInternal();
+    printf_stderr("[AO] [%p] first frame terminate\n", this);
     return Transition::TerminateSuccess();
   }
 
@@ -830,6 +860,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::FinishImageDescriptor(
     if (IsMetadataDecode() && !WantsFrameCount()) {
       CheckForTransparency(frameRect);
       FinishInternal();
+      printf_stderr("[AO] [%p] metadata terminate\n", this);
       return Transition::TerminateSuccess();
     }
   }
@@ -998,6 +1029,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadImageDataSubBlock(
   if (subBlockLength == 0) {
     // We hit the block terminator.
     EndImageFrame();
+    printf_stderr("[AO] [%p] nsGIFDecoder2::ReadImageDataSubBlock -- to block header\n", this);
     return Transition::To(State::BLOCK_HEADER, BLOCK_HEADER_LEN);
   }
 
@@ -1009,10 +1041,12 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadImageDataSubBlock(
       // This GIF is missing the block terminator for the final block; we'll put
       // up with it.
       FinishInternal();
+      printf_stderr("[AO] [%p] trailer sub block terminate\n", this);
       return Transition::TerminateSuccess();
     }
 
     // We're not at the end of the image, so just skip the extra data.
+    printf_stderr("[AO] [%p] nsGIFDecoder2::ReadImageDataSubBlock -- to skip lzw data\n", this);
     return Transition::ToUnbuffered(State::FINISHED_LZW_DATA,
                                     State::SKIP_LZW_DATA, subBlockLength);
   }
@@ -1020,6 +1054,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadImageDataSubBlock(
   // Handle the standard case: there's data in the sub-block and pixels left to
   // fill in the image. We read the sub-block unbuffered so we can get pixels on
   // the screen as soon as possible.
+  printf_stderr("[AO] [%p] nsGIFDecoder2::ReadImageDataSubBlock -- lzw data\n", this);
   return Transition::ToUnbuffered(State::FINISHED_LZW_DATA, State::LZW_DATA,
                                   subBlockLength);
 }
