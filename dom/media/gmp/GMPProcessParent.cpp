@@ -11,6 +11,8 @@
 #  include "WinUtils.h"
 #endif
 #include "GMPLog.h"
+#include "mozilla/GeckoArgs.h"
+#include "mozilla/ipc/ProcessChild.h"
 
 #include "base/string_util.h"
 #include "base/process_util.h"
@@ -82,6 +84,26 @@ GMPProcessParent::~GMPProcessParent() { MOZ_COUNT_DTOR(GMPProcessParent); }
 bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
   vector<string> args;
 
+  ipc::ProcessChild::AddPlatformBuildID(args);
+
+  // FIXME(aosmond) -- This is a blocking call back to the main thread. We can't
+  // land like this. We need to be able to do this asynchronously.
+  NS_DispatchAndSpinEventLoopUntilComplete(
+      "GMPProcessParent::Launch"_ns, mozilla::GetMainThreadSerialEventTarget(),
+      NS_NewRunnableFunction("GMPProcessParent::Launch", [this]() {
+        mPrefSerializer = MakeUnique<ipc::SharedPreferenceSerializer>();
+        if (!mPrefSerializer->SerializeToSharedMemory(GeckoProcessType_GMPlugin,
+                                                      /* remoteType */ ""_ns)) {
+          mPrefSerializer = nullptr;
+        }
+      }));
+
+  if (NS_WARN_IF(!mPrefSerializer)) {
+    return false;
+  }
+
+  mPrefSerializer->AddSharedPrefCmdLineArgs(*this, args);
+
 #ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
   GMP_LOG_DEBUG("GMPProcessParent::Launch() mLaunchArch: %d", mLaunchArch);
 #  if defined(XP_MACOSX)
@@ -124,6 +146,7 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
           !widget::WinUtils::ResolveJunctionPointsAndSymLinks(wGMPPath))) {
     GMP_LOG_DEBUG("ResolveJunctionPointsAndSymLinks failed for GMP path=%S",
                   wGMPPath.c_str());
+    mPrefSerializer = nullptr;
     return false;
   }
   GMP_LOG_DEBUG("GMPProcessParent::Launch() resolved path to %S",
@@ -144,12 +167,13 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
   }
 #  endif
 
-  args.push_back(WideToUTF8(wGMPPath));
+  std::string gmpPath = WideToUTF8(wGMPPath);
+  geckoargs::sPluginPath.Put(gmpPath.c_str(), args);
 #else
   if (NS_SUCCEEDED(rv)) {
-    args.push_back(normalizedPath.get());
+    geckoargs::sPluginPath.Put(normalizedPath.get(), args);
   } else {
-    args.push_back(mGMPPath);
+    geckoargs::sPluginPath.Put(mGMPPath.c_str(), args);
   }
 #endif
 
@@ -159,7 +183,13 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
   AddFdToRemap(kInvalidFd, kInvalidFd);
   AddFdToRemap(kInvalidFd, kInvalidFd);
 #endif
-  return SyncLaunch(args, aTimeoutMs);
+
+  if (!SyncLaunch(args, aTimeoutMs)) {
+    mPrefSerializer = nullptr;
+    return false;
+  }
+
+  return true;
 }
 
 void GMPProcessParent::Delete(nsCOMPtr<nsIRunnable> aCallback) {

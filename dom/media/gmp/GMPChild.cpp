@@ -9,6 +9,7 @@
 #include "base/task.h"
 #include "ChildProfilerController.h"
 #include "ChromiumCDMAdapter.h"
+#include "GeckoProfiler.h"
 #ifdef XP_LINUX
 #  include "dlfcn.h"
 #endif
@@ -38,6 +39,7 @@
 #include "nsThreadManager.h"
 #include "nsXULAppAPI.h"
 #include "nsIXULRuntime.h"
+#include "nsXPCOM.h"
 #include "prio.h"
 #ifdef XP_WIN
 #  include <stdlib.h>  // for _exit()
@@ -74,7 +76,7 @@ GMPChild::~GMPChild() {
 #endif
 }
 
-bool GMPChild::Init(const nsAString& aPluginPath,
+bool GMPChild::Init(const nsAString& aPluginPath, const char* aParentBuildID,
                     mozilla::ipc::UntypedEndpoint&& aEndpoint) {
   GMP_CHILD_LOG_DEBUG("%s pluginPath=%s", __FUNCTION__,
                       NS_ConvertUTF16toUTF8(aPluginPath).get());
@@ -89,7 +91,43 @@ bool GMPChild::Init(const nsAString& aPluginPath,
     return false;
   }
 
+  // This must be checked before any IPDL message, which may hit sentinel
+  // errors due to parent and content processes having different
+  // versions.
+  MessageChannel* channel = GetIPCChannel();
+  if (channel && !channel->SendBuildIDsMatchMessage(aParentBuildID)) {
+    // We need to quit this process if the buildID doesn't match the parent's.
+    // This can occur when an update occurred in the background.
+    ipc::ProcessChild::QuickExit();
+  }
+
   CrashReporterClient::InitSingleton(this);
+
+  if (NS_FAILED(NS_InitMinimalXPCOM())) {
+    return false;
+  }
+
+  nsAutoCString processName("GMP Process");
+
+  // Extract the plugin directory name if possible.
+  nsCOMPtr<nsIFile> libFile;
+  nsresult rv = NS_NewLocalFile(aPluginPath, true, getter_AddRefs(libFile));
+  if (NS_SUCCEEDED(rv)) {
+    nsCOMPtr<nsIFile> parent;
+    rv = libFile->GetParent(getter_AddRefs(parent));
+    if (NS_SUCCEEDED(rv)) {
+      nsAutoString parentLeafName;
+      rv = parent->GetLeafName(parentLeafName);
+      if (NS_SUCCEEDED(rv)) {
+        NS_ConvertUTF16toUTF8 pluginName(parentLeafName);
+        processName.AppendLiteral(" (");
+        processName.Append(pluginName);
+        processName.AppendLiteral(")");
+      }
+    }
+  }
+
+  profiler_set_process_name(processName);
 
   mPluginPath = aPluginPath;
 

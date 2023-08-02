@@ -360,7 +360,6 @@ nsresult nsComponentManagerImpl::Init() {
     // processes really need chrome manifests...?
     case GeckoProcessType_Default:
     case GeckoProcessType_Content:
-    case GeckoProcessType_GMPlugin:
       loadChromeManifests = true;
       break;
   }

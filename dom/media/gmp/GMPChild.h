@@ -29,7 +29,7 @@ class GMPChild : public PGMPChild {
 
   GMPChild();
 
-  bool Init(const nsAString& aPluginPath,
+  bool Init(const nsAString& aPluginPath, const char* aParentBuildID,
             mozilla::ipc::UntypedEndpoint&& aEndpoint);
   MessageLoop* GMPMessageLoop();
 
