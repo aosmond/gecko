@@ -1833,42 +1833,85 @@ mozilla::ipc::IPCResult GMPServiceParent::RecvLaunchGMP(
     return IPC_OK();
   }
 
-  if (!gmp->EnsureProcessLoaded(&result.pid())) {
-    result.pid() = base::kInvalidProcessId;
-    result.errorDescription() = "Process has not loaded."_ns;
-    aResolve(std::move(result));
-    return IPC_OK();
-  }
-
-  result.displayName() = gmp->GetDisplayName();
-
-  if (aAlreadyBridgedTo.Contains(result.pid())) {
-    aResolve(std::move(result));
-    return IPC_OK();
-  }
-
   Endpoint<PGMPContentParent> parent;
   Endpoint<PGMPContentChild> child;
-  rv = PGMPContent::CreateEndpoints(OtherPid(), result.pid(), &parent, &child);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    result.result() = rv;
-    result.errorDescription() = "PGMPContent::CreateEndpoints failed."_ns;
-    aResolve(std::move(result));
-    return IPC_OK();
+
+  switch (gmp->State()) {
+    case GMPStateLoaded:
+      // Process is already loaded, we can return right away.
+      result.displayName() = gmp->GetDisplayName();
+
+      if (aAlreadyBridgedTo.Contains(result.pid())) {
+        aResolve(std::move(result));
+        return IPC_OK();
+      }
+
+      rv = PGMPContent::CreateEndpoints(OtherPid(), result.pid(), &parent,
+                                        &child);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        result.result() = rv;
+        result.errorDescription() = "PGMPContent::CreateEndpoints failed."_ns;
+        aResolve(std::move(result));
+        return IPC_OK();
+      }
+
+      result.endpoint() = std::move(parent);
+
+      if (!gmp->SendInitGMPContentChild(std::move(child))) {
+        result.errorDescription() = "SendInitGMPContentChild failed."_ns;
+        return IPC_OK();
+      }
+
+      gmp->IncrementGMPContentChildCount();
+
+      result.result() = NS_OK;
+      aResolve(std::move(result));
+      return IPC_OK();
+    case GMPStateUnloading:
+    case GMPStateClosing:
+      // Process is shutting down, abort.
+      result.pid() = base::kInvalidProcessId;
+      result.errorDescription() = "Process has not loaded."_ns;
+      aResolve(std::move(result));
+      return IPC_OK();
+    case GMPStateNotLoaded:
+      // Process is not yet loaded, we need to initialize it.
+      if (!gmp->EnsureProcessLoaded(&result.pid())) {
+        result.pid() = base::kInvalidProcessId;
+        result.errorDescription() = "Process has not loaded."_ns;
+        aResolve(std::move(result));
+        return IPC_OK();
+      }
+
+      result.displayName() = gmp->GetDisplayName();
+
+      if (aAlreadyBridgedTo.Contains(result.pid())) {
+        aResolve(std::move(result));
+        return IPC_OK();
+      }
+
+      rv = PGMPContent::CreateEndpoints(OtherPid(), result.pid(), &parent,
+                                        &child);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        result.result() = rv;
+        result.errorDescription() = "PGMPContent::CreateEndpoints failed."_ns;
+        aResolve(std::move(result));
+        return IPC_OK();
+      }
+
+      result.endpoint() = std::move(parent);
+
+      if (!gmp->SendInitGMPContentChild(std::move(child))) {
+        result.errorDescription() = "SendInitGMPContentChild failed."_ns;
+        return IPC_OK();
+      }
+
+      gmp->IncrementGMPContentChildCount();
+
+      result.result() = NS_OK;
+      aResolve(std::move(result));
+      return IPC_OK();
   }
-
-  result.endpoint() = std::move(parent);
-
-  if (!gmp->SendInitGMPContentChild(std::move(child))) {
-    result.errorDescription() = "SendInitGMPContentChild failed."_ns;
-    return IPC_OK();
-  }
-
-  gmp->IncrementGMPContentChildCount();
-
-  result.result() = NS_OK;
-  aResolve(std::move(result));
-  return IPC_OK();
 }
 
 mozilla::ipc::IPCResult GMPServiceParent::RecvGetGMPNodeId(
