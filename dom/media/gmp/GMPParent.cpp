@@ -15,6 +15,7 @@
 #include "mozilla/dom/KeySystemNames.h"
 #include "mozilla/dom/WidevineCDMManifestBinding.h"
 #include "mozilla/FOGIPC.h"
+#include "mozilla/HangDetails.h"
 #include "mozilla/ipc/CrashReporterHost.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
@@ -427,6 +428,21 @@ mozilla::ipc::IPCResult GMPParent::RecvPGMPContentChildDestroyed() {
 mozilla::ipc::IPCResult GMPParent::RecvFOGData(ByteBuf&& aBuf) {
   GMP_PARENT_LOG_DEBUG("GMPParent RecvFOGData");
   glean::FOGData(std::move(aBuf));
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult GMPParent::RecvBHRThreadHang(
+    const HangDetails& aDetails) {
+  nsCOMPtr<nsIHangDetails> hangDetails =
+      new nsHangDetails(HangDetails(aDetails), PersistedToDisk::No);
+  NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "GMPParent::RecvBHRThreadHang", [hangDetails = std::move(hangDetails)] {
+        nsCOMPtr<nsIObserverService> obs =
+            mozilla::services::GetObserverService();
+        if (obs) {
+          obs->NotifyObservers(hangDetails, "bhr-thread-hang", nullptr);
+        }
+      }));
   return IPC_OK();
 }
 

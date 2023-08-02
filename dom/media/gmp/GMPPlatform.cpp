@@ -213,7 +213,13 @@ void InitPlatformAPI(GMPPlatformAPI& aPlatformAPI, GMPChild* aChild) {
 
 void SendFOGData(ipc::ByteBuf&& buf) {
   if (sChild) {
-    sChild->SendFOGData(std::move(buf));
+    Unused << sChild->SendFOGData(std::move(buf));
+  }
+}
+
+void SendBHRThreadHang(const HangDetails& aDetails) {
+  if (sChild) {
+    Unused << sChild->SendBHRThreadHang(aDetails);
   }
 }
 

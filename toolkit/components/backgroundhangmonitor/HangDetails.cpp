@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "HangDetails.h"
+#include "GMPPlatform.h"
 #include "nsIHangDetails.h"
 #include "nsPrintfCString.h"
 #include "js/Array.h"               // JS::NewArrayObject
@@ -300,6 +301,10 @@ void nsHangDetails::Submit() {
             }
             break;
           }
+          case GeckoProcessType_GMPlugin: {
+            mozilla::gmp::SendBHRThreadHang(hangDetails->mDetails);
+            break;
+          }
           case GeckoProcessType_GPU: {
             auto gp = gfx::GPUParent::GetSingleton();
             if (gp) {
@@ -316,8 +321,7 @@ void nsHangDetails::Submit() {
             break;
           }
           default:
-            // XXX: Consider handling GeckoProcessType_GMPlugin and
-            // GeckoProcessType_Plugin?
+            // XXX: Consider handling GeckoProcessType_RDD, Utility and Socket
             NS_WARNING("Unsupported BHR process type - discarding hang.");
             break;
         }
