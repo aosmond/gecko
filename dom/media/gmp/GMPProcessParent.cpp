@@ -82,26 +82,75 @@ GMPProcessParent::GMPProcessParent(const std::string& aGMPPath)
 GMPProcessParent::~GMPProcessParent() { MOZ_COUNT_DTOR(GMPProcessParent); }
 
 bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
-  vector<string> args;
+  class PrefSerializerRunnable final : public Runnable {
+   public:
+    PrefSerializerRunnable()
+        : Runnable("GMPProcessParent::PrefSerializerRunnable"),
+          mMonitor("GMPProcessParent::PrefSerializerRunnable::mMonitor") {}
 
-  ipc::ProcessChild::AddPlatformBuildID(args);
+    NS_IMETHOD Run() override {
+      auto prefSerializer = MakeUnique<ipc::SharedPreferenceSerializer>();
+      bool success =
+          prefSerializer->SerializeToSharedMemory(GeckoProcessType_GMPlugin,
+                                                  /* remoteType */ ""_ns);
 
-  // FIXME(aosmond) -- This is a blocking call back to the main thread. We can't
-  // land like this. We need to be able to do this asynchronously.
-  NS_DispatchAndSpinEventLoopUntilComplete(
-      "GMPProcessParent::Launch"_ns, mozilla::GetMainThreadSerialEventTarget(),
-      NS_NewRunnableFunction("GMPProcessParent::Launch", [this]() {
-        mPrefSerializer = MakeUnique<ipc::SharedPreferenceSerializer>();
-        if (!mPrefSerializer->SerializeToSharedMemory(GeckoProcessType_GMPlugin,
-                                                      /* remoteType */ ""_ns)) {
-          mPrefSerializer = nullptr;
+      MonitorAutoLock lock(mMonitor);
+      MOZ_ASSERT(!mComplete);
+      if (success) {
+        mPrefSerializer = std::move(prefSerializer);
+      }
+      mComplete = true;
+      lock.Notify();
+      return NS_OK;
+    }
+
+    void Wait(int32_t aTimeoutMs,
+              UniquePtr<ipc::SharedPreferenceSerializer>& aOut) {
+      MonitorAutoLock lock(mMonitor);
+
+      if (!mComplete) {
+        TimeDuration timeout = TimeDuration::FromMilliseconds(aTimeoutMs);
+        while (true) {
+          if (lock.Wait(timeout) == CVStatus::Timeout || mComplete) {
+            break;
+          }
+          if (mComplete) {
+            return;
+          }
         }
-      }));
+      }
 
+      aOut = std::move(mPrefSerializer);
+    }
+
+   private:
+    Monitor mMonitor;
+    UniquePtr<ipc::SharedPreferenceSerializer> mPrefSerializer;
+    bool mComplete = false;
+  };
+
+  // Dispatch our runnable to the main thread to grab the serialized prefs. We
+  // can only do this on the main thread, and unfortunately we are the only
+  // process that launches from the non-main thread.
+  auto prefTask = MakeRefPtr<PrefSerializerRunnable>();
+  nsresult rv = NS_DispatchToMainThread(prefTask);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return false;
+  }
+
+  // We don't want to release our thread context while we wait for the main
+  // thread to process the prefs. We already block when waiting for the launch
+  // of the process itself to finish, and the state machine assumes this call is
+  // blocking. This is also important for the buffering of pref updates, since
+  // we know any tasks dispatched with updates won't run until we launch (or
+  // fail to launch) the process.
+  prefTask->Wait(aTimeoutMs, mPrefSerializer);
   if (NS_WARN_IF(!mPrefSerializer)) {
     return false;
   }
 
+  vector<string> args;
+  ipc::ProcessChild::AddPlatformBuildID(args);
   mPrefSerializer->AddSharedPrefCmdLineArgs(*this, args);
 
 #ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
@@ -122,7 +171,7 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
 #else
   nsAutoCString normalizedPath;
 #endif
-  nsresult rv = NormalizePath(mGMPPath.c_str(), normalizedPath);
+  rv = NormalizePath(mGMPPath.c_str(), normalizedPath);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     GMP_LOG_DEBUG(
         "GMPProcessParent::Launch: "
