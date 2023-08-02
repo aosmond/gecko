@@ -690,6 +690,12 @@ mozilla::ipc::IPCResult GMPChild::RecvInitProfiler(
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult GMPChild::RecvPreferenceUpdate(
+    const Pref& aPref) {
+  Preferences::SetPreference(aPref);
+  return IPC_OK();
+}
+
 }  // namespace gmp
 }  // namespace mozilla
 

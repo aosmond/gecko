@@ -401,8 +401,17 @@ nsresult GMPParent::LoadProcess() {
   }
 
   mState = GMPStateLoaded;
+  mHasProcess = true;
 
   return NS_OK;
+}
+
+void GMPParent::OnPreferenceChange(const mozilla::dom::Pref& aPref) {
+  if (!mProcess) {
+    return;
+  }
+
+  Unused << SendPreferenceUpdate(aPref);
 }
 
 mozilla::ipc::IPCResult GMPParent::RecvPGMPContentChildDestroyed() {
@@ -528,6 +537,8 @@ void GMPParent::ChildTerminated() {
 void GMPParent::DeleteProcess() {
   MOZ_ASSERT(GMPEventTarget()->IsOnCurrentThread());
   GMP_PARENT_LOG_DEBUG("%s", __FUNCTION__);
+
+  mHasProcess = false;
 
   if (mState != GMPStateClosing) {
     // Don't Close() twice!

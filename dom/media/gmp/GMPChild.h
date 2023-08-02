@@ -75,6 +75,8 @@ class GMPChild : public PGMPChild {
   mozilla::ipc::IPCResult RecvInitProfiler(
       Endpoint<mozilla::PProfilerChild>&& aEndpoint);
 
+  mozilla::ipc::IPCResult RecvPreferenceUpdate(const Pref& aPref);
+
   void ActorDestroy(ActorDestroyReason aWhy) override;
   void ProcessingError(Result aCode, const char* aReason) override;
 
