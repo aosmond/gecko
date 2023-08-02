@@ -21,6 +21,7 @@
 #include "nsString.h"
 #include "nsTArray.h"
 #include "nsIFile.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/MozPromise.h"
 
 namespace mozilla::gmp {
@@ -90,6 +91,9 @@ class GMPParent final
 
   GMPState State() const;
   nsCOMPtr<nsISerialEventTarget> GMPEventTarget();
+
+  bool HasProcess() const { return mHasProcess; }
+  void OnPreferenceChange(const mozilla::dom::Pref& aPref);
 
   // A GMP can either be a single instance shared across all NodeIds (like
   // in the OpenH264 case), or we can require a new plugin instance for every
@@ -217,6 +221,8 @@ class GMPParent final
   bool mIsBlockingDeletion;
 
   bool mCanDecrypt;
+
+  Atomic<bool> mHasProcess{false};
 
   nsTArray<RefPtr<GMPTimerParent>> mTimers;
   nsTArray<RefPtr<GMPStorageParent>> mStorage;

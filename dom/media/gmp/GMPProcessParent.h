@@ -12,6 +12,7 @@
 #include "base/file_path.h"
 #include "base/thread.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
+#include "mozilla/ipc/ProcessUtils.h"
 #include "nsIFile.h"
 
 class nsIRunnable;
@@ -62,6 +63,7 @@ class GMPProcessParent final : public mozilla::ipc::GeckoChildProcessHost {
 
   std::string mGMPPath;
   nsCOMPtr<nsIRunnable> mDeletedCallback;
+  UniquePtr<ipc::SharedPreferenceSerializer> mPrefSerializer{};
 
 #if defined(XP_MACOSX) && defined(MOZ_SANDBOX)
   // Indicates whether we'll start the Mac GMP sandbox during
