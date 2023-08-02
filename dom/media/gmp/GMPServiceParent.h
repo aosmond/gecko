@@ -257,17 +257,15 @@ class GMPServiceParent final : public PGMPServiceParent {
   ipc::IPCResult RecvGetGMPNodeId(const nsAString& aOrigin,
                                   const nsAString& aTopLevelOrigin,
                                   const nsAString& aGMPName,
-                                  nsCString* aID) override;
+                                  GetGMPNodeIdResolver&& aResolve) override;
 
   static bool Create(Endpoint<PGMPServiceParent>&& aGMPService);
 
-  ipc::IPCResult RecvLaunchGMP(
-      const NodeIdVariant& aNodeIdVariant, const nsACString& aAPI,
-      nsTArray<nsCString>&& aTags, nsTArray<ProcessId>&& aAlreadyBridgedTo,
-      uint32_t* aOutPluginId, GMPPluginType* aOutPluginType,
-      ProcessId* aOutProcessId, nsCString* aOutDisplayName,
-      Endpoint<PGMPContentParent>* aOutEndpoint, nsresult* aOutRv,
-      nsCString* aOutErrorDescription) override;
+  ipc::IPCResult RecvLaunchGMP(const NodeIdVariant& aNodeIdVariant,
+                               const nsACString& aAPI,
+                               nsTArray<nsCString>&& aTags,
+                               nsTArray<ProcessId>&& aAlreadyBridgedTo,
+                               LaunchGMPResolver&& aResolve) override;
 
  private:
   ~GMPServiceParent();

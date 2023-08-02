@@ -10,6 +10,7 @@
 #include "gmp-video-frame-encoded.h"
 #include "ipc/EnumSerializer.h"
 #include "ipc/IPCMessageUtilsSpecializations.h"
+#include "mozilla/ipc/ProtocolMessageUtils.h"
 #include "GMPNativeTypes.h"
 #include "GMPSanitizedExports.h"
 
@@ -182,6 +183,34 @@ struct ParamTraits<GMPVideoCodec> {
     }
 
     return true;
+  }
+};
+
+template <>
+struct ParamTraits<GMPLaunchResult> {
+  typedef GMPLaunchResult paramType;
+
+  static void Write(MessageWriter* aWriter, paramType&& aParam) {
+    WriteParam(aWriter, aParam.mPluginId);
+    WriteParam(aWriter, aParam.mPluginType);
+    WriteParam(aWriter, aParam.mPid);
+    WriteParam(aWriter, aParam.mDisplayName);
+    WriteParam(aWriter, std::move(aParam.mEndpoint));
+    WriteParam(aWriter, aParam.mResult);
+    WriteParam(aWriter, aParam.mErrorDescription);
+  }
+
+  static bool Read(MessageReader* aReader, paramType* aResult) {
+    if (ReadParam(aReader, &(aResult->mPluginId)) &&
+        ReadParam(aReader, &(aResult->mPluginType)) &&
+        ReadParam(aReader, &(aResult->mPid)) &&
+        ReadParam(aReader, &(aResult->mDisplayName)) &&
+        ReadParam(aReader, &(aResult->mEndpoint)) &&
+        ReadParam(aReader, &(aResult->mResult)) &&
+        ReadParam(aReader, &(aResult->mErrorDescription))) {
+      return true;
+    }
+    return false;
   }
 };
 

@@ -6,12 +6,37 @@
 #ifndef GMPNativeTypes_h_
 #define GMPNativeTypes_h_
 
+#include "base/process.h"
+#include "mozilla/ipc/Endpoint.h"
+#include "nsString.h"
+
+namespace mozilla::gmp {
+class PGMPContentParent;
+}  // namespace mozilla::gmp
+
 enum class GMPPluginType {
   Unknown,
   Fake,
   Clearkey,
   OpenH264,
   Widevine,
+};
+
+struct GMPLaunchResult {
+  GMPLaunchResult(const GMPLaunchResult&) = delete;
+  GMPLaunchResult& operator=(const GMPLaunchResult&) = delete;
+
+  GMPLaunchResult() = default;
+  GMPLaunchResult(GMPLaunchResult&& aOther) = default;
+  GMPLaunchResult& operator=(GMPLaunchResult&& aOther) = default;
+
+  uint32_t mPluginId = 0;
+  GMPPluginType mPluginType = GMPPluginType::Unknown;
+  base::ProcessId mPid = base::kInvalidProcessId;
+  nsCString mDisplayName;
+  mozilla::ipc::Endpoint<mozilla::gmp::PGMPContentParent> mEndpoint;
+  nsresult mResult = NS_ERROR_FAILURE;
+  nsCString mErrorDescription;
 };
 
 #endif

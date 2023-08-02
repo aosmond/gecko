@@ -1794,82 +1794,79 @@ GMPServiceParent::~GMPServiceParent() {
 mozilla::ipc::IPCResult GMPServiceParent::RecvLaunchGMP(
     const NodeIdVariant& aNodeIdVariant, const nsACString& aAPI,
     nsTArray<nsCString>&& aTags, nsTArray<ProcessId>&& aAlreadyBridgedTo,
-    uint32_t* aOutPluginId, GMPPluginType* aOutPluginType,
-    ProcessId* aOutProcessId, nsCString* aOutDisplayName,
-    Endpoint<PGMPContentParent>* aOutEndpoint, nsresult* aOutRv,
-    nsCString* aOutErrorDescription) {
+    LaunchGMPResolver&& aResolve) {
+  GMPLaunchResult result;
+
   if (mService->IsShuttingDown()) {
-    *aOutRv = NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
-    *aOutErrorDescription = "Service is shutting down."_ns;
-    *aOutPluginId = 0;
-    *aOutPluginType = GMPPluginType::Unknown;
+    result.mResult = NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
+    result.mErrorDescription = "Service is shutting down."_ns;
+    aResolve(std::move(result));
     return IPC_OK();
   }
 
   nsCString nodeIdString;
   nsresult rv = mService->GetNodeId(aNodeIdVariant, nodeIdString);
   if (!NS_SUCCEEDED(rv)) {
-    *aOutRv = rv;
-    *aOutErrorDescription = "GetNodeId failed."_ns;
-    *aOutPluginId = 0;
-    *aOutPluginType = GMPPluginType::Unknown;
+    result.mResult = rv;
+    result.mErrorDescription = "GetNodeId failed."_ns;
+    aResolve(std::move(result));
     return IPC_OK();
   }
 
   RefPtr<GMPParent> gmp =
       mService->SelectPluginForAPI(nodeIdString, aAPI, aTags);
   if (gmp) {
-    *aOutPluginId = gmp->GetPluginId();
-    *aOutPluginType = gmp->GetPluginType();
+    result.mPluginId = gmp->GetPluginId();
+    result.mPluginType = gmp->GetPluginType();
   } else {
-    *aOutRv = NS_ERROR_FAILURE;
-    *aOutErrorDescription = "SelectPluginForAPI returns nullptr."_ns;
-    *aOutPluginId = 0;
-    *aOutPluginType = GMPPluginType::Unknown;
+    result.mErrorDescription = "SelectPluginForAPI returns nullptr."_ns;
+    aResolve(std::move(result));
     return IPC_OK();
   }
 
-  if (!gmp->EnsureProcessLoaded(aOutProcessId)) {
-    *aOutRv = NS_ERROR_FAILURE;
-    *aOutErrorDescription = "Process has not loaded."_ns;
+  if (!gmp->EnsureProcessLoaded(&result.mPid)) {
+    result.mErrorDescription = "Process has not loaded."_ns;
+    aResolve(std::move(result));
     return IPC_OK();
   }
 
-  *aOutDisplayName = gmp->GetDisplayName();
+  result.mDisplayName = gmp->GetDisplayName();
 
-  if (aAlreadyBridgedTo.Contains(*aOutProcessId)) {
-    *aOutRv = NS_OK;
+  if (aAlreadyBridgedTo.Contains(result.mPid)) {
+    aResolve(std::move(result));
     return IPC_OK();
   }
 
   Endpoint<PGMPContentParent> parent;
   Endpoint<PGMPContentChild> child;
-  rv =
-      PGMPContent::CreateEndpoints(OtherPid(), *aOutProcessId, &parent, &child);
+  rv = PGMPContent::CreateEndpoints(OtherPid(), result.mPid, &parent, &child);
   if (NS_WARN_IF(NS_FAILED(rv))) {
-    *aOutRv = rv;
-    *aOutErrorDescription = "PGMPContent::CreateEndpoints failed."_ns;
+    result.mResult = rv;
+    result.mErrorDescription = "PGMPContent::CreateEndpoints failed."_ns;
+    aResolve(std::move(result));
     return IPC_OK();
   }
 
-  *aOutEndpoint = std::move(parent);
+  result.mEndpoint = std::move(parent);
 
   if (!gmp->SendInitGMPContentChild(std::move(child))) {
-    *aOutRv = NS_ERROR_FAILURE;
-    *aOutErrorDescription = "SendInitGMPContentChild failed."_ns;
+    result.mErrorDescription = "SendInitGMPContentChild failed."_ns;
     return IPC_OK();
   }
 
   gmp->IncrementGMPContentChildCount();
 
-  *aOutRv = NS_OK;
+  result.mResult = NS_OK;
+  aResolve(std::move(result));
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult GMPServiceParent::RecvGetGMPNodeId(
     const nsAString& aOrigin, const nsAString& aTopLevelOrigin,
-    const nsAString& aGMPName, nsCString* aID) {
-  nsresult rv = mService->GetNodeId(aOrigin, aTopLevelOrigin, aGMPName, *aID);
+    const nsAString& aGMPName, GetGMPNodeIdResolver&& aResolve) {
+  nsCString id;
+  nsresult rv = mService->GetNodeId(aOrigin, aTopLevelOrigin, aGMPName, id);
+  aResolve(id);
   if (!NS_SUCCEEDED(rv)) {
     return IPC_FAIL(
         this,
