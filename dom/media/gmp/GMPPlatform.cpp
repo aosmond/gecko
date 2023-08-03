@@ -223,6 +223,17 @@ void SendBHRThreadHang(const HangDetails& aDetails) {
   }
 }
 
+#ifdef XP_WIN
+RefPtr<GetModulesTrustIpcPromise> SendGetModulesTrust(
+    ModulePaths&& aModules, bool aRunAtNormalPriority) {
+  if (!sChild) {
+    return GetModulesTrustIpcPromise::CreateAndReject(
+        ipc::ResponseRejectReason::SendError, __func__);
+  }
+  return sChild->SendGetModulesTrust(std::move(aModules), aRunAtNormalPriority);
+}
+#endif
+
 GMPThreadImpl::GMPThreadImpl() : mMutex("GMPThreadImpl"), mThread("GMPThread") {
   MOZ_COUNT_CTOR(GMPThread);
 }

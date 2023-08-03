@@ -6,11 +6,16 @@
 #ifndef GMPPlatform_h_
 #define GMPPlatform_h_
 
+#include "mozilla/RefPtr.h"
 #include "gmp-platform.h"
 #include <functional>
 
 namespace mozilla {
 class HangDetails;
+class GetModulesTrustIpcPromise;
+#ifdef XP_WIN
+struct ModulePaths;
+#endif
 
 namespace ipc {
 class ByteBuf;
@@ -31,6 +36,11 @@ GMPErr SetTimerOnMainThread(GMPTask* aTask, int64_t aTimeoutMS);
 void SendFOGData(ipc::ByteBuf&& buf);
 
 void SendBHRThreadHang(const HangDetails& aDetails);
+
+#ifdef XP_WIN
+RefPtr<GetModulesTrustIpcPromise> SendGetModulesTrust(ModulePaths&& aModules,
+                                                      bool aRunNormal);
+#endif
 
 }  // namespace gmp
 }  // namespace mozilla

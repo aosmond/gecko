@@ -39,6 +39,7 @@
 #include "runnable_utils.h"
 #ifdef XP_WIN
 #  include "mozilla/FileUtilsWin.h"
+#  include "mozilla/WinDllServices.h"
 #  include "WMFDecoderModule.h"
 #endif
 #if defined(MOZ_WIDGET_ANDROID)
@@ -443,6 +444,45 @@ mozilla::ipc::IPCResult GMPParent::RecvBHRThreadHang(
       }));
   return IPC_OK();
 }
+
+#if defined(XP_WIN)
+mozilla::ipc::IPCResult GMPParent::RecvGetModulesTrust(
+    ModulePaths&& aModPaths, bool aRunAtNormalPriority,
+    GetModulesTrustResolver&& aResolver) {
+  class ModulesTrustRunnable final : public Runnable {
+   public:
+    ModulesTrustRunnable(ModulePaths&& aModPaths, bool aRunAtNormalPriority,
+                         GetModulesTrustResolver&& aResolver)
+        : mModPaths(std::move(aModPaths)),
+          mResolver(std::move(aResolver)),
+          mEventTarget(GetCurrentSerialEventTarget()),
+          mRunAtNormalPriority(aRunAtNormalPriority) {}
+
+    NS_IMETHOD Run() override {
+      RefPtr<DllServices> dllSvc(DllServices::Get());
+      dllSvc->GetModulesTrust(std::move(mModPaths), mRunAtNormalPriority)
+          ->Then(
+              mEventTarget, __func__,
+              [self = RefPtr{this}](ModulesMapResult&& aResult) {
+                self->mResolver(Some(ModulesMapResult(std::move(aResult))));
+              },
+              [self = RefPtr{this}](nsresult aRv) {
+                self->mResolver(Nothing());
+              });
+    }
+
+   private:
+    ModulePaths mModPaths;
+    GetModulesTrustResolver mResolver;
+    nsCOMPtr<nsISerialEventTarget> mEventTarget;
+    bool aRunAtNormalPriority;
+  };
+
+  NS_DispatchToMainThread(MakeAndAddRef<ModulesTrustRunnable>(
+      std::move(aModPaths), aRunAtNormalPriority, std::move(aResolver)));
+  return IPC_OK();
+}
+#endif  // defined(XP_WIN)
 
 void GMPParent::CloseIfUnused() {
   MOZ_ASSERT(GMPEventTarget()->IsOnCurrentThread());

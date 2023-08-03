@@ -77,6 +77,15 @@ class GMPChild : public PGMPChild {
 
   mozilla::ipc::IPCResult RecvPreferenceUpdate(const Pref& aPref);
 
+#if defined(XP_WIN)
+  mozilla::ipc::IPCResult RecvStartWindowsUtilsService(
+      Endpoint<PWindowsUtilsChild>&& aEndpoint);
+
+  mozilla::ipc::IPCResult RecvGetUntrustedModulesData(
+      GetUntrustedModulesDataResolver&& aResolver);
+  mozilla::ipc::IPCResult RecvUnblockUntrustedModulesThread();
+#endif  // defined(XP_WIN)
+
   void ActorDestroy(ActorDestroyReason aWhy) override;
   void ProcessingError(Result aCode, const char* aReason) override;
 
