@@ -69,6 +69,11 @@ class GMPChild : public PGMPChild {
   mozilla::ipc::IPCResult RecvInitGMPContentChild(
       Endpoint<PGMPContentChild>&& aEndpoint);
 
+  mozilla::ipc::IPCResult RecvRequestMemoryReport(
+      const uint32_t& aGeneration, const bool& aAnonymize,
+      const bool& aMinimizeMemoryUsage, const Maybe<FileDescriptor>& aDMDFile,
+      const RequestMemoryReportResolver& aResolver);
+
   mozilla::ipc::IPCResult RecvFlushFOGData(FlushFOGDataResolver&& aResolver);
 
   mozilla::ipc::IPCResult RecvTestTriggerMetrics(

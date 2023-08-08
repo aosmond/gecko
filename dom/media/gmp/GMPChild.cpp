@@ -26,6 +26,7 @@
 #include "GMPVideoEncoderChild.h"
 #include "GMPVideoHost.h"
 #include "mozilla/Algorithm.h"
+#include "mozilla/dom/MemoryReportRequest.h"
 #include "mozilla/FOGIPC.h"
 #include "mozilla/glean/GleanMetrics.h"
 #include "mozilla/ipc/CrashReporterClient.h"
@@ -700,6 +701,31 @@ mozilla::ipc::IPCResult GMPChild::RecvInitProfiler(
 
 mozilla::ipc::IPCResult GMPChild::RecvPreferenceUpdate(const Pref& aPref) {
   Preferences::SetPreference(aPref);
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult GMPChild::RecvRequestMemoryReport(
+    const uint32_t& aGeneration, const bool& aAnonymize,
+    const bool& aMinimizeMemoryUsage, const Maybe<FileDescriptor>& aDMDFile,
+    const RequestMemoryReportResolver& aResolver) {
+  nsAutoCString processName;
+  nsAutoCString pluginName;
+  if (GetPluginName(pluginName)) {
+    processName.AppendPrintf("GMPlugin (%s, pid %u)", pluginName.Data(),
+                             (uint32_t)base::GetCurrentProcId());
+  } else {
+    processName.AppendPrintf("GMPlugin (pid %u)",
+                             (uint32_t)base::GetCurrentProcId());
+  }
+
+  dom::MemoryReportRequestClient::Start(
+      aGeneration, aAnonymize, aMinimizeMemoryUsage, aDMDFile, processName,
+      [self = RefPtr{this}](const MemoryReport& aReport) {
+        if (self->CanSend()) {
+          Unused << self->SendAddMemoryReport(aReport);
+        }
+      },
+      aResolver);
   return IPC_OK();
 }
 

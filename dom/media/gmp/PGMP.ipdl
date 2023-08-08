@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include HangTypes;
+include MemoryReportTypes;
 include PrefsTypes;
 include protocol PGMPContent;
 include protocol PGMPTimer;
@@ -38,6 +39,8 @@ parent:
 
   async PGMPContentChildDestroyed();
 
+  async AddMemoryReport(MemoryReport aReport);
+
   // Sent from time-to-time to limit the amount of telemetry vulnerable to loss
   // Buffer contains bincoded Rust structs.
   // https://firefox-source-docs.mozilla.org/toolkit/components/glean/dev/ipc.html
@@ -59,6 +62,12 @@ child:
   async InitGMPContentChild(Endpoint<PGMPContentChild> endpoint);
   async InitProfiler(Endpoint<PProfilerChild> endpoint);
   async PreferenceUpdate(Pref pref);
+
+  async RequestMemoryReport(uint32_t generation,
+                            bool anonymize,
+                            bool minimizeMemoryUsage,
+                            FileDescriptor? DMDFile)
+      returns (uint32_t aGeneration);
 
   // Tells the GMP process to flush any pending telemetry.
   // Used in tests and ping assembly. Buffer contains bincoded Rust structs.

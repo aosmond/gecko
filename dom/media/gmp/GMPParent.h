@@ -170,6 +170,8 @@ class GMPParent final
 
   mozilla::ipc::IPCResult RecvPGMPContentChildDestroyed();
 
+  mozilla::ipc::IPCResult RecvAddMemoryReport(const MemoryReport& aReport);
+
   mozilla::ipc::IPCResult RecvFOGData(ByteBuf&& aBuf);
 
   mozilla::ipc::IPCResult RecvBHRThreadHang(const HangDetails& aHangDetails);

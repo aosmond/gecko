@@ -436,6 +436,16 @@ mozilla::ipc::IPCResult GMPParent::RecvPGMPContentChildDestroyed() {
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult GMPParent::RecvAddMemoryReport(
+    const MemoryReport& aReport) {
+#if 0
+  if (mMemoryReportRequest) {
+    mMemoryReportRequest->RecvReport(aReport);
+  }
+#endif
+  return IPC_OK();
+}
+
 mozilla::ipc::IPCResult GMPParent::RecvFOGData(ByteBuf&& aBuf) {
   GMP_PARENT_LOG_DEBUG("GMPParent RecvFOGData");
   glean::FOGData(std::move(aBuf));
