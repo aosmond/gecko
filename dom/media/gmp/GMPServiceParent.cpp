@@ -61,9 +61,61 @@ namespace mozilla::gmp {
 
 static const uint32_t NodeIdSaltLength = 32;
 
+class GMPMemoryReporter final : public MemoryReportingProcess {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GMPMemoryReporter, override)
+
+  explicit GMPMemoryReporter(GMPParent* aGMPParent) : mGMPParent(aGMPParent) {}
+
+  bool IsAlive() const override { return mGMPParent->CanSend(); }
+
+  bool SendRequestMemoryReport(
+      const uint32_t& aGeneration, const bool& aAnonymize,
+      const bool& aMinimizeMemoryUsage,
+      const Maybe<ipc::FileDescriptor>& aDMDFile) override {
+    nsCOMPtr<nsISerialEventTarget> target = mGMPParent->GMPEventTarget();
+    if (NS_WARN_IF(!target)) {
+      return false;
+    }
+
+    Maybe<ipc::FileDescriptor> dmdFile(aDMDFile);
+    if (!target->IsOnCurrentThread()) {
+      return NS_SUCCEEDED(target->Dispatch(
+          NewRunnableMethod<uint32_t, bool, bool, Maybe<ipc::FileDescriptor>&&>(
+              "gmp::GMPMemoryReporter::SendRequestMemoryReportInternal", this,
+              &GMPMemoryReporter::SendRequestMemoryReportInternal, aGeneration,
+              aAnonymize, aMinimizeMemoryUsage, std::move(dmdFile))));
+    }
+
+    return SendRequestMemoryReportInternal(
+        aGeneration, aAnonymize, aMinimizeMemoryUsage, std::move(dmdFile));
+  }
+
+  int32_t Pid() const override {
+    if (!mGMPParent->CanSend()) {
+      return 0;
+    }
+    return (int32_t)mGMPParent->OtherPidMaybeInvalid();
+  }
+
+ private:
+  bool SendRequestMemoryReportInternal(uint32_t aGeneration, bool aAnonymize,
+                                       bool aMinimizeMemoryUsage,
+                                       Maybe<ipc::FileDescriptor>&& aDMDFile) {
+    return mGMPParent->SendRequestMemoryReport(aGeneration, aAnonymize,
+                                               aMinimizeMemoryUsage, aDMDFile);
+  }
+
+  ~GMPMemoryReporter() override = default;
+
+  RefPtr<GMPParent> mGMPParent;
+};
+
 already_AddRefed<GeckoMediaPluginServiceParent>
 GeckoMediaPluginServiceParent::GetSingleton() {
-  MOZ_ASSERT(XRE_IsParentProcess());
+  if (!XRE_IsParentProcess()) {
+    return nullptr;
+  }
   RefPtr<GeckoMediaPluginService> service(
       GeckoMediaPluginServiceParent::GetGeckoMediaPluginService());
 #ifdef DEBUG
@@ -479,7 +531,7 @@ void GeckoMediaPluginServiceParent::UnloadPlugins() {
     MutexAutoLock lock(mMutex);
     // Move all plugins references to a local array. This way mMutex won't be
     // locked when calling CloseActive (to avoid inter-locking).
-    std::swap(plugins, mPlugins);
+    plugins = std::move(mPlugins);
 
     for (GMPServiceParent* parent : mServiceParents) {
       Unused << parent->SendBeginShutdown();
@@ -673,6 +725,23 @@ void GeckoMediaPluginServiceParent::UpdateContentProcessGMPCapabilities(
   MOZ_ASSERT(obsService);
   if (obsService) {
     obsService->NotifyObservers(nullptr, "gmp-changed", nullptr);
+  }
+}
+
+void GeckoMediaPluginServiceParent::GetProcessMemoryReporter(
+    nsTArray<RefPtr<MemoryReportingProcess>>& aOut) {
+  MOZ_ASSERT(NS_IsMainThread());
+  MutexAutoLock lock(mMutex);
+
+  for (const RefPtr<GMPParent>& gmp : mPlugins) {
+    if (gmp->State() != GMPState::Loaded) {
+      // Plugins that are not in the Loaded state have no process attached to
+      // them, and any IPC we would attempt to send them would be ignored (or
+      // result in a warning on debug builds).
+      continue;
+    }
+
+    aOut.AppendElement(MakeAndAddRef<GMPMemoryReporter>(gmp));
   }
 }
 

@@ -1725,6 +1725,10 @@ class GMPSandboxPolicy : public SandboxPolicyCommon {
         return If(pid == 0, Allow()).Else(Trap(SchedTrap, nullptr));
       }
 
+      // For memory reporting.
+      case __NR_getrusage:
+        return Allow();
+
       // For clock(3) on older glibcs; bug 1304220.
       case __NR_times:
         return Allow();

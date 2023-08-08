@@ -13,6 +13,7 @@
 #include "MediaResult.h"
 #include "mozIGeckoMediaPluginService.h"
 #include "mozilla/dom/KeySystemNames.h"
+#include "mozilla/dom/MemoryReportRequest.h"
 #include "mozilla/dom/WidevineCDMManifestBinding.h"
 #include "mozilla/FOGIPC.h"
 #include "mozilla/HangDetails.h"
@@ -87,6 +88,10 @@ GMPParent::~GMPParent() {
   // This method is not restricted to a specific thread.
   GMP_PARENT_LOG_DEBUG("GMPParent dtor id=%u", mPluginId);
   MOZ_ASSERT(!mProcess);
+  if (mMemoryReportRequest) {
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+        __func__, [report = std::move(mMemoryReportRequest)]() {}));
+  }
 }
 
 void GMPParent::CloneFrom(const GMPParent* aOther) {
@@ -433,6 +438,43 @@ mozilla::ipc::IPCResult GMPParent::RecvPGMPContentChildDestroyed() {
   if (!IsUsed()) {
     CloseIfUnused();
   }
+  return IPC_OK();
+}
+
+bool GMPParent::SendRequestMemoryReport(
+    uint32_t aGeneration, bool aAnonymize, bool aMinimizeMemoryUsage,
+    const Maybe<ipc::FileDescriptor>& aDMDFile) {
+  NS_DispatchToMainThread(
+      NS_NewRunnableFunction(__func__, [self = RefPtr{this}, aGeneration]() {
+        self->mMemoryReportRequest =
+            MakeUnique<dom::MemoryReportRequestHost>(aGeneration);
+      }));
+
+  PGMPParent::SendRequestMemoryReport(aGeneration, aAnonymize,
+                                      aMinimizeMemoryUsage, aDMDFile)
+      ->Then(
+          GetMainThreadSerialEventTarget(), __func__,
+          [self = RefPtr{this}](const uint32_t& aGeneration2) {
+            if (self->mMemoryReportRequest) {
+              self->mMemoryReportRequest->Finish(aGeneration2);
+              self->mMemoryReportRequest = nullptr;
+            }
+          },
+          [self = RefPtr{this}](const mozilla::ipc::ResponseRejectReason&) {
+            self->mMemoryReportRequest = nullptr;
+          });
+
+  return true;
+}
+
+mozilla::ipc::IPCResult GMPParent::RecvAddMemoryReport(
+    const MemoryReport& aReport) {
+  NS_DispatchToMainThread(NS_NewRunnableFunction(
+      "GMPParent::RecvAddMemoryReport", [self = RefPtr{this}, aReport]() {
+        if (self->mMemoryReportRequest) {
+          self->mMemoryReportRequest->RecvReport(aReport);
+        }
+      }));
   return IPC_OK();
 }
 

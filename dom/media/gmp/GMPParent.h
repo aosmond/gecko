@@ -24,7 +24,12 @@
 #include "mozilla/Atomics.h"
 #include "mozilla/MozPromise.h"
 
-namespace mozilla::gmp {
+namespace mozilla {
+namespace dom {
+class MemoryReportRequestHost;
+}
+
+namespace gmp {
 
 class GMPCapability {
  public:
@@ -142,6 +147,10 @@ class GMPParent final
     return mCapabilities;
   }
 
+  bool SendRequestMemoryReport(uint32_t aGeneration, bool aAnonymize,
+                               bool aMinimizeMemoryUsage,
+                               const Maybe<ipc::FileDescriptor>& aDMDFile);
+
  private:
   ~GMPParent();
   void UpdatePluginType();
@@ -169,6 +178,8 @@ class GMPParent final
   bool DeallocPGMPTimerParent(PGMPTimerParent* aActor);
 
   mozilla::ipc::IPCResult RecvPGMPContentChildDestroyed();
+
+  mozilla::ipc::IPCResult RecvAddMemoryReport(const MemoryReport& aReport);
 
   mozilla::ipc::IPCResult RecvFOGData(ByteBuf&& aBuf);
 
@@ -247,8 +258,10 @@ class GMPParent final
 #endif
 
   const nsCOMPtr<nsISerialEventTarget> mMainThread;
+  UniquePtr<dom::MemoryReportRequestHost> mMemoryReportRequest{};
 };
 
-}  // namespace mozilla::gmp
+}  // namespace gmp
+}  // namespace mozilla
 
 #endif  // GMPParent_h_
