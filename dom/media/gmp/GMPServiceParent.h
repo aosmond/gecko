@@ -29,6 +29,10 @@ using ContentParent = mozilla::dom::ContentParent;
 namespace mozilla {
 class OriginAttributesPattern;
 
+namespace ipc {
+class MemoryReportingProcess;
+}
+
 namespace gmp {
 
 class GMPParent;
@@ -79,6 +83,8 @@ class GeckoMediaPluginServiceParent final
   // content process, otherwise will update all content processes.
   void UpdateContentProcessGMPCapabilities(
       ContentParent* aContentProcess = nullptr);
+
+  void GetProcessMemoryReporter(nsTArray<RefPtr<ipc::MemoryReportingProcess>>& aOut);
 
   void SendFlushFOGData(nsTArray<RefPtr<FlushFOGDataPromise>>& promises);
 

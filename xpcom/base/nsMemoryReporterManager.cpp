@@ -6,6 +6,7 @@
 
 #include "nsMemoryReporterManager.h"
 
+#include "GMPServiceParent.h"
 #include "nsAtomTable.h"
 #include "nsCOMPtr.h"
 #include "nsCOMArray.h"
@@ -1921,6 +1922,11 @@ nsresult nsMemoryReporterManager::StartGettingReports() {
     if (RefPtr<MemoryReportingProcess> proc = vr->GetProcessMemoryReporter()) {
       s->mChildrenPending.AppendElement(proc.forget());
     }
+  }
+
+  if (RefPtr<gmp::GeckoMediaPluginServiceParent> gmps =
+          gmp::GeckoMediaPluginServiceParent::GetSingleton()) {
+    gmps->GetProcessMemoryReporter(s->mChildrenPending);
   }
 
   if (!IsRegistrationBlocked() && net::gIOService) {
