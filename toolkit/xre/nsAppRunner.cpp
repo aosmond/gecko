@@ -6021,6 +6021,7 @@ bool XRE_IsE10sParentProcess() {
 bool XRE_UseNativeEventProcessing() {
   switch (XRE_GetProcessType()) {
 #if defined(XP_MACOSX) || defined(XP_WIN)
+    case GeckoProcessType_GMPlugin:
     case GeckoProcessType_RDD:
     case GeckoProcessType_Socket:
       return false;
