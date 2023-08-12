@@ -655,6 +655,11 @@ mozilla::ipc::IPCResult GMPChild::RecvCloseActive() {
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult GMPChild::RecvShutdown(ShutdownResolver&& aResolver) {
+  aResolver(void_t{});
+  return IPC_OK();
+}
+
 mozilla::ipc::IPCResult GMPChild::RecvInitGMPContentChild(
     Endpoint<PGMPContentChild>&& aEndpoint) {
   GMPContentChild* child =

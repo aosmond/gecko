@@ -42,6 +42,7 @@ child:
   async ProvideStorageId(nsCString storageId);
   async PreloadLibs(nsCString libs);
   async CloseActive();
+  async Shutdown() returns (void_t ok);
   async InitGMPContentChild(Endpoint<PGMPContentChild> endpoint);
   async InitProfiler(Endpoint<PProfilerChild> endpoint);
   async PreferenceUpdate(Pref pref);

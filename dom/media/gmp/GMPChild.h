@@ -66,6 +66,8 @@ class GMPChild : public PGMPChild {
   mozilla::ipc::IPCResult RecvCrashPluginNow();
   mozilla::ipc::IPCResult RecvCloseActive();
 
+  mozilla::ipc::IPCResult RecvShutdown(ShutdownResolver&& aResolver);
+
   mozilla::ipc::IPCResult RecvInitGMPContentChild(
       Endpoint<PGMPContentChild>&& aEndpoint);
 
