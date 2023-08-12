@@ -91,7 +91,6 @@ class GeckoMediaPluginServiceParent final
 
  private:
   friend class GMPServiceParent;
-  class Observer;
 
   virtual ~GeckoMediaPluginServiceParent();
 
@@ -127,7 +126,6 @@ class GeckoMediaPluginServiceParent final
       const mozilla::OriginAttributesPattern& aPattern);
   void ForgetThisBaseDomainOnGMPThread(const nsACString& aBaseDomain);
   void ClearRecentHistoryOnGMPThread(PRTime aSince);
-  void OnPreferenceChanged(mozilla::dom::Pref&& aPref);
 
   already_AddRefed<GMPParent> GetById(uint32_t aPluginId);
 
