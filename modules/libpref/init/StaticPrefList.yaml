@@ -9693,7 +9693,7 @@
 # Does the GMPlugin process initialize minimal XPCOM
 - name: media.gmp.use-minimal-xpcom
   type: RelaxedAtomicBool
-  value: false
+  value: true
   mirror: always
 
 #if defined(XP_LINUX) && defined(MOZ_SANDBOX)
