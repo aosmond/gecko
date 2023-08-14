@@ -30,7 +30,8 @@ class GMPChild : public PGMPChild {
   GMPChild();
 
   bool Init(const nsAString& aPluginPath, const char* aParentBuildID,
-            mozilla::ipc::UntypedEndpoint&& aEndpoint);
+            mozilla::ipc::UntypedEndpoint&& aEndpoint, bool aUseXpcom);
+  void Shutdown();
   MessageLoop* GMPMessageLoop();
 
   // Main thread only.
@@ -102,6 +103,7 @@ class GMPChild : public PGMPChild {
 #ifdef XP_LINUX
   nsTArray<void*> mLibHandles;
 #endif
+  bool mUseXpcom = false;
 };
 
 }  // namespace gmp

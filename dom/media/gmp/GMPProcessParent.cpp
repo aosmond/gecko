@@ -14,6 +14,7 @@
 #include "mozilla/GeckoArgs.h"
 #include "mozilla/ipc/ProcessChild.h"
 #include "mozilla/ipc/ProcessUtils.h"
+#include "mozilla/StaticPrefs_media.h"
 
 #include "base/string_util.h"
 #include "base/process_util.h"
@@ -126,30 +127,35 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
     bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
   };
 
-  // Dispatch our runnable to the main thread to grab the serialized prefs. We
-  // can only do this on the main thread, and unfortunately we are the only
-  // process that launches from the non-main thread.
-  auto prefTask = MakeRefPtr<PrefSerializerRunnable>();
-  nsresult rv = NS_DispatchToMainThread(prefTask);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return false;
-  }
-
-  // We don't want to release our thread context while we wait for the main
-  // thread to process the prefs. We already block when waiting for the launch
-  // of the process itself to finish, and the state machine assumes this call is
-  // blocking. This is also important for the buffering of pref updates, since
-  // we know any tasks dispatched with updates won't run until we launch (or
-  // fail to launch) the process.
-  UniquePtr<ipc::SharedPreferenceSerializer> prefSerializer;
-  prefTask->Wait(aTimeoutMs, prefSerializer);
-  if (NS_WARN_IF(!prefSerializer)) {
-    return false;
-  }
-
+  nsresult rv;
   vector<string> args;
+  UniquePtr<ipc::SharedPreferenceSerializer> prefSerializer;
+
   ipc::ProcessChild::AddPlatformBuildID(args);
-  prefSerializer->AddSharedPrefCmdLineArgs(*this, args);
+
+  if (StaticPrefs::media_gmp_use_minimal_xpcom()) {
+    // Dispatch our runnable to the main thread to grab the serialized prefs. We
+    // can only do this on the main thread, and unfortunately we are the only
+    // process that launches from the non-main thread.
+    auto prefTask = MakeRefPtr<PrefSerializerRunnable>();
+    rv = NS_DispatchToMainThread(prefTask);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return false;
+    }
+
+    // We don't want to release our thread context while we wait for the main
+    // thread to process the prefs. We already block when waiting for the launch
+    // of the process itself to finish, and the state machine assumes this call
+    // is blocking. This is also important for the buffering of pref updates,
+    // since we know any tasks dispatched with updates won't run until we launch
+    // (or fail to launch) the process.
+    prefTask->Wait(aTimeoutMs, prefSerializer);
+    if (NS_WARN_IF(!prefSerializer)) {
+      return false;
+    }
+
+    prefSerializer->AddSharedPrefCmdLineArgs(*this, args);
+  }
 
 #ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
   GMP_LOG_DEBUG("GMPProcessParent::Launch() mLaunchArch: %d", mLaunchArch);

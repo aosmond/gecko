@@ -26,6 +26,7 @@
 #include "GMPVideoEncoderChild.h"
 #include "GMPVideoHost.h"
 #include "mozilla/Algorithm.h"
+#include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/FOGIPC.h"
 #include "mozilla/glean/GleanMetrics.h"
 #include "mozilla/ipc/CrashReporterClient.h"
@@ -77,9 +78,11 @@ GMPChild::~GMPChild() {
 }
 
 bool GMPChild::Init(const nsAString& aPluginPath, const char* aParentBuildID,
-                    mozilla::ipc::UntypedEndpoint&& aEndpoint) {
-  GMP_CHILD_LOG_DEBUG("%s pluginPath=%s", __FUNCTION__,
-                      NS_ConvertUTF16toUTF8(aPluginPath).get());
+                    mozilla::ipc::UntypedEndpoint&& aEndpoint, bool aUseXpcom) {
+  GMP_CHILD_LOG_DEBUG("%s pluginPath=%s useXpcom=%d", __FUNCTION__,
+                      NS_ConvertUTF16toUTF8(aPluginPath).get(), aUseXpcom);
+
+  mUseXpcom = aUseXpcom;
 
   // GMPChild needs nsThreadManager to create the ProfilerChild thread.
   // It is also used on debug builds for the sandbox tests.
@@ -103,8 +106,12 @@ bool GMPChild::Init(const nsAString& aPluginPath, const char* aParentBuildID,
 
   CrashReporterClient::InitSingleton(this);
 
-  if (NS_WARN_IF(NS_FAILED(NS_InitMinimalXPCOM()))) {
-    return false;
+  if (aUseXpcom) {
+    if (NS_WARN_IF(NS_FAILED(NS_InitMinimalXPCOM()))) {
+      return false;
+    }
+  } else {
+    BackgroundHangMonitor::Startup();
   }
 
   mPluginPath = aPluginPath;
@@ -121,6 +128,14 @@ bool GMPChild::Init(const nsAString& aPluginPath, const char* aParentBuildID,
   profiler_set_process_name(processName);
 
   return true;
+}
+
+void GMPChild::Shutdown() {
+  if (mUseXpcom) {
+    NS_ShutdownXPCOM(nullptr);
+  } else {
+    BackgroundHangMonitor::Startup();
+  }
 }
 
 mozilla::ipc::IPCResult GMPChild::RecvProvideStorageId(

@@ -21,6 +21,8 @@ class GMPProcessChild final : public mozilla::ipc::ProcessChild {
   using ProcessChild::ProcessChild;
   ~GMPProcessChild();
 
+  static bool UseXPCOM(int aArgc, char* aArgv[]);
+
   bool Init(int aArgc, char* aArgv[]) override;
   void CleanUp() override;
 

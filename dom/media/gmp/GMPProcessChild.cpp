@@ -8,12 +8,19 @@
 #include "base/command_line.h"
 #include "base/string_util.h"
 #include "mozilla/ipc/IOThreadChild.h"
-#include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/GeckoArgs.h"
 
 using mozilla::ipc::IOThreadChild;
 
 namespace mozilla::gmp {
+
+/* static */ bool GMPProcessChild::UseXPCOM(int aArgc, char* aArgv[]) {
+  Maybe<uint64_t> prefsLen =
+      geckoargs::sPrefsLen.Get(aArgc, aArgv, CheckArgFlag::None);
+  Maybe<uint64_t> prefMapSize =
+      geckoargs::sPrefMapSize.Get(aArgc, aArgv, CheckArgFlag::None);
+  return prefsLen.isSome() && prefMapSize.isSome();
+}
 
 GMPProcessChild::~GMPProcessChild() = default;
 
@@ -31,13 +38,15 @@ bool GMPProcessChild::Init(int aArgc, char* aArgv[]) {
 
   NS_ConvertUTF8toUTF16 widePluginPath(*pluginPath);
 
-  if (!ProcessChild::InitPrefs(aArgc, aArgv)) {
+  bool useXpcom = UseXPCOM(aArgc, aArgv);
+  if (useXpcom && NS_WARN_IF(!ProcessChild::InitPrefs(aArgc, aArgv))) {
     return false;
   }
 
-  return mPlugin->Init(widePluginPath, *parentBuildID, TakeInitialEndpoint());
+  return mPlugin->Init(widePluginPath, *parentBuildID, TakeInitialEndpoint(),
+                       useXpcom);
 }
 
-void GMPProcessChild::CleanUp() { BackgroundHangMonitor::Shutdown(); }
+void GMPProcessChild::CleanUp() { mPlugin->Shutdown(); }
 
 }  // namespace mozilla::gmp
