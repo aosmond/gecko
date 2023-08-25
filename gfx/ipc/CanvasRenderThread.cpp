@@ -7,8 +7,12 @@
 #include "CanvasRenderThread.h"
 
 #include "mozilla/BackgroundHangMonitor.h"
+#include "mozilla/SharedThreadPool.h"
+#include "mozilla/TaskQueue.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/webrender/RenderThread.h"
+#include "nsThread.h"
+#include "prsystem.h"
 #include "transport/runnable_utils.h"
 
 namespace mozilla::gfx {
@@ -20,8 +24,11 @@ static bool sCanvasRenderThreadEverStarted = false;
 #endif
 
 CanvasRenderThread::CanvasRenderThread(nsCOMPtr<nsIThread>&& aThread,
+                                       nsCOMPtr<nsIThreadPool>&& aWorkers,
                                        bool aCreatedThread)
-    : mThread(std::move(aThread)), mCreatedThread(aCreatedThread) {}
+    : mThread(std::move(aThread)),
+      mWorkers(std::move(aWorkers)),
+      mCreatedThread(aCreatedThread) {}
 
 CanvasRenderThread::~CanvasRenderThread() = default;
 
@@ -37,6 +44,19 @@ void CanvasRenderThread::Start() {
   sCanvasRenderThreadEverStarted = true;
 #endif
 
+  // Given that the canvas workers are receiving instructions from
+  // content processes, it probably doesn't make sense to have more than
+  // half the number of processors doing canvas drawing. We set the
+  // lower limit to 2, so that even on single processor systems, if
+  // there is more than one window with canvas drawing, the OS can
+  // manage the load between them.
+  uint32_t threadLimit = std::max(2, PR_GetNumberOfProcessors() / 2);
+  nsCOMPtr<nsIThreadPool> workers =
+      SharedThreadPool::Get("CanvasWorkers"_ns, threadLimit);
+  if (NS_WARN_IF(!workers)) {
+    return;
+  }
+
   nsCOMPtr<nsIThread> thread;
   if (!gfxVars::SupportsThreadsafeGL()) {
     thread = wr::RenderThread::GetRenderThread();
@@ -47,8 +67,8 @@ void CanvasRenderThread::Start() {
   }
 
   if (thread) {
-    sCanvasRenderThread =
-        new CanvasRenderThread(std::move(thread), /* aCreatedThread */ false);
+    sCanvasRenderThread = new CanvasRenderThread(
+        std::move(thread), std::move(workers), /* aCreatedThread */ false);
     return;
   }
 
@@ -93,8 +113,8 @@ void CanvasRenderThread::Start() {
     return;
   }
 
-  sCanvasRenderThread =
-      new CanvasRenderThread(std::move(thread), /* aCreatedThread */ true);
+  sCanvasRenderThread = new CanvasRenderThread(
+      std::move(thread), std::move(workers), /* aCreatedThread */ true);
 }
 
 // static
@@ -104,12 +124,15 @@ void CanvasRenderThread::Shutdown() {
 
   // Null out sCanvasRenderThread before we enter synchronous Shutdown,
   // from here on we are to be considered shut down for our consumers.
+  nsCOMPtr<nsIThreadPool> oldWorkers = sCanvasRenderThread->mWorkers;
   nsCOMPtr<nsIThread> oldThread;
   if (sCanvasRenderThread->mCreatedThread) {
     oldThread = sCanvasRenderThread->GetCanvasRenderThread();
     MOZ_ASSERT(oldThread);
   }
   sCanvasRenderThread = nullptr;
+
+  oldWorkers->Shutdown();
 
   // We do a synchronous shutdown here while spinning the MT event loop, but
   // only if we created a dedicated CanvasRender thread.
@@ -124,6 +147,17 @@ bool CanvasRenderThread::IsInCanvasRenderThread() {
          sCanvasRenderThread->mThread == NS_GetCurrentThread();
 }
 
+/* static */ bool CanvasRenderThread::IsInCanvasWorkerThread() {
+  return sCanvasRenderThread &&
+         sCanvasRenderThread->mWorkers->IsOnCurrentThread();
+}
+
+/* static */ bool CanvasRenderThread::IsInCanvasRenderOrWorkerThread() {
+  return sCanvasRenderThread &&
+         (sCanvasRenderThread->mThread == NS_GetCurrentThread() ||
+          sCanvasRenderThread->mWorkers->IsOnCurrentThread());
+}
+
 // static
 already_AddRefed<nsIThread> CanvasRenderThread::GetCanvasRenderThread() {
   nsCOMPtr<nsIThread> thread;
@@ -133,9 +167,24 @@ already_AddRefed<nsIThread> CanvasRenderThread::GetCanvasRenderThread() {
   return thread.forget();
 }
 
-void CanvasRenderThread::PostRunnable(already_AddRefed<nsIRunnable> aRunnable) {
-  nsCOMPtr<nsIRunnable> runnable = aRunnable;
-  mThread->Dispatch(runnable.forget());
+/* static */ already_AddRefed<TaskQueue>
+CanvasRenderThread::CreateWorkerTaskQueue() {
+  if (sCanvasRenderThread) {
+    return TaskQueue::Create(do_AddRef(sCanvasRenderThread->mWorkers),
+                             "CanvasWorker")
+        .forget();
+  }
+  return nullptr;
+}
+
+/* static */ void CanvasRenderThread::Dispatch(
+    already_AddRefed<nsIRunnable> aRunnable) {
+  if (!sCanvasRenderThread) {
+    MOZ_DIAGNOSTIC_ASSERT(false,
+                          "Dispatching after CanvasRenderThread shutdown!");
+    return;
+  }
+  sCanvasRenderThread->mThread->Dispatch(std::move(aRunnable));
 }
 
 }  // namespace mozilla::gfx
