@@ -7,9 +7,15 @@
 #define _include_gfx_ipc_CanvasManagerParent_h__
 
 #include "mozilla/gfx/PCanvasManagerParent.h"
+#include "mozilla/UniquePtr.h"
 #include "nsHashtablesFwd.h"
 
-namespace mozilla::gfx {
+namespace mozilla {
+namespace layers {
+class SurfaceDescriptor;
+}
+
+namespace gfx {
 
 class CanvasManagerParent final : public PCanvasManagerParent {
  public:
@@ -19,6 +25,9 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   static void Shutdown();
 
+  static UniquePtr<layers::SurfaceDescriptor> WaitForSurfaceDescriptor(
+      base::ProcessId aOtherPid, int64_t aTextureId);
+
   CanvasManagerParent();
 
   void Bind(Endpoint<PCanvasManagerParent>&& aEndpoint);
@@ -26,6 +35,7 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   already_AddRefed<PWebGLParent> AllocPWebGLParent();
   already_AddRefed<PWebGPUParent> AllocPWebGPUParent();
+  already_AddRefed<PCanvasParent> AllocPCanvasParent();
 
   mozilla::ipc::IPCResult RecvInitialize(const uint32_t& aId);
   mozilla::ipc::IPCResult RecvGetSnapshot(
@@ -44,6 +54,7 @@ class CanvasManagerParent final : public PCanvasManagerParent {
   static ManagerSet sManagers;
 };
 
-}  // namespace mozilla::gfx
+}  // namespace gfx
+}  // namespace mozilla
 
 #endif  // _include_gfx_ipc_CanvasManagerParent_h__

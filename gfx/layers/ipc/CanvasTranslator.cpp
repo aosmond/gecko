@@ -8,6 +8,7 @@
 
 #include "gfxGradientCache.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/CanvasRenderThread.h"
 #include "mozilla/gfx/GPUParent.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/ipc/Endpoint.h"
@@ -19,7 +20,6 @@
 #include "mozilla/SyncRunnable.h"
 #include "mozilla/TaskQueue.h"
 #include "mozilla/Telemetry.h"
-#include "nsTHashSet.h"
 #include "RecordedCanvasEventImpl.h"
 
 #if defined(XP_WIN)
@@ -82,44 +82,7 @@ TextureData* CanvasTranslator::CreateTextureData(TextureType aTextureType,
   return textureData;
 }
 
-typedef nsTHashSet<RefPtr<CanvasTranslator>> CanvasTranslatorSet;
-
-static CanvasTranslatorSet& CanvasTranslators() {
-  MOZ_ASSERT(CanvasThreadHolder::IsInCanvasThread());
-  static CanvasTranslatorSet* sCanvasTranslator = new CanvasTranslatorSet();
-  return *sCanvasTranslator;
-}
-
-static void EnsureAllClosed() {
-  for (const auto& key : CanvasTranslators()) {
-    key->Close();
-  }
-}
-
-/* static */ void CanvasTranslator::Shutdown() {
-  // If the dispatch fails there is no canvas thread and so no translators.
-  CanvasThreadHolder::MaybeDispatchToCanvasThread(NewRunnableFunction(
-      "CanvasTranslator::EnsureAllClosed", &EnsureAllClosed));
-}
-
-/* static */ already_AddRefed<CanvasTranslator> CanvasTranslator::Create(
-    ipc::Endpoint<PCanvasParent>&& aEndpoint) {
-  MOZ_ASSERT(NS_IsInCompositorThread());
-
-  RefPtr<CanvasThreadHolder> threadHolder =
-      CanvasThreadHolder::EnsureCanvasThread();
-  RefPtr<CanvasTranslator> canvasTranslator =
-      new CanvasTranslator(do_AddRef(threadHolder));
-  threadHolder->DispatchToCanvasThread(
-      NewRunnableMethod<Endpoint<PCanvasParent>&&>(
-          "CanvasTranslator::Bind", canvasTranslator, &CanvasTranslator::Bind,
-          std::move(aEndpoint)));
-  return canvasTranslator.forget();
-}
-
-CanvasTranslator::CanvasTranslator(
-    already_AddRefed<CanvasThreadHolder> aCanvasThreadHolder)
-    : gfx::InlineTranslator(), mCanvasThreadHolder(aCanvasThreadHolder) {
+CanvasTranslator::CanvasTranslator() : gfx::InlineTranslator() {
   // Track when remote canvas has been activated.
   Telemetry::ScalarAdd(Telemetry::ScalarID::GFX_CANVAS_REMOTE_ACTIVATED, 1);
 }
@@ -131,19 +94,11 @@ CanvasTranslator::~CanvasTranslator() {
   mBaseDT = nullptr;
 }
 
-void CanvasTranslator::Bind(Endpoint<PCanvasParent>&& aEndpoint) {
-  if (!aEndpoint.Bind(this)) {
-    return;
-  }
-
-  CanvasTranslators().Insert(this);
-}
-
 mozilla::ipc::IPCResult CanvasTranslator::RecvInitTranslator(
     const TextureType& aTextureType,
     ipc::SharedMemoryBasic::Handle&& aReadHandle,
     CrossProcessSemaphoreHandle&& aReaderSem,
-    CrossProcessSemaphoreHandle&& aWriterSem) {
+    CrossProcessSemaphoreHandle&& aWriterSem, const bool& aUseIPDLThread) {
   if (mStream) {
     return IPC_FAIL(this, "RecvInitTranslator called twice.");
   }
@@ -171,7 +126,8 @@ mozilla::ipc::IPCResult CanvasTranslator::RecvInitTranslator(
   }
 #endif
 
-  mTranslationTaskQueue = mCanvasThreadHolder->CreateWorkerTaskQueue();
+  mTranslationTaskQueue =
+      gfx::CanvasRenderThread::CreateTaskQueue(aUseIPDLThread);
   return RecvResumeTranslation();
 }
 
@@ -221,7 +177,7 @@ void CanvasTranslator::StartTranslation() {
 }
 
 void CanvasTranslator::ActorDestroy(ActorDestroyReason why) {
-  MOZ_ASSERT(CanvasThreadHolder::IsInCanvasThread());
+  MOZ_ASSERT(gfx::CanvasRenderThread::IsInCanvasRenderThread());
 
   if (!mTranslationTaskQueue) {
     return FinishShutdown();
@@ -233,25 +189,11 @@ void CanvasTranslator::ActorDestroy(ActorDestroyReason why) {
 }
 
 void CanvasTranslator::FinishShutdown() {
-  MOZ_ASSERT(CanvasThreadHolder::IsInCanvasThread());
+  MOZ_ASSERT(gfx::CanvasRenderThread::IsInCanvasRenderThread());
 
   // mTranslationTaskQueue has shutdown we can safely drop the ring buffer to
   // break the cycle caused by RingBufferReaderServices.
   mStream = nullptr;
-
-  // CanvasTranslators has a MOZ_ASSERT(CanvasThreadHolder::IsInCanvasThread())
-  // to ensure it is only called on the Canvas Thread. This takes a lock on
-  // CanvasThreadHolder::sCanvasThreadHolder, which is also locked in
-  // CanvasThreadHolder::StaticRelease on the compositor thread from
-  // ReleaseOnCompositorThread below. If that lock wins the race with the one in
-  // IsInCanvasThread and it is the last CanvasThreadHolder reference then it
-  // shuts down the canvas thread waiting for it to finish. However
-  // IsInCanvasThread is waiting for the lock on the canvas thread and we
-  // deadlock. So, we need to call CanvasTranslators before
-  // ReleaseOnCompositorThread.
-  CanvasTranslatorSet& canvasTranslators = CanvasTranslators();
-  CanvasThreadHolder::ReleaseOnCompositorThread(mCanvasThreadHolder.forget());
-  canvasTranslators.Remove(this);
 }
 
 void CanvasTranslator::Deactivate() {
@@ -263,7 +205,7 @@ void CanvasTranslator::Deactivate() {
   // We need to tell the other side to deactivate. Make sure the stream is
   // marked as bad so that the writing side won't wait for space to write.
   mStream->SetIsBad();
-  mCanvasThreadHolder->DispatchToCanvasThread(
+  gfx::CanvasRenderThread::Dispatch(
       NewRunnableMethod("CanvasTranslator::SendDeactivate", this,
                         &CanvasTranslator::SendDeactivate));
 
@@ -278,7 +220,7 @@ void CanvasTranslator::Deactivate() {
 }
 
 bool CanvasTranslator::TranslateRecording() {
-  MOZ_ASSERT(CanvasThreadHolder::IsInCanvasWorker());
+  MOZ_ASSERT(gfx::CanvasRenderThread::IsInCanvasWorkerThread());
 
   uint8_t eventType = mStream->ReadNextEvent();
   while (mStream->good() && eventType != kDropBufferEventType) {
@@ -463,7 +405,7 @@ bool CanvasTranslator::CheckForFreshCanvasDevice(int aLineNumber) {
 
 void CanvasTranslator::NotifyDeviceChanged() {
   mDeviceResetInProgress = true;
-  mCanvasThreadHolder->DispatchToCanvasThread(
+  gfx::CanvasRenderThread::Dispatch(
       NewRunnableMethod("CanvasTranslator::SendNotifyDeviceChanged", this,
                         &CanvasTranslator::SendNotifyDeviceChanged));
 }
@@ -602,14 +544,14 @@ bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
   MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
 
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
+  if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::AllocShmem(aSize, aShmem);
   }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::AllocShmem");
 
-  mCanvasThreadHolder->DispatchToCanvasThread(
+  gfx::CanvasRenderThread::Dispatch(
       NS_NewRunnableFunction("layers::CanvasTranslator::AllocShmem", [&]() {
         AutoCompleteTask complete(&task);
         success = AllocShmem(aSize, aShmem);
@@ -625,14 +567,14 @@ bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
   MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
 
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
+  if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::AllocUnsafeShmem(aSize, aShmem);
   }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::AllocUnsafeShmem");
 
-  mCanvasThreadHolder->DispatchToCanvasThread(NS_NewRunnableFunction(
+  gfx::CanvasRenderThread::Dispatch(NS_NewRunnableFunction(
       "layers::CanvasTranslator::AllocUnsafeShmem", [&]() {
         AutoCompleteTask complete(&task);
         success = AllocUnsafeShmem(aSize, aShmem);
@@ -648,14 +590,14 @@ bool CanvasTranslator::DeallocShmem(ipc::Shmem& aShmem) {
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
   MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
 
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
+  if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::DeallocShmem(aShmem);
   }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::DeallocShmem");
 
-  mCanvasThreadHolder->DispatchToCanvasThread(
+  gfx::CanvasRenderThread::Dispatch(
       NS_NewRunnableFunction("layers::CanvasTranslator::DeallocShmem", [&]() {
         AutoCompleteTask complete(&task);
         success = DeallocShmem(aShmem);
