@@ -9,6 +9,7 @@
 #include "mozilla/gfx/CanvasRenderThread.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/ipc/Endpoint.h"
+#include "mozilla/layers/CanvasTranslator.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/webgpu/WebGPUParent.h"
 #include "nsIThread.h"
@@ -59,6 +60,34 @@ CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
   }
 }
 
+UniquePtr<layers::SurfaceDescriptor>
+CanvasManagerParent::WaitForSurfaceDescriptor(base::ProcessId aOtherPid,
+                                              int64_t aTextureId) {
+  // FIXME(aosmond): Thread safety???
+  CanvasManagerParent* manager = nullptr;
+  for (CanvasManagerParent* i : sManagers) {
+    if (i->OtherPidMaybeInvalid() == aOtherPid) {
+      manager = i;
+      break;
+    }
+  }
+
+  if (!manager) {
+    return nullptr;
+  }
+
+  for (const auto& item : manager->ManagedPCanvasParent()) {
+    auto* canvas = static_cast<layers::CanvasTranslator*>(item);
+    UniquePtr<layers::SurfaceDescriptor> sd =
+        canvas->WaitForSurfaceDescriptor(aTextureId);
+    if (sd) {
+      return sd;
+    }
+  }
+
+  return nullptr;
+}
+
 CanvasManagerParent::CanvasManagerParent() = default;
 CanvasManagerParent::~CanvasManagerParent() = default;
 
@@ -98,6 +127,10 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvInitialize(
   }
   mId = aId;
   return IPC_OK();
+}
+
+already_AddRefed<PCanvasParent> CanvasManagerParent::AllocPCanvasParent() {
+  return MakeAndAddRef<layers::CanvasTranslator>();
 }
 
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
