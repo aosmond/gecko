@@ -10,6 +10,7 @@
 
 #include "apz/src/APZCTreeManager.h"  // for APZCTreeManager
 #include "gfxUtils.h"
+#include "mozilla/gfx/CanvasManagerParent.h"
 #ifdef XP_WIN
 #  include "mozilla/gfx/DeviceManagerDx.h"  // for DeviceManagerDx
 #  include "mozilla/layers/ImageDataSerializer.h"
@@ -413,31 +414,11 @@ bool ContentCompositorBridgeParent::DeallocPTextureParent(
   return TextureHost::DestroyIPDLActor(actor);
 }
 
-mozilla::ipc::IPCResult ContentCompositorBridgeParent::RecvInitPCanvasParent(
-    Endpoint<PCanvasParent>&& aEndpoint) {
-  MOZ_RELEASE_ASSERT(!mCanvasTranslator,
-                     "mCanvasTranslator must be released before recreating.");
-
-  mCanvasTranslator = CanvasTranslator::Create(std::move(aEndpoint));
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult
-ContentCompositorBridgeParent::RecvReleasePCanvasParent() {
-  MOZ_RELEASE_ASSERT(mCanvasTranslator,
-                     "mCanvasTranslator hasn't been created.");
-
-  mCanvasTranslator = nullptr;
-  return IPC_OK();
-}
-
 UniquePtr<SurfaceDescriptor>
 ContentCompositorBridgeParent::LookupSurfaceDescriptorForClientTexture(
     const int64_t aTextureId) {
-  MOZ_RELEASE_ASSERT(mCanvasTranslator,
-                     "mCanvasTranslator hasn't been created.");
-
-  return mCanvasTranslator->WaitForSurfaceDescriptor(aTextureId);
+  return gfx::CanvasManagerParent::WaitForSurfaceDescriptor(OtherPid(),
+                                                            aTextureId);
 }
 
 bool ContentCompositorBridgeParent::IsSameProcess() const {

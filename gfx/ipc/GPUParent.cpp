@@ -14,7 +14,6 @@
 #include "GPUProcessManager.h"
 #include "gfxGradientCache.h"
 #include "GfxInfoBase.h"
-#include "CanvasManagerParent.h"
 #include "VRGPUChild.h"
 #include "VRManager.h"
 #include "VRManagerParent.h"
@@ -690,7 +689,6 @@ void GPUParent::ActorDestroy(ActorDestroyReason aWhy) {
         // This could be running on either the Compositor thread, the Renderer
         // thread, or the dedicated CanvasRender thread, so we need to shutdown
         // before the former two.
-        CanvasManagerParent::Shutdown();
         CanvasRenderThread::Shutdown();
         CompositorThreadHolder::Shutdown();
         RemoteTextureMap::Shutdown();

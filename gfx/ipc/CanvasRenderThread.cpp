@@ -9,6 +9,8 @@
 #include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/SharedThreadPool.h"
 #include "mozilla/TaskQueue.h"
+#include "mozilla/gfx/CanvasManagerParent.h"
+#include "mozilla/layers/CanvasTranslator.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/webrender/RenderThread.h"
 #include "nsThread.h"
@@ -121,6 +123,8 @@ void CanvasRenderThread::Start() {
 void CanvasRenderThread::Shutdown() {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(sCanvasRenderThread);
+
+  CanvasManagerParent::Shutdown();
 
   // Null out sCanvasRenderThread before we enter synchronous Shutdown,
   // from here on we are to be considered shut down for our consumers.

@@ -22,7 +22,6 @@
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/GraphicsMessages.h"
 #include "mozilla/gfx/CanvasManagerChild.h"
-#include "mozilla/gfx/CanvasManagerParent.h"
 #include "mozilla/gfx/CanvasRenderThread.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/DebugOnly.h"
@@ -1350,7 +1349,6 @@ void gfxPlatform::ShutdownLayersIPC() {
     // This could be running on either the Compositor thread, the Renderer
     // thread, or the dedicated CanvasRender thread, so we need to shutdown
     // before the former two.
-    gfx::CanvasManagerParent::Shutdown();
     gfx::CanvasRenderThread::Shutdown();
     // This has to happen after shutting down the child protocols.
     layers::CompositorThreadHolder::Shutdown();
