@@ -7,6 +7,7 @@
 #include "CanvasChild.h"
 
 #include "MainThreadUtils.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DrawTargetRecording.h"
 #include "mozilla/gfx/Tools.h"
 #include "mozilla/gfx/Rect.h"
@@ -124,9 +125,7 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
 };
 
-CanvasChild::CanvasChild(Endpoint<PCanvasChild>&& aEndpoint) {
-  aEndpoint.Bind(this);
-}
+CanvasChild::CanvasChild() = default;
 
 CanvasChild::~CanvasChild() = default;
 
@@ -146,7 +145,11 @@ ipc::IPCResult CanvasChild::RecvNotifyDeviceChanged() {
 /* static */ bool CanvasChild::mDeactivated = false;
 
 ipc::IPCResult CanvasChild::RecvDeactivate() {
+  RefPtr<CanvasChild> self(this);
   mDeactivated = true;
+  if (auto* cm = gfx::CanvasManagerChild::Get()) {
+    cm->DeactivateCanvas();
+  }
   NotifyCanvasDeviceReset();
   return IPC_OK();
 }
@@ -189,7 +192,7 @@ void CanvasChild::ResumeTranslation() {
 
 void CanvasChild::Destroy() {
   if (CanSend()) {
-    Close();
+    Send__delete__(this);
   }
 }
 

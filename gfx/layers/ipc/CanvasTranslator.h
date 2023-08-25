@@ -12,7 +12,6 @@
 
 #include "mozilla/gfx/InlineTranslator.h"
 #include "mozilla/layers/CanvasDrawEventRecorder.h"
-#include "mozilla/layers/CanvasThread.h"
 #include "mozilla/layers/LayersSurfaces.h"
 #include "mozilla/layers/PCanvasParent.h"
 #include "mozilla/ipc/CrossProcessSemaphore.h"
@@ -31,20 +30,7 @@ class CanvasTranslator final : public gfx::InlineTranslator,
 
   friend class PProtocolParent;
 
-  /**
-   * Create an uninitialized CanvasTranslator and bind it to the given endpoint
-   * on the CanvasPlaybackLoop.
-   *
-   * @param aEndpoint the endpoint to bind to
-   * @return the new CanvasTranslator
-   */
-  static already_AddRefed<CanvasTranslator> Create(
-      Endpoint<PCanvasParent>&& aEndpoint);
-
-  /**
-   * Shutdown all of the CanvasTranslators.
-   */
-  static void Shutdown();
+  CanvasTranslator();
 
   /**
    * Initialize the canvas translator for a particular TextureType and
@@ -226,9 +212,6 @@ class CanvasTranslator final : public gfx::InlineTranslator,
       gfx::ReferencePtr aSurface);
 
  private:
-  explicit CanvasTranslator(
-      already_AddRefed<CanvasThreadHolder> aCanvasThreadHolder);
-
   ~CanvasTranslator();
 
   void Bind(Endpoint<PCanvasParent>&& aEndpoint);
@@ -251,7 +234,6 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   bool CheckForFreshCanvasDevice(int aLineNumber);
   void NotifyDeviceChanged();
 
-  RefPtr<CanvasThreadHolder> mCanvasThreadHolder;
   RefPtr<TaskQueue> mTranslationTaskQueue;
 #if defined(XP_WIN)
   RefPtr<ID3D11Device> mDevice;
