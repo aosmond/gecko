@@ -597,14 +597,14 @@ UniquePtr<gfx::DataSourceSurface::ScopedMap> CanvasTranslator::GetPreparedMap(
 }
 
 bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
-    return PCanvasParent::AllocShmem(aSize, aShmem);
-  }
-
   // We will only use shmem allocation methods when remoting software canvas,
   // which can only happen if gfx.canvas.remote.allow-software is enabled.
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
   MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
+
+  if (mCanvasThreadHolder->IsInCanvasThread()) {
+    return PCanvasParent::AllocShmem(aSize, aShmem);
+  }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::AllocShmem");
@@ -620,14 +620,14 @@ bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
-    return PCanvasParent::AllocUnsafeShmem(aSize, aShmem);
-  }
-
   // We will only use shmem allocation methods when remoting software canvas,
   // which can only happen if gfx.canvas.remote.allow-software is enabled.
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
   MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
+
+  if (mCanvasThreadHolder->IsInCanvasThread()) {
+    return PCanvasParent::AllocUnsafeShmem(aSize, aShmem);
+  }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::AllocUnsafeShmem");
@@ -643,14 +643,14 @@ bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool CanvasTranslator::DeallocShmem(ipc::Shmem& aShmem) {
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
-    return PCanvasParent::DeallocShmem(aShmem);
-  }
-
   // We will only use shmem allocation methods when remoting software canvas,
   // which can only happen if gfx.canvas.remote.allow-software is enabled.
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
   MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
+
+  if (mCanvasThreadHolder->IsInCanvasThread()) {
+    return PCanvasParent::DeallocShmem(aShmem);
+  }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::DeallocShmem");
