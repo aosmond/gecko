@@ -338,9 +338,8 @@ class gfxPlatform : public mozilla::layers::MemoryPressureListener {
     return mContentBackend;
   }
 
-  virtual mozilla::gfx::BackendType GetPreferredCanvasBackend() {
-    return mPreferredCanvasBackend;
-  }
+  virtual mozilla::gfx::BackendType GetPreferredCanvasBackend();
+
   mozilla::gfx::BackendType GetFallbackCanvasBackend() {
     return mFallbackCanvasBackend;
   }
