@@ -25,9 +25,10 @@ namespace layers {
 class TextureData;
 
 class CanvasTranslator final : public gfx::InlineTranslator,
+                               public ipc::IShmemAllocator,
                                public PCanvasParent {
  public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasTranslator)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasTranslator, final)
 
   friend class PProtocolParent;
 
@@ -45,6 +46,12 @@ class CanvasTranslator final : public gfx::InlineTranslator,
    * Shutdown all of the CanvasTranslators.
    */
   static void Shutdown();
+
+  // IShmemAllocator
+  bool AllocShmem(size_t aSize, mozilla::ipc::Shmem* aShmem) final;
+  bool AllocUnsafeShmem(size_t aSize, mozilla::ipc::Shmem* aShmem) final;
+  bool DeallocShmem(mozilla::ipc::Shmem& aShmem) final;
+  bool IsSameProcess() const { return false; }
 
   /**
    * Initialize the canvas translator for a particular TextureType and

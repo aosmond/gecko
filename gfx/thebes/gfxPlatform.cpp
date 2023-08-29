@@ -2477,8 +2477,10 @@ void gfxPlatform::InitAcceleration() {
         "media.hardware-video-decoding.failed");
     InitGPUProcessPrefs();
 
-    gfxVars::SetRemoteCanvasEnabled(StaticPrefs::gfx_canvas_remote() &&
-                                    gfxConfig::IsEnabled(Feature::GPU_PROCESS));
+    gfxVars::SetRemoteCanvasEnabled(
+        StaticPrefs::gfx_canvas_remote() &&
+        (gfxConfig::IsEnabled(Feature::GPU_PROCESS) ||
+         StaticPrefs::gfx_canvas_remote_allow_in_parent()));
   }
 }
 
