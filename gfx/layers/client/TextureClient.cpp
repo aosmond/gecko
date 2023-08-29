@@ -313,6 +313,8 @@ static bool ShouldRemoteTextureType(TextureType aTextureType,
   switch (aTextureType) {
     case TextureType::D3D11:
       return true;
+    case TextureType::Unknown:
+      return StaticPrefs::gfx_canvas_remote_allow_software();
     default:
       return false;
   }

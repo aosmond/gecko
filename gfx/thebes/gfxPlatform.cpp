@@ -2477,8 +2477,10 @@ void gfxPlatform::InitAcceleration() {
         "media.hardware-video-decoding.failed");
     InitGPUProcessPrefs();
 
-    gfxVars::SetRemoteCanvasEnabled(StaticPrefs::gfx_canvas_remote() &&
-                                    gfxConfig::IsEnabled(Feature::GPU_PROCESS));
+    gfxVars::SetRemoteCanvasEnabled(
+        StaticPrefs::gfx_canvas_remote_AtStartup() &&
+        (gfxConfig::IsEnabled(Feature::GPU_PROCESS) ||
+         StaticPrefs::gfx_canvas_remote_allow_in_parent_AtStartup()));
   }
 }
 
@@ -3817,7 +3819,9 @@ bool gfxPlatform::FallbackFromAcceleration(FeatureStatus aStatus,
 
 /* static */
 void gfxPlatform::DisableGPUProcess() {
-  gfxVars::SetRemoteCanvasEnabled(false);
+  gfxVars::SetRemoteCanvasEnabled(
+      StaticPrefs::gfx_canvas_remote_AtStartup() &&
+      StaticPrefs::gfx_canvas_remote_allow_in_parent_AtStartup());
   if (kIsAndroid) {
     // On android, enable out-of-process WebGL only when GPU process exists.
     gfxVars::SetAllowWebglOop(false);
