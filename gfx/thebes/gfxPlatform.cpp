@@ -2485,10 +2485,10 @@ void gfxPlatform::InitAcceleration() {
                       "FEATURE_REMOTE_CANVAS_NO_GPU_PROCESS"_ns);
     }
 
-#ifndef XP_WIN
+#ifdef XP_MACOSX
     gfxConfig::ForceDisable(Feature::REMOTE_CANVAS, FeatureStatus::Blocked,
-                            "Platform not supported",
-                            "FEATURE_REMOTE_CANVAS_NOT_WINDOWS"_ns);
+                            "Cross process semaphores not supported",
+                            "FEATURE_REMOTE_CANVAS_NO_CROSS_PROCESS_SEM"_ns);
 #endif
 
     gfxVars::SetRemoteCanvasEnabled(feature.IsEnabled());
