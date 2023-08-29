@@ -15,6 +15,7 @@
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/TextureClientSharedSurface.h"
 #include "mozilla/layers/TextureWrapperImage.h"
+#include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/SVGObserverUtils.h"
 #include "nsICanvasRenderingContextInternal.h"
 #include "nsRFPService.h"
@@ -247,6 +248,13 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
       }
     }
   } else if (surface) {
+    if (StaticPrefs::gfx_canvas_remote_allow_software() &&
+        surface->GetType() == gfx::SurfaceType::RECORDING) {
+      // TODO(aosmond): We should be able to handle an ImageContainer containing
+      // a recording more gracefully instead of doing a readback. This is only
+      // for Skia.
+      RefPtr<gfx::DataSourceSurface> dataSurface = surface->GetDataSurface();
+    }
     auto surfaceImage = MakeRefPtr<layers::SourceSurfaceImage>(surface);
     surfaceImage->SetTextureFlags(flags);
     image = surfaceImage;
