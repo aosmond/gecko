@@ -11,9 +11,13 @@
 #include "mozilla/gfx/GPUParent.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/ipc/Endpoint.h"
+#include "mozilla/layers/BufferTexture.h"
 #include "mozilla/layers/SharedSurfacesParent.h"
+#include "mozilla/layers/SynchronousTask.h"
 #include "mozilla/layers/TextureClient.h"
+#include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/SyncRunnable.h"
+#include "mozilla/TaskQueue.h"
 #include "mozilla/Telemetry.h"
 #include "nsTHashSet.h"
 #include "RecordedCanvasEventImpl.h"
@@ -62,6 +66,15 @@ TextureData* CanvasTranslator::CreateTextureData(TextureType aTextureType,
       break;
     }
 #endif
+    case TextureType::Unknown:
+      // Do not allow the creation of BufferTextureData if the pref is not set.
+      if (!NS_WARN_IF(!StaticPrefs::gfx_canvas_remote_allow_software())) {
+        textureData = BufferTextureData::Create(
+            aSize, aFormat, gfx::BackendType::SKIA, LayersBackend::LAYERS_NONE,
+            TextureFlags::DEFAULT, TextureAllocationFlags::ALLOC_CLEAR_BUFFER,
+            this);
+      }
+      break;
     default:
       MOZ_CRASH("Unsupported TextureType for CanvasTranslator.");
   }
@@ -149,6 +162,11 @@ mozilla::ipc::IPCResult CanvasTranslator::RecvInitTranslator(
 #if defined(XP_WIN)
   if (!CheckForFreshCanvasDevice(__LINE__)) {
     gfxCriticalNote << "GFX: CanvasTranslator failed to get device";
+    return IPC_OK();
+  }
+#else
+  if (!CreateReferenceTexture()) {
+    gfxCriticalNote << "GFX: CanvasTranslator failed to reference texture";
     return IPC_OK();
   }
 #endif
@@ -576,6 +594,80 @@ UniquePtr<gfx::DataSourceSurface::ScopedMap> CanvasTranslator::GetPreparedMap(
 
   mMappedSurface = nullptr;
   return std::move(mPreparedMap);
+}
+
+bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
+  if (mCanvasThreadHolder->IsInCanvasThread()) {
+    return PCanvasParent::AllocShmem(aSize, aShmem);
+  }
+
+  // We will only use shmem allocation methods when remoting software canvas,
+  // which can only happen if gfx.canvas.remote.allow-software is enabled.
+  MOZ_ASSERT(mTextureType == TextureType::Unknown);
+
+  bool success = false;
+  layers::SynchronousTask task("layers::CanvasTranslator::AllocShmem");
+
+  mCanvasThreadHolder->DispatchToCanvasThread(
+      NS_NewRunnableFunction("layers::CanvasTranslator::AllocShmem", [&]() {
+        AutoCompleteTask complete(&task);
+        success = AllocShmem(aSize, aShmem);
+      }));
+
+  task.Wait();
+  return success;
+}
+
+bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
+  if (mCanvasThreadHolder->IsInCanvasThread()) {
+    return PCanvasParent::AllocUnsafeShmem(aSize, aShmem);
+  }
+
+  // We will only use shmem allocation methods when remoting software canvas,
+  // which can only happen if gfx.canvas.remote.allow-software is enabled.
+  MOZ_ASSERT(mTextureType == TextureType::Unknown);
+
+  bool success = false;
+  layers::SynchronousTask task("layers::CanvasTranslator::AllocUnsafeShmem");
+
+  mCanvasThreadHolder->DispatchToCanvasThread(NS_NewRunnableFunction(
+      "layers::CanvasTranslator::AllocUnsafeShmem", [&]() {
+        AutoCompleteTask complete(&task);
+        success = AllocUnsafeShmem(aSize, aShmem);
+      }));
+
+  task.Wait();
+  return success;
+}
+
+bool CanvasTranslator::DeallocShmem(ipc::Shmem& aShmem) {
+  if (mCanvasThreadHolder->IsInCanvasThread()) {
+    return PCanvasParent::DeallocShmem(aShmem);
+  }
+
+  // We will only use shmem allocation methods when remoting software canvas,
+  // which can only happen if gfx.canvas.remote.allow-software is enabled.
+  MOZ_ASSERT(mTextureType == TextureType::Unknown);
+
+  bool success = false;
+  layers::SynchronousTask task("layers::CanvasTranslator::DeallocShmem");
+
+  mCanvasThreadHolder->DispatchToCanvasThread(
+      NS_NewRunnableFunction("layers::CanvasTranslator::DeallocShmem", [&]() {
+        AutoCompleteTask complete(&task);
+        success = DeallocShmem(aShmem);
+      }));
+
+  task.Wait();
+  return success;
+}
+
+bool CanvasTranslator::IsSameProcess() const {
+  // We should not be using the CanvasTranslator for a canvas inside of the
+  // compositor process.
+  bool same = OtherPid() == base::GetCurrentProcId();
+  MOZ_ASSERT(!same);
+  return same;
 }
 
 }  // namespace layers
