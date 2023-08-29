@@ -5673,6 +5673,11 @@
   value: false
   mirror: once
 
+- name: gfx.canvas.remote.allow-software
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
 # How long to wait in milliseconds for a texture to be resolved
 - name: gfx.canvas.remote.texture-timeout-ms
   type: RelaxedAtomicUint32
