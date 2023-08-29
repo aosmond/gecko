@@ -7,6 +7,7 @@
 #include "CanvasManagerParent.h"
 #include "mozilla/dom/WebGLParent.h"
 #include "mozilla/gfx/CanvasRenderThread.h"
+#include "mozilla/layers/CompositorThread.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/CanvasTranslator.h"

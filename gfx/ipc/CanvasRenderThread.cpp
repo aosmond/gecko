@@ -17,6 +17,10 @@
 #include "prsystem.h"
 #include "transport/runnable_utils.h"
 
+bool NS_IsInCanvasThreadOrWorker() {
+  return mozilla::gfx::CanvasRenderThread::IsInCanvasRenderOrWorkerThread();
+}
+
 namespace mozilla::gfx {
 
 static StaticRefPtr<CanvasRenderThread> sCanvasRenderThread;
@@ -122,9 +126,12 @@ void CanvasRenderThread::Start() {
 // static
 void CanvasRenderThread::Shutdown() {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(sCanvasRenderThread);
 
   CanvasManagerParent::Shutdown();
+
+  if (!sCanvasRenderThread) {
+    return;
+  }
 
   // Null out sCanvasRenderThread before we enter synchronous Shutdown,
   // from here on we are to be considered shut down for our consumers.

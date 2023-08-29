@@ -519,14 +519,14 @@ UniquePtr<gfx::DataSourceSurface::ScopedMap> CanvasTranslator::GetPreparedMap(
 }
 
 bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
+  if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::AllocShmem(aSize, aShmem);
   }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::AllocShmem");
 
-  mCanvasThreadHolder->DispatchToCanvasThread(
+  gfx::CanvasRenderThread::Dispatch(
       NS_NewRunnableFunction("layers::CanvasTranslator::AllocShmem", [&]() {
         AutoCompleteTask complete(&task);
         success = AllocShmem(aSize, aShmem);
@@ -537,14 +537,14 @@ bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
+  if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::AllocUnsafeShmem(aSize, aShmem);
   }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::AllocUnsafeShmem");
 
-  mCanvasThreadHolder->DispatchToCanvasThread(NS_NewRunnableFunction(
+  gfx::CanvasRenderThread::Dispatch(NS_NewRunnableFunction(
       "layers::CanvasTranslator::AllocUnsafeShmem", [&]() {
         AutoCompleteTask complete(&task);
         success = AllocUnsafeShmem(aSize, aShmem);
@@ -555,14 +555,14 @@ bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool CanvasTranslator::DeallocShmem(ipc::Shmem& aShmem) {
-  if (mCanvasThreadHolder->IsInCanvasThread()) {
+  if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::DeallocShmem(aShmem);
   }
 
   bool success = false;
   layers::SynchronousTask task("layers::CanvasTranslator::DeallocShmem");
 
-  mCanvasThreadHolder->DispatchToCanvasThread(
+  gfx::CanvasRenderThread::Dispatch(
       NS_NewRunnableFunction("layers::CanvasTranslator::DeallocShmem", [&]() {
         AutoCompleteTask complete(&task);
         success = DeallocShmem(aShmem);

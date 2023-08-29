@@ -1310,7 +1310,6 @@ void gfxPlatform::InitLayersIPC() {
 #endif
     if (!gfxConfig::IsEnabled(Feature::GPU_PROCESS)) {
       RemoteTextureMap::Init();
-      gfx::CanvasRenderThread::Start();
       wr::RenderThread::Start(GPUProcessManager::Get()->AllocateNamespace());
       image::ImageMemoryReporter::InitForWebRender();
     }
