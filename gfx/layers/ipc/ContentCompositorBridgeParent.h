@@ -157,9 +157,6 @@ class ContentCompositorBridgeParent final : public CompositorBridgeParentBase {
 
   bool IsRemote() const override { return true; }
 
-  UniquePtr<SurfaceDescriptor> LookupSurfaceDescriptorForClientTexture(
-      const int64_t aTextureId) final;
-
  private:
   // Private destructor, to discourage deletion outside of Release():
   virtual ~ContentCompositorBridgeParent();

@@ -19,6 +19,9 @@ namespace mozilla::gfx {
 
 CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
 
+StaticMonitor CanvasManagerParent::sReplayTexturesMonitor;
+CanvasManagerParent::ReplayTextureMap CanvasManagerParent::sReplayTextures;
+
 /* static */ void CanvasManagerParent::Init(
     Endpoint<PCanvasManagerParent>&& aEndpoint) {
   MOZ_ASSERT(layers::CompositorThreadHolder::IsInCompositorThread());
@@ -58,34 +61,57 @@ CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
   for (auto const& actor : actors) {
     actor->Close();
   }
+
+  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+  sReplayTextures.clear();
 }
 
-UniquePtr<layers::SurfaceDescriptor>
-CanvasManagerParent::WaitForSurfaceDescriptor(base::ProcessId aOtherPid,
-                                              int64_t aTextureId) {
-  // FIXME(aosmond): Thread safety???
-  CanvasManagerParent* manager = nullptr;
-  for (CanvasManagerParent* i : sManagers) {
-    if (i->OtherPidMaybeInvalid() == aOtherPid) {
-      manager = i;
-      break;
+/* static */ void CanvasManagerParent::AddReplayTexture(
+    base::ProcessId aOtherPid, int64_t aTextureId,
+    layers::TextureData* aTextureData) {
+  auto desc = MakeUnique<layers::SurfaceDescriptor>();
+  if (!aTextureData->Serialize(*desc)) {
+    MOZ_CRASH("Failed to serialize");
+  }
+
+  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+  ReplayTextureKey key{aOtherPid, aTextureId};
+  sReplayTextures[key] = std::move(desc);
+  lock.NotifyAll();
+}
+
+/* static */ void CanvasManagerParent::RemoveReplayTexture(
+    base::ProcessId aOtherPid, int64_t aTextureId) {
+  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+
+  ReplayTextureKey key{aOtherPid, aTextureId};
+  sReplayTextures.erase(key);
+}
+
+/* static */ UniquePtr<layers::SurfaceDescriptor>
+CanvasManagerParent::WaitForReplayTexture(base::ProcessId aOtherPid,
+                                          int64_t aTextureId) {
+  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+
+  ReplayTextureKey key{aOtherPid, aTextureId};
+  ReplayTextureMap::iterator i;
+  while ((i = sReplayTextures.find(key)) == sReplayTextures.end()) {
+    // FIXME(aosmond): Check for deactivation.
+    // Currently it's state is stored per translator.
+
+    TimeDuration timeout = TimeDuration::FromMilliseconds(
+        StaticPrefs::gfx_canvas_remote_texture_timeout_ms());
+    CVStatus status = lock.Wait(timeout);
+    if (status == CVStatus::Timeout) {
+      // If something has gone wrong and the texture has already been destroyed,
+      // it will have cleaned up its descriptor.
+      return nullptr;
     }
   }
 
-  if (!manager) {
-    return nullptr;
-  }
-
-  for (const auto& item : manager->ManagedPCanvasParent()) {
-    auto* canvas = static_cast<layers::CanvasTranslator*>(item);
-    UniquePtr<layers::SurfaceDescriptor> sd =
-        canvas->WaitForSurfaceDescriptor(aTextureId);
-    if (sd) {
-      return sd;
-    }
-  }
-
-  return nullptr;
+  UniquePtr<layers::SurfaceDescriptor> desc = std::move(i->second);
+  sReplayTextures.erase(i);
+  return desc;
 }
 
 CanvasManagerParent::CanvasManagerParent() = default;
@@ -102,6 +128,13 @@ void CanvasManagerParent::Bind(Endpoint<PCanvasManagerParent>&& aEndpoint) {
 
 void CanvasManagerParent::ActorDestroy(ActorDestroyReason aWhy) {
   sManagers.Remove(this);
+
+  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+  for (auto i = sReplayTextures.begin(); i != sReplayTextures.end(); ++i) {
+    if (i->first.mOtherPid == OtherPidMaybeInvalid()) {
+      sReplayTextures.erase(i);
+    }
+  }
 }
 
 already_AddRefed<dom::PWebGLParent> CanvasManagerParent::AllocPWebGLParent() {

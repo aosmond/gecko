@@ -7,8 +7,10 @@
 #define _include_gfx_ipc_CanvasManagerParent_h__
 
 #include "mozilla/gfx/PCanvasManagerParent.h"
+#include "mozilla/StaticMonitor.h"
 #include "mozilla/UniquePtr.h"
 #include "nsHashtablesFwd.h"
+#include <unordered_map>
 
 namespace mozilla {
 namespace layers {
@@ -25,7 +27,13 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   static void Shutdown();
 
-  static UniquePtr<layers::SurfaceDescriptor> WaitForSurfaceDescriptor(
+  static void AddReplayTexture(base::ProcessId aOtherPid, int64_t aTextureId,
+                               layers::TextureData* aTextureData);
+
+  static void RemoveReplayTexture(base::ProcessId aOtherPid,
+                                  int64_t aTextureId);
+
+  static UniquePtr<layers::SurfaceDescriptor> WaitForReplayTexture(
       base::ProcessId aOtherPid, int64_t aTextureId);
 
   CanvasManagerParent();
@@ -52,6 +60,43 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   using ManagerSet = nsTHashSet<CanvasManagerParent*>;
   static ManagerSet sManagers;
+
+  struct ReplayTextureKey {
+    base::ProcessId mOtherPid;
+    int64_t mId;
+
+    // Implement some operators so this class can be used as a key in
+    // stdlib classes.
+    bool operator<(const ReplayTextureKey& aOther) const {
+      return mOtherPid < aOther.mOtherPid || mId < aOther.mId;
+    }
+
+    bool operator==(const ReplayTextureKey& aOther) const {
+      return mOtherPid == aOther.mOtherPid && mId == aOther.mId;
+    }
+
+    bool operator!=(const ReplayTextureKey& aOther) const {
+      return !(*this == aOther);
+    }
+
+    // Helper struct that allow this class to be used as a key in
+    // std::unordered_map like so:
+    //   std::unordered_map<ReplayTextureKey, ValueType,
+    //                      ReplayTextureKey::HashFn> myMap;
+    struct HashFn {
+      std::size_t operator()(const ReplayTextureKey& aKey) const {
+        return std::hash<int64_t>{}(static_cast<int64_t>(aKey.mOtherPid)
+                                    << 32) ^
+               std::hash<int64_t>{}(aKey.mId);
+      }
+    };
+  };
+
+  using ReplayTextureMap =
+      std::unordered_map<ReplayTextureKey, UniquePtr<layers::SurfaceDescriptor>,
+                         ReplayTextureKey::HashFn>;
+  static StaticMonitor sReplayTexturesMonitor;
+  static ReplayTextureMap sReplayTextures;
 };
 
 }  // namespace gfx
