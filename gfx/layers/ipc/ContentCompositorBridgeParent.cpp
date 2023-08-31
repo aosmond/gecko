@@ -10,7 +10,6 @@
 
 #include "apz/src/APZCTreeManager.h"  // for APZCTreeManager
 #include "gfxUtils.h"
-#include "mozilla/gfx/CanvasManagerParent.h"
 #ifdef XP_WIN
 #  include "mozilla/gfx/DeviceManagerDx.h"  // for DeviceManagerDx
 #  include "mozilla/layers/ImageDataSerializer.h"
@@ -412,13 +411,6 @@ PTextureParent* ContentCompositorBridgeParent::AllocPTextureParent(
 bool ContentCompositorBridgeParent::DeallocPTextureParent(
     PTextureParent* actor) {
   return TextureHost::DestroyIPDLActor(actor);
-}
-
-UniquePtr<SurfaceDescriptor>
-ContentCompositorBridgeParent::LookupSurfaceDescriptorForClientTexture(
-    const int64_t aTextureId) {
-  return gfx::CanvasManagerParent::WaitForSurfaceDescriptor(OtherPid(),
-                                                            aTextureId);
 }
 
 bool ContentCompositorBridgeParent::IsSameProcess() const {

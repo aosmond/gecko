@@ -8,6 +8,7 @@
 
 #include "gfxGradientCache.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/CanvasManagerParent.h"
 #include "mozilla/gfx/CanvasRenderThread.h"
 #include "mozilla/gfx/GPUParent.h"
 #include "mozilla/gfx/Logging.h"
@@ -34,9 +35,6 @@ namespace layers {
 // events from the content process. We don't want to wait for too long in case
 // other content processes are waiting for events to process.
 static const TimeDuration kReadEventTimeout = TimeDuration::FromMilliseconds(5);
-
-static const TimeDuration kDescriptorTimeout =
-    TimeDuration::FromMilliseconds(10000);
 
 class RingBufferReaderServices final
     : public CanvasEventRingBuffer::ReaderServices {
@@ -214,9 +212,10 @@ void CanvasTranslator::Deactivate() {
     entry.second->Unlock();
   }
 
+  //FIXME(aosmond): Handle deactivation better???
   // Also notify anyone waiting for a surface descriptor. This must be done
   // after mDeactivated is set to true.
-  mSurfaceDescriptorsMonitor.NotifyAll();
+  //mSurfaceDescriptorsMonitor.NotifyAll();
 }
 
 bool CanvasTranslator::TranslateRecording() {
@@ -410,18 +409,6 @@ void CanvasTranslator::NotifyDeviceChanged() {
                         &CanvasTranslator::SendNotifyDeviceChanged));
 }
 
-void CanvasTranslator::AddSurfaceDescriptor(int64_t aTextureId,
-                                            TextureData* aTextureData) {
-  UniquePtr<SurfaceDescriptor> descriptor = MakeUnique<SurfaceDescriptor>();
-  if (!aTextureData->Serialize(*descriptor)) {
-    MOZ_CRASH("Failed to serialize");
-  }
-
-  MonitorAutoLock lock(mSurfaceDescriptorsMonitor);
-  mSurfaceDescriptors[aTextureId] = std::move(descriptor);
-  mSurfaceDescriptorsMonitor.Notify();
-}
-
 already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
     gfx::ReferencePtr aRefPtr, const gfx::IntSize& aSize,
     gfx::SurfaceFormat aFormat) {
@@ -432,7 +419,8 @@ already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
       MOZ_DIAGNOSTIC_ASSERT(mNextTextureId >= 0, "No texture ID set");
       textureData->Lock(OpenMode::OPEN_READ_WRITE);
       mTextureDatas[mNextTextureId] = UniquePtr<TextureData>(textureData);
-      AddSurfaceDescriptor(mNextTextureId, textureData);
+      gfx::CanvasManagerParent::AddReplayTexture(OtherPid(), mNextTextureId,
+                                                 textureData);
       dt = textureData->BorrowDrawTarget();
     }
   } while (!dt && CheckForFreshCanvasDevice(__LINE__));
@@ -446,9 +434,8 @@ void CanvasTranslator::RemoveTexture(int64_t aTextureId) {
   mTextureDatas.erase(aTextureId);
 
   // It is possible that the texture from the content process has never been
-  // forwarded to the GPU process, so make sure its descriptor is removed.
-  MonitorAutoLock lock(mSurfaceDescriptorsMonitor);
-  mSurfaceDescriptors.erase(aTextureId);
+  // forwarded from the GPU process, so make sure its descriptor is removed.
+  gfx::CanvasManagerParent::RemoveReplayTexture(OtherPid(), aTextureId);
 }
 
 TextureData* CanvasTranslator::LookupTextureData(int64_t aTextureId) {
@@ -457,30 +444,6 @@ TextureData* CanvasTranslator::LookupTextureData(int64_t aTextureId) {
     return nullptr;
   }
   return result->second.get();
-}
-
-UniquePtr<SurfaceDescriptor> CanvasTranslator::WaitForSurfaceDescriptor(
-    int64_t aTextureId) {
-  MonitorAutoLock lock(mSurfaceDescriptorsMonitor);
-  DescriptorMap::iterator result;
-  while ((result = mSurfaceDescriptors.find(aTextureId)) ==
-         mSurfaceDescriptors.end()) {
-    // If remote canvas has been deactivated just return null.
-    if (mDeactivated) {
-      return nullptr;
-    }
-
-    CVStatus status = mSurfaceDescriptorsMonitor.Wait(kDescriptorTimeout);
-    if (status == CVStatus::Timeout) {
-      // If something has gone wrong and the texture has already been destroyed,
-      // it will have cleaned up its descriptor.
-      return nullptr;
-    }
-  }
-
-  UniquePtr<SurfaceDescriptor> descriptor = std::move(result->second);
-  mSurfaceDescriptors.erase(aTextureId);
-  return descriptor;
 }
 
 already_AddRefed<gfx::SourceSurface> CanvasTranslator::LookupExternalSurface(
@@ -542,7 +505,6 @@ bool CanvasTranslator::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
   // We will only use shmem allocation methods when remoting software canvas,
   // which can only happen if gfx.canvas.remote.allow-software is enabled.
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
-  MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
 
   if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::AllocShmem(aSize, aShmem);
@@ -565,7 +527,6 @@ bool CanvasTranslator::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
   // We will only use shmem allocation methods when remoting software canvas,
   // which can only happen if gfx.canvas.remote.allow-software is enabled.
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
-  MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
 
   if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::AllocUnsafeShmem(aSize, aShmem);
@@ -588,7 +549,6 @@ bool CanvasTranslator::DeallocShmem(ipc::Shmem& aShmem) {
   // We will only use shmem allocation methods when remoting software canvas,
   // which can only happen if gfx.canvas.remote.allow-software is enabled.
   MOZ_ASSERT(mTextureType == TextureType::Unknown);
-  MOZ_ASSERT(mBackendType == gfx::BackendType::SKIA);
 
   if (gfx::CanvasRenderThread::IsInCanvasRenderThread()) {
     return PCanvasParent::DeallocShmem(aShmem);

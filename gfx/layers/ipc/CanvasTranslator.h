@@ -153,15 +153,6 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   TextureData* LookupTextureData(int64_t aTextureId);
 
   /**
-   * Waits for the SurfaceDescriptor associated with a TextureData from another
-   * process to be created and then returns it.
-   *
-   * @param aTextureId the key used to find the SurfaceDescriptor
-   * @returns the SurfaceDescriptor found
-   */
-  UniquePtr<SurfaceDescriptor> WaitForSurfaceDescriptor(int64_t aTextureId);
-
-  /**
    * Removes the texture and other objects associated with a texture ID.
    *
    * @param aTextureId the texture ID to remove
@@ -290,11 +281,6 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   nsRefPtrHashtable<nsPtrHashKey<void>, gfx::DataSourceSurface> mDataSurfaces;
   gfx::ReferencePtr mMappedSurface;
   UniquePtr<gfx::DataSourceSurface::ScopedMap> mPreparedMap;
-  typedef std::unordered_map<int64_t, UniquePtr<SurfaceDescriptor>>
-      DescriptorMap;
-  DescriptorMap mSurfaceDescriptors MOZ_GUARDED_BY(mSurfaceDescriptorsMonitor);
-  Monitor mSurfaceDescriptorsMonitor{
-      "CanvasTranslator::mSurfaceDescriptorsMonitor"};
   Atomic<bool> mDeactivated{false};
   bool mIsInTransaction = false;
   bool mDeviceResetInProgress = false;
