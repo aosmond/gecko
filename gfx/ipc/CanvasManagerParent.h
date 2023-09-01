@@ -27,6 +27,8 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   static void Shutdown();
 
+  static void DisableRemoteCanvas();
+
   static void AddReplayTexture(base::ProcessId aOtherPid, int64_t aTextureId,
                                layers::TextureData* aTextureData);
 
@@ -53,6 +55,7 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
  private:
   static void ShutdownInternal();
+  static void DisableRemoteCanvasInternal();
 
   ~CanvasManagerParent() override;
 
@@ -96,7 +99,9 @@ class CanvasManagerParent final : public PCanvasManagerParent {
       std::unordered_map<ReplayTextureKey, UniquePtr<layers::SurfaceDescriptor>,
                          ReplayTextureKey::HashFn>;
   static StaticMonitor sReplayTexturesMonitor;
-  static ReplayTextureMap sReplayTextures;
+  static ReplayTextureMap sReplayTextures
+      MOZ_GUARDED_BY(sReplayTexturesMonitor);
+  static bool sReplayTexturesEnabled MOZ_GUARDED_BY(sReplayTexturesMonitor);
 };
 
 }  // namespace gfx

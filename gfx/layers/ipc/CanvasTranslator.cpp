@@ -196,10 +196,8 @@ void CanvasTranslator::Deactivate() {
     entry.second->Unlock();
   }
 
-  //FIXME(aosmond): Handle deactivation better???
-  // Also notify anyone waiting for a surface descriptor. This must be done
-  // after mDeactivated is set to true.
-  //mSurfaceDescriptorsMonitor.NotifyAll();
+  // Disable remote canvas for all.
+  gfx::CanvasManagerParent::DisableRemoteCanvas();
 }
 
 bool CanvasTranslator::TranslateRecording() {
