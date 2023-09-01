@@ -8,6 +8,7 @@
 #include "mozilla/dom/WebGLParent.h"
 #include "mozilla/gfx/CanvasRenderThread.h"
 #include "mozilla/gfx/gfxVars.h"
+#include "mozilla/gfx/GPUParent.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/CanvasTranslator.h"
 #include "mozilla/layers/CompositorThread.h"
@@ -21,6 +22,7 @@ CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
 
 StaticMonitor CanvasManagerParent::sReplayTexturesMonitor;
 CanvasManagerParent::ReplayTextureMap CanvasManagerParent::sReplayTextures;
+bool CanvasManagerParent::sReplayTexturesEnabled(true);
 
 /* static */ void CanvasManagerParent::Init(
     Endpoint<PCanvasManagerParent>&& aEndpoint) {
@@ -64,6 +66,53 @@ CanvasManagerParent::ReplayTextureMap CanvasManagerParent::sReplayTextures;
 
   StaticMonitorAutoLock lock(sReplayTexturesMonitor);
   sReplayTextures.clear();
+  lock.NotifyAll();
+}
+
+/* static */ void CanvasManagerParent::DisableRemoteCanvas() {
+  NS_DispatchToMainThread(
+      NS_NewRunnableFunction("CanvasManagerParent::DisableRemoteCanvas", [] {
+        if (XRE_IsGPUProcess()) {
+          GPUParent::GetSingleton()->NotifyDisableRemoteCanvas();
+        } else {
+          gfxPlatform::DisableRemoteCanvas();
+        }
+      }));
+
+  if (CanvasRenderThread::IsInCanvasRenderThread()) {
+    DisableRemoteCanvasInternal();
+    return;
+  }
+
+  CanvasRenderThread::Dispatch(NS_NewRunnableFunction(
+      "CanvasManagerParent::DisableRemoteCanvas",
+      [] { CanvasManagerParent::DisableRemoteCanvasInternal(); }));
+}
+
+/* static */ void CanvasManagerParent::DisableRemoteCanvasInternal() {
+  MOZ_ASSERT(CanvasRenderThread::IsInCanvasRenderThread());
+
+  AutoTArray<RefPtr<layers::CanvasTranslator>, 16> actors;
+  for (const auto& manager : sManagers) {
+    for (const auto& canvas : manager->ManagedPCanvasParent()) {
+      actors.AppendElement(static_cast<layers::CanvasTranslator*>(canvas));
+    }
+  }
+
+  {
+    StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+    sReplayTexturesEnabled = false;
+    sReplayTextures.clear();
+  }
+
+  for (const auto& actor : actors) {
+    Unused << NS_WARN_IF(!actor->SendDeactivate());
+  }
+
+  {
+    StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+    lock.NotifyAll();
+  }
 }
 
 /* static */ void CanvasManagerParent::AddReplayTexture(
@@ -96,8 +145,9 @@ CanvasManagerParent::WaitForReplayTexture(base::ProcessId aOtherPid,
   ReplayTextureKey key{aOtherPid, aTextureId};
   ReplayTextureMap::iterator i;
   while ((i = sReplayTextures.find(key)) == sReplayTextures.end()) {
-    // FIXME(aosmond): Check for deactivation.
-    // Currently it's state is stored per translator.
+    if (NS_WARN_IF(!sReplayTexturesEnabled)) {
+      return nullptr;
+    }
 
     TimeDuration timeout = TimeDuration::FromMilliseconds(
         StaticPrefs::gfx_canvas_remote_texture_timeout_ms());
