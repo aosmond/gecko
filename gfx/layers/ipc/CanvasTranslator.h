@@ -273,6 +273,8 @@ class CanvasTranslator final : public gfx::InlineTranslator,
 
   void FinishShutdown();
 
+  bool CheckDeactivated();
+
   void Deactivate();
 
   TextureData* CreateTextureData(TextureType aTextureType,
