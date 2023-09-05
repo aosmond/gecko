@@ -8,6 +8,8 @@
 
 #include "gfxGradientCache.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/CanvasManagerParent.h"
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUParent.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/ipc/Endpoint.h"
@@ -189,7 +191,7 @@ ipc::IPCResult CanvasTranslator::RecvNewBuffer(
 }
 
 ipc::IPCResult CanvasTranslator::RecvResumeTranslation() {
-  if (mDeactivated) {
+  if (CheckDeactivated()) {
     // The other side might have sent a resume message before we deactivated.
     return IPC_OK();
   }
@@ -254,6 +256,18 @@ void CanvasTranslator::FinishShutdown() {
   canvasTranslators.Remove(this);
 }
 
+bool CanvasTranslator::CheckDeactivated() {
+  if (mDeactivated) {
+    return true;
+  }
+
+  if (NS_WARN_IF(!gfx::gfxVars::RemoteCanvasEnabled())) {
+    Deactivate();
+  }
+
+  return mDeactivated;
+}
+
 void CanvasTranslator::Deactivate() {
   if (mDeactivated) {
     return;
@@ -275,6 +289,9 @@ void CanvasTranslator::Deactivate() {
   // Also notify anyone waiting for a surface descriptor. This must be done
   // after mDeactivated is set to true.
   mSurfaceDescriptorsMonitor.NotifyAll();
+
+  // Disable remote canvas for all.
+  gfx::CanvasManagerParent::DisableRemoteCanvas();
 }
 
 bool CanvasTranslator::TranslateRecording() {

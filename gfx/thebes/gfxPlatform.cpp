@@ -2477,10 +2477,24 @@ void gfxPlatform::InitAcceleration() {
         "media.hardware-video-decoding.failed");
     InitGPUProcessPrefs();
 
-    gfxVars::SetRemoteCanvasEnabled(
-        StaticPrefs::gfx_canvas_remote_AtStartup() &&
-        (gfxConfig::IsEnabled(Feature::GPU_PROCESS) ||
-         StaticPrefs::gfx_canvas_remote_allow_in_parent_AtStartup()));
+    FeatureState& feature = gfxConfig::GetFeature(Feature::REMOTE_CANVAS);
+    feature.SetDefault(StaticPrefs::gfx_canvas_remote_AtStartup(),
+                       FeatureStatus::Disabled, "Disabled via pref");
+
+    if (!gfxConfig::IsEnabled(Feature::GPU_PROCESS) &&
+        !StaticPrefs::gfx_canvas_remote_allow_in_parent_AtStartup()) {
+      feature.Disable(FeatureStatus::UnavailableNoGpuProcess,
+                      "Disabled without GPU process",
+                      "FEATURE_REMOTE_CANVAS_NO_GPU_PROCESS"_ns);
+    }
+
+#ifdef XP_MACOSX
+    gfxConfig::ForceDisable(Feature::REMOTE_CANVAS, FeatureStatus::Blocked,
+                            "Cross process semaphores not supported",
+                            "FEATURE_REMOTE_CANVAS_NO_CROSS_PROCESS_SEM"_ns);
+#endif
+
+    gfxVars::SetRemoteCanvasEnabled(feature.IsEnabled());
   }
 }
 
@@ -3819,9 +3833,15 @@ bool gfxPlatform::FallbackFromAcceleration(FeatureStatus aStatus,
 
 /* static */
 void gfxPlatform::DisableGPUProcess() {
-  gfxVars::SetRemoteCanvasEnabled(
-      StaticPrefs::gfx_canvas_remote_AtStartup() &&
-      StaticPrefs::gfx_canvas_remote_allow_in_parent_AtStartup());
+  if (gfxVars::RemoteCanvasEnabled() &&
+      !StaticPrefs::gfx_canvas_remote_allow_in_parent_AtStartup()) {
+    gfxConfig::Disable(
+        Feature::REMOTE_CANVAS, FeatureStatus::UnavailableNoGpuProcess,
+        "Disabled by GPU process disabled",
+        "FEATURE_REMOTE_CANVAS_DISABLED_BY_GPU_PROCESS_DISABLED"_ns);
+    gfxVars::SetRemoteCanvasEnabled(false);
+  }
+
   if (kIsAndroid) {
     // On android, enable out-of-process WebGL only when GPU process exists.
     gfxVars::SetAllowWebglOop(false);
@@ -3840,6 +3860,16 @@ void gfxPlatform::DisableGPUProcess() {
   // did not end up disabling it, despite losing the GPU process.
   wr::RenderThread::Start(GPUProcessManager::Get()->AllocateNamespace());
   image::ImageMemoryReporter::InitForWebRender();
+}
+
+/* static */ void gfxPlatform::DisableRemoteCanvas() {
+  if (!gfxVars::RemoteCanvasEnabled()) {
+    return;
+  }
+  gfxConfig::ForceDisable(Feature::REMOTE_CANVAS, FeatureStatus::Failed,
+                          "Disabled by runtime error",
+                          "FEATURE_REMOTE_CANVAS_RUNTIME_ERROR"_ns);
+  gfxVars::SetRemoteCanvasEnabled(false);
 }
 
 void gfxPlatform::FetchAndImportContentDeviceData() {
