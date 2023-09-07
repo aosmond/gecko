@@ -578,5 +578,13 @@ void CanvasDrawEventRecorder::StoreSourceSurfaceRecording(
   StoreExternalSurfaceRecording(aSurface, wr::AsUint64(extId));
 }
 
+CanvasDrawEventRecorder::CanvasDrawEventRecorder() {
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
+}
+
+CanvasDrawEventRecorder::~CanvasDrawEventRecorder() {
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
+}
+
 }  // namespace layers
 }  // namespace mozilla

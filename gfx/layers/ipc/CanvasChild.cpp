@@ -127,10 +127,13 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
 };
 
 CanvasChild::CanvasChild(Endpoint<PCanvasChild>&& aEndpoint) {
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
   aEndpoint.Bind(this);
 }
 
-CanvasChild::~CanvasChild() = default;
+CanvasChild::~CanvasChild() {
+  printf_stderr("[AO] [%p] %s\n", this, __func__);
+}
 
 static void NotifyCanvasDeviceReset() {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
@@ -158,11 +161,13 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
     MOZ_ASSERT(mTextureType == TextureType::Unknown);
     mTextureType = aTextureType;
     mRecorder = MakeAndAddRef<CanvasDrawEventRecorder>();
+    printf_stderr("[AO] [%p] %s -- create recorder %p\n", this, __func__, mRecorder.get());
     SharedMemoryBasic::Handle handle;
     CrossProcessSemaphoreHandle readerSem;
     CrossProcessSemaphoreHandle writerSem;
     if (!mRecorder->Init(OtherPid(), &handle, &readerSem, &writerSem,
                          MakeUnique<RingBufferWriterServices>(this))) {
+      printf_stderr("[AO] [%p] %s -- destroy recorder %p\n", this, __func__, mRecorder.get());
       mRecorder = nullptr;
       return;
     }
@@ -180,6 +185,7 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
   // Explicitly drop our reference to the recorder, because it holds a reference
   // to us via the ResumeTranslation callback.
+  printf_stderr("[AO] [%p] %s -- destroy recorder %p\n", this, __func__, mRecorder.get());
   mRecorder = nullptr;
 }
 
@@ -244,6 +250,7 @@ void CanvasChild::EnsureBeginTransaction() {
       SharedMemoryBasic::Handle handle;
       if (!mRecorder->SwitchBuffer(OtherPid(), &handle) ||
           !SendNewBuffer(std::move(handle))) {
+        printf_stderr("[AO] [%p] %s -- destroy recorder %p\n", this, __func__, mRecorder.get());
         mRecorder = nullptr;
         return;
       }

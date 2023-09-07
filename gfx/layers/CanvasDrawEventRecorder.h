@@ -267,7 +267,7 @@ class CanvasEventRingBuffer final : public gfx::EventRingBuffer {
 class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(CanvasDrawEventRecorder, final)
-  explicit CanvasDrawEventRecorder(){};
+  explicit CanvasDrawEventRecorder();
 
   bool Init(base::ProcessId aOtherPid, ipc::SharedMemoryBasic::Handle* aHandle,
             CrossProcessSemaphoreHandle* aReaderSem,
@@ -315,6 +315,7 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
   }
 
  private:
+  virtual ~CanvasDrawEventRecorder();
   CanvasEventRingBuffer mOutputStream;
 };
 
