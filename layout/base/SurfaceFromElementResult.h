@@ -40,7 +40,6 @@ struct DirectDrawInfo {
 
 struct SurfaceFromElementResult {
   friend class mozilla::dom::CanvasRenderingContext2D;
-  friend class mozilla::dom::ImageBitmap;
   friend class ::nsLayoutUtils;
 
   /* If SFEResult contains a valid surface, it either mLayersImage or
