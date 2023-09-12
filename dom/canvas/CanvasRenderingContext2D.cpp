@@ -151,6 +151,8 @@ using namespace mozilla::layers;
 
 namespace mozilla::dom {
 
+static mozilla::LazyLogModule gCanvasLog("CanvasRenderingContext2D");
+
 // Cap sigma to avoid overly large temp surfaces.
 const Float SIGMA_MAX = 100;
 
@@ -5190,6 +5192,9 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
                                          double aDw, double aDh,
                                          uint8_t aOptional_argc,
                                          ErrorResult& aError) {
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] draw image source (%f, %f) %f x %f\n", aSx, aSy, aSw, aSh));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] draw image dest   (%f, %f) %f x %f\n", aDx, aDy, aDw, aDh));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] draw image args %u\n", uint32_t(aOptional_argc)));
   MOZ_ASSERT(aOptional_argc == 0 || aOptional_argc == 2 || aOptional_argc == 6);
 
   if (!ValidateRect(aDx, aDy, aDw, aDh, true)) {
@@ -5331,6 +5336,8 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     }
   }
 
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] intrinsic size %dx%d img size %dx%d\n", intrinsicImgSize.width, intrinsicImgSize.height, imgSize.width, imgSize.height));
+
   if (aOptional_argc == 0) {
     aSx = aSy = 0.0;
     aSw = (double)imgSize.width;
@@ -5342,6 +5349,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     aSw = (double)imgSize.width;
     aSh = (double)imgSize.height;
   }
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] adjusted (%f, %f) %f x %f\n", aSx, aSy, aSw, aSh));
 
   if (aSw == 0.0 || aSh == 0.0) {
     return;
@@ -5350,10 +5358,17 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
   ClipImageDimension(aSx, aSw, imgSize.width, aDx, aDw);
   ClipImageDimension(aSy, aSh, imgSize.height, aDy, aDh);
 
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] dim source (%f, %f) %f x %f\n", aSx, aSy, aSw, aSh));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] dim dest (%f, %f) %f x %f\n", aDx, aDy, aDw, aDh));
+
   if (aSw <= 0.0 || aSh <= 0.0 || aDw <= 0.0 || aDh <= 0.0) {
     // source and/or destination are fully clipped, so nothing is painted
     return;
   }
+
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] finally drawing original once again\n"));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] foobar"));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] fuck you build system"));
 
   // Per spec, the smoothing setting applies only to scaling up a bitmap image.
   // When down-scaling the user agent is free to choose whether or not to smooth
