@@ -151,6 +151,8 @@ using namespace mozilla::layers;
 
 namespace mozilla::dom {
 
+static mozilla::LazyLogModule gCanvasLog("CanvasRenderingContext2D");
+
 // Cap sigma to avoid overly large temp surfaces.
 const Float SIGMA_MAX = 100;
 
@@ -5191,6 +5193,9 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
                                          double aDw, double aDh,
                                          uint8_t aOptional_argc,
                                          ErrorResult& aError) {
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] draw image source (%f, %f) %f x %f\n", aSx, aSy, aSw, aSh));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] draw image dest   (%f, %f) %f x %f\n", aDx, aDy, aDw, aDh));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] draw image args %u\n", uint32_t(aOptional_argc)));
   MOZ_ASSERT(aOptional_argc == 0 || aOptional_argc == 2 || aOptional_argc == 6);
 
   if (!ValidateRect(aDx, aDy, aDw, aDh, true)) {
@@ -5338,15 +5343,20 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
   double clipOriginX, clipOriginY, clipWidth, clipHeight;
   if (cropRect) {
+    MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] has clip\n"));
     clipOriginX = cropRect.ref().X();
     clipOriginY = cropRect.ref().Y();
     clipWidth = cropRect.ref().Width();
     clipHeight = cropRect.ref().Height();
   } else {
+    MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] use img size as clip\n"));
     clipOriginX = clipOriginY = 0.0;
     clipWidth = imgSize.width;
     clipHeight = imgSize.height;
   }
+
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] intrinsic size %dx%d img size %dx%d\n", intrinsicImgSize.width, intrinsicImgSize.height, imgSize.width, imgSize.height));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] clip (%f, %f) %f x %f\n", clipOriginX, clipOriginY, clipWidth, clipHeight));
 
   // Any provided coordinates are in the display space, or the same as the
   // intrinsic size. In order to get to the surface coordinate space, we may
@@ -5374,6 +5384,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     aSw = aSw * scaleXToCrop;
     aSh = aSh * scaleYToCrop;
   }
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] adjusted (%f, %f) %f x %f\n", aSx, aSy, aSw, aSh));
 
   if (aSw == 0.0 || aSh == 0.0) {
     return;
@@ -5382,10 +5393,15 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
   ClipImageDimension(aSx, aSw, clipOriginX, clipWidth, aDx, aDw);
   ClipImageDimension(aSy, aSh, clipOriginY, clipHeight, aDy, aDh);
 
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] dim source (%f, %f) %f x %f\n", aSx, aSy, aSw, aSh));
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] dim dest (%f, %f) %f x %f\n", aDx, aDy, aDw, aDh));
+
   if (aSw <= 0.0 || aSh <= 0.0 || aDw <= 0.0 || aDh <= 0.0) {
     // source and/or destination are fully clipped, so nothing is painted
     return;
   }
+
+  MOZ_LOG(gCanvasLog, LogLevel::Debug, ("[AO] finally drawing\n"));
 
   // Per spec, the smoothing setting applies only to scaling up a bitmap image.
   // When down-scaling the user agent is free to choose whether or not to smooth
