@@ -284,7 +284,7 @@ class nsDisplayCanvas final : public nsPaintedDisplayItem {
       if (!surface || !surface->IsValid()) {
         return;
       }
-      gfx::IntSize size = surface->GetSize();
+      gfx::IntSize size = image->GetSize();
 
       transform = gfxUtils::SnapTransform(
           transform, gfxRect(0, 0, size.width, size.height), nullptr);

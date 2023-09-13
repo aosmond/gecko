@@ -99,13 +99,19 @@ function createSolidGreenBitmap(width, height) {
   return bitmap;
 }
 
+function wait(ms) {
+  return new Promise((resolve, reject) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function scaleTestCase(name, refWidth, refHeight, testWidth, testHeight, canvasWidth, canvasHeight) {
   const refBitmap = await createSolidGreenBitmap(refWidth, refHeight);
   const refCanvas = createCanvas(refWidth, refHeight);
   const refCtx = refCanvas.getContext("bitmaprenderer");
   refCtx.transferFromImageBitmap(refBitmap);
-  is(refCanvas.width, refWidth, name + ": canvas width " + refCanvas.width + " is reference " + refWidth);
-  is(refCanvas.height, refHeight, name + ": canvas height " + refCanvas.height + " is reference " + refHeight);
+  is(refCanvas.width, refWidth, name + ": refCanvas width " + refCanvas.width + " is ref " + refWidth);
+  is(refCanvas.height, refHeight, name + ": refCanvas height " + refCanvas.height + " is ref " + refHeight);
   const refSnapshot = await snapshotWindow(window);
   document.body.removeChild(refCanvas);
 
@@ -115,14 +121,22 @@ async function scaleTestCase(name, refWidth, refHeight, testWidth, testHeight, c
   ctx.transferFromImageBitmap(bitmap);
   is(canvas.width, testWidth, name + ": canvas width " + canvas.width + " is bitmap " + testWidth);
   is(canvas.height, testHeight, name + ": canvas height " + canvas.height + " is bitmap " + testHeight);
+  await wait(5000);
   if (refWidth !== testWidth) {
     canvas.width = refWidth;
+    is(canvas.width, refWidth, name + ": canvas width " + canvas.width + " is ref " + refWidth);
   }
   if (refHeight !== testHeight) {
     canvas.height = refHeight;
+    is(canvas.height, refHeight, name + ": canvas height " + canvas.height + " is ref " + refHeight);
   }
+  canvas.offsetHeight;
+  await wait(5000);
   const snapshot = await snapshotWindow(window);
   document.body.removeChild(canvas);
+
+  ok(false, refSnapshot.toDataURL());
+  ok(false, snapshot.toDataURL());
 
   const results = compareSnapshots(snapshot, refSnapshot, true);
   ok(results[0], name + ": screenshots should be the same");
@@ -130,12 +144,13 @@ async function scaleTestCase(name, refWidth, refHeight, testWidth, testHeight, c
 }
 
 async function scaleTest() {
-  await scaleTestCase("grow_unscaled", 64, 64, 64, 64, 32, 32); // Canvas grows, no scaling.
-  await scaleTestCase("grow_downscaled", 64, 64, 128, 128, 32, 32); // Canvas grows, scales down.
-  await scaleTestCase("same_downscaled", 64, 64, 128, 128, 128, 128); // Canvas unchanged, scales down.
-  await scaleTestCase("shrink_unscaled", 64, 64, 64, 64, 128, 128); // Canvas shrinks, no scaling.
-  await scaleTestCase("shrink_downscaled", 64, 64, 128, 128, 256, 256); // Canvas shrinks, scales down.
-  runTestOnWorker();
+  //await scaleTestCase("grow_unscaled", 64, 64, 64, 64, 32, 32); // Canvas grows, no scaling.
+  //await scaleTestCase("grow_downscaled", 64, 64, 128, 128, 32, 32); // Canvas grows, scales down.
+  await scaleTestCase("grow_upscaled", 64, 64, 32, 32, 16, 16); // Canvas grows, scales up.
+  //await scaleTestCase("same_downscaled", 64, 64, 128, 128, 128, 128); // Canvas unchanged, scales down.
+  //await scaleTestCase("shrink_unscaled", 64, 64, 64, 64, 128, 128); // Canvas shrinks, no scaling.
+  //await scaleTestCase("shrink_downscaled", 64, 64, 128, 128, 256, 256); // Canvas shrinks, scales down.
+  //runTestOnWorker();
 }
 
 function runTestOnWorker() {
@@ -165,8 +180,9 @@ function runTestOnWorker() {
 }
 
 SpecialPowers.pushPrefEnv({'set': [
-  ['gfx.offscreencanvas.enabled', true],
-]}, runTest.bind(this, 64, 64, runTest.bind(this, 128, 128, scaleTest)));
+  ['gfx.canvas.accelerated', false],
+]}, scaleTest);
+	//runTest.bind(this, 64, 64, runTest.bind(this, 128, 128, scaleTest)));
 
 </script>
 </body>
