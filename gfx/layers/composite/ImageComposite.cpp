@@ -108,6 +108,7 @@ int ImageComposite::ChooseImageIndex() {
   // Change to this behaviour would break dropped frames counting calculation:
   // We rely on this assumption to determine if during successive runs an
   // image is returned that isn't the one following immediately the previous one
+  printf_stderr("[AO] ImageComposite::ChooseImageIndex -- %p, images %zu\n", this, mImages.Length());
   if (mImages.IsEmpty()) {
     return -1;
   }
@@ -130,6 +131,7 @@ int ImageComposite::ChooseImageIndex() {
 
     if (!mImages[imageIndex].mTextureHost->IsValid()) {
       // Still not ready to be shown.
+      printf_stderr("[AO] ImageComposite::ChooseImageIndex -- %p, invalid\n", this);
       return -1;
     }
 
@@ -142,6 +144,7 @@ int ImageComposite::ChooseImageIndex() {
 
     mLastChooseImageIndexComposition = compositionOpportunityId;
 
+    printf_stderr("[AO] ImageComposite::ChooseImageIndex -- %p, select %d\n", this, imageIndex);
     return imageIndex;
   }
 
@@ -151,10 +154,12 @@ int ImageComposite::ChooseImageIndex() {
   for (uint32_t i = 0; i < mImages.Length(); ++i) {
     if (mImages[i].mFrameID == mLastFrameID &&
         mImages[i].mProducerID == mLastProducerID) {
+      printf_stderr("[AO] ImageComposite::ChooseImageIndex -- %p, select %d\n", this, i);
       return i;
     }
   }
 
+  printf_stderr("[AO] ImageComposite::ChooseImageIndex -- %p, select zero\n", this);
   return 0;
 }
 

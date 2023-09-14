@@ -1792,12 +1792,14 @@ void WebRenderBridgeParent::AddPipelineIdForCompositable(
   }
 
   if (!host) {
+    printf_stderr("[AO] WebRenderBridgeParent::AddPipelineIdForCompositable -- pipeline %08x-%08x, host %p\n", aPipelineId.mNamespace, aPipelineId.mHandle, host.get());
     return;
   }
 
   WebRenderImageHost* wrHost = host->AsWebRenderImageHost();
   MOZ_ASSERT(wrHost);
   if (!wrHost) {
+    printf_stderr("[AO] WebRenderBridgeParent::AddPipelineIdForCompositable -- pipeline %08x-%08x, wrHost %p\n", aPipelineId.mNamespace, aPipelineId.mHandle, wrHost);
     gfxCriticalNote
         << "Incompatible CompositableHost at WebRenderBridgeParent.";
   }
@@ -1806,6 +1808,7 @@ void WebRenderBridgeParent::AddPipelineIdForCompositable(
     return;
   }
 
+  printf_stderr("[AO] WebRenderBridgeParent::AddPipelineIdForCompositable -- pipeline %08x-%08x, wrHost %p, currentTexture %p\n", aPipelineId.mNamespace, aPipelineId.mHandle, wrHost, wrHost->GetCurrentTextureHost());
   wrHost->SetWrBridge(aPipelineId, this);
   mAsyncCompositables.emplace(wr::AsUint64(aPipelineId), wrHost);
   mAsyncImageManager->AddAsyncImagePipeline(aPipelineId, wrHost);

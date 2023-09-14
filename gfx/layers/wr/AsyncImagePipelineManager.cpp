@@ -217,6 +217,8 @@ Maybe<TextureHost::ResourceUpdateOp> AsyncImagePipelineManager::UpdateImageKeys(
   MOZ_ASSERT(aKeys.IsEmpty());
   MOZ_ASSERT(aPipeline);
 
+  printf_stderr("[AO] AsyncImagePipelineManager::UpdateImageKeys -- pipeline %08x-%08x\n", aPipelineId.mNamespace, aPipelineId.mHandle);
+
   TextureHost* texture =
       aPipeline->mImageHost->GetAsTextureHostForComposite(this);
   TextureHost* previousTexture = aPipeline->mCurrentTexture.get();
@@ -224,6 +226,7 @@ Maybe<TextureHost::ResourceUpdateOp> AsyncImagePipelineManager::UpdateImageKeys(
   if (texture == previousTexture) {
     // The texture has not changed, just reuse previous ImageKeys.
     aKeys = aPipeline->mKeys.Clone();
+    printf_stderr("[AO] AsyncImagePipelineManager::UpdateImageKeys -- pipeline %08x-%08x, unchanged texture %p\n", aPipelineId.mNamespace, aPipelineId.mHandle, texture);
     return Nothing();
   }
 
@@ -231,6 +234,7 @@ Maybe<TextureHost::ResourceUpdateOp> AsyncImagePipelineManager::UpdateImageKeys(
     // We don't have a new texture or texture does not have SubTextures, there
     // isn't much we can do.
     aKeys = aPipeline->mKeys.Clone();
+    printf_stderr("[AO] AsyncImagePipelineManager::UpdateImageKeys -- pipeline %08x-%08x, no texture %p\n", aPipelineId.mNamespace, aPipelineId.mHandle, texture);
     return Nothing();
   }
 
@@ -241,6 +245,7 @@ Maybe<TextureHost::ResourceUpdateOp> AsyncImagePipelineManager::UpdateImageKeys(
                          wrapper->mForPid);
   }
 
+  printf_stderr("[AO] AsyncImagePipelineManager::UpdateImageKeys -- pipeline %08x-%08x, texture %p\n", aPipelineId.mNamespace, aPipelineId.mHandle, texture);
   aPipeline->mCurrentTexture = texture;
 
   WebRenderTextureHost* wrTexture = texture->AsWebRenderTextureHost();

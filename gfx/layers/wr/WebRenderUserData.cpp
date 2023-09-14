@@ -111,6 +111,7 @@ WebRenderImageData::~WebRenderImageData() {
   ClearImageKey();
 
   if (mPipelineId) {
+    printf_stderr("[AO] WebRenderImageData::CreateAsyncImageWebRenderCommands -- remove pipeline container %p, pipeline %08x-%08x\n", mContainer.get(), mPipelineId.ref().mNamespace, mPipelineId.ref().mHandle);
     mManager->RemovePipelineIdForCompositable(mPipelineId.ref());
   }
 }
@@ -203,6 +204,7 @@ void WebRenderImageData::CreateAsyncImageWebRenderCommands(
     // In this case, we need to remove the existed pipeline and create new one
     // because the ImageContainer is changed.
     WrBridge()->RemovePipelineIdForCompositable(mPipelineId.ref());
+    printf_stderr("[AO] WebRenderImageData::CreateAsyncImageWebRenderCommands -- old container %p -> %p, pipeline %08x-%08x\n", mContainer.get(), aContainer, mPipelineId.ref().mNamespace, mPipelineId.ref().mHandle);
     mPipelineId.reset();
   }
 
@@ -214,6 +216,7 @@ void WebRenderImageData::CreateAsyncImageWebRenderCommands(
         mPipelineId.ref(), aContainer->GetAsyncContainerHandle(),
         CompositableHandleOwner::ImageBridge);
     mContainer = aContainer;
+    printf_stderr("[AO] WebRenderImageData::CreateAsyncImageWebRenderCommands -- new container %p, pipeline %08x-%08x, async handle %lx\n", aContainer, mPipelineId.ref().mNamespace, mPipelineId.ref().mHandle, aContainer->GetAsyncContainerHandle().Value());
   }
   MOZ_ASSERT(!mImageClient);
 
@@ -228,6 +231,7 @@ void WebRenderImageData::CreateAsyncImageWebRenderCommands(
   aBuilder.PushIFrame(aBounds, aIsBackfaceVisible, mPipelineId.ref(),
                       /*ignoreMissingPipelines*/ false);
 
+  printf_stderr("[AO] WebRenderImageData::CreateAsyncImageWebRenderCommands -- update pipeline container %p, pipeline %08x-%08x\n", aContainer, mPipelineId.ref().mNamespace, mPipelineId.ref().mHandle);
   WrBridge()->AddWebRenderParentCommand(OpUpdateAsyncImagePipeline(
       mPipelineId.value(), aSCBounds, aRotation, aFilter, aMixBlendMode));
 }

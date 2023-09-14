@@ -112,6 +112,7 @@ class nsDisplayCanvas final : public nsPaintedDisplayItem {
       // CompositableHandle managed inside the compositor process. There is
       // nothing to paint until the owner attaches it.
 
+      printf_stderr("[AO] nsDisplayCanvas::CreateWebRenderCommand -- flush element %p\n", element);
       element->FlushOffscreenCanvas();
 
       nsHTMLCanvasFrame* canvasFrame = static_cast<nsHTMLCanvasFrame*>(mFrame);
@@ -125,6 +126,7 @@ class nsDisplayCanvas final : public nsPaintedDisplayItem {
           dest, mFrame->PresContext()->AppUnitsPerDevPixel());
 
       RefPtr<ImageContainer> container = element->GetImageContainer();
+      printf_stderr("[AO] nsDisplayCanvas::CreateWebRenderCommand -- container %p\n", container.get());
       if (container) {
         MOZ_ASSERT(container->IsAsync());
         aManager->CommandBuilder().PushImage(this, container, aBuilder,

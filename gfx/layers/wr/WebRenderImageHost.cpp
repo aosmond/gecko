@@ -34,9 +34,12 @@ class ISurfaceAllocator;
 WebRenderImageHost::WebRenderImageHost(const TextureInfo& aTextureInfo)
     : CompositableHost(aTextureInfo),
       ImageComposite(),
-      mCurrentAsyncImageManager(nullptr) {}
+      mCurrentAsyncImageManager(nullptr) {
+  printf_stderr("[AO] WebRenderImageHost::WebRenderImageHost -- %p\n", this);
+}
 
 WebRenderImageHost::~WebRenderImageHost() {
+  printf_stderr("[AO] WebRenderImageHost::~WebRenderImageHost -- %p\n", this);
   MOZ_ASSERT(mPendingRemoteTextureWrappers.empty());
   MOZ_ASSERT(mWrBridges.empty());
 }
