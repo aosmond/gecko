@@ -4330,6 +4330,16 @@ void ClientWebGLContext::TexImage(uint8_t funcDims, GLenum imageTarget,
       }
     }
   }
+#if 0
+  offset.x += desc->unpacking.skipPixels;
+  offset.y += desc->unpacking.skipRows;
+  if (size) {
+    size->x = desc->unpacking.rowLength;
+    size->y = desc->unpacking.imageHeight;
+  } else {
+    size.emplace(desc->unpacking.rowLength, desc->unpacking.imageHeight, 1);
+  }
+#endif
   desc->unpacking = rawUnpacking;
 
   if (desc->structuredSrcSize) {

@@ -138,9 +138,18 @@ Maybe<webgl::TexUnpackBlobDesc> FromOffscreenCanvas(
 Maybe<webgl::TexUnpackBlobDesc> FromVideoFrame(
     const ClientWebGLContext& webgl, const GLenum target, Maybe<uvec3> size,
     const dom::VideoFrame& videoFrame, ErrorResult* const out_error) {
+  uint32_t flags = kDefaultSurfaceFromElementFlags;
+
+  /*const auto& rawUnpacking = webgl.State().mPixelUnpackState;
+  auto defaultSubrectState = webgl::PixelPackingState{};
+  defaultSubrectState.alignmentInTypeElems = rawUnpacking.alignmentInTypeElems;
+  if (rawUnpacking == defaultSubrectState) {*/
+    flags &= ~nsLayoutUtils::SFE_EXACT_SIZE_SURFACE;
+    flags |= nsLayoutUtils::SFE_ALLOW_UNCROPPED_UNSCALED;
+  //}
+
   auto sfer = nsLayoutUtils::SurfaceFromVideoFrame(
-      const_cast<dom::VideoFrame*>(&videoFrame),
-      kDefaultSurfaceFromElementFlags);
+      const_cast<dom::VideoFrame*>(&videoFrame), flags);
   return FromSurfaceFromElementResult(webgl, target, size, sfer, out_error);
 }
 
@@ -206,6 +215,16 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
 
   ////
 
+  auto subrectState = webgl::PixelUnpackStateWebgl{};
+  if (sfer.mCropRect) {
+    subrectState.skipPixels = sfer.mCropRect->x;
+    subrectState.skipRows = sfer.mCropRect->y;
+    subrectState.rowLength = sfer.mCropRect->width;
+    subrectState.imageHeight = sfer.mCropRect->height;
+  }
+
+  ////
+
   if (!sd && !dataSurf) {
     webgl.EnqueueWarning("Resource has no data (yet?). Uploading zeros.");
     if (!size) {
@@ -251,7 +270,8 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
                                 Some(elemSize),
                                 layersImage,
                                 sd,
-                                dataSurf});
+                                dataSurf,
+                                subrectState});
 }
 
 }  // namespace webgl
