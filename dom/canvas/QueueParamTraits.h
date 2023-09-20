@@ -14,6 +14,8 @@
 #include "mozilla/IntegerRange.h"
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/ipc/SharedMemoryBasic.h"
+#include "mozilla/layers/SharedSurfacesChild.h"
+#include "mozilla/layers/SharedSurfacesParent.h"
 #include "mozilla/Logging.h"
 #include "mozilla/TimeStamp.h"
 #include "nsExceptionHandler.h"
@@ -397,27 +399,39 @@ struct QueueParamTraits<webgl::TexUnpackBlobDesc> {
         !view.WriteParam(isDataSurf)) {
       return false;
     }
-    if (isDataSurf) {
-      const auto& surf = in.dataSurf;
-      gfx::DataSourceSurface::ScopedMap map(surf, gfx::DataSourceSurface::READ);
-      if (!map.IsMapped()) {
-        return false;
-      }
-      const auto& surfSize = surf->GetSize();
-      const auto stride = *MaybeAs<size_t>(map.GetStride());
-      if (!view.WriteParam(surfSize) || !view.WriteParam(surf->GetFormat()) ||
-          !view.WriteParam(stride)) {
-        return false;
-      }
-
-      const size_t dataSize = stride * surfSize.height;
-      const auto& begin = map.GetData();
-      const auto range = Range<const uint8_t>{begin, dataSize};
-      if (!view.WriteFromRange(range)) {
-        return false;
-      }
+    if (!isDataSurf) {
+      return true;
     }
-    return true;
+    const auto& surf = in.dataSurf;
+
+    // If this data surface is a SharedSurfaceSharedData, we already have it
+    // mapped into the compositor process.
+    wr::ExternalImageId extId{};
+    nsresult rv = layers::SharedSurfacesChild::Share(surf, extId);
+    const bool hasExtId = NS_SUCCEEDED(rv);
+    if (!view.WriteParam(hasExtId)) {
+      return false;
+    }
+
+    if (hasExtId) {
+      return view.WriteParam(wr::AsUint64(extId));
+    }
+
+    gfx::DataSourceSurface::ScopedMap map(surf, gfx::DataSourceSurface::READ);
+    if (!map.IsMapped()) {
+      return false;
+    }
+    const auto& surfSize = surf->GetSize();
+    const auto stride = *MaybeAs<size_t>(map.GetStride());
+    if (!view.WriteParam(surfSize) || !view.WriteParam(surf->GetFormat()) ||
+        !view.WriteParam(stride)) {
+      return false;
+    }
+
+    const size_t dataSize = stride * surfSize.height;
+    const auto& begin = map.GetData();
+    const auto range = Range<const uint8_t>{begin, dataSize};
+    return view.WriteFromRange(range);
   }
 
   template <typename U>
@@ -432,24 +446,42 @@ struct QueueParamTraits<webgl::TexUnpackBlobDesc> {
         !view.ReadParam(&isDataSurf)) {
       return false;
     }
-    if (isDataSurf) {
-      gfx::IntSize surfSize;
-      gfx::SurfaceFormat format;
-      size_t stride;
-      if (!view.ReadParam(&surfSize) || !view.ReadParam(&format) ||
-          !view.ReadParam(&stride)) {
+
+    if (!isDataSurf) {
+      return true;
+    }
+
+    bool hasExtId;
+    if (!view.ReadParam(&hasExtId)) {
+      return false;
+    }
+
+    if (hasExtId) {
+      uint64_t extId;
+      if (!view.ReadParam(&extId)) {
         return false;
       }
-      const size_t dataSize = stride * surfSize.height;
-      const auto range = view.template ReadRange<uint8_t>(dataSize);
-      if (!range) return false;
-
-      // DataSourceSurface demands pointer-to-mutable.
-      const auto bytes = const_cast<uint8_t*>(range->begin().get());
-      out->dataSurf = gfx::Factory::CreateWrappingDataSourceSurface(
-          bytes, stride, surfSize, format);
-      MOZ_ASSERT(out->dataSurf);
+      out->dataSurf =
+          layers::SharedSurfacesParent::Get(wr::ToExternalImageId(extId));
+      return !!out->dataSurf;
     }
+
+    gfx::IntSize surfSize;
+    gfx::SurfaceFormat format;
+    size_t stride;
+    if (!view.ReadParam(&surfSize) || !view.ReadParam(&format) ||
+        !view.ReadParam(&stride)) {
+      return false;
+    }
+    const size_t dataSize = stride * surfSize.height;
+    const auto range = view.template ReadRange<uint8_t>(dataSize);
+    if (!range) return false;
+
+    // DataSourceSurface demands pointer-to-mutable.
+    const auto bytes = const_cast<uint8_t*>(range->begin().get());
+    out->dataSurf = gfx::Factory::CreateWrappingDataSourceSurface(
+        bytes, stride, surfSize, format);
+    MOZ_ASSERT(out->dataSurf);
     return true;
   }
 };
