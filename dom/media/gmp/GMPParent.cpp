@@ -305,16 +305,6 @@ class NotifyGMPProcessLoadedTask : public Runnable {
       return NS_ERROR_FAILURE;
     }
 
-#if defined(XP_WIN)
-    RefPtr<DllServices> dllSvc(DllServices::Get());
-    bool isReadyForBackgroundProcessing =
-        dllSvc->IsReadyForBackgroundProcessing();
-    gmpEventTarget->Dispatch(NewRunnableMethod<bool, bool>(
-        "GMPParent::SendInitDllServices", mGMPParent,
-        &GMPParent::SendInitDllServices, isReadyForBackgroundProcessing,
-        Telemetry::CanRecordReleaseData()));
-#endif
-
     if (canProfile) {
       ipc::Endpoint<PProfilerChild> profilerParent(
           ProfilerParent::CreateForProcess(mProcessId));
@@ -402,6 +392,18 @@ nsresult GMPParent::LoadProcess() {
 #endif
 
     NS_DispatchToMainThread(new NotifyGMPProcessLoadedTask(OtherPid(), this));
+
+#if defined(XP_WIN)
+    // We need to ensure we initialize the DLL blocklist before we start the
+    // plugin.
+    if (mProcess->UseXPCOM() && Telemetry::CanRecordReleaseData() &&
+        !SendInitDllServices(mProcess->IsReadyForBackgroundProcessing())) {
+      GMP_PARENT_LOG_DEBUG(
+          "%s: Failed to send init dll services to child process",
+          __FUNCTION__);
+      return NS_ERROR_FAILURE;
+    }
+#endif
 
     // Intr call to block initialization on plugin load.
     if (!SendStartPlugin(mAdapter)) {

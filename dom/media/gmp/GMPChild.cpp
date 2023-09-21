@@ -761,12 +761,9 @@ mozilla::ipc::IPCResult GMPChild::RecvShutdown(ShutdownResolver&& aResolver) {
 
 #if defined(XP_WIN)
 mozilla::ipc::IPCResult GMPChild::RecvInitDllServices(
-    const bool& aCanRecordReleaseTelemetry,
     const bool& aIsReadyForBackgroundProcessing) {
-  if (aCanRecordReleaseTelemetry) {
-    RefPtr<DllServices> dllSvc(DllServices::Get());
-    dllSvc->StartUntrustedModulesProcessor(aIsReadyForBackgroundProcessing);
-  }
+  RefPtr<DllServices> dllSvc(DllServices::Get());
+  dllSvc->StartUntrustedModulesProcessor(aIsReadyForBackgroundProcessing);
   return IPC_OK();
 }
 

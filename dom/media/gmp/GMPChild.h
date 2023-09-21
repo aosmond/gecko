@@ -84,7 +84,6 @@ class GMPChild : public PGMPChild {
 
 #if defined(XP_WIN)
   mozilla::ipc::IPCResult RecvInitDllServices(
-      const bool& aCanRecordReleaseTelemetry,
       const bool& aIsReadyForBackgroundProcessing);
 
   mozilla::ipc::IPCResult RecvGetUntrustedModulesData(

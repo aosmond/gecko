@@ -63,8 +63,7 @@ child:
   async FlushFOGData() returns (ByteBuf buf);
 
 #if defined(XP_WIN)
-  async InitDllServices(bool canRecordReleaseTelemetry,
-                        bool aIsReadyForBackgroundProcessing);
+  async InitDllServices(bool aIsReadyForBackgroundProcessing);
 
   async GetUntrustedModulesData() returns (UntrustedModulesData? data);
 

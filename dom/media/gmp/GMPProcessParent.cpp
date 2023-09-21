@@ -8,6 +8,7 @@
 #include "GMPUtils.h"
 #include "nsIRunnable.h"
 #ifdef XP_WIN
+#  include "mozilla/WinDllServices.h"
 #  include "WinUtils.h"
 #endif
 #include "GMPLog.h"
@@ -92,23 +93,35 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
           mMonitor("GMPProcessParent::PrefSerializerRunnable::mMonitor") {}
 
     NS_IMETHOD Run() override {
+      MOZ_ASSERT(NS_IsMainThread());
+
       auto prefSerializer = MakeUnique<ipc::SharedPreferenceSerializer>();
       bool success =
           prefSerializer->SerializeToSharedMemory(GeckoProcessType_GMPlugin,
                                                   /* remoteType */ ""_ns);
+#ifdef XP_WIN
+      RefPtr<DllServices> dllSvc(DllServices::Get());
+      bool ready = dllSvc->IsReadyForBackgroundProcessing();
+#endif
 
       MonitorAutoLock lock(mMonitor);
       MOZ_ASSERT(!mComplete);
       if (success) {
         mPrefSerializer = std::move(prefSerializer);
       }
+#ifdef XP_WIN
+      mIsReadyForBackgroundProcessing = ready;
+#endif
       mComplete = true;
       lock.Notify();
       return NS_OK;
     }
 
     void Wait(int32_t aTimeoutMs,
-              UniquePtr<ipc::SharedPreferenceSerializer>& aOut) {
+#ifdef XP_WIN
+              bool& aOutReadyForBackgroundProcessing,
+#endif
+              UniquePtr<ipc::SharedPreferenceSerializer>& aOutSerializer) {
       MonitorAutoLock lock(mMonitor);
 
       TimeDuration timeout = TimeDuration::FromMilliseconds(aTimeoutMs);
@@ -118,13 +131,19 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
         }
       }
 
-      aOut = std::move(mPrefSerializer);
+#ifdef XP_WIN
+      aOutReadyForBackgroundProcessing = mReadyForBackgroundProcessing;
+#endif
+      aOutSerializer = std::move(mPrefSerializer);
     }
 
    private:
     Monitor mMonitor;
     UniquePtr<ipc::SharedPreferenceSerializer> mPrefSerializer
         MOZ_GUARDED_BY(mMonitor);
+#ifdef XP_WIN
+    bool mReadyForBackgroundProcessing MOZ_GUARDED_BY(mMonitor) = false;
+#endif
     bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
   };
 
@@ -150,7 +169,11 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
     // is blocking. This is also important for the buffering of pref updates,
     // since we know any tasks dispatched with updates won't run until we launch
     // (or fail to launch) the process.
-    prefTask->Wait(aTimeoutMs, prefSerializer);
+    prefTask->Wait(aTimeoutMs,
+#ifdef XP_WIN
+                   mIsReadyForBackgroundProcessing,
+#endif
+                   prefSerializer);
     if (NS_WARN_IF(!prefSerializer)) {
       return false;
     }
