@@ -9707,6 +9707,13 @@
   value: false
   mirror: always
 
+# How long to wait in milliseconds for a texture to be resolved in the event
+# that canvas races with VideoBridge on accessing a newly created texture.
+- name: media.video-bridge.texture-timeout-ms
+  type: RelaxedAtomicUint32
+  value: 10000
+  mirror: always
+
 - name: media.gpu-process-decoder
   type: RelaxedAtomicBool
 #if defined(XP_WIN)
