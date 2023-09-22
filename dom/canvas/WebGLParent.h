@@ -7,6 +7,7 @@
 #define WEBGLPARENT_H_
 
 #include "mozilla/GfxMessageUtils.h"
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/dom/PWebGLParent.h"
 #include "mozilla/WeakPtr.h"
 
@@ -31,7 +32,9 @@ class WebGLParent : public PWebGLParent, public SupportsWeakPtr {
   mozilla::ipc::IPCResult RecvInitialize(const webgl::InitContextDesc&,
                                          webgl::InitContextResult* out);
 
-  WebGLParent();  // For IPDL
+  explicit WebGLParent(const dom::ContentParentId& aContentId);  // For IPDL
+
+  const dom::ContentParentId& GetContentId() const { return mContentId; }
 
   using IPCResult = mozilla::ipc::IPCResult;
 
@@ -116,6 +119,8 @@ class WebGLParent : public PWebGLParent, public SupportsWeakPtr {
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
   UniquePtr<HostWebGLContext> mHost;
+
+  dom::ContentParentId mContentId;
 
   // Runnable that repeatedly processes our WebGL command queue
   RefPtr<Runnable> mRunCommandsRunnable;
