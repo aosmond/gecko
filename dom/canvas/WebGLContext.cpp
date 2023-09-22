@@ -619,6 +619,14 @@ RefPtr<WebGLContext> WebGLContext::Create(HostWebGLContext& host,
   const auto UploadableSdTypes = [&]() {
     webgl::EnumMask<layers::SurfaceDescriptor::Type> types;
     types[layers::SurfaceDescriptor::TSurfaceDescriptorBuffer] = true;
+    // This is conditional on using the CanvasRenderer thread because we need to
+    // synchronize with the RDD process and compositor thread to wait for a
+    // texture to be available in the compositor process. We don't want to block
+    // the other threads canvas runs on, so in that configuration, we would
+    // prefer to do the readback from the RDD which is guaranteed to work, and
+    // only block the owning thread for WebGL.
+    types[layers::SurfaceDescriptor::TSurfaceDescriptorGPUVideo] =
+        gfx::gfxVars::UseCanvasRenderThread();
     if (webgl->gl->IsANGLE()) {
       types[layers::SurfaceDescriptor::TSurfaceDescriptorD3D10] = true;
       types[layers::SurfaceDescriptor::TSurfaceDescriptorDXGIYCbCr] = true;
