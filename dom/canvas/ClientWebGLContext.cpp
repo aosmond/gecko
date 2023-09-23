@@ -808,6 +808,7 @@ ClientWebGLContext::SetDimensions(const int32_t signedWidth,
   // Context (re-)creation
 
   if (!CreateHostContext(size)) {
+    printf_stderr("[AO] ClientWebGLContext::SetDimensions -- failed to create context\n");
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
@@ -848,6 +849,7 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
                            gfx::gfxVars::UseSoftwareWebRender());
 
       if (isCompositorSlow) {
+        printf_stderr("[AO] ClientWebGLContext::CreateHostContext -- slow compositor\n");
         return Err(
             "failIfMajorPerformanceCaveat: Compositor is not"
             " hardware-accelerated.");
@@ -879,6 +881,7 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
 
     auto* const cm = gfx::CanvasManagerChild::Get();
     if (NS_WARN_IF(!cm)) {
+      printf_stderr("[AO] ClientWebGLContext::CreateHostContext -- no canvas manager\n");
       return Err("!CanvasManagerChild::Get()");
     }
 
@@ -886,6 +889,7 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
     outOfProcess =
         static_cast<dom::WebGLChild*>(cm->SendPWebGLConstructor(outOfProcess));
     if (!outOfProcess) {
+      printf_stderr("[AO] ClientWebGLContext::CreateHostContext -- IPDL constructor failed\n");
       return Err("SendPWebGLConstructor failed");
     }
 
@@ -896,6 +900,7 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
     }
 
     if (!outOfProcess->SendInitialize(initDesc, &notLost.info)) {
+      printf_stderr("[AO] ClientWebGLContext::CreateHostContext -- IPDL initialize failed\n");
       return Err("WebGL actor Initialize failed");
     }
 
@@ -913,6 +918,7 @@ bool ClientWebGLContext::CreateHostContext(const uvec2& requestedSize) {
     notLost.info.error = str;
   }
   if (!notLost.info.error.empty()) {
+    printf_stderr("[AO] ClientWebGLContext::CreateHostContext -- creation error '%s'\n", notLost.info.error.c_str());
     ThrowEvent_WebGLContextCreationError(notLost.info.error);
     return false;
   }
@@ -1009,6 +1015,7 @@ ClientWebGLContext::SetContextOptions(JSContext* cx,
 
   dom::WebGLContextAttributes attributes;
   if (!attributes.Init(cx, options)) {
+    printf_stderr("[AO] ClientWebGLContext::SetContextOptions -- failed to init attributes\n");
     aRvForDictionaryInit.Throw(NS_ERROR_UNEXPECTED);
     return NS_ERROR_UNEXPECTED;
   }
@@ -1051,6 +1058,7 @@ ClientWebGLContext::SetContextOptions(JSContext* cx,
   if (mInitialOptions && *mInitialOptions != newOpts) {
     // Err if the options asked for aren't the same as what they were
     // originally.
+    printf_stderr("[AO] ClientWebGLContext::SetContextOptions -- options mismatch\n");
     return NS_ERROR_FAILURE;
   }
 

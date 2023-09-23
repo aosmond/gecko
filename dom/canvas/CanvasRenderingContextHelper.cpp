@@ -272,12 +272,14 @@ nsresult CanvasRenderingContextHelper::UpdateContext(
   nsresult rv = currentContext->SetContextOptions(aCx, aNewContextOptions,
                                                   aRvForDictionaryInit);
   if (NS_FAILED(rv)) {
+    printf_stderr("[AO] CanvasRenderingContextHelper::UpdateContext -- failed to SetContextOptions\n");
     mCurrentContext = nullptr;
     return rv;
   }
 
   rv = currentContext->SetDimensions(sz.width, sz.height);
   if (NS_FAILED(rv)) {
+    printf_stderr("[AO] CanvasRenderingContextHelper::UpdateContext -- failed to dims %dx%d\n", sz.width, sz.height);
     mCurrentContext = nullptr;
   }
 
