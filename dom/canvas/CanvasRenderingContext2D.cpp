@@ -97,6 +97,7 @@
 #include "mozilla/gfx/DataSurfaceHelpers.h"
 #include "mozilla/gfx/PatternHelpers.h"
 #include "mozilla/gfx/Swizzle.h"
+#include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/PersistentBufferProvider.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Preferences.h"
@@ -117,6 +118,7 @@
 #include "mozilla/dom/SVGImageElement.h"
 #include "mozilla/dom/TextMetrics.h"
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/Logging.h"
 #include "nsGlobalWindowInner.h"
 #include "nsDeviceContext.h"
 #include "nsFontMetrics.h"
@@ -151,6 +153,8 @@ using namespace mozilla::ipc;
 using namespace mozilla::layers;
 
 namespace mozilla::dom {
+
+static LazyLogModule gCanvas2DLog("Canvas2D");
 
 // Cap sigma to avoid overly large temp surfaces.
 const Float SIGMA_MAX = 100;
@@ -1657,6 +1661,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
   }
 
   aOutProvider = new PersistentBufferProviderAccelerated(aOutDT);
+  MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO using accelerated"));
   return true;
 }
 
@@ -1666,29 +1671,40 @@ bool CanvasRenderingContext2D::TrySharedTarget(
   aOutDT = nullptr;
   aOutProvider = nullptr;
 
-  if (!mCanvasElement) {
-    return false;
-  }
-
   if (mBufferProvider && mBufferProvider->IsShared()) {
     // we are already using a shared buffer provider, we are allocating a new
     // one because the current one failed so let's just fall back to the basic
     // provider.
     mClipsNeedConverting = true;
+    MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO was using shared, abandoning"));
     return false;
   }
 
-  WindowRenderer* renderer = WindowRendererFromCanvasElement(mCanvasElement);
+  if (mCanvasElement) {
+    MOZ_ASSERT(NS_IsMainThread());
 
-  if (!renderer) {
-    return false;
+    WindowRenderer* renderer = WindowRendererFromCanvasElement(mCanvasElement);
+    if (NS_WARN_IF(!renderer)) {
+      return false;
+    }
+
+    aOutProvider = renderer->CreatePersistentBufferProvider(
+        GetSize(), GetSurfaceFormat(),
+        !mAllowAcceleration || GetEffectiveWillReadFrequently());
+  } else if (mOffscreenCanvas) {
+    RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton();
+    if (NS_WARN_IF(!imageBridge)) {
+      MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO no image bridge"));
+      return false;
+    }
+
+    aOutProvider = PersistentBufferProviderShared::Create(
+        GetSize(), GetSurfaceFormat(), imageBridge,
+        !mAllowAcceleration || GetEffectiveWillReadFrequently());
   }
-
-  aOutProvider = renderer->CreatePersistentBufferProvider(
-      GetSize(), GetSurfaceFormat(),
-      !mAllowAcceleration || GetEffectiveWillReadFrequently());
 
   if (!aOutProvider) {
+    MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO no shared provider"));
     return false;
   }
 
@@ -1697,6 +1713,12 @@ bool CanvasRenderingContext2D::TrySharedTarget(
   aOutDT = aOutProvider->BorrowDrawTarget(IntRect());
   MOZ_ASSERT(aOutDT);
 
+  if (!aOutDT) {
+    MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO no shared dt"));
+    return false;
+  }
+
+  MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO using shared"));
   return !!aOutDT;
 }
 
@@ -1718,6 +1740,7 @@ bool CanvasRenderingContext2D::TryBasicTarget(
   }
 
   aOutProvider = new PersistentBufferProviderBasic(aOutDT);
+  MOZ_LOG(gCanvas2DLog, LogLevel::Debug, ("AO using basic"));
   return true;
 }
 
