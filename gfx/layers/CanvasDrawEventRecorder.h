@@ -277,11 +277,14 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
             CrossProcessSemaphoreHandle* aReaderSem,
             CrossProcessSemaphoreHandle* aWriterSem,
             UniquePtr<CanvasEventRingBuffer::WriterServices> aWriterServices) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
     return mOutputStream.InitWriter(aOtherPid, aHandle, aReaderSem, aWriterSem,
                                     std::move(aWriterServices));
   }
 
   void RecordEvent(const gfx::RecordedEvent& aEvent) final {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+
     if (!mOutputStream.good()) {
       return;
     }
@@ -292,18 +295,23 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
   void StoreSourceSurfaceRecording(gfx::SourceSurface* aSurface,
                                    const char* aReason) final;
 
-  void Flush() final {}
+  void Flush() final { NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder); }
 
   void ReturnRead(uint8_t* aOut, const gfx::IntSize& aSize, size_t aBPP,
                   size_t aStride = 0) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
     mOutputStream.ReturnRead(aOut, aSize, aBPP, aStride);
   }
 
   void ReturnRead(uint8_t* aOut, size_t aSize) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
     mOutputStream.ReturnRead(aOut, aSize);
   }
 
-  uint32_t CreateCheckpoint() { return mOutputStream.CreateCheckpoint(); }
+  uint32_t CreateCheckpoint() {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    return mOutputStream.CreateCheckpoint();
+  }
 
   /**
    * Waits until the given checkpoint has been read by the translator.
@@ -313,13 +321,18 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
    *          or we timeout.
    */
   bool WaitForCheckpoint(uint32_t aCheckpoint) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
     return mOutputStream.WaitForCheckpoint(aCheckpoint);
   }
 
-  bool UsingLargeStream() { return mOutputStream.UsingLargeStream(); }
+  bool UsingLargeStream() {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    return mOutputStream.UsingLargeStream();
+  }
 
   bool SwitchBuffer(base::ProcessId aOtherPid,
                     ipc::SharedMemoryBasic::Handle* aHandle) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
     return mOutputStream.SwitchBuffer(aOtherPid, aHandle);
   }
 
