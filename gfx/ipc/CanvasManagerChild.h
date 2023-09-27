@@ -42,6 +42,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   void ActorDestroy(ActorDestroyReason aReason) override;
 
   static CanvasManagerChild* Get();
+  static CanvasManagerChild* MaybeGet();
   static void Shutdown();
   static bool CreateParent(
       mozilla::ipc::Endpoint<PCanvasManagerParent>&& aEndpoint);
@@ -51,6 +52,8 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   void DeactivateCanvas();
 
   RefPtr<layers::CanvasChild> GetCanvasChild();
+
+  layers::CanvasChild* MaybeGetCanvasChild() const { return mCanvasChild; }
 
   RefPtr<webgpu::WebGPUChild> GetWebGPUChild();
 
