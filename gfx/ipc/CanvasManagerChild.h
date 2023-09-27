@@ -59,6 +59,8 @@ class CanvasManagerChild final : public PCanvasManagerChild {
 
   RefPtr<layers::CanvasChild> GetCanvasChild();
 
+  layers::CanvasChild* MaybeGetCanvasChild() const { return mCanvasChild; }
+
   RefPtr<webgpu::WebGPUChild> GetWebGPUChild();
 
   layers::ActiveResourceTracker* GetActiveResourceTracker();

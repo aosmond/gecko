@@ -58,8 +58,14 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
    *
    * @params aTextureType the TextureType to create in the CanvasTranslator.
    */
-  void EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                      TextureType aTextureType);
+  RefPtr<CanvasDrawEventRecorder> EnsureRecorder(gfx::IntSize aSize,
+                                                 gfx::SurfaceFormat aFormat,
+                                                 TextureType aTextureType);
+
+  /**
+   * Send a messsage to our CanvasParent to resume translation.
+   */
+  void ResumeTranslation();
 
   /**
    * Clean up IPDL actor.
