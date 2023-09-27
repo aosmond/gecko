@@ -607,6 +607,12 @@ bool CanvasDrawEventRecorder::Init(
 void CanvasDrawEventRecorder::DetachResources() {
   NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
 
+  nsTHashSet<RecordedTextureData*> recordedTextures =
+      std::move(mRecordedTextures);
+  for (const auto& texture : recordedTextures) {
+    texture->DestroyOnOwningThread();
+  }
+
   DrawEventRecorderPrivate::DetachResources();
 
   {
