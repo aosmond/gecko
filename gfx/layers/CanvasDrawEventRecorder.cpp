@@ -12,6 +12,8 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/dom/WorkerRunnable.h"
+#include "mozilla/layers/CanvasChild.h"
+#include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/TextureRecorded.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
 #include "nsThreadUtils.h"
@@ -124,6 +126,12 @@ bool CanvasEventRingBuffer::InitReader(
 
   mGood = true;
   return true;
+}
+
+void CanvasEventRingBuffer::Destroy() {
+  if (mWriterServices) {
+    mWriterServices->Destroy();
+  }
 }
 
 bool CanvasEventRingBuffer::SetNewBuffer(
@@ -576,7 +584,10 @@ CanvasDrawEventRecorder::CanvasDrawEventRecorder(
     dom::ThreadSafeWorkerRef* aWorkerRef)
     : mWorkerRef(aWorkerRef), mIsOnWorker(!!aWorkerRef) {}
 
-CanvasDrawEventRecorder::~CanvasDrawEventRecorder() { MOZ_ASSERT(!mWorkerRef); }
+CanvasDrawEventRecorder::~CanvasDrawEventRecorder() {
+  MOZ_ASSERT(!mWorkerRef);
+  MOZ_ASSERT(mRecordedTextures.IsEmpty());
+}
 
 bool CanvasDrawEventRecorder::Init(
     base::ProcessId aOtherPid, ipc::SharedMemoryBasic::Handle* aHandle,
@@ -592,12 +603,49 @@ bool CanvasDrawEventRecorder::Init(
 void CanvasDrawEventRecorder::DetachResources() {
   NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
 
+  nsTHashSet<RecordedTextureData*> recordedTextures =
+      std::move(mRecordedTextures);
+  for (const auto& texture : recordedTextures) {
+    texture->DestroyOnOwningThread();
+  }
+
+  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
+      recordedSurfaces = std::move(mRecordedSurfaces);
+  for (const auto& entry : recordedSurfaces) {
+    RefPtr<SourceSurfaceCanvasRecording> surface(entry.GetData());
+    if (surface) {
+      surface->DestroyOnOwningThread();
+    }
+  }
+
+  // There may be pending deletions waiting on the ImageBridgeChild thread for
+  // this recorder. Let's make sure we handle any outstanding events before
+  // destroying our worker reference.
+  if (mIsOnWorker) {
+    if (RefPtr<ImageBridgeChild> imageBridge =
+            ImageBridgeChild::GetSingleton()) {
+      imageBridge->FlushEvents();
+    }
+  }
+
   DrawEventRecorderPrivate::DetachResources();
+  mOutputStream.Destroy();
 
   {
     auto lockedPendingDeletions = mPendingDeletions.Lock();
     mWorkerRef = nullptr;
   }
+}
+
+bool CanvasDrawEventRecorder::IsOnOwningThread() {
+  auto lockedPendingDeletions = mPendingDeletions.Lock();
+
+  if (mWorkerRef) {
+    return mWorkerRef->Private()->IsOnCurrentThread();
+  }
+
+  MOZ_RELEASE_ASSERT(!mIsOnWorker, "Worker already shutdown!");
+  return NS_IsMainThread();
 }
 
 void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(
