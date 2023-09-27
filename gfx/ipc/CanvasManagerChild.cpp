@@ -148,6 +148,14 @@ void CanvasManagerChild::Destroy() {
   return manager;
 }
 
+/* static */ CanvasManagerChild* CanvasManagerChild::MaybeGet() {
+  if (!sLocalManager.initialized()) {
+    return nullptr;
+  }
+
+  return sLocalManager.get();
+}
+
 void CanvasManagerChild::EndCanvasTransaction() {
   NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
 

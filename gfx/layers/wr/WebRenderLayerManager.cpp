@@ -10,6 +10,7 @@
 #include "mozilla/StaticPrefs_apz.h"
 #include "mozilla/StaticPrefs_layers.h"
 #include "mozilla/dom/BrowserChild.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DrawEventRecorder.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/StackingContextHelper.h"
@@ -299,7 +300,9 @@ bool WebRenderLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags) {
     }
   }
 
-  GetCompositorBridgeChild()->EndCanvasTransaction();
+  if (auto* cm = CanvasManagerChild::Get()) {
+    cm->EndCanvasTransaction();
+  }
 
   Maybe<TransactionData> transactionData;
   if (mStateManager.mAsyncResourceUpdates || !mPendingScrollUpdates.IsEmpty() ||
@@ -440,7 +443,9 @@ void WebRenderLayerManager::EndTransactionWithoutLayer(
     }
   }
 
-  GetCompositorBridgeChild()->EndCanvasTransaction();
+  if (auto* cm = CanvasManagerChild::Get()) {
+    cm->EndCanvasTransaction();
+  }
 
   {
     AUTO_PROFILER_TRACING_MARKER("Paint", "ForwardDPTransaction", GRAPHICS);
