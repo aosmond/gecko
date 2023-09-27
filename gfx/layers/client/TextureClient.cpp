@@ -22,6 +22,7 @@
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_layers.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DataSurfaceHelpers.h"  // for CreateDataSourceSurfaceByCloning
 #include "mozilla/gfx/Logging.h"             // for gfxDebug
 #include "mozilla/gfx/gfxVars.h"
@@ -331,10 +332,12 @@ TextureData* TextureData::Create(TextureForwarder* aAllocator,
       GetTextureType(aFormat, aSize, aKnowsCompositor, aSelector, aAllocFlags);
 
   if (ShouldRemoteTextureType(textureType, aSelector)) {
-    RefPtr<CanvasChild> canvasChild = aAllocator->GetCanvasChild();
-    if (canvasChild) {
-      return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
-                                     textureType);
+    if (auto* cm = CanvasManagerChild::Get()) {
+      RefPtr<CanvasChild> canvasChild = cm->GetCanvasChild();
+      if (canvasChild) {
+        return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
+                                       textureType);
+      }
     }
 
     // We don't have a CanvasChild, but are supposed to be remote.
