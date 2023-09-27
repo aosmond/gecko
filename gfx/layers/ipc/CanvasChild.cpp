@@ -143,7 +143,7 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
 
 CanvasChild::CanvasChild() = default;
 
-CanvasChild::~CanvasChild() = default;
+CanvasChild::~CanvasChild() { NS_ASSERT_OWNINGTHREAD(CanvasChild); }
 
 static void NotifyCanvasDeviceReset() {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
@@ -153,6 +153,8 @@ static void NotifyCanvasDeviceReset() {
 }
 
 ipc::IPCResult CanvasChild::RecvNotifyDeviceChanged() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   NotifyCanvasDeviceReset();
   mRecorder->RecordEvent(RecordedDeviceChangeAcknowledged());
   return IPC_OK();
@@ -161,6 +163,8 @@ ipc::IPCResult CanvasChild::RecvNotifyDeviceChanged() {
 /* static */ bool CanvasChild::mDeactivated = false;
 
 ipc::IPCResult CanvasChild::RecvDeactivate() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   RefPtr<CanvasChild> self(this);
   mDeactivated = true;
   if (auto* cm = gfx::CanvasManagerChild::Get()) {
@@ -171,6 +175,8 @@ ipc::IPCResult CanvasChild::RecvDeactivate() {
 }
 
 void CanvasChild::EnsureRecorder(TextureType aTextureType) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (!mRecorder) {
     MOZ_ASSERT(mTextureType == TextureType::Unknown);
     mTextureType = aTextureType;
@@ -196,6 +202,8 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
 }
 
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // Explicitly drop our reference to the recorder, because it holds a reference
   // to us via the ResumeTranslation callback.
   if (mRecorder) {
@@ -205,18 +213,24 @@ void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
 }
 
 void CanvasChild::ResumeTranslation() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (CanSend()) {
     SendResumeTranslation();
   }
 }
 
 void CanvasChild::Destroy() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (CanSend()) {
     Send__delete__(this);
   }
 }
 
 void CanvasChild::OnTextureWriteLock() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return;
@@ -227,6 +241,8 @@ void CanvasChild::OnTextureWriteLock() {
 }
 
 void CanvasChild::OnTextureForwarded() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return;
@@ -253,6 +269,8 @@ void CanvasChild::OnTextureForwarded() {
 }
 
 bool CanvasChild::EnsureBeginTransaction() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return false;
@@ -278,6 +296,8 @@ bool CanvasChild::EnsureBeginTransaction() {
 }
 
 void CanvasChild::EndTransaction() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return;
@@ -298,6 +318,8 @@ void CanvasChild::ClearCachedResources() {
 }
 
 bool CanvasChild::ShouldBeCleanedUp() const {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // Always return true if we've been deactivated.
   if (Deactivated()) {
     return true;
@@ -309,6 +331,8 @@ bool CanvasChild::ShouldBeCleanedUp() const {
 
 already_AddRefed<gfx::DrawTarget> CanvasChild::CreateDrawTarget(
     gfx::IntSize aSize, gfx::SurfaceFormat aFormat) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return nullptr;
@@ -322,6 +346,8 @@ already_AddRefed<gfx::DrawTarget> CanvasChild::CreateDrawTarget(
 }
 
 void CanvasChild::RecordEvent(const gfx::RecordedEvent& aEvent) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return;
@@ -332,7 +358,7 @@ void CanvasChild::RecordEvent(const gfx::RecordedEvent& aEvent) {
 
 already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
     const gfx::SourceSurface* aSurface) {
-  MOZ_DIAGNOSTIC_ASSERT(NS_IsMainThread());
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
   MOZ_ASSERT(aSurface);
 
   // We drop mRecorder in ActorDestroy to break the reference cycle.
@@ -381,6 +407,7 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
 
 already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
     const RefPtr<gfx::SourceSurface>& aSurface) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
   MOZ_ASSERT(aSurface);
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {

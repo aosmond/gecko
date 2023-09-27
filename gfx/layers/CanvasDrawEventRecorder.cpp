@@ -569,6 +569,8 @@ void CanvasEventRingBuffer::ReturnRead(char* aOut, size_t aSize) {
 
 void CanvasDrawEventRecorder::StoreSourceSurfaceRecording(
     gfx::SourceSurface* aSurface, const char* aReason) {
+  NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+
   wr::ExternalImageId extId{};
   nsresult rv = layers::SharedSurfacesChild::Share(aSurface, extId);
   if (NS_FAILED(rv)) {
