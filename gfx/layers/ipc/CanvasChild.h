@@ -49,7 +49,7 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
    *
    * @params aTextureType the TextureType to create in the CanvasTranslator.
    */
-  void EnsureRecorder(TextureType aTextureType);
+  RefPtr<CanvasDrawEventRecorder> EnsureRecorder(TextureType aTextureType);
 
   /**
    * Send a messsage to our CanvasParent to resume translation.
@@ -151,6 +151,41 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   std::vector<RefPtr<gfx::SourceSurface>> mLastTransactionExternalSurfaces;
   bool mIsInTransaction = false;
   bool mHasOutstandingWriteLock = false;
+};
+
+class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
+ public:
+  MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SourceSurfaceCanvasRecording, final)
+
+  SourceSurfaceCanvasRecording(
+      const RefPtr<gfx::SourceSurface>& aRecordedSuface,
+      CanvasChild* aCanvasChild,
+      const RefPtr<CanvasDrawEventRecorder>& aRecorder);
+
+  ~SourceSurfaceCanvasRecording() final;
+
+  void Init();
+
+  void DestroyOnOwningThread();
+
+  gfx::SurfaceType GetType() const final { return mRecordedSurface->GetType(); }
+
+  gfx::IntSize GetSize() const final { return mRecordedSurface->GetSize(); }
+
+  gfx::SurfaceFormat GetFormat() const final {
+    return mRecordedSurface->GetFormat();
+  }
+
+  already_AddRefed<gfx::DataSourceSurface> GetDataSurface() final;
+
+ private:
+  bool IsOnOwningThread() const;
+  void EnsureDataSurfaceOnOwningThread();
+
+  RefPtr<gfx::SourceSurface> mRecordedSurface;
+  RefPtr<CanvasChild> mCanvasChild;
+  RefPtr<CanvasDrawEventRecorder> mRecorder;
+  RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
 };
 
 }  // namespace layers
