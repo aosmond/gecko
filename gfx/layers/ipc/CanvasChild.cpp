@@ -40,115 +40,42 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
                       CrossProcessSemaphoreHandle&& aReaderSem,
                       CrossProcessSemaphoreHandle&& aWriterSem,
                       const bool& aUseIPDLThread) override {
-    if (!mCanvasChild) {
+    RefPtr<CanvasChild> canvasChild(mCanvasChild);
+    if (!canvasChild) {
       return false;
     }
-    return mCanvasChild->SendInitTranslator(
+    return canvasChild->SendInitTranslator(
         aTextureType, std::move(aReadHandle), std::move(aBufferHandles),
         aBufferSize, std::move(aReaderSem), std::move(aWriterSem),
         aUseIPDLThread);
   }
 
   bool AddBuffer(Handle&& aBufferHandle, const uint64_t& aBufferSize) override {
-    if (!mCanvasChild) {
+    RefPtr<CanvasChild> canvasChild(mCanvasChild);
+    if (!canvasChild) {
       return false;
     }
-    return mCanvasChild->SendAddBuffer(std::move(aBufferHandle), aBufferSize);
+    return canvasChild->SendAddBuffer(std::move(aBufferHandle), aBufferSize);
   }
 
   bool ReaderClosed() override {
-    if (!mCanvasChild) {
+    RefPtr<CanvasChild> canvasChild(mCanvasChild);
+    if (!canvasChild) {
       return false;
     }
-    return !mCanvasChild->CanSend() || ipc::ProcessChild::ExpectingShutdown();
+    return !canvasChild->CanSend() || ipc::ProcessChild::ExpectingShutdown();
   }
 
   bool RestartReader() override {
-    if (!mCanvasChild) {
+    RefPtr<CanvasChild> canvasChild(mCanvasChild);
+    if (!canvasChild) {
       return false;
     }
-    return mCanvasChild->SendRestartTranslation();
+    return canvasChild->SendRestartTranslation();
   }
 
  private:
-  const WeakPtr<CanvasChild> mCanvasChild;
-};
-
-class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
- public:
-  MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SourceSurfaceCanvasRecording, final)
-
-  SourceSurfaceCanvasRecording(
-      const RefPtr<gfx::SourceSurface>& aRecordedSuface,
-      CanvasChild* aCanvasChild,
-      const RefPtr<CanvasDrawEventRecorder>& aRecorder)
-      : mRecordedSurface(aRecordedSuface),
-        mCanvasChild(aCanvasChild),
-        mRecorder(aRecorder) {
-    // It's important that AddStoredObject is called first because that will
-    // run any pending processing required by recorded objects that have been
-    // deleted off the main thread.
-    mRecorder->AddStoredObject(this);
-    mRecorder->RecordEvent(RecordedAddSurfaceAlias(this, aRecordedSuface));
-  }
-
-  ~SourceSurfaceCanvasRecording() {
-    ReferencePtr surfaceAlias = this;
-    if (NS_IsMainThread()) {
-      ReleaseOnMainThread(std::move(mRecorder), surfaceAlias,
-                          std::move(mRecordedSurface), std::move(mCanvasChild));
-      return;
-    }
-
-    mRecorder->AddPendingDeletion(
-        [recorder = std::move(mRecorder), surfaceAlias,
-         aliasedSurface = std::move(mRecordedSurface),
-         canvasChild = std::move(mCanvasChild)]() mutable -> void {
-          ReleaseOnMainThread(std::move(recorder), surfaceAlias,
-                              std::move(aliasedSurface),
-                              std::move(canvasChild));
-        });
-  }
-
-  gfx::SurfaceType GetType() const final { return mRecordedSurface->GetType(); }
-
-  gfx::IntSize GetSize() const final { return mRecordedSurface->GetSize(); }
-
-  gfx::SurfaceFormat GetFormat() const final {
-    return mRecordedSurface->GetFormat();
-  }
-
-  already_AddRefed<gfx::DataSourceSurface> GetDataSurface() final {
-    EnsureDataSurfaceOnMainThread();
-    return do_AddRef(mDataSourceSurface);
-  }
-
- private:
-  void EnsureDataSurfaceOnMainThread() {
-    // The data can only be retrieved on the main thread.
-    if (!mDataSourceSurface && NS_IsMainThread()) {
-      mDataSourceSurface = mCanvasChild->GetDataSurface(mRecordedSurface);
-    }
-  }
-
-  // Used to ensure that clean-up that requires it is done on the main thread.
-  static void ReleaseOnMainThread(RefPtr<CanvasDrawEventRecorder> aRecorder,
-                                  ReferencePtr aSurfaceAlias,
-                                  RefPtr<gfx::SourceSurface> aAliasedSurface,
-                                  RefPtr<CanvasChild> aCanvasChild) {
-    MOZ_ASSERT(NS_IsMainThread());
-
-    aRecorder->RemoveStoredObject(aSurfaceAlias);
-    aRecorder->RecordEvent(RecordedRemoveSurfaceAlias(aSurfaceAlias));
-    aAliasedSurface = nullptr;
-    aCanvasChild = nullptr;
-    aRecorder = nullptr;
-  }
-
-  RefPtr<gfx::SourceSurface> mRecordedSurface;
-  RefPtr<CanvasChild> mCanvasChild;
-  RefPtr<CanvasDrawEventRecorder> mRecorder;
-  RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
+  const ThreadSafeWeakPtr<CanvasChild> mCanvasChild;
 };
 
 CanvasChild::CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef)
@@ -159,6 +86,12 @@ CanvasChild::CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef)
 CanvasChild::~CanvasChild() = default;
 
 static void NotifyCanvasDeviceReset() {
+  if (!NS_IsMainThread()) {
+    NS_DispatchToMainThread(
+        NewRunnableFunction(__func__, &NotifyCanvasDeviceReset));
+    return;
+  }
+
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   if (obs) {
     obs->NotifyObservers(nullptr, "canvas-device-reset", nullptr);
@@ -187,8 +120,8 @@ ipc::IPCResult CanvasChild::RecvDeactivate() {
   return IPC_OK();
 }
 
-void CanvasChild::EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                                 TextureType aTextureType) {
+RefPtr<CanvasDrawEventRecorder> CanvasChild::EnsureRecorder(
+    gfx::IntSize aSize, gfx::SurfaceFormat aFormat, TextureType aTextureType) {
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
 
   if (!mRecorder) {
@@ -197,8 +130,10 @@ void CanvasChild::EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
       MutexAutoLock lock(mMutex);
       recorder = MakeAndAddRef<CanvasDrawEventRecorder>(mWorkerRef);
     }
+
     if (!recorder->Init(aTextureType, MakeUnique<RecorderHelpers>(this))) {
-      return;
+      recorder->DetachResources();
+      return nullptr;
     }
 
     mRecorder = recorder.forget();
@@ -209,6 +144,7 @@ void CanvasChild::EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
 
   MutexAutoLock lock(mMutex);
   EnsureDataSurfaceShmem(aSize, aFormat);
+  return mRecorder;
 }
 
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
@@ -347,7 +283,7 @@ bool CanvasChild::ShouldBeCleanedUp() const {
   }
 
   // We can only be cleaned up if nothing else references our recorder.
-  return mRecorder->hasOneRef();
+  return !mRecorder || mRecorder->hasOneRef();
 }
 
 already_AddRefed<gfx::DrawTarget> CanvasChild::CreateDrawTarget(
@@ -447,11 +383,12 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
   auto checkpoint = CreateCheckpoint();
   struct DataShmemHolder {
     RefPtr<ipc::SharedMemoryBasic> shmem;
-    RefPtr<CanvasChild> canvasChild;
+    ThreadSafeWeakPtr<CanvasChild> canvasChild;
   };
 
   auto* data = static_cast<uint8_t*>(shmem->memory());
-  auto* closure = new DataShmemHolder{std::move(shmem), this};
+  auto* closure =
+      new DataShmemHolder{std::move(shmem), ThreadSafeWeakPtr{RefPtr{this}}};
   auto dataFormatWidth = ssSize.width * BytesPerPixel(ssFormat);
 
   RefPtr<gfx::DataSourceSurface> dataSurface =
@@ -459,8 +396,10 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
           data, dataFormatWidth, ssSize, ssFormat,
           [](void* aClosure) {
             auto* shmemHolder = static_cast<DataShmemHolder*>(aClosure);
-            shmemHolder->canvasChild->ReturnDataSurfaceShmem(
-                shmemHolder->shmem.forget());
+            RefPtr<CanvasChild> canvasChild(shmemHolder->canvasChild);
+            if (canvasChild) {
+              canvasChild->ReturnDataSurfaceShmem(shmemHolder->shmem.forget());
+            }
             delete shmemHolder;
           },
           closure);
@@ -477,7 +416,10 @@ already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
     return nullptr;
   }
 
-  return MakeAndAddRef<SourceSurfaceCanvasRecording>(aSurface, this, mRecorder);
+  auto wrapper =
+      MakeRefPtr<SourceSurfaceCanvasRecording>(aSurface, this, mRecorder);
+  wrapper->Init();
+  return wrapper.forget();
 }
 
 void CanvasChild::ReturnDataSurfaceShmem(
