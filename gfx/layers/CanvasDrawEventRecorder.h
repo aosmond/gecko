@@ -14,6 +14,8 @@
 #include "mozilla/ipc/CrossProcessSemaphore.h"
 #include "mozilla/ipc/SharedMemoryBasic.h"
 #include "mozilla/layers/LayersTypes.h"
+#include "mozilla/layers/SourceSurfaceCanvasRecording.h"
+#include "mozilla/layers/WebRenderBridgeChild.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/UniquePtr.h"
 
@@ -26,6 +28,7 @@ class ThreadSafeWorkerRef;
 }
 
 namespace layers {
+class RecordedTextureData;
 
 typedef mozilla::ipc::SharedMemoryBasic::Handle Handle;
 typedef mozilla::CrossProcessSemaphoreHandle CrossProcessSemaphoreHandle;
@@ -72,6 +75,8 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate,
    public:
     virtual ~Helpers() = default;
 
+    virtual void Destroy() = 0;
+
     virtual bool InitTranslator(const TextureType& aTextureType,
                                 Handle&& aReadHandle,
                                 nsTArray<Handle>&& aBufferHandles,
@@ -104,6 +109,39 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate,
   void RecordEvent(const gfx::RecordedEvent& aEvent) final;
 
   void DetachResources() final;
+
+  bool IsOnOwningThread();
+
+  void TrackRecordedTexture(RecordedTextureData* aTextureData) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    DebugOnly<bool> rv = mRecordedTextures.EnsureInserted(aTextureData);
+    MOZ_ASSERT(rv, "Texture is already in set!");
+  }
+
+  void UntrackRecordedTexture(RecordedTextureData* aTextureData) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    mRecordedTextures.Remove(aTextureData);
+  }
+
+  void TrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    mRecordedSurfaces.InsertOrUpdate(aSurface, aSurface);
+  }
+
+  void UntrackDestroyedRecordedSurface(void* aSurface) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    ThreadSafeWeakPtr<SourceSurfaceCanvasRecording> weakRef =
+        mRecordedSurfaces.Get(aSurface);
+    RefPtr<SourceSurfaceCanvasRecording> strongRef(weakRef);
+    if (!strongRef) {
+      mRecordedSurfaces.Remove(aSurface);
+    }
+  }
+
+  void UntrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    mRecordedSurfaces.Remove(aSurface);
+  }
 
   void AddPendingDeletion(std::function<void()>&& aPendingDeletion) override;
 
@@ -183,6 +221,9 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate,
 
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
   bool mIsOnWorker = false;
+  nsTHashSet<RecordedTextureData*> mRecordedTextures;
+  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
+      mRecordedSurfaces;
 };
 
 }  // namespace layers
