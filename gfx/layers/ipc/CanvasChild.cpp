@@ -25,6 +25,8 @@ namespace layers {
 
 class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
  public:
+  NS_DECL_OWNINGTHREAD
+
   explicit RecorderHelpers(const RefPtr<CanvasChild>& aCanvasChild)
       : mCanvasChild(aCanvasChild) {}
 
@@ -36,7 +38,8 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
                       CrossProcessSemaphoreHandle&& aReaderSem,
                       CrossProcessSemaphoreHandle&& aWriterSem,
                       const bool& aUseIPDLThread) override {
-    if (!mCanvasChild) {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
+    if (NS_WARN_IF(!mCanvasChild)) {
       return false;
     }
     return mCanvasChild->SendInitTranslator(
@@ -46,6 +49,7 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
   }
 
   bool AddBuffer(Handle&& aBufferHandle, const uint64_t& aBufferSize) override {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
     if (!mCanvasChild) {
       return false;
     }
@@ -53,6 +57,7 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
   }
 
   bool ReaderClosed() override {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
     if (!mCanvasChild) {
       return false;
     }
@@ -60,6 +65,7 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
   }
 
   bool RestartReader() override {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
     if (!mCanvasChild) {
       return false;
     }
@@ -159,6 +165,8 @@ static void NotifyCanvasDeviceReset() {
 }
 
 ipc::IPCResult CanvasChild::RecvNotifyDeviceChanged() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   NotifyCanvasDeviceReset();
   mRecorder->RecordEvent(RecordedDeviceChangeAcknowledged());
   return IPC_OK();
@@ -167,6 +175,8 @@ ipc::IPCResult CanvasChild::RecvNotifyDeviceChanged() {
 /* static */ bool CanvasChild::mDeactivated = false;
 
 ipc::IPCResult CanvasChild::RecvDeactivate() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   RefPtr<CanvasChild> self(this);
   mDeactivated = true;
   if (auto* cm = gfx::CanvasManagerChild::Get()) {
@@ -178,6 +188,8 @@ ipc::IPCResult CanvasChild::RecvDeactivate() {
 
 void CanvasChild::EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
                                  TextureType aTextureType) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (!mRecorder) {
     auto recorder = MakeRefPtr<CanvasDrawEventRecorder>();
     if (!recorder->Init(aTextureType, MakeUnique<RecorderHelpers>(this))) {
@@ -194,23 +206,31 @@ void CanvasChild::EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
 }
 
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (mRecorder) {
     mRecorder->DetachResources();
   }
 }
 
 void CanvasChild::Destroy() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (CanSend()) {
     Send__delete__(this);
   }
 }
 
 void CanvasChild::OnTextureWriteLock() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   mHasOutstandingWriteLock = true;
   mLastWriteLockCheckpoint = mRecorder->CreateCheckpoint();
 }
 
 void CanvasChild::OnTextureForwarded() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (mHasOutstandingWriteLock) {
     mRecorder->RecordEvent(RecordedCanvasFlush());
     if (!mRecorder->WaitForCheckpoint(mLastWriteLockCheckpoint)) {
@@ -229,6 +249,8 @@ void CanvasChild::OnTextureForwarded() {
 }
 
 bool CanvasChild::EnsureBeginTransaction() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (!mIsInTransaction) {
     RecordEvent(RecordedCanvasBeginTransaction());
     mIsInTransaction = true;
@@ -238,6 +260,8 @@ bool CanvasChild::EnsureBeginTransaction() {
 }
 
 void CanvasChild::EndTransaction() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (mIsInTransaction) {
     RecordEvent(RecordedCanvasEndTransaction());
     mIsInTransaction = false;
@@ -257,15 +281,21 @@ void CanvasChild::EndTransaction() {
 }
 
 void CanvasChild::DropFreeBuffersWhenDormant() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
   // Drop any free buffers if we have not had any non-empty transactions.
   if (mDormant) {
     mRecorder->DropFreeBuffers();
   }
 }
 
-void CanvasChild::ClearCachedResources() { mRecorder->DropFreeBuffers(); }
+void CanvasChild::ClearCachedResources() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+  mRecorder->DropFreeBuffers();
+}
 
 bool CanvasChild::ShouldBeCleanedUp() const {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // Always return true if we've been deactivated.
   if (Deactivated()) {
     return true;
@@ -277,6 +307,8 @@ bool CanvasChild::ShouldBeCleanedUp() const {
 
 already_AddRefed<gfx::DrawTarget> CanvasChild::CreateDrawTarget(
     gfx::IntSize aSize, gfx::SurfaceFormat aFormat) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   RefPtr<gfx::DrawTarget> dummyDt = gfx::Factory::CreateDrawTarget(
       gfx::BackendType::SKIA, gfx::IntSize(1, 1), aFormat);
   RefPtr<gfx::DrawTarget> dt = MakeAndAddRef<gfx::DrawTargetRecording>(
@@ -286,6 +318,8 @@ already_AddRefed<gfx::DrawTarget> CanvasChild::CreateDrawTarget(
 
 bool CanvasChild::EnsureDataSurfaceShmem(gfx::IntSize aSize,
                                          gfx::SurfaceFormat aFormat) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   size_t dataFormatWidth = aSize.width * BytesPerPixel(aFormat);
   size_t sizeRequired =
       ipc::SharedMemory::PageAlignedSize(dataFormatWidth * aSize.height);
@@ -315,6 +349,8 @@ bool CanvasChild::EnsureDataSurfaceShmem(gfx::IntSize aSize,
 }
 
 void CanvasChild::RecordEvent(const gfx::RecordedEvent& aEvent) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   // We drop mRecorder in ActorDestroy to break the reference cycle.
   if (!mRecorder) {
     return;
@@ -324,12 +360,13 @@ void CanvasChild::RecordEvent(const gfx::RecordedEvent& aEvent) {
 }
 
 int64_t CanvasChild::CreateCheckpoint() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
   return mRecorder->CreateCheckpoint();
 }
 
 already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
     const gfx::SourceSurface* aSurface) {
-  MOZ_DIAGNOSTIC_ASSERT(NS_IsMainThread());
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
   MOZ_ASSERT(aSurface);
 
   // mTransactionsSinceGetDataSurface is used to determine if we want to prepare
@@ -381,6 +418,8 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
 
 already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
     const RefPtr<gfx::SourceSurface>& aSurface) {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+
   if (!aSurface) {
     return nullptr;
   }
