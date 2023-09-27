@@ -515,12 +515,6 @@ PTextureChild* CompositorBridgeChild::CreateTexture(
       LayersId{0} /* FIXME? */, aSerial, aExternalImageId);
 }
 
-void CompositorBridgeChild::EndCanvasTransaction() {
-  if (auto* cm = gfx::CanvasManagerChild::Get()) {
-    cm->EndCanvasTransaction();
-  }
-}
-
 void CompositorBridgeChild::ClearCachedResources() {
   CanvasChild::ClearCachedResources();
 }

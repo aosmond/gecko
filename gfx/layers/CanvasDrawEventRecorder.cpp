@@ -12,6 +12,7 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/dom/WorkerRunnable.h"
+#include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/TextureRecorded.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
 #include "nsThreadUtils.h"
@@ -124,6 +125,12 @@ bool CanvasEventRingBuffer::InitReader(
 
   mGood = true;
   return true;
+}
+
+void CanvasEventRingBuffer::Destroy() {
+  if (mWriterServices) {
+    mWriterServices->Destroy();
+  }
 }
 
 bool CanvasEventRingBuffer::SetNewBuffer(
@@ -607,12 +614,39 @@ bool CanvasDrawEventRecorder::Init(
 void CanvasDrawEventRecorder::DetachResources() {
   NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
 
+  nsTHashSet<RecordedTextureData*> recordedTextures =
+      std::move(mRecordedTextures);
+  for (const auto& texture : recordedTextures) {
+    texture->DestroyOnOwningThread();
+  }
+
+  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
+      recordedSurfaces = std::move(mRecordedSurfaces);
+  for (const auto& entry : recordedSurfaces) {
+    RefPtr<SourceSurfaceCanvasRecording> surface(entry.GetData());
+    if (surface) {
+      surface->DestroyOnOwningThread();
+    }
+  }
+
   DrawEventRecorderPrivate::DetachResources();
+  mOutputStream.Destroy();
 
   {
     auto lockedPendingDeletions = mPendingDeletions.Lock();
     mWorkerRef = nullptr;
   }
+}
+
+bool CanvasDrawEventRecorder::IsOnOwningThread() {
+  auto lockedPendingDeletions = mPendingDeletions.Lock();
+
+  if (mWorkerRef) {
+    return mWorkerRef->Private()->IsOnCurrentThread();
+  }
+
+  MOZ_RELEASE_ASSERT(!mOnWorker, "Worker already shutdown!");
+  return NS_IsMainThread();
 }
 
 void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(

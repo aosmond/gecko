@@ -49,7 +49,7 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
    *
    * @params aTextureType the TextureType to create in the CanvasTranslator.
    */
-  void EnsureRecorder(TextureType aTextureType);
+  RefPtr<CanvasDrawEventRecorder> EnsureRecorder(TextureType aTextureType);
 
   /**
    * Send a messsage to our CanvasParent to resume translation.
