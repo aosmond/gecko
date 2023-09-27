@@ -222,6 +222,9 @@ void ImageBridgeChild::ShutdownStep2(SynchronousTask* aTask) {
   AutoCompleteTask complete(aTask);
 
   MOZ_ASSERT(InForwarderThread(), "Should be in ImageBridgeChild thread.");
+
+  mSectionAllocator = nullptr;
+
   if (!mDestroyed) {
     Close();
   }
@@ -248,6 +251,7 @@ ImageBridgeChild::ImageBridgeChild(uint32_t aNamespace,
                                    uint32_t aCompositableNamespace)
     : mNamespace(aNamespace),
       mCompositableNamespace(aCompositableNamespace),
+      mSectionAllocator(MakeUnique<FixedSizeSmallShmemSectionAllocator>(this)),
       mCanSend(false),
       mDestroyed(false),
       mFwdTransactionId(0),
@@ -622,6 +626,10 @@ void ImageBridgeChild::InitWithGPUProcess(
 bool InImageBridgeChildThread() {
   return sImageBridgeChildThread &&
          sImageBridgeChildThread->IsOnCurrentThread();
+}
+
+FixedSizeSmallShmemSectionAllocator* ImageBridgeChild::GetTileLockAllocator() {
+  return mSectionAllocator.get();
 }
 
 nsCOMPtr<nsISerialEventTarget> ImageBridgeChild::GetThread() const {
