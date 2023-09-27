@@ -60,6 +60,9 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
       : mRecordedSurface(aRecordedSuface),
         mCanvasChild(aCanvasChild),
         mRecorder(aRecorder) {
+    MOZ_ASSERT(mRecordedSurface);
+    MOZ_ASSERT(mCanvasChild);
+    MOZ_ASSERT(mRecorder);
     // It's important that AddStoredObject is called first because that will
     // run any pending processing required by recorded objects that have been
     // deleted off the main thread.
@@ -69,9 +72,9 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
 
   ~SourceSurfaceCanvasRecording() {
     ReferencePtr surfaceAlias = this;
-    if (NS_IsMainThread()) {
-      ReleaseOnMainThread(std::move(mRecorder), surfaceAlias,
-                          std::move(mRecordedSurface), std::move(mCanvasChild));
+    if (IsOnOwningThread()) {
+      Destroy(std::move(mRecorder), surfaceAlias, std::move(mRecordedSurface),
+              std::move(mCanvasChild));
       return;
     }
 
@@ -79,9 +82,8 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
         [recorder = std::move(mRecorder), surfaceAlias,
          aliasedSurface = std::move(mRecordedSurface),
          canvasChild = std::move(mCanvasChild)]() mutable -> void {
-          ReleaseOnMainThread(std::move(recorder), surfaceAlias,
-                              std::move(aliasedSurface),
-                              std::move(canvasChild));
+          Destroy(std::move(recorder), surfaceAlias, std::move(aliasedSurface),
+                  std::move(canvasChild));
         });
   }
 
@@ -94,25 +96,38 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   }
 
   already_AddRefed<gfx::DataSourceSurface> GetDataSurface() final {
-    EnsureDataSurfaceOnMainThread();
+    EnsureDataSurfaceOnOwningThread();
     return do_AddRef(mDataSourceSurface);
   }
 
  private:
-  void EnsureDataSurfaceOnMainThread() {
-    // The data can only be retrieved on the main thread.
-    if (!mDataSourceSurface && NS_IsMainThread()) {
+  bool IsOnOwningThread() const {
+    // We don't have any way to access the relevant thread/event target, but we
+    // can leverage the thread local state to see if our CanvasChild matches the
+    // the thread local CanvasChild. If so, then we know we are on the owning
+    // thread.
+    if (auto* cm = gfx::CanvasManagerChild::MaybeGet()) {
+      return cm->MaybeGetCanvasChild() == mCanvasChild;
+    }
+    return false;
+  }
+
+  void EnsureDataSurfaceOnOwningThread() {
+    if (mDataSourceSurface) {
+      return;
+    }
+
+    // The data can only be retrieved on the owning/recording thread.
+    if (IsOnOwningThread()) {
       mDataSourceSurface = mCanvasChild->GetDataSurface(mRecordedSurface);
     }
   }
 
   // Used to ensure that clean-up that requires it is done on the main thread.
-  static void ReleaseOnMainThread(RefPtr<CanvasDrawEventRecorder> aRecorder,
-                                  ReferencePtr aSurfaceAlias,
-                                  RefPtr<gfx::SourceSurface> aAliasedSurface,
-                                  RefPtr<CanvasChild> aCanvasChild) {
-    MOZ_ASSERT(NS_IsMainThread());
-
+  static void Destroy(RefPtr<CanvasDrawEventRecorder> aRecorder,
+                      ReferencePtr aSurfaceAlias,
+                      RefPtr<gfx::SourceSurface> aAliasedSurface,
+                      RefPtr<CanvasChild> aCanvasChild) {
     aRecorder->RemoveStoredObject(aSurfaceAlias);
     aRecorder->RecordEvent(RecordedRemoveSurfaceAlias(aSurfaceAlias));
     aAliasedSurface = nullptr;
