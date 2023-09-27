@@ -81,6 +81,7 @@ struct TextureDeallocParams {
   RefPtr<LayersIPCChannel> allocator;
   bool clientDeallocation;
   bool syncDeallocation;
+  bool selfDeleting;
 };
 
 void DeallocateTextureClient(TextureDeallocParams params);
@@ -114,6 +115,7 @@ class TextureChild final : PTextureChild {
         mDestroyed(false),
         mIPCOpen(false),
         mOwnsTextureData(false),
+        mSelfDeletingTextureData(false),
         mOwnerCalledDestroy(false),
         mUsesImageBridge(false) {}
 
@@ -233,6 +235,7 @@ class TextureChild final : PTextureChild {
   Atomic<bool> mDestroyed;
   bool mIPCOpen;
   bool mOwnsTextureData;
+  bool mSelfDeletingTextureData;
   bool mOwnerCalledDestroy;
   bool mUsesImageBridge;
 
@@ -330,16 +333,14 @@ TextureData* TextureData::Create(TextureForwarder* aAllocator,
       GetTextureType(aFormat, aSize, aKnowsCompositor, aSelector, aAllocFlags);
 
   if (ShouldRemoteTextureType(textureType, aSelector)) {
-    if (auto* cm = gfx::CanvasManagerChild::Get()) {
-      RefPtr<CanvasChild> canvasChild = cm->GetCanvasChild();
-      if (canvasChild) {
-        return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
-                                       textureType);
-      }
+    RecordedTextureData* textureData = new RecordedTextureData(aSize, aFormat);
+    if (textureData->Init(textureType)) {
+      return textureData;
     }
 
-    // We don't have a CanvasChild, but are supposed to be remote.
-    // Fall back to software.
+    // We failed to initialize the RecordedTextureData, but are supposed to be
+    // remote. Fall back to software.
+    delete textureData;
     textureType = TextureType::Unknown;
   }
 
@@ -383,7 +384,8 @@ bool TextureData::IsRemote(KnowsCompositor* aKnowsCompositor,
 }
 
 static void DestroyTextureData(TextureData* aTextureData,
-                               LayersIPCChannel* aAllocator, bool aDeallocate) {
+                               LayersIPCChannel* aAllocator, bool aDeallocate,
+                               bool aSelfDeleting) {
   if (!aTextureData) {
     return;
   }
@@ -393,7 +395,10 @@ static void DestroyTextureData(TextureData* aTextureData,
   } else {
     aTextureData->Forget(aAllocator);
   }
-  delete aTextureData;
+
+  if (!aSelfDeleting) {
+    delete aTextureData;
+  }
 }
 
 void TextureChild::ActorDestroy(ActorDestroyReason why) {
@@ -402,7 +407,8 @@ void TextureChild::ActorDestroy(ActorDestroyReason why) {
   mIPCOpen = false;
 
   if (mTextureData) {
-    DestroyTextureData(mTextureData, GetAllocator(), mOwnsTextureData);
+    DestroyTextureData(mTextureData, GetAllocator(), mOwnsTextureData,
+                       mSelfDeletingTextureData);
     mTextureData = nullptr;
   }
 }
@@ -417,13 +423,14 @@ void TextureChild::Destroy(const TextureDeallocParams& aParams) {
 
   if (!IPCOpen()) {
     DestroyTextureData(aParams.data, aParams.allocator,
-                       aParams.clientDeallocation);
+                       aParams.clientDeallocation, aParams.selfDeleting);
     return;
   }
 
   // DestroyTextureData will be called by TextureChild::ActorDestroy
   mTextureData = aParams.data;
   mOwnsTextureData = aParams.clientDeallocation;
+  mSelfDeletingTextureData = aParams.selfDeleting;
 
   if (!mCompositableForwarder ||
       !mCompositableForwarder->DestroyInTransaction(this)) {
@@ -502,7 +509,8 @@ void DeallocateTextureClient(TextureDeallocParams params) {
     // TextureClient before sharing it with the compositor. It means the data
     // cannot be owned by the TextureHost since we never created the
     // TextureHost...
-    DestroyTextureData(params.data, params.allocator, /* aDeallocate */ true);
+    DestroyTextureData(params.data, params.allocator, /* aDeallocate */ true,
+                       params.selfDeleting);
     return;
   }
 
@@ -536,6 +544,7 @@ void TextureClient::Destroy() {
     params.actor = actor;
     params.allocator = mAllocator;
     params.clientDeallocation = !!(mFlags & TextureFlags::DEALLOCATE_CLIENT);
+    params.selfDeleting = !!(mFlags & TextureFlags::DATA_SELF_DELETING);
     params.data = data;
     // At the moment we always deallocate synchronously when deallocating on the
     // client side, but having asynchronous deallocate in some of the cases will
