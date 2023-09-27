@@ -31,6 +31,8 @@ class RingBufferWriterServices final
 
   ~RingBufferWriterServices() override = default;
 
+  void Destroy() override { mCanvasChild = nullptr; }
+
   bool ReaderClosed() override {
     if (!mCanvasChild) {
       return false;
@@ -46,84 +48,7 @@ class RingBufferWriterServices final
   }
 
  private:
-  const WeakPtr<CanvasChild> mCanvasChild;
-};
-
-class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
- public:
-  MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SourceSurfaceCanvasRecording, final)
-
-  SourceSurfaceCanvasRecording(
-      const RefPtr<gfx::SourceSurface>& aRecordedSuface,
-      CanvasChild* aCanvasChild,
-      const RefPtr<CanvasDrawEventRecorder>& aRecorder)
-      : mRecordedSurface(aRecordedSuface),
-        mCanvasChild(aCanvasChild),
-        mRecorder(aRecorder) {
-    // It's important that AddStoredObject is called first because that will
-    // run any pending processing required by recorded objects that have been
-    // deleted off the main thread.
-    mRecorder->AddStoredObject(this);
-    mRecorder->RecordEvent(RecordedAddSurfaceAlias(this, aRecordedSuface));
-  }
-
-  ~SourceSurfaceCanvasRecording() {
-    ReferencePtr surfaceAlias = this;
-    if (NS_IsMainThread()) {
-      ReleaseOnMainThread(std::move(mRecorder), surfaceAlias,
-                          std::move(mRecordedSurface), std::move(mCanvasChild));
-      return;
-    }
-
-    mRecorder->AddPendingDeletion(
-        [recorder = std::move(mRecorder), surfaceAlias,
-         aliasedSurface = std::move(mRecordedSurface),
-         canvasChild = std::move(mCanvasChild)]() mutable -> void {
-          ReleaseOnMainThread(std::move(recorder), surfaceAlias,
-                              std::move(aliasedSurface),
-                              std::move(canvasChild));
-        });
-  }
-
-  gfx::SurfaceType GetType() const final { return mRecordedSurface->GetType(); }
-
-  gfx::IntSize GetSize() const final { return mRecordedSurface->GetSize(); }
-
-  gfx::SurfaceFormat GetFormat() const final {
-    return mRecordedSurface->GetFormat();
-  }
-
-  already_AddRefed<gfx::DataSourceSurface> GetDataSurface() final {
-    EnsureDataSurfaceOnMainThread();
-    return do_AddRef(mDataSourceSurface);
-  }
-
- private:
-  void EnsureDataSurfaceOnMainThread() {
-    // The data can only be retrieved on the main thread.
-    if (!mDataSourceSurface && NS_IsMainThread()) {
-      mDataSourceSurface = mCanvasChild->GetDataSurface(mRecordedSurface);
-    }
-  }
-
-  // Used to ensure that clean-up that requires it is done on the main thread.
-  static void ReleaseOnMainThread(RefPtr<CanvasDrawEventRecorder> aRecorder,
-                                  ReferencePtr aSurfaceAlias,
-                                  RefPtr<gfx::SourceSurface> aAliasedSurface,
-                                  RefPtr<CanvasChild> aCanvasChild) {
-    MOZ_ASSERT(NS_IsMainThread());
-
-    aRecorder->RemoveStoredObject(aSurfaceAlias);
-    aRecorder->RecordEvent(RecordedRemoveSurfaceAlias(aSurfaceAlias));
-    aAliasedSurface = nullptr;
-    aCanvasChild = nullptr;
-    aRecorder = nullptr;
-  }
-
-  RefPtr<gfx::SourceSurface> mRecordedSurface;
-  RefPtr<CanvasChild> mCanvasChild;
-  RefPtr<CanvasDrawEventRecorder> mRecorder;
-  RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
+  WeakPtr<CanvasChild> mCanvasChild;
 };
 
 CanvasChild::CanvasChild() = default;
@@ -159,7 +84,8 @@ ipc::IPCResult CanvasChild::RecvDeactivate() {
   return IPC_OK();
 }
 
-void CanvasChild::EnsureRecorder(TextureType aTextureType) {
+RefPtr<CanvasDrawEventRecorder> CanvasChild::EnsureRecorder(
+    TextureType aTextureType) {
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
 
   if (!mRecorder) {
@@ -172,7 +98,7 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
     if (!mRecorder->Init(OtherPid(), &handle, &readerSem, &writerSem,
                          MakeUnique<RingBufferWriterServices>(this))) {
       mRecorder = nullptr;
-      return;
+      return nullptr;
     }
 
     if (CanSend()) {
@@ -184,6 +110,7 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
 
   MOZ_RELEASE_ASSERT(mTextureType == aTextureType,
                      "We only support one remote TextureType currently.");
+  return mRecorder;
 }
 
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
@@ -399,7 +326,10 @@ already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
     return nullptr;
   }
 
-  return MakeAndAddRef<SourceSurfaceCanvasRecording>(aSurface, this, mRecorder);
+  auto wrapper =
+      MakeRefPtr<SourceSurfaceCanvasRecording>(aSurface, this, mRecorder);
+  wrapper->Init();
+  return wrapper.forget();
 }
 
 }  // namespace layers
