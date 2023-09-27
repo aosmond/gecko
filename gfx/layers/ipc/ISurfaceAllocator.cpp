@@ -10,6 +10,8 @@
 #include "mozilla/layers/TextureHost.h"        // for TextureHost
 #include "mozilla/layers/TextureForwarder.h"
 #include "mozilla/layers/CompositableForwarder.h"
+#include "mozilla/layers/SynchronousTask.h"
+#include "nsISerialEventTarget.h"
 
 namespace mozilla {
 namespace layers {
@@ -79,6 +81,27 @@ bool FixedSizeSmallShmemSectionAllocator::AllocShmemSection(
 
   if (!IPCOpen()) {
     gfxCriticalError() << "Attempt to allocate a ShmemSection after shutdown.";
+    return false;
+  }
+
+  // We may be called off the owning IPDL thread. This should generally only
+  // happen if mShmProvider is ImageBridgeChild.
+  if (nsISerialEventTarget* target = mShmProvider->GetThread()) {
+    if (!target->IsOnCurrentThread()) {
+      bool success = false;
+      SynchronousTask task(
+          "FixedSizeSmallShmemSectionAllocator::AllocShmemSection");
+      target->Dispatch(NS_NewRunnableFunction(
+          "FixedSizeSmallShmemSectionAllocator::AllocShmemSection",
+          [&]() -> void {
+            AutoCompleteTask complete(&task);
+            success = AllocShmemSection(aSize, aShmemSection);
+          }));
+      task.Wait();
+      return success;
+    }
+  } else {
+    MOZ_ASSERT_UNREACHABLE("No shmem allocator thread available!");
     return false;
   }
 
@@ -183,11 +206,51 @@ void FixedSizeSmallShmemSectionAllocator::DeallocShmemSection(
     return;
   }
 
+  // We may be called off the owning IPDL thread. This should generally only
+  // happen if mShmProvider is ImageBridgeChild.
+  if (nsISerialEventTarget* target = mShmProvider->GetThread()) {
+    if (!target->IsOnCurrentThread()) {
+      SynchronousTask task(
+          "FixedSizeSmallShmemSectionAllocator::DeallocShmemSection");
+      target->Dispatch(NS_NewRunnableFunction(
+          "FixedSizeSmallShmemSectionAllocator::DeallocShmemSection",
+          [&]() -> void {
+            AutoCompleteTask complete(&task);
+            DeallocShmemSection(aShmemSection);
+          }));
+      task.Wait();
+      return;
+    }
+  } else {
+    MOZ_ASSERT_UNREACHABLE("No shmem allocator thread available!");
+    return;
+  }
+
   FreeShmemSection(aShmemSection);
   ShrinkShmemSectionHeap();
 }
 
 void FixedSizeSmallShmemSectionAllocator::ShrinkShmemSectionHeap() {
+  // We may be called off the owning IPDL thread. This should generally only
+  // happen if mShmProvider is ImageBridgeChild.
+  if (nsISerialEventTarget* target = mShmProvider->GetThread()) {
+    if (!target->IsOnCurrentThread()) {
+      SynchronousTask task(
+          "FixedSizeSmallShmemSectionAllocator::ShrinkShmemSectionHeap");
+      target->Dispatch(NS_NewRunnableFunction(
+          "FixedSizeSmallShmemSectionAllocator::ShrinkShmemSectionHeap",
+          [&]() -> void {
+            AutoCompleteTask complete(&task);
+            ShrinkShmemSectionHeap();
+          }));
+      task.Wait();
+      return;
+    }
+  } else {
+    MOZ_ASSERT_UNREACHABLE("No shmem allocator thread available!");
+    return;
+  }
+
   if (!IPCOpen()) {
     mUsedShmems.clear();
     return;
