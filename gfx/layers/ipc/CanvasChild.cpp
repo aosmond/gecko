@@ -69,17 +69,11 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
 
   ~SourceSurfaceCanvasRecording() {
     ReferencePtr surfaceAlias = this;
-    if (NS_IsMainThread()) {
-      ReleaseOnMainThread(std::move(mRecorder), surfaceAlias,
-                          std::move(mRecordedSurface), std::move(mCanvasChild));
-      return;
-    }
-
     mRecorder->AddPendingDeletion(
         [recorder = std::move(mRecorder), surfaceAlias,
          aliasedSurface = std::move(mRecordedSurface),
          canvasChild = std::move(mCanvasChild)]() mutable -> void {
-          ReleaseOnMainThread(std::move(recorder), surfaceAlias,
+          Destroy(std::move(recorder), surfaceAlias,
                               std::move(aliasedSurface),
                               std::move(canvasChild));
         });
@@ -107,12 +101,10 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   }
 
   // Used to ensure that clean-up that requires it is done on the main thread.
-  static void ReleaseOnMainThread(RefPtr<CanvasDrawEventRecorder> aRecorder,
-                                  ReferencePtr aSurfaceAlias,
-                                  RefPtr<gfx::SourceSurface> aAliasedSurface,
-                                  RefPtr<CanvasChild> aCanvasChild) {
-    MOZ_ASSERT(NS_IsMainThread());
-
+  static void Destroy(RefPtr<CanvasDrawEventRecorder> aRecorder,
+                      ReferencePtr aSurfaceAlias,
+                      RefPtr<gfx::SourceSurface> aAliasedSurface,
+                      RefPtr<CanvasChild> aCanvasChild) {
     aRecorder->RemoveStoredObject(aSurfaceAlias);
     aRecorder->RecordEvent(RecordedRemoveSurfaceAlias(aSurfaceAlias));
     aAliasedSurface = nullptr;

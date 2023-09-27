@@ -569,14 +569,18 @@ void CanvasEventRingBuffer::ReturnRead(char* aOut, size_t aSize) {
 
 void CanvasDrawEventRecorder::StoreSourceSurfaceRecording(
     gfx::SourceSurface* aSurface, const char* aReason) {
-  wr::ExternalImageId extId{};
-  nsresult rv = layers::SharedSurfacesChild::Share(aSurface, extId);
-  if (NS_FAILED(rv)) {
-    DrawEventRecorderPrivate::StoreSourceSurfaceRecording(aSurface, aReason);
-    return;
+  if (NS_IsMainThread()) {
+    // TODO(aosmond): Can we avoid a copy of a shared surface off the main
+    // thread?
+    wr::ExternalImageId extId{};
+    nsresult rv = layers::SharedSurfacesChild::Share(aSurface, extId);
+    if (NS_SUCCEEDED(rv)) {
+      StoreExternalSurfaceRecording(aSurface, wr::AsUint64(extId));
+      return;
+    }
   }
 
-  StoreExternalSurfaceRecording(aSurface, wr::AsUint64(extId));
+  DrawEventRecorderPrivate::StoreSourceSurfaceRecording(aSurface, aReason);
 }
 
 }  // namespace layers

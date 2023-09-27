@@ -37,6 +37,8 @@ void CanvasManagerChild::ActorDestroy(ActorDestroyReason aReason) {
 }
 
 void CanvasManagerChild::Destroy() {
+  mActiveResourceTracker.reset();
+
   if (mCanvasChild) {
     mCanvasChild->Destroy();
     mCanvasChild = nullptr;
@@ -183,6 +185,14 @@ RefPtr<webgpu::WebGPUChild> CanvasManagerChild::GetWebGPUChild() {
   }
 
   return mWebGPUChild;
+}
+
+layers::ActiveResourceTracker* CanvasManagerChild::GetActiveResourceTracker() {
+  if (!mActiveResourceTracker) {
+    mActiveResourceTracker = MakeUnique<ActiveResourceTracker>(
+        1000, "CanvasManagerChild", GetCurrentSerialEventTarget());
+  }
+  return mActiveResourceTracker.get();
 }
 
 already_AddRefed<DataSourceSurface> CanvasManagerChild::GetSnapshot(
