@@ -151,6 +151,14 @@ void CanvasManagerChild::Destroy() {
   return manager;
 }
 
+/* static */ CanvasManagerChild* CanvasManagerChild::MaybeGet() {
+  if (!sLocalManager.initialized()) {
+    return nullptr;
+  }
+
+  return sLocalManager.get();
+}
+
 void CanvasManagerChild::AddShutdownObserver(
     dom::CanvasRenderingContext2D* aCanvas) {
   mActiveCanvas.insert(aCanvas);
