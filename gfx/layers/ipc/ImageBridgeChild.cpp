@@ -205,6 +205,8 @@ void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
     }
   }
 
+  mSectionAllocator = nullptr;
+
   if (mCanSend) {
     SendWillClose();
   }
@@ -483,6 +485,7 @@ void ImageBridgeChild::Bind(Endpoint<PImageBridgeChild>&& aEndpoint) {
     return;
   }
 
+  mSectionAllocator.reset(new FixedSizeSmallShmemSectionAllocator(this));
   mCanSend = true;
 }
 
@@ -599,6 +602,10 @@ void ImageBridgeChild::InitWithGPUProcess(
 bool InImageBridgeChildThread() {
   return sImageBridgeChildThread &&
          sImageBridgeChildThread->IsOnCurrentThread();
+}
+
+FixedSizeSmallShmemSectionAllocator* ImageBridgeChild::GetTileLockAllocator() {
+  return mSectionAllocator.get();
 }
 
 nsISerialEventTarget* ImageBridgeChild::GetThread() const {
