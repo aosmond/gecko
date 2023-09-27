@@ -41,6 +41,10 @@ void OffscreenCanvasDisplayHelper::DestroyElement() {
 }
 
 void OffscreenCanvasDisplayHelper::DestroyCanvas() {
+  if (auto* cm = gfx::CanvasManagerChild::Get()) {
+    cm->EndCanvasTransaction();
+  }
+
   MutexAutoLock lock(mMutex);
   mOffscreenCanvas = nullptr;
   mWorkerRef = nullptr;
@@ -139,6 +143,12 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
     nsICanvasRenderingContextInternal* aContext,
     layers::TextureType aTextureType,
     const Maybe<OffscreenCanvasDisplayData>& aData) {
+  auto endTransaction = MakeScopeExit([&]() {
+    if (auto* cm = gfx::CanvasManagerChild::Get()) {
+      cm->EndCanvasTransaction();
+    }
+  });
+
   MutexAutoLock lock(mMutex);
 
   gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
