@@ -8,17 +8,23 @@
 #define mozilla_layers_TextureRecorded_h
 
 #include "TextureClient.h"
+#include "mozilla/Mutex.h"
 #include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/LayersTypes.h"
 
 namespace mozilla {
+namespace dom {
+class ThreadSafeWorkerRef;
+}
+
 namespace layers {
 
 class RecordedTextureData final : public TextureData {
  public:
-  RecordedTextureData(already_AddRefed<CanvasChild> aCanvasChild,
-                      gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
-                      TextureType aTextureType);
+  RecordedTextureData(gfx::IntSize aSize, gfx::SurfaceFormat aFormat);
+
+  bool Init(TextureType aTextureType);
+  void DestroyOnOwningThread();
 
   void FillInfo(TextureData::Info& aInfo) const final;
 
@@ -32,6 +38,8 @@ class RecordedTextureData final : public TextureData {
 
   already_AddRefed<gfx::SourceSurface> BorrowSnapshot() final;
 
+  void Forget(LayersIPCChannel* aAllocator) final;
+
   void Deallocate(LayersIPCChannel* aAllocator) final;
 
   bool Serialize(SurfaceDescriptor& aDescriptor) final;
@@ -41,15 +49,21 @@ class RecordedTextureData final : public TextureData {
   TextureFlags GetTextureFlags() const final;
 
  private:
+  friend class TextureData;
+
   DISALLOW_COPY_AND_ASSIGN(RecordedTextureData);
 
   ~RecordedTextureData() override;
 
   int64_t mTextureId;
-  RefPtr<CanvasChild> mCanvasChild;
+
+  Mutex mMutex;
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
+  RefPtr<CanvasChild> mCanvasChild MOZ_GUARDED_BY(mMutex);
+  RefPtr<gfx::DrawTarget> mDT MOZ_GUARDED_BY(mMutex);
+
   gfx::IntSize mSize;
   gfx::SurfaceFormat mFormat;
-  RefPtr<gfx::DrawTarget> mDT;
   RefPtr<gfx::SourceSurface> mSnapshot;
   OpenMode mLockedMode;
 };
