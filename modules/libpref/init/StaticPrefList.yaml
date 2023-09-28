@@ -5672,7 +5672,7 @@
 # Whether OffscreenCanvas can use remote canvas
 - name: gfx.canvas.remote.allow-offscreen
   type: RelaxedAtomicBool
-  value: false
+  value: true
   mirror: always
 
 # How long to wait in milliseconds for a texture to be resolved
