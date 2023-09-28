@@ -5541,13 +5541,7 @@
 
 - name: gfx.canvas.accelerated
   type: bool
-#if defined(XP_MACOSX) || defined(XP_LINUX) && !defined(ANDROID)
-  value: true
-#elif defined(MOZ_WIDGET_ANDROID)
-  value: true
-#else
   value: false
-#endif
   mirror: always
 
 # Whether to attempt to enable Accelerated Canvas2D regardless of blocklisting.
@@ -5657,16 +5651,12 @@
 
 - name: gfx.canvas.remote
   type: bool
-#if defined(XP_WIN)
   value: true
-#else
-  value: false
-#endif
   mirror: once
 
 - name: gfx.canvas.remote.allow-in-parent
   type: bool
-  value: false
+  value: true
   mirror: once
 
 # Whether OffscreenCanvas can use remote canvas
@@ -5677,7 +5667,7 @@
 
 - name: gfx.canvas.remote.force-software
   type: RelaxedAtomicBool
-  value: false
+  value: true
   mirror: always
 
 # How long to wait in milliseconds for a texture to be resolved
