@@ -205,8 +205,6 @@ void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
     }
   }
 
-  mSectionAllocator = nullptr;
-
   if (mCanSend) {
     SendWillClose();
   }
@@ -222,6 +220,9 @@ void ImageBridgeChild::ShutdownStep2(SynchronousTask* aTask) {
 
   MOZ_ASSERT(InImageBridgeChildThread(),
              "Should be in ImageBridgeChild thread.");
+
+  mSectionAllocator = nullptr;
+
   if (!mDestroyed) {
     Close();
   }
@@ -246,6 +247,7 @@ void ImageBridgeChild::CreateImageClientSync(SynchronousTask* aTask,
 
 ImageBridgeChild::ImageBridgeChild(uint32_t aNamespace)
     : mNamespace(aNamespace),
+      mSectionAllocator(MakeUnique<FixedSizeSmallShmemSectionAllocator>(this)),
       mCanSend(false),
       mDestroyed(false),
       mFwdTransactionId(0),
@@ -485,7 +487,6 @@ void ImageBridgeChild::Bind(Endpoint<PImageBridgeChild>&& aEndpoint) {
     return;
   }
 
-  mSectionAllocator.reset(new FixedSizeSmallShmemSectionAllocator(this));
   mCanSend = true;
 }
 
