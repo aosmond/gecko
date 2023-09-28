@@ -19,6 +19,7 @@ class WorkerPrivate;
 
 namespace layers {
 class CanvasChild;
+class ActiveResourceTracker;
 }  // namespace layers
 
 namespace webgpu {
@@ -53,6 +54,8 @@ class CanvasManagerChild final : public PCanvasManagerChild {
 
   RefPtr<webgpu::WebGPUChild> GetWebGPUChild();
 
+  layers::ActiveResourceTracker* GetActiveResourceTracker();
+
  private:
   ~CanvasManagerChild();
   void Destroy();
@@ -60,6 +63,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   RefPtr<mozilla::dom::IPCWorkerRef> mWorkerRef;
   RefPtr<layers::CanvasChild> mCanvasChild;
   RefPtr<webgpu::WebGPUChild> mWebGPUChild;
+  UniquePtr<layers::ActiveResourceTracker> mActiveResourceTracker;
   const uint32_t mId;
   bool mActive = true;
 
