@@ -17,6 +17,7 @@ class ThreadSafeWorkerRef;
 }
 
 namespace layers {
+class RecordedTextureData;
 
 static const uint8_t kCheckpointEventType = -1;
 static const uint8_t kDropBufferEventType = -2;
@@ -279,6 +280,8 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
             CrossProcessSemaphoreHandle* aWriterSem,
             UniquePtr<CanvasEventRingBuffer::WriterServices> aWriterServices);
 
+  void DetachResources() final;
+
   void RecordEvent(const gfx::RecordedEvent& aEvent) final {
     NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
 
@@ -287,6 +290,17 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
     }
 
     aEvent.RecordToStream(mOutputStream);
+  }
+
+  void TrackRecordedTexture(RecordedTextureData* aTextureData) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    DebugOnly<bool> rv = mRecordedTextures.EnsureInserted(aTextureData);
+    MOZ_ASSERT(rv, "Texture is already in set!");
+  }
+
+  void UntrackRecordedTexture(RecordedTextureData* aTextureData) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    mRecordedTextures.Remove(aTextureData);
   }
 
   void AddPendingDeletion(std::function<void()>&& aPendingDeletion) override;
@@ -336,6 +350,7 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
       RefPtr<CanvasDrawEventRecorder>&& aRecorder);
 
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
+  nsTHashSet<RecordedTextureData*> mRecordedTextures;
   CanvasEventRingBuffer mOutputStream;
 };
 

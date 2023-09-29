@@ -12,6 +12,7 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/dom/WorkerRunnable.h"
+#include "mozilla/layers/TextureRecorded.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
 #include "nsThreadUtils.h"
 
@@ -572,7 +573,11 @@ void CanvasEventRingBuffer::ReturnRead(char* aOut, size_t aSize) {
 }
 
 CanvasDrawEventRecorder::CanvasDrawEventRecorder() = default;
-CanvasDrawEventRecorder::~CanvasDrawEventRecorder() = default;
+
+CanvasDrawEventRecorder::~CanvasDrawEventRecorder() {
+  NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+  MOZ_ASSERT(mRecordedTextures.IsEmpty());
+}
 
 bool CanvasDrawEventRecorder::Init(
     base::ProcessId aOtherPid, ipc::SharedMemoryBasic::Handle* aHandle,
@@ -584,7 +589,8 @@ bool CanvasDrawEventRecorder::Init(
   if (dom::WorkerPrivate* workerPrivate =
           dom::GetCurrentThreadWorkerPrivate()) {
     RefPtr<dom::StrongWorkerRef> strongRef = dom::StrongWorkerRef::Create(
-        workerPrivate, "OffscreenCanvas::GetContext");
+        workerPrivate, "CanvasDrawEventRecorder::Init",
+        [self = RefPtr{this}]() { self->DetachResources(); });
     if (NS_WARN_IF(!strongRef)) {
       return false;
     }
@@ -595,6 +601,18 @@ bool CanvasDrawEventRecorder::Init(
 
   return mOutputStream.InitWriter(aOtherPid, aHandle, aReaderSem, aWriterSem,
                                   std::move(aWriterServices));
+}
+
+void CanvasDrawEventRecorder::DetachResources() {
+  NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+
+  nsTHashSet<RecordedTextureData*> recordedTextures =
+      std::move(mRecordedTextures);
+  for (const auto& texture : recordedTextures) {
+    texture->DestroyOnOwningThread();
+  }
+
+  DrawEventRecorderPrivate::DetachResources();
 }
 
 void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(

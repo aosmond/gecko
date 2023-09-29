@@ -20,6 +20,8 @@ class RecordedTextureData final : public TextureData {
 
   bool Init(TextureType aTextureType);
 
+  void DestroyOnOwningThread();
+
   void FillInfo(TextureData::Info& aInfo) const final;
 
   bool Lock(OpenMode aMode) final;
@@ -48,8 +50,6 @@ class RecordedTextureData final : public TextureData {
   friend class TextureData;
 
   DISALLOW_COPY_AND_ASSIGN(RecordedTextureData);
-
-  void DestroyOnOwningThread();
 
   ~RecordedTextureData() override;
 

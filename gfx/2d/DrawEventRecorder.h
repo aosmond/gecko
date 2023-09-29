@@ -36,7 +36,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
     return true;
   }
   virtual void FlushItem(IntRect) {}
-  void DetachResources() {
+  virtual void DetachResources() {
     NS_ASSERT_OWNINGTHREAD(DrawEventRecorderPrivate);
 
     nsTHashSet<ScaledFont*> fonts = std::move(mStoredFonts);
