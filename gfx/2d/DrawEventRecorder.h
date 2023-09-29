@@ -93,7 +93,7 @@ class DrawEventRecorderPrivate : public DrawEventRecorder {
     return mStoredObjects.EnsureInserted(aObject);
   }
 
-  void AddPendingDeletion(std::function<void()>&& aPendingDeletion) {
+  virtual void AddPendingDeletion(std::function<void()>&& aPendingDeletion) {
     auto lockedPendingDeletions = mPendingDeletions.Lock();
     lockedPendingDeletions->emplace_back(std::move(aPendingDeletion));
   }

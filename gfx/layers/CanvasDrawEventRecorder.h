@@ -12,6 +12,10 @@
 #include "mozilla/ipc/SharedMemoryBasic.h"
 
 namespace mozilla {
+namespace dom {
+class ThreadSafeWorkerRef;
+}
+
 namespace layers {
 
 static const uint8_t kCheckpointEventType = -1;
@@ -267,16 +271,13 @@ class CanvasEventRingBuffer final : public gfx::EventRingBuffer {
 class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(CanvasDrawEventRecorder, final)
-  explicit CanvasDrawEventRecorder(){};
+  explicit CanvasDrawEventRecorder();
+  ~CanvasDrawEventRecorder() override;
 
   bool Init(base::ProcessId aOtherPid, ipc::SharedMemoryBasic::Handle* aHandle,
             CrossProcessSemaphoreHandle* aReaderSem,
             CrossProcessSemaphoreHandle* aWriterSem,
-            UniquePtr<CanvasEventRingBuffer::WriterServices> aWriterServices) {
-    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-    return mOutputStream.InitWriter(aOtherPid, aHandle, aReaderSem, aWriterSem,
-                                    std::move(aWriterServices));
-  }
+            UniquePtr<CanvasEventRingBuffer::WriterServices> aWriterServices);
 
   void RecordEvent(const gfx::RecordedEvent& aEvent) final {
     NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
@@ -287,6 +288,8 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
 
     aEvent.RecordToStream(mOutputStream);
   }
+
+  void AddPendingDeletion(std::function<void()>&& aPendingDeletion) override;
 
   void StoreSourceSurfaceRecording(gfx::SourceSurface* aSurface,
                                    const char* aReason) final;
@@ -327,6 +330,12 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
   }
 
  private:
+  void QueueProcessPendingDeletions(
+      RefPtr<CanvasDrawEventRecorder>&& aRecorder);
+  void QueueProcessPendingDeletionsLocked(
+      RefPtr<CanvasDrawEventRecorder>&& aRecorder);
+
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
   CanvasEventRingBuffer mOutputStream;
 };
 
