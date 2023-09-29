@@ -73,10 +73,12 @@ class SourceSurfaceRecording : public SourceSurface {
         mFormat(aFormat),
         mRecorder(aRecorder),
         mOriginalSurface(aOriginalSurface) {
+    printf_stderr("[AO] SourceSurfaceRecording::SourceSurfaceRecording -- %p\n", this);
     mRecorder->AddStoredObject(this);
   }
 
   ~SourceSurfaceRecording() {
+    printf_stderr("[AO] SourceSurfaceRecording::~SourceSurfaceRecording -- %p\n", this);
     mRecorder->RemoveStoredObject(this);
     mRecorder->RecordEvent(
         RecordedSourceSurfaceDestruction(ReferencePtr(this)));

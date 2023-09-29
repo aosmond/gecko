@@ -60,6 +60,7 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
       : mRecordedSurface(aRecordedSuface),
         mCanvasChild(aCanvasChild),
         mRecorder(aRecorder) {
+    printf_stderr("[AO] SourceSurfaceCanvasRecording::SourceSurfaceCanvasRecording -- %p, recorder %p, canvaschild %p, recordedsurface %p\n", this, mRecorder.get(), mCanvasChild.get(), mRecordedSurface.get());
     MOZ_ASSERT(mRecordedSurface);
     MOZ_ASSERT(mCanvasChild);
     MOZ_ASSERT(mRecorder);
@@ -73,15 +74,18 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   ~SourceSurfaceCanvasRecording() {
     ReferencePtr surfaceAlias = this;
     if (IsOnOwningThread()) {
+      printf_stderr("[AO] SourceSurfaceCanvasRecording::~SourceSurfaceCanvasRecording -- %p (owning thread)\n", this);
       Destroy(std::move(mRecorder), surfaceAlias, std::move(mRecordedSurface),
               std::move(mCanvasChild));
       return;
     }
 
+    printf_stderr("[AO] SourceSurfaceCanvasRecording::~SourceSurfaceCanvasRecording -- %p (pending)\n", this);
     mRecorder->AddPendingDeletion(
         [recorder = std::move(mRecorder), surfaceAlias,
          aliasedSurface = std::move(mRecordedSurface),
-         canvasChild = std::move(mCanvasChild)]() mutable -> void {
+         canvasChild = std::move(mCanvasChild), self = this]() mutable -> void {
+          printf_stderr("[AO] SourceSurfaceCanvasRecording::~SourceSurfaceCanvasRecording -- %p (pending destroyed)\n", self);
           Destroy(std::move(recorder), surfaceAlias, std::move(aliasedSurface),
                   std::move(canvasChild));
         });
@@ -141,9 +145,14 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
 };
 
-CanvasChild::CanvasChild() = default;
+CanvasChild::CanvasChild() {
+  printf_stderr("[AO] CanvasChild::CanvasChild -- %p\n", this);
+}
 
-CanvasChild::~CanvasChild() { NS_ASSERT_OWNINGTHREAD(CanvasChild); }
+CanvasChild::~CanvasChild() {
+  printf_stderr("[AO] CanvasChild::~CanvasChild -- %p\n", this);
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
+}
 
 static void NotifyCanvasDeviceReset() {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
@@ -181,11 +190,13 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
     MOZ_ASSERT(mTextureType == TextureType::Unknown);
     mTextureType = aTextureType;
     mRecorder = MakeAndAddRef<CanvasDrawEventRecorder>();
+    printf_stderr("[AO] CanvasChild::EnsureRecorder -- %p mRecorder create %p\n", this, mRecorder.get());
     SharedMemoryBasic::Handle handle;
     CrossProcessSemaphoreHandle readerSem;
     CrossProcessSemaphoreHandle writerSem;
     if (!mRecorder->Init(OtherPid(), &handle, &readerSem, &writerSem,
                          MakeUnique<RingBufferWriterServices>(this))) {
+      printf_stderr("[AO] CanvasChild::EnsureRecorder -- %p mRecorder destroy %p\n", this, mRecorder.get());
       mRecorder = nullptr;
       return;
     }
@@ -202,11 +213,13 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
 }
 
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
+  printf_stderr("[AO] CanvasManagerChild::ActorDestroy -- %p\n", this);
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
 
   // Explicitly drop our reference to the recorder, because it holds a reference
   // to us via the ResumeTranslation callback.
   if (mRecorder) {
+    printf_stderr("[AO] CanvasChild::ActorDestroy -- %p mRecorder destroy %p\n", this, mRecorder.get());
     mRecorder->DetachResources();
     mRecorder = nullptr;
   }
@@ -283,6 +296,7 @@ bool CanvasChild::EnsureBeginTransaction() {
       SharedMemoryBasic::Handle handle;
       if (!mRecorder->SwitchBuffer(OtherPid(), &handle) ||
           !SendNewBuffer(std::move(handle))) {
+        printf_stderr("[AO] CanvasChild::EnsureBeginTransaction -- %p mRecorder destroy %p\n", this, mRecorder.get());
         mRecorder = nullptr;
         return false;
       }

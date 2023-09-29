@@ -65,6 +65,7 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
 
 void RecordedTextureData::DestroyOnOwningThreadLocked() {
   mWorkerRef = nullptr;
+  mSnapshot = nullptr;
   // We need the translator to drop its reference for the DrawTarget first,
   // because the TextureData might need to destroy its DrawTarget within a lock.
   mDT = nullptr;

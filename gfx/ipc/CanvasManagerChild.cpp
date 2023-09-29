@@ -44,6 +44,7 @@ void CanvasManagerChild::Destroy() {
   }
 
   if (mCanvasChild) {
+    printf_stderr("[AO] CanvasManagerChild::Destroy -- CanvasManagerChild %p destroy CanvasChild %p\n", this, mCanvasChild.get());
     mCanvasChild->Destroy();
     mCanvasChild = nullptr;
   }
@@ -159,6 +160,7 @@ void CanvasManagerChild::EndCanvasTransaction() {
 
   mCanvasChild->EndTransaction();
   if (mCanvasChild->ShouldBeCleanedUp()) {
+    printf_stderr("[AO] CanvasManagerChild::EndCanvasTransaction -- CanvasManagerChild %p destroy CanvasChild %p\n", this, mCanvasChild.get());
     mCanvasChild->Destroy();
     mCanvasChild = nullptr;
   }
@@ -167,6 +169,7 @@ void CanvasManagerChild::EndCanvasTransaction() {
 void CanvasManagerChild::DeactivateCanvas() {
   mActive = false;
   if (mCanvasChild) {
+    printf_stderr("[AO] CanvasManagerChild::DeactivateCanvas -- CanvasManagerChild %p destroy CanvasChild %p\n", this, mCanvasChild.get());
     mCanvasChild->Destroy();
     mCanvasChild = nullptr;
   }
@@ -180,6 +183,7 @@ RefPtr<layers::CanvasChild> CanvasManagerChild::GetCanvasChild() {
 
   if (!mCanvasChild) {
     mCanvasChild = MakeAndAddRef<layers::CanvasChild>();
+    printf_stderr("[AO] CanvasManagerChild::GetCanvasChild -- CanvasManagerChild %p create CanvasChild %p\n", this, mCanvasChild.get());
     if (!SendPCanvasConstructor(mCanvasChild)) {
       mCanvasChild = nullptr;
     }
