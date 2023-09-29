@@ -37,6 +37,8 @@ void OffscreenCanvasDisplayHelper::DestroyElement() {
   MOZ_ASSERT(NS_IsMainThread());
 
   MutexAutoLock lock(mMutex);
+  mImageContainer->ClearAllImages();
+  mFrontBufferSurface = nullptr;
   mCanvasElement = nullptr;
 }
 
@@ -46,6 +48,8 @@ void OffscreenCanvasDisplayHelper::DestroyCanvas() {
   }
 
   MutexAutoLock lock(mMutex);
+  mImageContainer->ClearAllImages();
+  mFrontBufferSurface = nullptr;
   mOffscreenCanvas = nullptr;
   mWorkerRef = nullptr;
 }
