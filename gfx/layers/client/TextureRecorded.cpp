@@ -6,10 +6,10 @@
 
 #include "TextureRecorded.h"
 
-#include "mozilla/dom/WorkerPrivate.h"
-#include "mozilla/dom/WorkerRef.h"
-#include "mozilla/dom/WorkerRunnable.h"
+#include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/gfx/CanvasManagerChild.h"
+#include "mozilla/layers/CanvasChild.h"
+#include "mozilla/layers/CanvasDrawEventRecorder.h"
 #include "RecordedCanvasEventImpl.h"
 
 namespace mozilla {
@@ -25,11 +25,17 @@ static int64_t sNextRecordedTextureId = 0;
 
 RecordedTextureData::RecordedTextureData(gfx::IntSize aSize,
                                          gfx::SurfaceFormat aFormat)
-    : mMutex("RecordedTextureData::mMutex"), mSize(aSize), mFormat(aFormat) {}
+    : mSize(aSize), mFormat(aFormat) {}
 
 RecordedTextureData::~RecordedTextureData() = default;
 
 bool RecordedTextureData::Init(TextureType aTextureType) {
+  if (NS_WARN_IF(!NS_IsMainThread() && !dom::GetCurrentThreadWorkerPrivate())) {
+    MOZ_ASSERT_UNREACHABLE(
+        "RecordedTextureData must be created on main or DOM worker threads!");
+    return false;
+  }
+
   auto* cm = gfx::CanvasManagerChild::Get();
   if (NS_WARN_IF(!cm)) {
     return false;
@@ -40,105 +46,32 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
     return false;
   }
 
-  if (dom::WorkerPrivate* workerPrivate =
-          dom::GetCurrentThreadWorkerPrivate()) {
-    RefPtr<dom::StrongWorkerRef> strongRef = dom::StrongWorkerRef::Create(
-        workerPrivate, "RecordedTextureData::RecordedTextureData",
-        [self = this]() { self->DestroyOnOwningThread(); });
-    if (NS_WARN_IF(!strongRef)) {
-      return false;
-    }
-
-    MutexAutoLock lock(mMutex);
-    mWorkerRef = new dom::ThreadSafeWorkerRef(strongRef);
-  } else if (!NS_IsMainThread()) {
-    MOZ_ASSERT_UNREACHABLE(
-        "RecordedTextureData must be created on main or DOM worker threads!");
+  mRecorder = canvasChild->EnsureRecorder(aTextureType);
+  if (NS_WARN_IF(!mRecorder)) {
     return false;
   }
 
-  MutexAutoLock lock(mMutex);
   mCanvasChild = std::move(canvasChild);
-  mCanvasChild->EnsureRecorder(aTextureType);
   return true;
 }
 
-void RecordedTextureData::DestroyOnOwningThreadLocked() {
-  mWorkerRef = nullptr;
+void RecordedTextureData::DestroyOnOwningThread() {
   // We need the translator to drop its reference for the DrawTarget first,
   // because the TextureData might need to destroy its DrawTarget within a lock.
+  mSnapshot = nullptr;
   mDT = nullptr;
+  mRecorder = nullptr;
   if (mCanvasChild) {
     mCanvasChild->RecordEvent(RecordedTextureDestruction(mTextureId));
     mCanvasChild = nullptr;
   }
 }
 
-void RecordedTextureData::DestroyOnOwningThread() {
-  MutexAutoLock lock(mMutex);
-  DestroyOnOwningThreadLocked();
-}
-
 void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
-  class DeallocateWorkerRunnable final : public dom::WorkerRunnable {
-   public:
-    DeallocateWorkerRunnable(dom::WorkerPrivate* aWorkerPrivate,
-                             RecordedTextureData* aData)
-        : dom::WorkerRunnable(aWorkerPrivate), mData(aData) {}
-
-    bool WorkerRun(JSContext*, dom::WorkerPrivate*) override {
-      mData->DestroyOnOwningThread();
-      delete mData;
-      return true;
-    }
-
-   private:
-    RecordedTextureData* mData;
-  };
-
-  mMutex.Lock();
-
-  // If we are on the owning thread, or we have already destroyed the thread
-  // sensitive objects, then we can just delete ourselves inline.
-  if ((!mDT && !mCanvasChild) ||
-      (mWorkerRef && mWorkerRef->Private()->IsOnCurrentThread()) ||
-      (!mWorkerRef && NS_IsMainThread())) {
-    DestroyOnOwningThreadLocked();
-    mMutex.Unlock();
-    delete this;
-    return;
-  }
-
-  // Otherwise we need to destroy on the right thread. Without a worker ref,
-  // then we know the main thread owns us.
-  if (!mWorkerRef) {
-    mMutex.Unlock();
-    NS_DispatchToMainThread(NS_NewRunnableFunction(
-        "RecordedTextureData::Deallocate", [self = this]() {
-          self->DestroyOnOwningThread();
-          delete self;
-        }));
-    return;
-  }
-
-  // If we have a worker ref, then we need to dispatch, but we can only dispatch
-  // from the main thread. Depending on the context in which we got freed, we
-  // could be on several threads, including the main or ImageBridge threads.
-  if (NS_IsMainThread()) {
-    auto task =
-        MakeRefPtr<DeallocateWorkerRunnable>(mWorkerRef->Private(), this);
-    if (NS_WARN_IF(!task->Dispatch())) {
-      MOZ_CRASH("Leaking RemoteTextureData!");
-    }
-    mMutex.Unlock();
-    return;
-  }
-
-  mMutex.Unlock();
-
-  NS_DispatchToMainThread(
-      NS_NewRunnableFunction("RecordedTextureData::Deallocate",
-                             [self = this]() { self->Deallocate(nullptr); }));
+  mRecorder->AddPendingDeletion([self = this]() -> void {
+    self->DestroyOnOwningThread();
+    delete self;
+  });
 }
 
 void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {
@@ -149,7 +82,6 @@ void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {
 }
 
 bool RecordedTextureData::Lock(OpenMode aMode) {
-  MutexAutoLock lock(mMutex);
   if (!mCanvasChild->EnsureBeginTransaction()) {
     return false;
   }
@@ -177,7 +109,6 @@ bool RecordedTextureData::Lock(OpenMode aMode) {
 }
 
 void RecordedTextureData::Unlock() {
-  MutexAutoLock lock(mMutex);
   if ((mLockedMode == OpenMode::OPEN_READ_WRITE) &&
       mCanvasChild->ShouldCacheDataSurface()) {
     mSnapshot = mDT->Snapshot();
@@ -190,13 +121,11 @@ void RecordedTextureData::Unlock() {
 }
 
 already_AddRefed<gfx::DrawTarget> RecordedTextureData::BorrowDrawTarget() {
-  MutexAutoLock lock(mMutex);
   mSnapshot = nullptr;
   return do_AddRef(mDT);
 }
 
 void RecordedTextureData::EndDraw() {
-  MutexAutoLock lock(mMutex);
   MOZ_ASSERT(mDT->hasOneRef());
   MOZ_ASSERT(mLockedMode == OpenMode::OPEN_READ_WRITE);
 
@@ -207,8 +136,6 @@ void RecordedTextureData::EndDraw() {
 }
 
 already_AddRefed<gfx::SourceSurface> RecordedTextureData::BorrowSnapshot() {
-  MutexAutoLock lock(mMutex);
-
   // There are some failure scenarios where we have no DrawTarget and
   // BorrowSnapshot is called in an attempt to copy to a new texture.
   if (!mDT) {
@@ -228,7 +155,6 @@ bool RecordedTextureData::Serialize(SurfaceDescriptor& aDescriptor) {
 }
 
 void RecordedTextureData::OnForwardedToHost() {
-  MutexAutoLock lock(mMutex);
   mCanvasChild->OnTextureForwarded();
 }
 

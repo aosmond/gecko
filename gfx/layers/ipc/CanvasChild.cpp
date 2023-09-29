@@ -156,7 +156,8 @@ ipc::IPCResult CanvasChild::RecvDeactivate() {
   return IPC_OK();
 }
 
-void CanvasChild::EnsureRecorder(TextureType aTextureType) {
+RefPtr<CanvasDrawEventRecorder> CanvasChild::EnsureRecorder(
+    TextureType aTextureType) {
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
 
   if (!mRecorder) {
@@ -169,7 +170,7 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
     if (!mRecorder->Init(OtherPid(), &handle, &readerSem, &writerSem,
                          MakeUnique<RingBufferWriterServices>(this))) {
       mRecorder = nullptr;
-      return;
+      return nullptr;
     }
 
     if (CanSend()) {
@@ -181,6 +182,7 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
 
   MOZ_RELEASE_ASSERT(mTextureType == aTextureType,
                      "We only support one remote TextureType currently.");
+  return mRecorder;
 }
 
 void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {

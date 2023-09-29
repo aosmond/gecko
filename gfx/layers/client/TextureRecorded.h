@@ -8,16 +8,11 @@
 #define mozilla_layers_TextureRecorded_h
 
 #include "TextureClient.h"
-#include "mozilla/Mutex.h"
-#include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/LayersTypes.h"
 
-namespace mozilla {
-namespace dom {
-class ThreadSafeWorkerRef;
-}
-
-namespace layers {
+namespace mozilla::layers {
+class CanvasChild;
+class CanvasDrawEventRecorder;
 
 class RecordedTextureData final : public TextureData {
  public:
@@ -54,25 +49,22 @@ class RecordedTextureData final : public TextureData {
 
   DISALLOW_COPY_AND_ASSIGN(RecordedTextureData);
 
-  ~RecordedTextureData() override;
-
   void DestroyOnOwningThread();
-  void DestroyOnOwningThreadLocked() MOZ_REQUIRES(mMutex);
+
+  ~RecordedTextureData() override;
 
   int64_t mTextureId;
 
-  Mutex mMutex;
-  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
-  RefPtr<CanvasChild> mCanvasChild MOZ_GUARDED_BY(mMutex);
-  RefPtr<gfx::DrawTarget> mDT MOZ_GUARDED_BY(mMutex);
+  RefPtr<CanvasChild> mCanvasChild;
+  RefPtr<CanvasDrawEventRecorder> mRecorder;
+  RefPtr<gfx::DrawTarget> mDT;
+  RefPtr<gfx::SourceSurface> mSnapshot;
 
   gfx::IntSize mSize;
   gfx::SurfaceFormat mFormat;
-  RefPtr<gfx::SourceSurface> mSnapshot;
   OpenMode mLockedMode;
 };
 
-}  // namespace layers
-}  // namespace mozilla
+}  // namespace mozilla::layers
 
 #endif  // mozilla_layers_TextureRecorded_h

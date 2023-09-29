@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/dom/WorkerRunnable.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
@@ -646,12 +647,30 @@ void CanvasDrawEventRecorder::QueueProcessPendingDeletions(
 
 void CanvasDrawEventRecorder::AddPendingDeletion(
     std::function<void()>&& aPendingDeletion) {
-  auto lockedPendingDeletions = mPendingDeletions.Lock();
-  bool wasEmpty = lockedPendingDeletions->empty();
-  lockedPendingDeletions->emplace_back(std::move(aPendingDeletion));
-  if (wasEmpty) {
-    RefPtr<CanvasDrawEventRecorder> self(this);
-    QueueProcessPendingDeletionsLocked(std::move(self));
+  PendingDeletionsVector pendingDeletions;
+
+  {
+    auto lockedPendingDeletions = mPendingDeletions.Lock();
+    bool wasEmpty = lockedPendingDeletions->empty();
+    lockedPendingDeletions->emplace_back(std::move(aPendingDeletion));
+
+    // If we are not on the owning thread, we must queue an event to run the
+    // deletions, if we transitioned from empty to non-empty.
+    if ((mWorkerRef && !mWorkerRef->Private()->IsOnCurrentThread()) ||
+        (!mWorkerRef && !NS_IsMainThread())) {
+      if (wasEmpty) {
+        RefPtr<CanvasDrawEventRecorder> self(this);
+        QueueProcessPendingDeletionsLocked(std::move(self));
+      }
+      return;
+    }
+
+    // Otherwise, we can just run all of them right now.
+    pendingDeletions.swap(*lockedPendingDeletions);
+  }
+
+  for (const auto& pendingDeletion : pendingDeletions) {
+    pendingDeletion();
   }
 }
 
