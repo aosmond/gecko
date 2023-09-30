@@ -171,8 +171,13 @@ void CanvasChild::EnsureRecorder(TextureType aTextureType) {
 
   if (!mRecorder) {
     MOZ_ASSERT(mTextureType == TextureType::Unknown);
+
+    {
+      MutexAutoLock lock(mMutex);
+      mRecorder = MakeAndAddRef<CanvasDrawEventRecorder>(mWorkerRef);
+    }
+
     mTextureType = aTextureType;
-    mRecorder = MakeAndAddRef<CanvasDrawEventRecorder>();
     SharedMemoryBasic::Handle handle;
     CrossProcessSemaphoreHandle readerSem;
     CrossProcessSemaphoreHandle writerSem;
