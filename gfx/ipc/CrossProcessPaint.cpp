@@ -152,6 +152,7 @@ PaintFragment PaintFragment::Record(dom::BrowsingContext* aBc,
   }
 
   if (!recorder->mOutputStream.mValid) {
+    recorder->DetachResources();
     return PaintFragment{};
   }
 
@@ -162,11 +163,14 @@ PaintFragment PaintFragment::Record(dom::BrowsingContext* aBc,
   recorder->mOutputStream.mLength = 0;
   recorder->mOutputStream.mCapacity = 0;
 
-  return PaintFragment{
+  PaintFragment fragment{
       surfaceSize.ToUnknownSize(),
       std::move(recording),
       std::move(recorder->TakeDependentSurfaces()),
   };
+
+  recorder->DetachResources();
+  return fragment;
 }
 
 bool PaintFragment::IsEmpty() const {
