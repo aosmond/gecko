@@ -8,6 +8,7 @@
 #define mozilla_layers_TextureRecorded_h
 
 #include "TextureClient.h"
+#include "mozilla/Mutex.h"
 #include "mozilla/layers/LayersTypes.h"
 
 namespace mozilla::layers {
@@ -55,8 +56,9 @@ class RecordedTextureData final : public TextureData {
 
   int64_t mTextureId;
 
+  Mutex mMutex;
   RefPtr<CanvasChild> mCanvasChild;
-  RefPtr<CanvasDrawEventRecorder> mRecorder;
+  RefPtr<CanvasDrawEventRecorder> mRecorder MOZ_GUARDED_BY(mMutex);
   RefPtr<gfx::DrawTarget> mDT;
   RefPtr<gfx::SourceSurface> mSnapshot;
 

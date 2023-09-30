@@ -350,6 +350,7 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
       RefPtr<CanvasDrawEventRecorder>&& aRecorder);
 
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
+  bool mOnWorker = false;
   nsTHashSet<RecordedTextureData*> mRecordedTextures;
   CanvasEventRingBuffer mOutputStream;
 };

@@ -597,6 +597,7 @@ bool CanvasDrawEventRecorder::Init(
 
     auto lockedPendingDeletions = mPendingDeletions.Lock();
     mWorkerRef = new dom::ThreadSafeWorkerRef(strongRef);
+    mOnWorker = true;
   }
 
   return mOutputStream.InitWriter(aOtherPid, aHandle, aReaderSem, aWriterSem,
@@ -613,11 +614,20 @@ void CanvasDrawEventRecorder::DetachResources() {
   }
 
   DrawEventRecorderPrivate::DetachResources();
+
+  {
+    auto lockedPendingDeletions = mPendingDeletions.Lock();
+    mWorkerRef = nullptr;
+  }
 }
 
 void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(
     RefPtr<CanvasDrawEventRecorder>&& aRecorder) {
   if (!mWorkerRef) {
+    MOZ_RELEASE_ASSERT(
+        !mOnWorker,
+        "QueueProcessPendingDeletionsLocked called after worker shutdown!");
+
     NS_DispatchToMainThread(NS_NewRunnableFunction(
         "CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked",
         [self = std::move(aRecorder)]() { self->ProcessPendingDeletions(); }));
@@ -660,6 +670,11 @@ void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(
 void CanvasDrawEventRecorder::QueueProcessPendingDeletions(
     RefPtr<CanvasDrawEventRecorder>&& aRecorder) {
   auto lockedPendingDeletions = mPendingDeletions.Lock();
+  if (lockedPendingDeletions->empty()) {
+    // We raced to handle the deletions, and something got there first.
+    return;
+  }
+
   QueueProcessPendingDeletionsLocked(std::move(aRecorder));
 }
 
@@ -671,6 +686,9 @@ void CanvasDrawEventRecorder::AddPendingDeletion(
     auto lockedPendingDeletions = mPendingDeletions.Lock();
     bool wasEmpty = lockedPendingDeletions->empty();
     lockedPendingDeletions->emplace_back(std::move(aPendingDeletion));
+
+    MOZ_RELEASE_ASSERT(!mOnWorker || mWorkerRef,
+                       "AddPendingDeletion called after worker shutdown!");
 
     // If we are not on the owning thread, we must queue an event to run the
     // deletions, if we transitioned from empty to non-empty.

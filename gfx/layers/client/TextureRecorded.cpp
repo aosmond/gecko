@@ -25,7 +25,7 @@ static int64_t sNextRecordedTextureId = 0;
 
 RecordedTextureData::RecordedTextureData(gfx::IntSize aSize,
                                          gfx::SurfaceFormat aFormat)
-    : mSize(aSize), mFormat(aFormat) {}
+    : mMutex("RecordedTextureData::mMutex"), mSize(aSize), mFormat(aFormat) {}
 
 RecordedTextureData::~RecordedTextureData() = default;
 
@@ -46,17 +46,23 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
     return false;
   }
 
-  mRecorder = canvasChild->EnsureRecorder(aTextureType);
-  if (NS_WARN_IF(!mRecorder)) {
+  RefPtr<CanvasDrawEventRecorder> recorder =
+      canvasChild->EnsureRecorder(aTextureType);
+  if (NS_WARN_IF(!recorder)) {
     return false;
   }
 
-  mRecorder->TrackRecordedTexture(this);
+  recorder->TrackRecordedTexture(this);
+
+  MutexAutoLock lock(mMutex);
+  mRecorder = std::move(recorder);
   mCanvasChild = std::move(canvasChild);
   return true;
 }
 
 void RecordedTextureData::DestroyOnOwningThread() {
+  MutexAutoLock lock(mMutex);
+
   // We need the translator to drop its reference for the DrawTarget first,
   // because the TextureData might need to destroy its DrawTarget within a lock.
   mSnapshot = nullptr;
@@ -72,6 +78,19 @@ void RecordedTextureData::DestroyOnOwningThread() {
 }
 
 void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
+  // When we are deallocating, we know this is our only reference, and this is
+  // effectively the destructor. This will either happen on the main thread (for
+  // main thread recording) or the ImageBridgeChild thread (for DOM worker
+  // recordings). The only method we can race with is DestroyOnOwningThread
+  // which may be called on the DOM worker thread during worker shutdown. As
+  // such, the mutex is only necessary for these two methods.
+  MutexAutoLock lock(mMutex);
+
+  if (!mRecorder) {
+    delete this;
+    return;
+  }
+
   mRecorder->AddPendingDeletion([self = this]() -> void {
     self->DestroyOnOwningThread();
     delete self;
@@ -86,6 +105,11 @@ void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {
 }
 
 bool RecordedTextureData::Lock(OpenMode aMode) {
+  if (NS_WARN_IF(!mCanvasChild)) {
+    MOZ_ASSERT_UNREACHABLE("Lock after shutdown?");
+    return false;
+  }
+
   if (!mCanvasChild->EnsureBeginTransaction()) {
     return false;
   }
@@ -113,6 +137,14 @@ bool RecordedTextureData::Lock(OpenMode aMode) {
 }
 
 void RecordedTextureData::Unlock() {
+  if (NS_WARN_IF(mLockedMode == OpenMode::OPEN_NONE)) {
+    return;
+  }
+
+  if (NS_WARN_IF(!mCanvasChild)) {
+    return;
+  }
+
   if ((mLockedMode == OpenMode::OPEN_READ_WRITE) &&
       mCanvasChild->ShouldCacheDataSurface()) {
     mSnapshot = mDT->Snapshot();
@@ -130,6 +162,11 @@ already_AddRefed<gfx::DrawTarget> RecordedTextureData::BorrowDrawTarget() {
 }
 
 void RecordedTextureData::EndDraw() {
+  if (NS_WARN_IF(!mCanvasChild)) {
+    MOZ_ASSERT_UNREACHABLE("Draw interrupted by shutdown?");
+    return;
+  }
+
   MOZ_ASSERT(mDT->hasOneRef());
   MOZ_ASSERT(mLockedMode == OpenMode::OPEN_READ_WRITE);
 
@@ -142,7 +179,7 @@ void RecordedTextureData::EndDraw() {
 already_AddRefed<gfx::SourceSurface> RecordedTextureData::BorrowSnapshot() {
   // There are some failure scenarios where we have no DrawTarget and
   // BorrowSnapshot is called in an attempt to copy to a new texture.
-  if (!mDT) {
+  if (!mDT || !mCanvasChild) {
     return nullptr;
   }
 
@@ -159,7 +196,9 @@ bool RecordedTextureData::Serialize(SurfaceDescriptor& aDescriptor) {
 }
 
 void RecordedTextureData::OnForwardedToHost() {
-  mCanvasChild->OnTextureForwarded();
+  if (mCanvasChild) {
+    mCanvasChild->OnTextureForwarded();
+  }
 }
 
 TextureFlags RecordedTextureData::GetTextureFlags() const {
