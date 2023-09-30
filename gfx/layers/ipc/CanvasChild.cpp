@@ -192,7 +192,11 @@ void CanvasChild::EnsureRecorder(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
 
   if (!mRecorder) {
-    auto recorder = MakeRefPtr<CanvasDrawEventRecorder>();
+    RefPtr<CanvasDrawEventRecorder> recorder;
+    {
+      MutexAutoLock lock(mMutex);
+      recorder = MakeAndAddRef<CanvasDrawEventRecorder>(mWorkerRef);
+    }
     if (!recorder->Init(aTextureType, MakeUnique<RecorderHelpers>(this))) {
       return;
     }
