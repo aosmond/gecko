@@ -91,6 +91,12 @@ void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
     return;
   }
 
+  if (mRecorder->IsOnOwningThread()) {
+    DestroyOnOwningThread();
+    delete this;
+    return;
+  }
+
   mRecorder->AddPendingDeletion([self = this]() -> void {
     self->DestroyOnOwningThread();
     delete self;

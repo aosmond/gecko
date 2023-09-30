@@ -621,6 +621,17 @@ void CanvasDrawEventRecorder::DetachResources() {
   }
 }
 
+bool CanvasDrawEventRecorder::IsOnOwningThread() {
+  auto lockedPendingDeletions = mPendingDeletions.Lock();
+
+  if (mWorkerRef) {
+    return mWorkerRef->Private()->IsOnCurrentThread();
+  }
+
+  MOZ_RELEASE_ASSERT(!mOnWorker, "Worker already shutdown!");
+  return NS_IsMainThread();
+}
+
 void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(
     RefPtr<CanvasDrawEventRecorder>&& aRecorder) {
   if (!mWorkerRef) {

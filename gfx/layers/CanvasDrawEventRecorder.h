@@ -282,6 +282,8 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
 
   void DetachResources() final;
 
+  bool IsOnOwningThread();
+
   void RecordEvent(const gfx::RecordedEvent& aEvent) final {
     NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
 
