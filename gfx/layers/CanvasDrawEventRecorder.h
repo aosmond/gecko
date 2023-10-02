@@ -10,6 +10,7 @@
 #include "mozilla/gfx/DrawEventRecorder.h"
 #include "mozilla/ipc/CrossProcessSemaphore.h"
 #include "mozilla/ipc/SharedMemoryBasic.h"
+#include "mozilla/layers/WebRenderBridgeChild.h"
 
 namespace mozilla {
 namespace dom {
@@ -18,6 +19,7 @@ class ThreadSafeWorkerRef;
 
 namespace layers {
 class RecordedTextureData;
+class SourceSurfaceCanvasRecording;
 
 static const uint8_t kCheckpointEventType = -1;
 static const uint8_t kDropBufferEventType = -2;
@@ -305,6 +307,16 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
     mRecordedTextures.Remove(aTextureData);
   }
 
+  void TrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    mRecordedSurfaces.InsertOrUpdate(aSurface, aSurface);
+  }
+
+  void UntrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    mRecordedSurfaces.Remove(aSurface);
+  }
+
   void AddPendingDeletion(std::function<void()>&& aPendingDeletion) override;
 
   void StoreSourceSurfaceRecording(gfx::SourceSurface* aSurface,
@@ -354,6 +366,8 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
   bool mOnWorker = false;
   nsTHashSet<RecordedTextureData*> mRecordedTextures;
+  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
+      mRecordedSurfaces;
   CanvasEventRingBuffer mOutputStream;
 };
 

@@ -153,6 +153,41 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   bool mHasOutstandingWriteLock = false;
 };
 
+class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
+ public:
+  MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(SourceSurfaceCanvasRecording, final)
+
+  SourceSurfaceCanvasRecording(
+      const RefPtr<gfx::SourceSurface>& aRecordedSuface,
+      CanvasChild* aCanvasChild,
+      const RefPtr<CanvasDrawEventRecorder>& aRecorder);
+
+  ~SourceSurfaceCanvasRecording() final;
+
+  void Init();
+
+  void DestroyOnOwningThread();
+
+  gfx::SurfaceType GetType() const final { return mRecordedSurface->GetType(); }
+
+  gfx::IntSize GetSize() const final { return mRecordedSurface->GetSize(); }
+
+  gfx::SurfaceFormat GetFormat() const final {
+    return mRecordedSurface->GetFormat();
+  }
+
+  already_AddRefed<gfx::DataSourceSurface> GetDataSurface() final;
+
+ private:
+  bool IsOnOwningThread() const;
+  void EnsureDataSurfaceOnOwningThread();
+
+  RefPtr<gfx::SourceSurface> mRecordedSurface;
+  RefPtr<CanvasChild> mCanvasChild;
+  RefPtr<CanvasDrawEventRecorder> mRecorder;
+  RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
+};
+
 }  // namespace layers
 }  // namespace mozilla
 

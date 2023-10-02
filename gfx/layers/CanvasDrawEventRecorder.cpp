@@ -12,6 +12,7 @@
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/dom/WorkerRunnable.h"
+#include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/TextureRecorded.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
 #include "nsThreadUtils.h"
@@ -611,6 +612,15 @@ void CanvasDrawEventRecorder::DetachResources() {
       std::move(mRecordedTextures);
   for (const auto& texture : recordedTextures) {
     texture->DestroyOnOwningThread();
+  }
+
+  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
+      recordedSurfaces = std::move(mRecordedSurfaces);
+  for (const auto& entry : recordedSurfaces) {
+    RefPtr<SourceSurfaceCanvasRecording> surface(entry.GetData());
+    if (surface) {
+      surface->DestroyOnOwningThread();
+    }
   }
 
   DrawEventRecorderPrivate::DetachResources();
