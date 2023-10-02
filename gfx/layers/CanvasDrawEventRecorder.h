@@ -35,6 +35,8 @@ class CanvasEventRingBuffer final : public gfx::EventRingBuffer {
    public:
     virtual ~WriterServices() = default;
 
+    virtual void Destroy() = 0;
+
     /**
      * @returns true if the reader of the CanvasEventRingBuffer has permanently
      *          stopped processing, otherwise returns false.
@@ -64,6 +66,8 @@ class CanvasEventRingBuffer final : public gfx::EventRingBuffer {
   };
 
   CanvasEventRingBuffer() {}
+
+  void Destroy();
 
   /**
    * Initializes the shared memory used for the ringbuffer and footers.

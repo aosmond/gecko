@@ -31,6 +31,8 @@ class RingBufferWriterServices final
 
   ~RingBufferWriterServices() override = default;
 
+  void Destroy() override { mCanvasChild = nullptr; }
+
   bool ReaderClosed() override {
     if (!mCanvasChild) {
       return false;
@@ -46,7 +48,7 @@ class RingBufferWriterServices final
   }
 
  private:
-  const WeakPtr<CanvasChild> mCanvasChild;
+  WeakPtr<CanvasChild> mCanvasChild;
 };
 
 SourceSurfaceCanvasRecording::SourceSurfaceCanvasRecording(

@@ -127,6 +127,12 @@ bool CanvasEventRingBuffer::InitReader(
   return true;
 }
 
+void CanvasEventRingBuffer::Destroy() {
+  if (mWriterServices) {
+    mWriterServices->Destroy();
+  }
+}
+
 bool CanvasEventRingBuffer::SetNewBuffer(
     ipc::SharedMemoryBasic::Handle aReadHandle) {
   MOZ_RELEASE_ASSERT(
@@ -624,6 +630,7 @@ void CanvasDrawEventRecorder::DetachResources() {
   }
 
   DrawEventRecorderPrivate::DetachResources();
+  mOutputStream.Destroy();
 
   {
     auto lockedPendingDeletions = mPendingDeletions.Lock();
