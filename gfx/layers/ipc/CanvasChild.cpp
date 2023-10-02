@@ -63,11 +63,19 @@ SourceSurfaceCanvasRecording::~SourceSurfaceCanvasRecording() {
     return;
   }
 
+#if 0
+  if (IsOnOwningThread()) {
+    DestroyOnOwningThread();
+    return;
+  }
+#endif
+
   ReferencePtr surfaceAlias = this;
   mRecorder->AddPendingDeletion(
       [recorder = std::move(mRecorder), surfaceAlias,
        aliasedSurface = std::move(mRecordedSurface),
        canvasChild = std::move(mCanvasChild)]() -> void {
+        recorder->UntrackDestroyedRecordedSurface(surfaceAlias);
         recorder->RemoveStoredObject(surfaceAlias);
         recorder->RecordEvent(RecordedRemoveSurfaceAlias(surfaceAlias));
       });

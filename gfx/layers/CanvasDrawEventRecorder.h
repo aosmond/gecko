@@ -316,6 +316,16 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
     mRecordedSurfaces.InsertOrUpdate(aSurface, aSurface);
   }
 
+  void UntrackDestroyedRecordedSurface(void* aSurface) {
+    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
+    ThreadSafeWeakPtr<SourceSurfaceCanvasRecording> weakRef =
+        mRecordedSurfaces.Get(aSurface);
+    RefPtr<SourceSurfaceCanvasRecording> strongRef(weakRef);
+    if (!strongRef) {
+      mRecordedSurfaces.Remove(aSurface);
+    }
+  }
+
   void UntrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
     NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
     mRecordedSurfaces.Remove(aSurface);
