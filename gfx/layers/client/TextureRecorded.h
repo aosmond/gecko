@@ -54,6 +54,8 @@ class RecordedTextureData final : public TextureData {
 
   ~RecordedTextureData() override;
 
+  void DestroyOnOwningThreadLocked() MOZ_REQUIRES(mMutex);
+
   int64_t mTextureId;
 
   Mutex mMutex;

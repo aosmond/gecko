@@ -60,9 +60,7 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
   return true;
 }
 
-void RecordedTextureData::DestroyOnOwningThread() {
-  MutexAutoLock lock(mMutex);
-
+void RecordedTextureData::DestroyOnOwningThreadLocked() {
   // We need the translator to drop its reference for the DrawTarget first,
   // because the TextureData might need to destroy its DrawTarget within a lock.
   mSnapshot = nullptr;
@@ -77,6 +75,11 @@ void RecordedTextureData::DestroyOnOwningThread() {
   }
 }
 
+void RecordedTextureData::DestroyOnOwningThread() {
+  MutexAutoLock lock(mMutex);
+  DestroyOnOwningThreadLocked();
+}
+
 void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
   // When we are deallocating, we know this is our only reference, and this is
   // effectively the destructor. This will either happen on the main thread (for
@@ -84,23 +87,29 @@ void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
   // recordings). The only method we can race with is DestroyOnOwningThread
   // which may be called on the DOM worker thread during worker shutdown. As
   // such, the mutex is only necessary for these two methods.
-  MutexAutoLock lock(mMutex);
+  mMutex.Lock();
 
   if (!mRecorder) {
+    mMutex.Unlock();
     delete this;
     return;
   }
 
   if (mRecorder->IsOnOwningThread()) {
-    DestroyOnOwningThread();
+    DestroyOnOwningThreadLocked();
+    mMutex.Unlock();
     delete this;
     return;
   }
 
-  mRecorder->AddPendingDeletion([self = this]() -> void {
-    self->DestroyOnOwningThread();
-    delete self;
-  });
+  RefPtr<CanvasDrawEventRecorder> recorder = mRecorder;
+  mMutex.Unlock();
+
+  recorder->AddPendingDeletion(
+      [self = this, recorder = std::move(recorder)]() -> void {
+        self->DestroyOnOwningThread();
+        delete self;
+      });
 }
 
 void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {
