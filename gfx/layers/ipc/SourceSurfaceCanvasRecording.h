@@ -9,7 +9,12 @@
 
 #include "mozilla/gfx/2D.h"
 
-namespace mozilla::layers {
+namespace mozilla {
+namespace dom {
+class ThreadSafeWorkerRef;
+}
+
+namespace layers {
 class CanvasChild;
 class CanvasDrawEventRecorder;
 
@@ -24,9 +29,7 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
 
   ~SourceSurfaceCanvasRecording() final;
 
-  void Init();
-
-  void DestroyOnOwningThread();
+  bool Init();
 
   gfx::SurfaceType GetType() const final { return mRecordedSurface->GetType(); }
 
@@ -39,8 +42,13 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   already_AddRefed<gfx::DataSourceSurface> GetDataSurface() final;
 
  private:
+  void DestroyOnOwningThreadLocked() MOZ_REQUIRES(mMutex);
+  void DestroyOnOwningThread();
   bool IsOnOwningThread() const;
   void EnsureDataSurfaceOnOwningThread();
+
+  mutable Mutex mMutex;
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
 
   RefPtr<gfx::SourceSurface> mRecordedSurface;
   RefPtr<CanvasChild> mCanvasChild;
@@ -48,6 +56,7 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   RefPtr<gfx::DataSourceSurface> mDataSourceSurface;
 };
 
-}  // namespace mozilla::layers
+}  // namespace layers
+}  // namespace mozilla
 
 #endif  // mozilla_layers_SourceSurfaceCanvasRecording_h

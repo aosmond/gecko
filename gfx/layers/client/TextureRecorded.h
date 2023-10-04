@@ -11,7 +11,12 @@
 #include "mozilla/Mutex.h"
 #include "mozilla/layers/LayersTypes.h"
 
-namespace mozilla::layers {
+namespace mozilla {
+namespace dom {
+class ThreadSafeWorkerRef;
+}
+
+namespace layers {
 class CanvasChild;
 class CanvasDrawEventRecorder;
 
@@ -59,6 +64,7 @@ class RecordedTextureData final : public TextureData {
   int64_t mTextureId;
 
   Mutex mMutex;
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
   RefPtr<CanvasChild> mCanvasChild;
   RefPtr<CanvasDrawEventRecorder> mRecorder MOZ_GUARDED_BY(mMutex);
   RefPtr<gfx::DrawTarget> mDT;
@@ -69,6 +75,7 @@ class RecordedTextureData final : public TextureData {
   OpenMode mLockedMode;
 };
 
-}  // namespace mozilla::layers
+}  // namespace layers
+}  // namespace mozilla
 
 #endif  // mozilla_layers_TextureRecorded_h

@@ -15,6 +15,7 @@
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/ipc/ProcessChild.h"
 #include "mozilla/layers/CanvasDrawEventRecorder.h"
+#include "mozilla/layers/SourceSurfaceCanvasRecording.h"
 #include "nsIObserverService.h"
 #include "RecordedCanvasEventImpl.h"
 
@@ -328,7 +329,9 @@ already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
 
   auto wrapper =
       MakeRefPtr<SourceSurfaceCanvasRecording>(aSurface, this, mRecorder);
-  wrapper->Init();
+  if (NS_WARN_IF(!wrapper->Init())) {
+    return nullptr;
+  }
   return wrapper.forget();
 }
 

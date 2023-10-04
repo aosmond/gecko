@@ -7,6 +7,8 @@
 #include "TextureRecorded.h"
 
 #include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerPrivate.h"
+#include "mozilla/dom/WorkerRef.h"
 #include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/CanvasDrawEventRecorder.h"
@@ -30,6 +32,23 @@ RecordedTextureData::RecordedTextureData(gfx::IntSize aSize,
 RecordedTextureData::~RecordedTextureData() = default;
 
 bool RecordedTextureData::Init(TextureType aTextureType) {
+  RefPtr<dom::ThreadSafeWorkerRef> workerRef;
+  if (dom::WorkerPrivate* workerPrivate =
+          dom::GetCurrentThreadWorkerPrivate()) {
+    ThreadSafeWeakPtr<SourceSurfaceCanvasRecording> weakRef(this);
+    RefPtr<dom::StrongWorkerRef> strongRef = dom::StrongWorkerRef::Create(
+        workerPrivate, "RecordedTextureData::Init",
+        [self = this]() mutable { self->DestroyOnOwningThread(); });
+    if (NS_WARN_IF(!strongRef)) {
+      return false;
+    }
+
+    workerRef = new dom::ThreadSafeWorkerRef(strongRef);
+  } else if (!NS_IsMainThread()) {
+    MOZ_ASSERT_UNREACHABLE("Can only create on main or worker threads!");
+    return false;
+  }
+
   if (NS_WARN_IF(!NS_IsMainThread() && !dom::GetCurrentThreadWorkerPrivate())) {
     MOZ_ASSERT_UNREACHABLE(
         "RecordedTextureData must be created on main or DOM worker threads!");
@@ -55,6 +74,7 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
   recorder->TrackRecordedTexture(this);
 
   MutexAutoLock lock(mMutex);
+  mWorkerRef = std::move(workerRef);
   mRecorder = std::move(recorder);
   mCanvasChild = std::move(canvasChild);
   return true;
@@ -65,10 +85,7 @@ void RecordedTextureData::DestroyOnOwningThreadLocked() {
   // because the TextureData might need to destroy its DrawTarget within a lock.
   mSnapshot = nullptr;
   mDT = nullptr;
-  if (mRecorder) {
-    mRecorder->UntrackRecordedTexture(this);
-    mRecorder = nullptr;
-  }
+  mRecorder = nullptr;
   if (mCanvasChild) {
     mCanvasChild->RecordEvent(RecordedTextureDestruction(mTextureId));
     mCanvasChild = nullptr;
@@ -89,27 +106,29 @@ void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
   // such, the mutex is only necessary for these two methods.
   mMutex.Lock();
 
+  // We may have already freed the recorder.
   if (!mRecorder) {
     mMutex.Unlock();
     delete this;
     return;
   }
 
-  if (mRecorder->IsOnOwningThread()) {
+  // We are on the owning thread, so we can release ourselves.
+  if ((mWorkerRef && mWorkerRef->Private()->IsOnCurrentThread()) ||
+      (!mWorkerRef && NS_IsMainThread())) {
     DestroyOnOwningThreadLocked();
     mMutex.Unlock();
     delete this;
     return;
   }
 
-  RefPtr<CanvasDrawEventRecorder> recorder = mRecorder;
-  mMutex.Unlock();
-
-  recorder->AddPendingDeletion(
+  // Otherwise we rely upon the recorder to do it on our behalf.
+  mRecorder->AddPendingDeletion(
       [self = this, recorder = std::move(recorder)]() -> void {
         self->DestroyOnOwningThread();
         delete self;
       });
+  mMutex.Unlock();
 }
 
 void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {

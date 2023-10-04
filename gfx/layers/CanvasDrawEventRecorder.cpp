@@ -620,15 +620,6 @@ void CanvasDrawEventRecorder::DetachResources() {
     texture->DestroyOnOwningThread();
   }
 
-  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
-      recordedSurfaces = std::move(mRecordedSurfaces);
-  for (const auto& entry : recordedSurfaces) {
-    RefPtr<SourceSurfaceCanvasRecording> surface(entry.GetData());
-    if (surface) {
-      surface->DestroyOnOwningThread();
-    }
-  }
-
   DrawEventRecorderPrivate::DetachResources();
   mOutputStream.Destroy();
 

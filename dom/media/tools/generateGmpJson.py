@@ -15,9 +15,11 @@ def fetch_data_for_cdms(cdms, urlParams):
         if "fileName" in cdm:
             cdm["fileUrl"] = cdm["fileName"].format_map(urlParams)
             response = requests.get(cdm["fileUrl"])
-            response.raise_for_status()
-            cdm["hashValue"] = hashlib.sha512(response.content).hexdigest()
-            cdm["filesize"] = len(response.content)
+            if response.status_code == 200:
+                cdm["hashValue"] = hashlib.sha512(response.content).hexdigest()
+                cdm["filesize"] = len(response.content)
+            else:
+                logging.error("fetch_data_for_cdms: could not fetch %s, status %u", cdm["fileUrl"], response.status_code)
 
 
 def generate_json_for_cdms(cdms):
@@ -29,7 +31,7 @@ def generate_json_for_cdms(cdms):
                 + '          "alias": "{alias}"\n'
                 + "        }},\n"
             ).format_map(cdm)
-        else:
+        elif "hashValue" in cdm:
             cdm_json += (
                 '        "{target}": {{\n'
                 + '          "fileUrl": "{fileUrl}",\n'
