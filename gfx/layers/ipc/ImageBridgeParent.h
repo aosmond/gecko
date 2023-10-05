@@ -113,7 +113,7 @@ class ImageBridgeParent final : public PImageBridgeParent,
   static bool NotifyImageComposites(
       nsTArray<ImageCompositeNotificationInfo>& aNotifications);
 
-  bool UsesImageBridge() const override { return true; }
+  bool UsesWebRenderTextureHostWrapper() const override { return false; }
 
   bool IPCOpen() const override { return !mClosed; }
 

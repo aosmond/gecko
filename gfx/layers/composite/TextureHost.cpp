@@ -102,15 +102,8 @@ class TextureParent : public ParentActor<PTextureParent> {
 static bool WrapWithWebRenderTextureHost(ISurfaceAllocator* aDeallocator,
                                          LayersBackend aBackend,
                                          TextureFlags aFlags) {
-  if (!aDeallocator) {
-    return false;
-  }
-  if ((aFlags & TextureFlags::SNAPSHOT) ||
-      (!aDeallocator->UsesImageBridge() &&
-       !aDeallocator->AsCompositorBridgeParentBase())) {
-    return false;
-  }
-  return true;
+  return !(aFlags & TextureFlags::SNAPSHOT) && aDeallocator &&
+         aDeallocator->UsesWebRenderTextureHostWrapper();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

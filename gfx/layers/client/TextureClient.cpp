@@ -22,6 +22,7 @@
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_layers.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DataSurfaceHelpers.h"  // for CreateDataSourceSurfaceByCloning
 #include "mozilla/gfx/Logging.h"             // for gfxDebug
 #include "mozilla/gfx/gfxVars.h"
@@ -114,7 +115,7 @@ class TextureChild final : PTextureChild {
         mIPCOpen(false),
         mOwnsTextureData(false),
         mOwnerCalledDestroy(false),
-        mUsesImageBridge(false) {}
+        mUsesTextureChildLock(false) {}
 
   mozilla::ipc::IPCResult Recv__delete__() override { return IPC_OK(); }
 
@@ -125,13 +126,13 @@ class TextureChild final : PTextureChild {
   bool IPCOpen() const { return mIPCOpen; }
 
   void Lock() const {
-    if (mUsesImageBridge) {
+    if (mUsesTextureChildLock) {
       mLock.Enter();
     }
   }
 
   void Unlock() const {
-    if (mUsesImageBridge) {
+    if (mUsesTextureChildLock) {
       mLock.Leave();
     }
   }
@@ -233,7 +234,7 @@ class TextureChild final : PTextureChild {
   bool mIPCOpen;
   bool mOwnsTextureData;
   bool mOwnerCalledDestroy;
-  bool mUsesImageBridge;
+  bool mUsesTextureChildLock;
 
   friend class TextureClient;
   friend void DeallocateTextureClient(TextureDeallocParams params);
@@ -329,10 +330,12 @@ TextureData* TextureData::Create(TextureForwarder* aAllocator,
       GetTextureType(aFormat, aSize, aKnowsCompositor, aSelector, aAllocFlags);
 
   if (ShouldRemoteTextureType(textureType, aSelector)) {
-    RefPtr<CanvasChild> canvasChild = aAllocator->GetCanvasChild();
-    if (canvasChild) {
-      return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
-                                     textureType);
+    if (auto* cm = gfx::CanvasManagerChild::Get()) {
+      RefPtr<CanvasChild> canvasChild = cm->GetCanvasChild();
+      if (canvasChild) {
+        return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
+                                       textureType);
+      }
     }
 
     // We don't have a CanvasChild, but are supposed to be remote.
@@ -1005,8 +1008,8 @@ bool TextureClient::InitIPDLActor(CompositableForwarder* aForwarder) {
         return false;
       }
       mActor->mCompositableForwarder = aForwarder;
-      mActor->mUsesImageBridge =
-          aForwarder->GetTextureForwarder()->UsesImageBridge();
+      mActor->mUsesTextureChildLock =
+          aForwarder->GetTextureForwarder()->UsesTextureChildLock();
     }
     return true;
   }

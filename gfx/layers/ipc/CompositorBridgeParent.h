@@ -128,6 +128,7 @@ class CompositorBridgeParentBase : public PCompositorBridgeParent,
                      uint64_t aTransactionId) override;
   void SendAsyncMessage(
       const nsTArray<AsyncParentMessageData>& aMessage) override;
+  bool UsesWebRenderTextureHostWrapper() const override { return true; }
 
   // IShmemAllocator
   bool AllocShmem(size_t aSize, mozilla::ipc::Shmem* aShmem) override;
