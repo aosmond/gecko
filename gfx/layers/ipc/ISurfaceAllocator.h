@@ -97,9 +97,7 @@ class ISurfaceAllocator {
 
   virtual bool IsSameProcess() const = 0;
 
-  virtual bool UsesImageBridge() const { return false; }
-
-  virtual bool UsesWebRenderBridge() const { return false; }
+  virtual bool UsesWebRenderTextureHostWrapper() const { return false; }
 
  protected:
   void Finalize() {}

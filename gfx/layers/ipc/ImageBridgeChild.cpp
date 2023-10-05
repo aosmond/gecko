@@ -304,7 +304,7 @@ void ImageBridgeChild::UpdateImageClient(RefPtr<ImageContainer> aContainer) {
     RefPtr<Runnable> runnable =
         WrapRunnable(RefPtr<ImageBridgeChild>(this),
                      &ImageBridgeChild::UpdateImageClient, aContainer);
-    GetThread()->Dispatch(runnable.forget());
+    sImageBridgeChildThread->Dispatch(runnable.forget());
     return;
   }
 
@@ -340,7 +340,7 @@ void ImageBridgeChild::UpdateCompositable(
     RefPtr<Runnable> runnable = WrapRunnable(
         RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::UpdateCompositable,
         aContainer, aTextureId, aOwnerId, aSize, aFlags);
-    GetThread()->Dispatch(runnable.forget());
+    sImageBridgeChildThread->Dispatch(runnable.forget());
     return;
   }
 
@@ -399,7 +399,7 @@ void ImageBridgeChild::FlushAllImages(ImageClient* aClient,
   RefPtr<Runnable> runnable = WrapRunnable(
       RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::FlushAllImagesSync,
       &task, aClient, aContainer);
-  GetThread()->Dispatch(runnable.forget());
+  sImageBridgeChildThread->Dispatch(runnable.forget());
 
   task.Wait();
 }
@@ -449,7 +449,7 @@ bool ImageBridgeChild::InitForContent(Endpoint<PImageBridgeChild>&& aEndpoint,
 
   RefPtr<ImageBridgeChild> child = new ImageBridgeChild(aNamespace);
 
-  child->GetThread()->Dispatch(NS_NewRunnableFunction(
+  sImageBridgeChildThread->Dispatch(NS_NewRunnableFunction(
       "layers::ImageBridgeChild::Bind",
       [child, endpoint = std::move(aEndpoint)]() mutable {
         child->Bind(std::move(endpoint));
@@ -523,7 +523,7 @@ void ImageBridgeChild::WillShutdown() {
     RefPtr<Runnable> runnable =
         WrapRunnable(RefPtr<ImageBridgeChild>(this),
                      &ImageBridgeChild::ShutdownStep1, &task);
-    GetThread()->Dispatch(runnable.forget());
+    sImageBridgeChildThread->Dispatch(runnable.forget());
 
     task.Wait();
   }
@@ -534,7 +534,7 @@ void ImageBridgeChild::WillShutdown() {
     RefPtr<Runnable> runnable =
         WrapRunnable(RefPtr<ImageBridgeChild>(this),
                      &ImageBridgeChild::ShutdownStep2, &task);
-    GetThread()->Dispatch(runnable.forget());
+    sImageBridgeChildThread->Dispatch(runnable.forget());
 
     task.Wait();
   }
@@ -557,7 +557,7 @@ void ImageBridgeChild::InitSameProcess(uint32_t aNamespace) {
 
   RefPtr<Runnable> runnable =
       WrapRunnable(child, &ImageBridgeChild::BindSameProcess, parent);
-  child->GetThread()->Dispatch(runnable.forget());
+  sImageBridgeChildThread->Dispatch(runnable.forget());
 
   // Assign this after so other threads can't post messages before we connect to
   // IPDL.
@@ -582,7 +582,7 @@ void ImageBridgeChild::InitWithGPUProcess(
 
   RefPtr<ImageBridgeChild> child = new ImageBridgeChild(aNamespace);
 
-  child->GetThread()->Dispatch(NS_NewRunnableFunction(
+  sImageBridgeChildThread->Dispatch(NS_NewRunnableFunction(
       "layers::ImageBridgeChild::Bind",
       [child, endpoint = std::move(aEndpoint)]() mutable {
         child->Bind(std::move(endpoint));
@@ -601,8 +601,8 @@ bool InImageBridgeChildThread() {
          sImageBridgeChildThread->IsOnCurrentThread();
 }
 
-nsISerialEventTarget* ImageBridgeChild::GetThread() const {
-  return sImageBridgeChildThread;
+nsCOMPtr<nsISerialEventTarget> ImageBridgeChild::GetThread() const {
+  return sImageBridgeChildThread.get();
 }
 
 /* static */
@@ -631,7 +631,7 @@ RefPtr<ImageClient> ImageBridgeChild::CreateImageClient(
   RefPtr<Runnable> runnable = WrapRunnable(
       RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::CreateImageClientSync,
       &task, &result, aType, aImageContainer);
-  GetThread()->Dispatch(runnable.forget());
+  sImageBridgeChildThread->Dispatch(runnable.forget());
 
   task.Wait();
 
@@ -705,7 +705,7 @@ bool ImageBridgeChild::DispatchAllocShmemInternal(size_t aSize,
   RefPtr<Runnable> runnable = WrapRunnable(
       RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::ProxyAllocShmemNow,
       &task, aSize, aShmem, aUnsafe, &success);
-  GetThread()->Dispatch(runnable.forget());
+  sImageBridgeChildThread->Dispatch(runnable.forget());
 
   task.Wait();
 
@@ -742,7 +742,7 @@ bool ImageBridgeChild::DeallocShmem(ipc::Shmem& aShmem) {
   RefPtr<Runnable> runnable = WrapRunnable(
       RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::ProxyDeallocShmemNow,
       &task, &aShmem, &result);
-  GetThread()->Dispatch(runnable.forget());
+  sImageBridgeChildThread->Dispatch(runnable.forget());
 
   task.Wait();
   return result;
@@ -897,7 +897,7 @@ void ImageBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle) {
     RefPtr<Runnable> runnable =
         WrapRunnable(RefPtr<ImageBridgeChild>(this),
                      &ImageBridgeChild::ReleaseCompositable, aHandle);
-    GetThread()->Dispatch(runnable.forget());
+    sImageBridgeChildThread->Dispatch(runnable.forget());
     return;
   }
 
