@@ -31,12 +31,16 @@ CanvasManagerChild::CanvasManagerChild(uint32_t aId) : mId(aId) {}
 CanvasManagerChild::~CanvasManagerChild() = default;
 
 void CanvasManagerChild::ActorDestroy(ActorDestroyReason aReason) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   if (sLocalManager.get() == this) {
     sLocalManager.set(nullptr);
   }
 }
 
 void CanvasManagerChild::Destroy() {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   if (mCanvasChild) {
     mCanvasChild->Destroy();
     mCanvasChild = nullptr;
@@ -139,6 +143,8 @@ void CanvasManagerChild::Destroy() {
 }
 
 void CanvasManagerChild::EndCanvasTransaction() {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   if (!mCanvasChild) {
     return;
   }
@@ -151,6 +157,8 @@ void CanvasManagerChild::EndCanvasTransaction() {
 }
 
 void CanvasManagerChild::DeactivateCanvas() {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   mActive = false;
   if (mCanvasChild) {
     mCanvasChild->Destroy();
@@ -159,6 +167,8 @@ void CanvasManagerChild::DeactivateCanvas() {
 }
 
 RefPtr<layers::CanvasChild> CanvasManagerChild::GetCanvasChild() {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   if (!mActive) {
     MOZ_ASSERT(!mCanvasChild);
     return nullptr;
@@ -175,6 +185,8 @@ RefPtr<layers::CanvasChild> CanvasManagerChild::GetCanvasChild() {
 }
 
 RefPtr<webgpu::WebGPUChild> CanvasManagerChild::GetWebGPUChild() {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   if (!mWebGPUChild) {
     mWebGPUChild = MakeAndAddRef<webgpu::WebGPUChild>();
     if (!SendPWebGPUConstructor(mWebGPUChild)) {
@@ -189,6 +201,8 @@ already_AddRefed<DataSourceSurface> CanvasManagerChild::GetSnapshot(
     uint32_t aManagerId, int32_t aProtocolId,
     const Maybe<RemoteTextureOwnerId>& aOwnerId, SurfaceFormat aFormat,
     bool aPremultiply, bool aYFlip) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
   if (!CanSend()) {
     return nullptr;
   }
