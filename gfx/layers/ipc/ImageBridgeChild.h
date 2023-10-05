@@ -159,7 +159,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
    *
    * Can be called from any thread.
    */
-  nsISerialEventTarget* GetThread() const override;
+  nsCOMPtr<nsISerialEventTarget> GetThread() const override;
 
   base::ProcessId GetParentPid() const override { return OtherPid(); }
 
@@ -237,7 +237,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
   void Connect(CompositableClient* aCompositable,
                ImageContainer* aImageContainer) override;
 
-  bool UsesImageBridge() const override { return true; }
+  bool UsesTextureChildLock() const override { return true; }
 
   /**
    * See CompositableForwarder::UseTextures

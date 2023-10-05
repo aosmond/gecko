@@ -39,7 +39,6 @@ using mozilla::dom::BrowserChild;
 
 class IAPZCTreeManager;
 class APZCTreeManagerChild;
-class CanvasChild;
 class CompositorBridgeParent;
 class CompositorManagerChild;
 class CompositorOptions;
@@ -100,8 +99,6 @@ class CompositorBridgeChild final : public PCompositorBridgeChild,
       LayersBackend aLayersBackend, TextureFlags aFlags, uint64_t aSerial,
       wr::MaybeExternalImageId& aExternalImageId) override;
 
-  already_AddRefed<CanvasChild> GetCanvasChild() final;
-
   void EndCanvasTransaction();
 
   /**
@@ -153,7 +150,7 @@ class CompositorBridgeChild final : public PCompositorBridgeChild,
 
   FixedSizeSmallShmemSectionAllocator* GetTileLockAllocator() override;
 
-  nsISerialEventTarget* GetThread() const override { return mThread; }
+  nsCOMPtr<nsISerialEventTarget> GetThread() const override { return mThread; }
 
   base::ProcessId GetParentPid() const override { return OtherPid(); }
 
@@ -248,8 +245,6 @@ class CompositorBridgeChild final : public PCompositorBridgeChild,
   // TextureClients that must be kept alive during async painting. This
   // is only accessed on the main thread.
   nsTArray<RefPtr<TextureClient>> mTextureClientsForAsyncPaint;
-
-  RefPtr<CanvasChild> mCanvasChild;
 };
 
 }  // namespace layers
