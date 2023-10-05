@@ -7,6 +7,7 @@
 #define _include_gfx_ipc_CanvasManagerParent_h__
 
 #include "mozilla/gfx/PCanvasManagerParent.h"
+#include "mozilla/layers/CompositableTransactionParent.h"
 #include "mozilla/StaticMonitor.h"
 #include "mozilla/UniquePtr.h"
 #include "nsHashtablesFwd.h"
@@ -20,7 +21,9 @@ class SurfaceDescriptor;
 
 namespace gfx {
 
-class CanvasManagerParent final : public PCanvasManagerParent {
+class CanvasManagerParent final : public PCanvasManagerParent,
+                                  public layers::CompositableParentManager,
+                                  public mozilla::ipc::IShmemAllocator {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasManagerParent, override);
 
@@ -56,6 +59,25 @@ class CanvasManagerParent final : public PCanvasManagerParent {
       const uint32_t& aManagerId, const int32_t& aProtocolId,
       const Maybe<RemoteTextureOwnerId>& aOwnerId,
       webgl::FrontBufferSnapshotIpc* aResult);
+
+  // HostIPCAllocator
+  base::ProcessId GetChildProcessId() override { return OtherPid(); }
+  void NotifyNotUsed(layers::PTextureParent* aTexture,
+                     uint64_t aTransactionId) override;
+  void SendAsyncMessage(
+      const nsTArray<layers::AsyncParentMessageData>& aMessage) override;
+
+  // ISurfaceAllocator
+  IShmemAllocator* AsShmemAllocator() override { return this; }
+  bool IPCOpen() const override { return CanSend(); }
+  bool IsSameProcess() const override {
+    return OtherPid() == base::GetCurrentProcId();
+  }
+
+  // IShmemAllocator
+  bool AllocShmem(size_t aSize, mozilla::ipc::Shmem* aShmem) override;
+  bool AllocUnsafeShmem(size_t aSize, mozilla::ipc::Shmem* aShmem) override;
+  bool DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
  private:
   static UniquePtr<layers::SurfaceDescriptor> TakeReplayTexture(

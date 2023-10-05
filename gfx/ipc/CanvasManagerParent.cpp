@@ -13,9 +13,12 @@
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/CanvasTranslator.h"
 #include "mozilla/layers/CompositorThread.h"
+#include "mozilla/layers/TextureHost.h"
 #include "mozilla/webgpu/WebGPUParent.h"
 #include "nsIThread.h"
 #include "nsThreadUtils.h"
+
+using namespace mozilla::layers;
 
 namespace mozilla::gfx {
 
@@ -28,7 +31,7 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
 
 /* static */ void CanvasManagerParent::Init(
     Endpoint<PCanvasManagerParent>&& aEndpoint) {
-  MOZ_ASSERT(layers::CompositorThreadHolder::IsInCompositorThread());
+  MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
 
   auto manager = MakeRefPtr<CanvasManagerParent>();
 
@@ -94,10 +97,10 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
 /* static */ void CanvasManagerParent::DisableRemoteCanvasInternal() {
   MOZ_ASSERT(CanvasRenderThread::IsInCanvasRenderThread());
 
-  AutoTArray<RefPtr<layers::CanvasTranslator>, 16> actors;
+  AutoTArray<RefPtr<CanvasTranslator>, 16> actors;
   for (const auto& manager : sManagers) {
     for (const auto& canvas : manager->ManagedPCanvasParent()) {
-      actors.AppendElement(static_cast<layers::CanvasTranslator*>(canvas));
+      actors.AppendElement(static_cast<CanvasTranslator*>(canvas));
     }
   }
 
@@ -118,9 +121,8 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
 }
 
 /* static */ void CanvasManagerParent::AddReplayTexture(
-    layers::CanvasTranslator* aOwner, int64_t aTextureId,
-    layers::TextureData* aTextureData) {
-  auto desc = MakeUnique<layers::SurfaceDescriptor>();
+    CanvasTranslator* aOwner, int64_t aTextureId, TextureData* aTextureData) {
+  auto desc = MakeUnique<SurfaceDescriptor>();
   if (!aTextureData->Serialize(*desc)) {
     MOZ_CRASH("Failed to serialize");
   }
@@ -132,7 +134,7 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
 }
 
 /* static */ void CanvasManagerParent::RemoveReplayTexture(
-    layers::CanvasTranslator* aOwner, int64_t aTextureId) {
+    CanvasTranslator* aOwner, int64_t aTextureId) {
   StaticMonitorAutoLock lock(sReplayTexturesMonitor);
 
   auto i = sReplayTextures.Length();
@@ -147,7 +149,7 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
 }
 
 /* static */ void CanvasManagerParent::RemoveReplayTextures(
-    layers::CanvasTranslator* aOwner) {
+    CanvasTranslator* aOwner) {
   StaticMonitorAutoLock lock(sReplayTexturesMonitor);
 
   auto i = sReplayTextures.Length();
@@ -160,7 +162,7 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
   }
 }
 
-/* static */ UniquePtr<layers::SurfaceDescriptor>
+/* static */ UniquePtr<SurfaceDescriptor>
 CanvasManagerParent::TakeReplayTexture(base::ProcessId aOtherPid,
                                        int64_t aTextureId) {
   // While in theory this could be relatively expensive, the array is most
@@ -170,8 +172,7 @@ CanvasManagerParent::TakeReplayTexture(base::ProcessId aOtherPid,
     --i;
     const auto& texture = sReplayTextures[i];
     if (texture.mOwner->OtherPid() == aOtherPid && texture.mId == aTextureId) {
-      UniquePtr<layers::SurfaceDescriptor> desc =
-          std::move(sReplayTextures[i].mDesc);
+      UniquePtr<SurfaceDescriptor> desc = std::move(sReplayTextures[i].mDesc);
       sReplayTextures.RemoveElementAt(i);
       return desc;
     }
@@ -179,12 +180,12 @@ CanvasManagerParent::TakeReplayTexture(base::ProcessId aOtherPid,
   return nullptr;
 }
 
-/* static */ UniquePtr<layers::SurfaceDescriptor>
+/* static */ UniquePtr<SurfaceDescriptor>
 CanvasManagerParent::WaitForReplayTexture(base::ProcessId aOtherPid,
                                           int64_t aTextureId) {
   StaticMonitorAutoLock lock(sReplayTexturesMonitor);
 
-  UniquePtr<layers::SurfaceDescriptor> desc;
+  UniquePtr<SurfaceDescriptor> desc;
   while (!(desc = TakeReplayTexture(aOtherPid, aTextureId))) {
     if (NS_WARN_IF(!sReplayTexturesEnabled)) {
       return nullptr;
@@ -244,9 +245,8 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvInitialize(
   return IPC_OK();
 }
 
-already_AddRefed<layers::PCanvasParent>
-CanvasManagerParent::AllocPCanvasParent() {
-  return MakeAndAddRef<layers::CanvasTranslator>();
+already_AddRefed<PCanvasParent> CanvasManagerParent::AllocPCanvasParent() {
+  return MakeAndAddRef<CanvasTranslator>();
 }
 
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
@@ -304,6 +304,52 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
 
   *aResult = std::move(buffer);
   return IPC_OK();
+}
+
+void CanvasManagerParent::NotifyNotUsed(PTextureParent* aTexture,
+                                        uint64_t aTransactionId) {
+  RefPtr<TextureHost> texture = TextureHost::AsTextureHost(aTexture);
+  if (!texture) {
+    return;
+  }
+
+  if (!(texture->GetFlags() & TextureFlags::RECYCLE) &&
+      !(texture->GetFlags() & TextureFlags::WAIT_HOST_USAGE_END)) {
+    return;
+  }
+
+  uint64_t textureId = TextureHost::GetTextureSerial(aTexture);
+  mPendingAsyncMessage.push_back(OpNotifyNotUsed(textureId, aTransactionId));
+
+  if (!IsAboutToSendAsyncMessages()) {
+    SendPendingAsyncMessages();
+  }
+}
+
+void CanvasManagerParent::SendAsyncMessage(
+    const nsTArray<AsyncParentMessageData>& aMessage) {
+  // FIXME(aosmond)
+}
+
+bool CanvasManagerParent::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
+  if (!CanSend()) {
+    return false;
+  }
+  return PCanvasManagerParent::AllocShmem(aSize, aShmem);
+}
+
+bool CanvasManagerParent::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
+  if (!CanSend()) {
+    return false;
+  }
+  return PCanvasManagerParent::AllocUnsafeShmem(aSize, aShmem);
+}
+
+bool CanvasManagerParent::DeallocShmem(ipc::Shmem& aShmem) {
+  if (!CanSend()) {
+    return false;
+  }
+  return PCanvasManagerParent::DeallocShmem(aShmem);
 }
 
 }  // namespace mozilla::gfx
