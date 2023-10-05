@@ -32,6 +32,7 @@ class DataSourceSurface;
 class CanvasManagerChild final : public PCanvasManagerChild {
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasManagerChild, override);
+  NS_DECL_OWNINGTHREAD;
 
   explicit CanvasManagerChild(uint32_t aId);
   uint32_t Id() const { return mId; }
