@@ -1225,10 +1225,9 @@ bool GPUProcessManager::CreateContentImageBridge(
 
   if (mGPUChild) {
     mGPUChild->SendNewContentImageBridge(std::move(parentPipe));
-  } else {
-    if (!ImageBridgeParent::CreateForContent(std::move(parentPipe))) {
-      return false;
-    }
+  } else if (!ImageBridgeParent::CreateForContent(
+                 std::move(parentPipe), /* aCompositableNamespace */ 0)) {
+    return false;
   }
 
   *aOutEndpoint = std::move(childPipe);

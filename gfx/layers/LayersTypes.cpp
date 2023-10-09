@@ -52,12 +52,6 @@ std::ostream& operator<<(std::ostream& aStream, const LayersId& aId) {
 }
 
 /* static */
-CompositableHandle CompositableHandle::GetNext() {
-  static std::atomic<uint64_t> sCounter = 0;
-  return CompositableHandle{++sCounter};
-}
-
-/* static */
 RemoteTextureId RemoteTextureId::GetNext() {
   static std::atomic<uint64_t> sCounter = 0;
   return RemoteTextureId{++sCounter};
