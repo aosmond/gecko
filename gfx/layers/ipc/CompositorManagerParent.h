@@ -55,6 +55,9 @@ class CompositorManagerParent final : public PCompositorManagerParent {
   mozilla::ipc::IPCResult RecvInitCanvasManager(
       Endpoint<PCanvasManagerParent>&&);
 
+  mozilla::ipc::IPCResult RecvInitImageBridge(Endpoint<PImageBridgeParent>&&,
+                                              uint32_t);
+
   void BindComplete(bool aIsRoot);
   void ActorDestroy(ActorDestroyReason aReason) override;
 

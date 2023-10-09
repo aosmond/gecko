@@ -7,6 +7,7 @@
 
 include protocol PCanvasManager;
 include protocol PCompositorBridge;
+include protocol PImageBridge;
 include LayersSurfaces;
 include "mozilla/GfxMessageUtils.h";
 include "mozilla/layers/WebRenderMessageUtils.h";
@@ -88,6 +89,8 @@ parent:
   async ReportMemory() returns (MemoryReport aReport);
 
   async InitCanvasManager(Endpoint<PCanvasManagerParent> endpoint);
+
+  async InitImageBridge(Endpoint<PImageBridgeParent> endpoint, uint32_t compositableNamespace);
 
 child:
   async NotifyWebRenderError(WebRenderError error);
