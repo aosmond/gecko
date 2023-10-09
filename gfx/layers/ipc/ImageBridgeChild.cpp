@@ -12,11 +12,13 @@
 #include "ImageContainer.h"     // for ImageContainer
 #include "SynchronousTask.h"
 #include "mozilla/Assertions.h"        // for MOZ_ASSERT, etc
+#include "mozilla/Atomics.h"
 #include "mozilla/Monitor.h"           // for Monitor, MonitorAutoLock
 #include "mozilla/ReentrantMonitor.h"  // for ReentrantMonitor, etc
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"  // for StaticRefPtr
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/gfx/Point.h"  // for IntSize
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/ipc/Endpoint.h"
@@ -24,6 +26,7 @@
 #include "mozilla/layers/CompositableClient.h"  // for CompositableChild, etc
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ISurfaceAllocator.h"  // for ISurfaceAllocator
+#include "mozilla/layers/ImageBridgeWorkerChild.h"
 #include "mozilla/layers/ImageClient.h"        // for ImageClient
 #include "mozilla/layers/LayersMessages.h"     // for CompositableOperation
 #include "mozilla/layers/TextureClient.h"      // for TextureClient
@@ -177,7 +180,7 @@ void ImageBridgeChild::NotifyNotUsed(uint64_t aTextureId,
 }
 
 void ImageBridgeChild::CancelWaitForNotifyNotUsed(uint64_t aTextureId) {
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   mTexturesWaitingNotifyNotUsed.erase(aTextureId);
 }
 
@@ -185,13 +188,13 @@ void ImageBridgeChild::CancelWaitForNotifyNotUsed(uint64_t aTextureId) {
 static StaticMutex sImageBridgeSingletonLock MOZ_UNANNOTATED;
 static StaticRefPtr<ImageBridgeChild> sImageBridgeChildSingleton;
 static StaticRefPtr<nsIThread> sImageBridgeChildThread;
+static Atomic<uint32_t> sImageBridgeChildNextID(0);
 
 // dispatched function
 void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
   AutoCompleteTask complete(aTask);
 
-  MOZ_ASSERT(InImageBridgeChildThread(),
-             "Should be in ImageBridgeChild thread.");
+  MOZ_ASSERT(InForwarderThread(), "Should be in ImageBridgeChild thread.");
 
   MediaSystemResourceManager::Shutdown();
 
@@ -218,8 +221,7 @@ void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
 void ImageBridgeChild::ShutdownStep2(SynchronousTask* aTask) {
   AutoCompleteTask complete(aTask);
 
-  MOZ_ASSERT(InImageBridgeChildThread(),
-             "Should be in ImageBridgeChild thread.");
+  MOZ_ASSERT(InForwarderThread(), "Should be in ImageBridgeChild thread.");
   if (!mDestroyed) {
     Close();
   }
@@ -252,7 +254,6 @@ ImageBridgeChild::ImageBridgeChild(uint32_t aNamespace,
       mContainerMapLock("ImageBridgeChild.mContainerMapLock") {
   MOZ_ASSERT(mNamespace);
   MOZ_RELEASE_ASSERT(mCompositableNamespace != UINT32_MAX);
-  MOZ_ASSERT(NS_IsMainThread());
 
   mTxn = new CompositableTransaction();
 }
@@ -268,7 +269,7 @@ void ImageBridgeChild::MarkShutDown() {
 void ImageBridgeChild::Connect(CompositableClient* aCompositable,
                                ImageContainer* aImageContainer) {
   MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   MOZ_ASSERT(CanSend());
 
   uint64_t id = ++mNextCompositableId;
@@ -296,7 +297,16 @@ void ImageBridgeChild::ForgetImageContainer(const CompositableHandle& aHandle) {
 }
 
 /* static */
-RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton() {
+RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton(
+    bool aPreferThreadLocal /* = false */) {
+  if (aPreferThreadLocal) {
+    // We only create threadlocal instances for workers.
+    dom::WorkerPrivate* wp = dom::GetCurrentThreadWorkerPrivate();
+    if (wp) {
+      return ImageBridgeWorkerChild::Get(wp);
+    }
+  }
+
   StaticMutexAutoLock lock(sImageBridgeSingletonLock);
   return sImageBridgeChildSingleton;
 }
@@ -306,7 +316,7 @@ void ImageBridgeChild::UpdateImageClient(RefPtr<ImageContainer> aContainer) {
     return;
   }
 
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     RefPtr<Runnable> runnable =
         WrapRunnable(RefPtr<ImageBridgeChild>(this),
                      &ImageBridgeChild::UpdateImageClient, aContainer);
@@ -342,7 +352,7 @@ void ImageBridgeChild::UpdateCompositable(
     return;
   }
 
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     RefPtr<Runnable> runnable = WrapRunnable(
         RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::UpdateCompositable,
         aContainer, aTextureId, aOwnerId, aSize, aFlags);
@@ -370,10 +380,9 @@ void ImageBridgeChild::UpdateCompositable(
   EndTransaction();
 }
 
-void ImageBridgeChild::FlushAllImagesSync(SynchronousTask* aTask,
-                                          ImageClient* aClient,
-                                          ImageContainer* aContainer) {
-  AutoCompleteTask complete(aTask);
+void ImageBridgeChild::FlushAllImagesNow(ImageClient* aClient,
+                                         ImageContainer* aContainer) {
+  MOZ_ASSERT(InForwarderThread());
 
   if (!CanSend()) {
     return;
@@ -388,14 +397,19 @@ void ImageBridgeChild::FlushAllImagesSync(SynchronousTask* aTask,
   EndTransaction();
 }
 
+void ImageBridgeChild::FlushAllImagesSync(SynchronousTask* aTask,
+                                          ImageClient* aClient,
+                                          ImageContainer* aContainer) {
+  AutoCompleteTask complete(aTask);
+  FlushAllImagesNow(aClient, aContainer);
+}
+
 void ImageBridgeChild::FlushAllImages(ImageClient* aClient,
                                       ImageContainer* aContainer) {
   MOZ_ASSERT(aClient);
-  MOZ_ASSERT(!InImageBridgeChildThread());
 
-  if (InImageBridgeChildThread()) {
-    NS_ERROR(
-        "ImageBridgeChild::FlushAllImages() is called on ImageBridge thread.");
+  if (InForwarderThread()) {
+    FlushAllImagesNow(aClient, aContainer);
     return;
   }
 
@@ -629,7 +643,7 @@ void ImageBridgeChild::UpdateTextureFactoryIdentifier(
 
 RefPtr<ImageClient> ImageBridgeChild::CreateImageClient(
     CompositableType aType, ImageContainer* aImageContainer) {
-  if (InImageBridgeChildThread()) {
+  if (InForwarderThread()) {
     return CreateImageClientNow(aType, aImageContainer);
   }
 
@@ -649,7 +663,7 @@ RefPtr<ImageClient> ImageBridgeChild::CreateImageClient(
 
 RefPtr<ImageClient> ImageBridgeChild::CreateImageClientNow(
     CompositableType aType, ImageContainer* aImageContainer) {
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   if (!CanSend()) {
     return nullptr;
   }
@@ -664,7 +678,7 @@ RefPtr<ImageClient> ImageBridgeChild::CreateImageClientNow(
 }
 
 bool ImageBridgeChild::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     return DispatchAllocShmemInternal(aSize, aShmem,
                                       true);  // true: unsafe
   }
@@ -676,7 +690,7 @@ bool ImageBridgeChild::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool ImageBridgeChild::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     return DispatchAllocShmemInternal(aSize, aShmem,
                                       false);  // false: unsafe
   }
@@ -732,7 +746,7 @@ void ImageBridgeChild::ProxyDeallocShmemNow(SynchronousTask* aTask,
 }
 
 bool ImageBridgeChild::DeallocShmem(ipc::Shmem& aShmem) {
-  if (InImageBridgeChildThread()) {
+  if (InForwarderThread()) {
     if (!CanSend()) {
       return false;
     }
@@ -896,7 +910,7 @@ bool ImageBridgeChild::CanPostTask() const {
 }
 
 void ImageBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle) {
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     // If we can't post a task, then we definitely cannot send, so there's
     // no reason to queue up this send.
     if (!CanPostTask()) {
@@ -925,7 +939,6 @@ void ImageBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle) {
 }
 
 bool ImageBridgeChild::CanSend() const {
-  MOZ_ASSERT(InImageBridgeChildThread());
   return mCanSend;
 }
 
@@ -934,12 +947,11 @@ void ImageBridgeChild::HandleFatalError(const char* aMsg) {
 }
 
 wr::MaybeExternalImageId ImageBridgeChild::GetNextExternalImageId() {
-  static uint32_t sNextID = 1;
-  ++sNextID;
-  MOZ_RELEASE_ASSERT(sNextID != UINT32_MAX);
+  uint32_t id = ++sImageBridgeChildNextID;
+  MOZ_RELEASE_ASSERT(id != UINT32_MAX);
 
   uint64_t imageId = mNamespace;
-  imageId = imageId << 32 | sNextID;
+  imageId = imageId << 32 | id;
   return Some(wr::ToExternalImageId(imageId));
 }
 

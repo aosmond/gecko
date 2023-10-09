@@ -12,6 +12,7 @@
 #include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layers/ContentCompositorBridgeParent.h"
 #include "mozilla/layers/CompositorThread.h"
+#include "mozilla/layers/ImageBridgeParent.h"
 #include "mozilla/layers/SharedSurfacesParent.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/Unused.h"
@@ -315,6 +316,13 @@ mozilla::ipc::IPCResult CompositorManagerParent::RecvReportMemory(
 mozilla::ipc::IPCResult CompositorManagerParent::RecvInitCanvasManager(
     Endpoint<PCanvasManagerParent>&& aEndpoint) {
   gfx::CanvasManagerParent::Init(std::move(aEndpoint));
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult CompositorManagerParent::RecvInitImageBridge(
+    Endpoint<PImageBridgeParent>&& aEndpoint, uint32_t aCompositableNamespace) {
+  ImageBridgeParent::CreateForContent(std::move(aEndpoint),
+                                      aCompositableNamespace);
   return IPC_OK();
 }
 
