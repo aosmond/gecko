@@ -5,13 +5,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+include LayersMessages;
+include LayersSurfaces;
 include "mozilla/layers/LayersMessageUtils.h";
+include "mozilla/layers/WebRenderMessageUtils.h";
 include protocol PCanvas;
+include protocol PTexture;
 include protocol PWebGL;
 include protocol PWebGPU;
 
+using mozilla::layers::CompositableHandle from "mozilla/layers/LayersTypes.h";
 using mozilla::layers::RemoteTextureOwnerId from "mozilla/layers/LayersTypes.h";
+using struct mozilla::layers::TextureInfo from "mozilla/layers/CompositorTypes.h";
+using mozilla::layers::TextureFlags from "mozilla/layers/CompositorTypes.h";
 using mozilla::webgl::FrontBufferSnapshotIpc from "mozilla/dom/WebGLIpdl.h";
+using mozilla::wr::MaybeExternalImageId from "mozilla/webrender/WebRenderTypes.h";
 
 namespace mozilla {
 namespace gfx {
@@ -25,6 +33,7 @@ namespace gfx {
 [NeedsOtherPid]
 sync protocol PCanvasManager
 {
+  manages PTexture;
   manages PCanvas;
   manages PWebGL;
   manages PWebGPU;
@@ -46,6 +55,15 @@ parent:
   // reading without having to block on the worker thread that owns the context
   // instance.
   sync GetSnapshot(uint32_t aManagerId, int32_t aProtocolId, RemoteTextureOwnerId? ownerId) returns (FrontBufferSnapshotIpc ret);
+
+  async PTexture(SurfaceDescriptor aSharedData, ReadLockDescriptor aReadLock, LayersBackend aBackend, TextureFlags aTextureFlags, uint64_t aSerial, MaybeExternalImageId aExternalImageId);
+
+  async NewCompositable(CompositableHandle aHandle, TextureInfo aInfo);
+  async ReleaseCompositable(CompositableHandle aHandle);
+  async Update(CompositableOperation[] ops, OpDestroy[] toDestroy, uint64_t fwdTransactionId);
+
+child:
+  async ParentAsyncMessages(AsyncParentMessageData[] aMessages);
 };
 
 } // gfx

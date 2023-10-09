@@ -12,6 +12,7 @@
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/CompositorManagerChild.h"
+#include "mozilla/layers/TextureClient.h"
 #include "mozilla/webgpu/WebGPUChild.h"
 
 using namespace mozilla::dom;
@@ -280,6 +281,81 @@ already_AddRefed<DataSourceSurface> CanvasManagerChild::GetSnapshot(
     }
   }
   return surface.forget();
+}
+
+PTextureChild* CanvasManagerChild::AllocPTextureChild(
+    const SurfaceDescriptor&, ReadLockDescriptor&, const LayersBackend&,
+    const TextureFlags&, const uint64_t& aSerial,
+    const wr::MaybeExternalImageId& aExternalImageId) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+  MOZ_ASSERT(CanSend());
+  return TextureClient::CreateIPDLActor();
+}
+
+bool CanvasManagerChild::DeallocPTextureChild(PTextureChild* actor) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+  return TextureClient::DestroyIPDLActor(actor);
+}
+
+mozilla::ipc::IPCResult CanvasManagerChild::RecvParentAsyncMessages(
+    nsTArray<AsyncParentMessageData>&& aMessages) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
+  for (AsyncParentMessageArray::index_type i = 0; i < aMessages.Length(); ++i) {
+    const AsyncParentMessageData& message = aMessages[i];
+
+    switch (message.type()) {
+      case AsyncParentMessageData::TOpNotifyNotUsed: {
+        const OpNotifyNotUsed& op = message.get_OpNotifyNotUsed();
+        NotifyNotUsed(op.TextureId(), op.fwdTransactionId());
+        break;
+      }
+      default:
+        NS_ERROR("unknown AsyncParentMessageData type");
+        return IPC_FAIL_NO_REASON(this);
+    }
+  }
+  return IPC_OK();
+}
+
+void CanvasManagerChild::HoldUntilCompositableRefReleasedIfNecessary(
+    TextureClient* aClient) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
+  if (!aClient) {
+    return;
+  }
+
+  // Wait ReleaseCompositableRef only when TextureFlags::RECYCLE or
+  // TextureFlags::WAIT_HOST_USAGE_END is set on ImageBridge.
+  bool waitNotifyNotUsed =
+      aClient->GetFlags() & TextureFlags::RECYCLE ||
+      aClient->GetFlags() & TextureFlags::WAIT_HOST_USAGE_END;
+  if (!waitNotifyNotUsed) {
+    return;
+  }
+
+  aClient->SetLastFwdTransactionId(GetFwdTransactionId());
+  mTexturesWaitingNotifyNotUsed.emplace(aClient->GetSerial(), aClient);
+}
+
+void CanvasManagerChild::NotifyNotUsed(uint64_t aTextureId,
+                                       uint64_t aFwdTransactionId) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+
+  auto it = mTexturesWaitingNotifyNotUsed.find(aTextureId);
+  if (it != mTexturesWaitingNotifyNotUsed.end()) {
+    if (aFwdTransactionId < it->second->GetLastFwdTransactionId()) {
+      // Released on host side, but client already requested newer use texture.
+      return;
+    }
+    mTexturesWaitingNotifyNotUsed.erase(it);
+  }
+}
+
+void CanvasManagerChild::CancelWaitForNotifyNotUsed(uint64_t aTextureId) {
+  NS_ASSERT_OWNINGTHREAD(CanvasManagerChild);
+  mTexturesWaitingNotifyNotUsed.erase(aTextureId);
 }
 
 }  // namespace mozilla::gfx

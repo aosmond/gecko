@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include LayersSurfaces;
+include protocol PCanvasManager;
 include protocol PCompositorBridge;
 include protocol PImageBridge;
 include protocol PVideoBridge;
@@ -22,7 +23,7 @@ namespace layers {
  */
 [ManualDealloc, ChildImpl=virtual, ParentImpl=virtual]
 sync protocol PTexture {
-    manager PImageBridge or PCompositorBridge or PVideoBridge;
+    manager PImageBridge or PCompositorBridge or PVideoBridge or PCanvasManager;
 
 child:
     async __delete__();

@@ -27,6 +27,9 @@ class CanvasManagerParent final : public PCanvasManagerParent,
  public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasManagerParent, override);
 
+  typedef nsTArray<CompositableOperation> EditArray;
+  typedef nsTArray<OpDestroy> OpDestroyArray;
+
   static void Init(Endpoint<PCanvasManagerParent>&& aEndpoint);
 
   static void Shutdown();
@@ -59,6 +62,22 @@ class CanvasManagerParent final : public PCanvasManagerParent,
       const uint32_t& aManagerId, const int32_t& aProtocolId,
       const Maybe<RemoteTextureOwnerId>& aOwnerId,
       webgl::FrontBufferSnapshotIpc* aResult);
+  mozilla::ipc::IPCResult RecvNewCompositable(const CompositableHandle& aHandle,
+                                              const TextureInfo& aInfo);
+  mozilla::ipc::IPCResult RecvReleaseCompositable(
+      const CompositableHandle& aHandle);
+  mozilla::ipc::IPCResult RecvUpdate(EditArray&& aEdits,
+                                     OpDestroyArray&& aToDestroy,
+                                     const uint64_t& aFwdTransactionId);
+
+  // Texture management
+  PTextureParent* AllocPTextureParent(
+      const layers::SurfaceDescriptor& aSharedData,
+      layers::ReadLockDescriptor& aReadLock,
+      const layers::LayersBackend& aLayersBackend,
+      const layers::TextureFlags& aFlags, const uint64_t& aSerial,
+      const wr::MaybeExternalImageId& aExternalImageId);
+  bool DeallocPTextureParent(PTextureParent* actor);
 
   // HostIPCAllocator
   base::ProcessId GetChildProcessId() override { return OtherPid(); }

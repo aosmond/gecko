@@ -6,6 +6,7 @@
 
 #include "CanvasManagerParent.h"
 #include "gfxPlatform.h"
+#include "mozilla/Unused.h"
 #include "mozilla/dom/WebGLParent.h"
 #include "mozilla/gfx/CanvasRenderThread.h"
 #include "mozilla/gfx/gfxVars.h"
@@ -21,6 +22,29 @@
 using namespace mozilla::layers;
 
 namespace mozilla::gfx {
+
+class MOZ_STACK_CLASS AutoCanvasManagerParentAsyncMessageSender final {
+ public:
+  explicit AutoCanvasManagerParentAsyncMessageSender(
+      CanvasManagerParent* aCanvasManager,
+      nsTArray<OpDestroy>* aToDestroy = nullptr)
+      : mCanvasManager(aCanvasManager), mToDestroy(aToDestroy) {
+    mCanvasManager->SetAboutToSendAsyncMessages();
+  }
+
+  ~AutoCanvasManagerParentAsyncMessageSender() {
+    mCanvasManager->SendPendingAsyncMessages();
+    if (mToDestroy) {
+      for (const auto& op : *mToDestroy) {
+        mCanvasManager->DestroyActor(op);
+      }
+    }
+  }
+
+ private:
+  CanvasManagerParent* mCanvasManager;
+  nsTArray<OpDestroy>* mToDestroy;
+};
 
 CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
 
@@ -306,6 +330,65 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult CanvasManagerParent::RecvNewCompositable(
+    const CompositableHandle& aHandle, const TextureInfo& aInfo) {
+  RefPtr<CompositableHost> host = AddCompositable(aHandle, aInfo);
+  if (!host) {
+    return IPC_FAIL_NO_REASON(this);
+  }
+
+  host->SetAsyncRef(AsyncCompositableRef(OtherPid(), aHandle));
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult CanvasManagerParent::RecvReleaseCompositable(
+    const CompositableHandle& aHandle) {
+  ReleaseCompositable(aHandle);
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult CanvasManagerParent::RecvUpdate(
+    EditArray&& aEdits, OpDestroyArray&& aToDestroy,
+    const uint64_t& aFwdTransactionId) {
+  AUTO_PROFILER_TRACING_MARKER("Paint", "CanvasManagerTransaction", GRAPHICS);
+  AUTO_PROFILER_LABEL("CanvasManagerParent::RecvUpdate", GRAPHICS);
+
+  // This ensures that destroy operations are always processed. It is not safe
+  // to early-return from RecvUpdate without doing so.
+  AutoCanvasManagerParentAsyncMessageSender autoAsyncMessageSender(this,
+                                                                   &aToDestroy);
+  UpdateFwdTransactionId(aFwdTransactionId);
+
+  for (const auto& edit : aEdits) {
+    RefPtr<CompositableHost> compositable =
+        FindCompositable(edit.compositable());
+    if (!compositable ||
+        !ReceiveCompositableUpdate(edit.detail(), WrapNotNull(compositable),
+                                   edit.compositable())) {
+      return IPC_FAIL_NO_REASON(this);
+    }
+    uint32_t dropped = compositable->GetDroppedFrames();
+    if (dropped) {
+      Unused << SendReportFramesDropped(edit.compositable(), dropped);
+    }
+  }
+
+  return IPC_OK();
+}
+
+PTextureParent* CanvasManagerParent::AllocPTextureParent(
+    const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
+    const LayersBackend& aLayersBackend, const TextureFlags& aFlags,
+    const uint64_t& aSerial, const wr::MaybeExternalImageId& aExternalImageId) {
+  return TextureHost::CreateIPDLActor(this, aSharedData, std::move(aReadLock),
+                                      aLayersBackend, aFlags, aSerial,
+                                      aExternalImageId);
+}
+
+bool CanvasManagerParent::DeallocPTextureParent(PTextureParent* actor) {
+  return TextureHost::DestroyIPDLActor(actor);
+}
+
 void CanvasManagerParent::NotifyNotUsed(PTextureParent* aTexture,
                                         uint64_t aTransactionId) {
   RefPtr<TextureHost> texture = TextureHost::AsTextureHost(aTexture);
@@ -328,7 +411,7 @@ void CanvasManagerParent::NotifyNotUsed(PTextureParent* aTexture,
 
 void CanvasManagerParent::SendAsyncMessage(
     const nsTArray<AsyncParentMessageData>& aMessage) {
-  // FIXME(aosmond)
+  Unused << SendParentAsyncMessages(aMessage);
 }
 
 bool CanvasManagerParent::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
