@@ -243,6 +243,7 @@ class WebRenderBridgeChild final : public PWebRenderBridgeChild,
   bool mIsInClearCachedResources;
   wr::IdNamespace mIdNamespace;
   uint32_t mResourceId;
+  uint32_t mNextCompositableId = 0;
   wr::PipelineId mPipelineId;
   WebRenderLayerManager* mManager;
 

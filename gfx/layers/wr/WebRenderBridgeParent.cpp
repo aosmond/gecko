@@ -1782,8 +1782,8 @@ void WebRenderBridgeParent::AddPipelineIdForCompositable(
       break;
     case CompositableHandleOwner::ImageBridge: {
       RefPtr<ImageBridgeParent> imageBridge =
-          ImageBridgeParent::GetInstance(OtherPid());
-      if (!imageBridge) {
+          ImageBridgeParent::GetInstance(OtherPid(), aHandle.Namespace());
+      if (NS_WARN_IF(!imageBridge)) {
         return;
       }
       host = imageBridge->FindCompositable(aHandle);
@@ -1791,7 +1791,7 @@ void WebRenderBridgeParent::AddPipelineIdForCompositable(
     }
   }
 
-  if (!host) {
+  if (NS_WARN_IF(!host)) {
     return;
   }
 

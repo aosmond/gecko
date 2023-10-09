@@ -361,7 +361,10 @@ void WebRenderBridgeChild::Connect(CompositableClient* aCompositable,
   MOZ_ASSERT(!mDestroyed);
   MOZ_ASSERT(aCompositable);
 
-  CompositableHandle handle = CompositableHandle::GetNext();
+  uint32_t id = ++mNextCompositableId;
+  MOZ_RELEASE_ASSERT(id != UINT32_MAX);
+
+  CompositableHandle handle(id);
   mCompositables.InsertOrUpdate(uint64_t(handle), aCompositable);
 
   aCompositable->InitIPDL(handle);

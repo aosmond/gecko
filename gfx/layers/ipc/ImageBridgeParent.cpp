@@ -62,11 +62,12 @@ void ImageBridgeParent::Setup() {
 }
 
 ImageBridgeParent::ImageBridgeParent(nsISerialEventTarget* aThread,
-                                     ProcessId aChildProcessId)
+                                     ProcessId aChildProcessId,
+                                     uint32_t aCompositableNamespace)
     : mThread(aThread),
+      mCompositableNamespace(aCompositableNamespace),
       mClosed(false),
       mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {
-  MOZ_ASSERT(NS_IsMainThread());
   SetOtherProcessId(aChildProcessId);
 }
 
@@ -74,14 +75,18 @@ ImageBridgeParent::~ImageBridgeParent() = default;
 
 /* static */
 ImageBridgeParent* ImageBridgeParent::CreateSameProcess() {
+  MOZ_ASSERT(XRE_IsParentProcess() || XRE_IsGPUProcess());
+
   base::ProcessId pid = base::GetCurrentProcId();
+  uint32_t compositableNamespace = 0;
+  ImageBridgeMapKey key{pid, compositableNamespace};
   RefPtr<ImageBridgeParent> parent =
-      new ImageBridgeParent(CompositorThread(), pid);
+      new ImageBridgeParent(CompositorThread(), pid, compositableNamespace);
 
   {
     MonitorAutoLock lock(*sImageBridgesLock);
-    MOZ_RELEASE_ASSERT(sImageBridges.count(pid) == 0);
-    sImageBridges[pid] = parent;
+    MOZ_RELEASE_ASSERT(sImageBridges.count(key) == 0);
+    sImageBridges[key] = parent;
   }
 
   sImageBridgeParentSingleton = parent;
@@ -98,8 +103,8 @@ bool ImageBridgeParent::CreateForGPUProcess(
     return false;
   }
 
-  RefPtr<ImageBridgeParent> parent =
-      new ImageBridgeParent(compositorThread, aEndpoint.OtherPid());
+  RefPtr<ImageBridgeParent> parent = new ImageBridgeParent(
+      compositorThread, aEndpoint.OtherPid(), /* aCompositableNamespace */ 0);
 
   compositorThread->Dispatch(NewRunnableMethod<Endpoint<PImageBridgeParent>&&>(
       "layers::ImageBridgeParent::Bind", parent, &ImageBridgeParent::Bind,
@@ -146,7 +151,7 @@ void ImageBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
   mCompositables.clear();
   {
     MonitorAutoLock lock(*sImageBridgesLock);
-    sImageBridges.erase(OtherPid());
+    sImageBridges.erase(ImageBridgeMapKey{OtherPid(), mCompositableNamespace});
   }
   GetThread()->Dispatch(
       NewRunnableMethod("layers::ImageBridgeParent::DeferredDestroy", this,
@@ -215,14 +220,18 @@ mozilla::ipc::IPCResult ImageBridgeParent::RecvUpdate(
 
 /* static */
 bool ImageBridgeParent::CreateForContent(
-    Endpoint<PImageBridgeParent>&& aEndpoint) {
+    Endpoint<PImageBridgeParent>&& aEndpoint, uint32_t aCompositableNamespace) {
   nsCOMPtr<nsISerialEventTarget> compositorThread = CompositorThread();
   if (!compositorThread) {
     return false;
   }
 
-  RefPtr<ImageBridgeParent> bridge =
-      new ImageBridgeParent(compositorThread, aEndpoint.OtherPid());
+  // We may create multiple ImageBridgeParent objects for the same content
+  // process. If aCompositableNamespace is zero, then it is for the generic, any
+  // thread ImageBridgeChild in the content process. If it is non-zero, then it
+  // must be an instance for a DOM worker in the content process.
+  RefPtr<ImageBridgeParent> bridge = new ImageBridgeParent(
+      compositorThread, aEndpoint.OtherPid(), aCompositableNamespace);
   compositorThread->Dispatch(NewRunnableMethod<Endpoint<PImageBridgeParent>&&>(
       "layers::ImageBridgeParent::Bind", bridge, &ImageBridgeParent::Bind,
       std::move(aEndpoint)));
@@ -233,12 +242,14 @@ bool ImageBridgeParent::CreateForContent(
 void ImageBridgeParent::Bind(Endpoint<PImageBridgeParent>&& aEndpoint) {
   if (!aEndpoint.Bind(this)) return;
 
+  ImageBridgeMapKey key{OtherPid(), mCompositableNamespace};
+
   // If the child process ID was reused by the OS before the ImageBridgeParent
   // object was destroyed, we need to clean it up first.
   RefPtr<ImageBridgeParent> oldActor;
   {
     MonitorAutoLock lock(*sImageBridgesLock);
-    ImageBridgeMap::const_iterator i = sImageBridges.find(OtherPid());
+    ImageBridgeMap::const_iterator i = sImageBridges.find(key);
     if (i != sImageBridges.end()) {
       oldActor = i->second;
     }
@@ -252,7 +263,7 @@ void ImageBridgeParent::Bind(Endpoint<PImageBridgeParent>&& aEndpoint) {
 
   {
     MonitorAutoLock lock(*sImageBridgesLock);
-    sImageBridges[OtherPid()] = this;
+    sImageBridges[key] = this;
   }
 }
 
@@ -317,15 +328,19 @@ void ImageBridgeParent::SendAsyncMessage(
   mozilla::Unused << SendParentAsyncMessages(aMessage);
 }
 
-class ProcessIdComparator {
+class ProcessIdAndNamespaceComparator {
  public:
   bool Equals(const ImageCompositeNotificationInfo& aA,
               const ImageCompositeNotificationInfo& aB) const {
-    return aA.mImageBridgeProcessId == aB.mImageBridgeProcessId;
+    return aA.mImageBridgeProcessId == aB.mImageBridgeProcessId &&
+           aA.mNotification.compositable().Namespace() ==
+               aB.mNotification.compositable().Namespace();
   }
   bool LessThan(const ImageCompositeNotificationInfo& aA,
                 const ImageCompositeNotificationInfo& aB) const {
-    return aA.mImageBridgeProcessId < aB.mImageBridgeProcessId;
+    return aA.mImageBridgeProcessId < aB.mImageBridgeProcessId ||
+           aA.mNotification.compositable().Namespace() <
+               aB.mNotification.compositable().Namespace();
   }
 };
 
@@ -334,7 +349,7 @@ bool ImageBridgeParent::NotifyImageComposites(
     nsTArray<ImageCompositeNotificationInfo>& aNotifications) {
   // Group the notifications by destination process ID and then send the
   // notifications in one message per group.
-  aNotifications.Sort(ProcessIdComparator());
+  aNotifications.Sort(ProcessIdAndNamespaceComparator());
   uint32_t i = 0;
   bool ok = true;
   while (i < aNotifications.Length()) {
@@ -343,12 +358,14 @@ bool ImageBridgeParent::NotifyImageComposites(
     uint32_t end = i + 1;
     MOZ_ASSERT(aNotifications[i].mNotification.compositable());
     ProcessId pid = aNotifications[i].mImageBridgeProcessId;
+    uint32_t ns = aNotifications[i].mNotification.compositable().Namespace();
     while (end < aNotifications.Length() &&
-           aNotifications[end].mImageBridgeProcessId == pid) {
+           aNotifications[end].mImageBridgeProcessId == pid &&
+           aNotifications[end].mNotification.compositable().Namespace() == ns) {
       notifications.AppendElement(aNotifications[end].mNotification);
       ++end;
     }
-    RefPtr<ImageBridgeParent> bridge = GetInstance(pid);
+    RefPtr<ImageBridgeParent> bridge = GetInstance(pid, ns);
     if (!bridge || bridge->mClosed) {
       i = end;
       continue;
@@ -365,12 +382,13 @@ bool ImageBridgeParent::NotifyImageComposites(
 void ImageBridgeParent::DeferredDestroy() { mCompositorThreadHolder = nullptr; }
 
 already_AddRefed<ImageBridgeParent> ImageBridgeParent::GetInstance(
-    ProcessId aId) {
+    ProcessId aId, uint32_t aCompositableNamespace) {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
   MonitorAutoLock lock(*sImageBridgesLock);
-  ImageBridgeMap::const_iterator i = sImageBridges.find(aId);
+  ImageBridgeMap::const_iterator i =
+      sImageBridges.find(ImageBridgeMapKey{aId, aCompositableNamespace});
   if (i == sImageBridges.end()) {
-    NS_WARNING("Cannot find image bridge for process!");
+    NS_WARNING("Cannot find image bridge for process/namespace!");
     return nullptr;
   }
   RefPtr<ImageBridgeParent> bridge = i->second;
