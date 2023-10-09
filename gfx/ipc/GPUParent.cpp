@@ -616,7 +616,8 @@ mozilla::ipc::IPCResult GPUParent::RecvNewContentCompositorManager(
 
 mozilla::ipc::IPCResult GPUParent::RecvNewContentImageBridge(
     Endpoint<PImageBridgeParent>&& aEndpoint) {
-  if (!ImageBridgeParent::CreateForContent(std::move(aEndpoint))) {
+  if (!ImageBridgeParent::CreateForContent(std::move(aEndpoint),
+                                           /* aCompositableNamespace */ 0)) {
     return IPC_FAIL_NO_REASON(this);
   }
   return IPC_OK();
