@@ -104,9 +104,9 @@ bool InImageBridgeChildThread();
  * thread is not used at all (except for the very first transaction that
  * provides the CompositableHost with an AsyncID).
  */
-class ImageBridgeChild final : public PImageBridgeChild,
-                               public CompositableForwarder,
-                               public TextureForwarder {
+class ImageBridgeChild : public PImageBridgeChild,
+                         public CompositableForwarder,
+                         public TextureForwarder {
   friend class ImageContainer;
 
   typedef nsTArray<AsyncParentMessageData> AsyncParentMessageArray;
@@ -146,13 +146,15 @@ class ImageBridgeChild final : public PImageBridgeChild,
    *
    * can be called from any thread.
    */
-  static RefPtr<ImageBridgeChild> GetSingleton();
+  static RefPtr<ImageBridgeChild> GetSingleton(bool aPreferThreadLocal = false);
 
   static void IdentifyCompositorTextureHost(
       const TextureFactoryIdentifier& aIdentifier);
 
   void BeginTransaction();
   void EndTransaction();
+
+  uint32_t GetNamespace() const { return mNamespace; }
 
   /**
    * Returns the ImageBridgeChild's thread.
@@ -161,7 +163,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
    */
   nsCOMPtr<nsISerialEventTarget> GetThread() const override;
 
-  base::ProcessId GetParentPid() const override { return OtherPid(); }
+  base::ProcessId GetParentPid() const final { return OtherPid(); }
 
   PTextureChild* AllocPTextureChild(
       const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
@@ -185,28 +187,29 @@ class ImageBridgeChild final : public PImageBridgeChild,
       const CompositableHandle& aHandle, const uint32_t& aFrames);
 
   // Create an ImageClient from any thread.
-  RefPtr<ImageClient> CreateImageClient(CompositableType aType,
-                                        ImageContainer* aImageContainer);
+  virtual RefPtr<ImageClient> CreateImageClient(
+      CompositableType aType, ImageContainer* aImageContainer);
 
   // Create an ImageClient from the ImageBridge thread.
   RefPtr<ImageClient> CreateImageClientNow(CompositableType aType,
                                            ImageContainer* aImageContainer);
 
-  void UpdateImageClient(RefPtr<ImageContainer> aContainer);
+  virtual void UpdateImageClient(RefPtr<ImageContainer> aContainer);
 
-  void UpdateCompositable(const RefPtr<ImageContainer> aContainer,
-                          const RemoteTextureId aTextureId,
-                          const RemoteTextureOwnerId aOwnerId,
-                          const gfx::IntSize aSize, const TextureFlags aFlags);
+  virtual void UpdateCompositable(const RefPtr<ImageContainer> aContainer,
+                                  const RemoteTextureId aTextureId,
+                                  const RemoteTextureOwnerId aOwnerId,
+                                  const gfx::IntSize aSize,
+                                  const TextureFlags aFlags);
 
   /**
    * Flush all Images sent to CompositableHost.
    */
-  void FlushAllImages(ImageClient* aClient, ImageContainer* aContainer);
+  virtual void FlushAllImages(ImageClient* aClient, ImageContainer* aContainer);
 
-  bool IPCOpen() const override { return mCanSend; }
+  bool IPCOpen() const final { return mCanSend; }
 
- private:
+ protected:
   /**
    * This must be called by the static function DeleteImageBridgeSync defined
    * in ImageBridgeChild.cpp ONLY.
@@ -218,6 +221,8 @@ class ImageBridgeChild final : public PImageBridgeChild,
                              RefPtr<ImageClient>* result,
                              CompositableType aType,
                              ImageContainer* aImageContainer);
+
+  void FlushAllImagesNow(ImageClient* aClient, ImageContainer* aContainer);
 
   void FlushAllImagesSync(SynchronousTask* aTask, ImageClient* aClient,
                           ImageContainer* aContainer);
@@ -256,7 +261,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
                                        const gfx::IntSize aSize,
                                        const TextureFlags aFlags) override;
 
-  void ReleaseCompositable(const CompositableHandle& aHandle) override;
+  virtual void ReleaseCompositable(const CompositableHandle& aHandle) override;
 
   void ForgetImageContainer(const CompositableHandle& aHandle);
 
@@ -338,7 +343,6 @@ class ImageBridgeChild final : public PImageBridgeChild,
 
   static void ShutdownSingleton();
 
- private:
   uint32_t mNamespace;
   uint32_t mCompositableNamespace;
   uint32_t mNextCompositableId = 0;
