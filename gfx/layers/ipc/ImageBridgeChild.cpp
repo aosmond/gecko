@@ -178,7 +178,7 @@ void ImageBridgeChild::NotifyNotUsed(uint64_t aTextureId,
 }
 
 void ImageBridgeChild::CancelWaitForNotifyNotUsed(uint64_t aTextureId) {
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   mTexturesWaitingNotifyNotUsed.erase(aTextureId);
 }
 
@@ -192,8 +192,7 @@ static Atomic<uint32_t> sImageBridgeChildNextID(0);
 void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
   AutoCompleteTask complete(aTask);
 
-  MOZ_ASSERT(InImageBridgeChildThread(),
-             "Should be in ImageBridgeChild thread.");
+  MOZ_ASSERT(InForwarderThread(), "Should be in ImageBridgeChild thread.");
 
   MediaSystemResourceManager::Shutdown();
 
@@ -220,8 +219,7 @@ void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
 void ImageBridgeChild::ShutdownStep2(SynchronousTask* aTask) {
   AutoCompleteTask complete(aTask);
 
-  MOZ_ASSERT(InImageBridgeChildThread(),
-             "Should be in ImageBridgeChild thread.");
+  MOZ_ASSERT(InForwarderThread(), "Should be in ImageBridgeChild thread.");
   if (!mDestroyed) {
     Close();
   }
@@ -270,7 +268,7 @@ void ImageBridgeChild::MarkShutDown() {
 void ImageBridgeChild::Connect(CompositableClient* aCompositable,
                                ImageContainer* aImageContainer) {
   MOZ_ASSERT(aCompositable);
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   MOZ_ASSERT(CanSend());
 
   uint64_t id = ++mNextCompositableId;
@@ -308,7 +306,7 @@ void ImageBridgeChild::UpdateImageClient(RefPtr<ImageContainer> aContainer) {
     return;
   }
 
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     RefPtr<Runnable> runnable =
         WrapRunnable(RefPtr<ImageBridgeChild>(this),
                      &ImageBridgeChild::UpdateImageClient, aContainer);
@@ -344,7 +342,7 @@ void ImageBridgeChild::UpdateCompositable(
     return;
   }
 
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     RefPtr<Runnable> runnable = WrapRunnable(
         RefPtr<ImageBridgeChild>(this), &ImageBridgeChild::UpdateCompositable,
         aContainer, aTextureId, aOwnerId, aSize, aFlags);
@@ -372,10 +370,9 @@ void ImageBridgeChild::UpdateCompositable(
   EndTransaction();
 }
 
-void ImageBridgeChild::FlushAllImagesSync(SynchronousTask* aTask,
-                                          ImageClient* aClient,
-                                          ImageContainer* aContainer) {
-  AutoCompleteTask complete(aTask);
+void ImageBridgeChild::FlushAllImagesNow(ImageClient* aClient,
+                                         ImageContainer* aContainer) {
+  MOZ_ASSERT(InForwarderThread());
 
   if (!CanSend()) {
     return;
@@ -390,14 +387,19 @@ void ImageBridgeChild::FlushAllImagesSync(SynchronousTask* aTask,
   EndTransaction();
 }
 
+void ImageBridgeChild::FlushAllImagesSync(SynchronousTask* aTask,
+                                          ImageClient* aClient,
+                                          ImageContainer* aContainer) {
+  AutoCompleteTask complete(aTask);
+  FlushAllImagesNow(aClient, aContainer);
+}
+
 void ImageBridgeChild::FlushAllImages(ImageClient* aClient,
                                       ImageContainer* aContainer) {
   MOZ_ASSERT(aClient);
-  MOZ_ASSERT(!InImageBridgeChildThread());
 
-  if (InImageBridgeChildThread()) {
-    NS_ERROR(
-        "ImageBridgeChild::FlushAllImages() is called on ImageBridge thread.");
+  if (InForwarderThread()) {
+    FlushAllImagesNow(aClient, aContainer);
     return;
   }
 
@@ -631,7 +633,7 @@ void ImageBridgeChild::UpdateTextureFactoryIdentifier(
 
 RefPtr<ImageClient> ImageBridgeChild::CreateImageClient(
     CompositableType aType, ImageContainer* aImageContainer) {
-  if (InImageBridgeChildThread()) {
+  if (InForwarderThread()) {
     return CreateImageClientNow(aType, aImageContainer);
   }
 
@@ -651,7 +653,7 @@ RefPtr<ImageClient> ImageBridgeChild::CreateImageClient(
 
 RefPtr<ImageClient> ImageBridgeChild::CreateImageClientNow(
     CompositableType aType, ImageContainer* aImageContainer) {
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   if (!CanSend()) {
     return nullptr;
   }
@@ -666,7 +668,7 @@ RefPtr<ImageClient> ImageBridgeChild::CreateImageClientNow(
 }
 
 bool ImageBridgeChild::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     return DispatchAllocShmemInternal(aSize, aShmem,
                                       true);  // true: unsafe
   }
@@ -678,7 +680,7 @@ bool ImageBridgeChild::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool ImageBridgeChild::AllocShmem(size_t aSize, ipc::Shmem* aShmem) {
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     return DispatchAllocShmemInternal(aSize, aShmem,
                                       false);  // false: unsafe
   }
@@ -734,7 +736,7 @@ void ImageBridgeChild::ProxyDeallocShmemNow(SynchronousTask* aTask,
 }
 
 bool ImageBridgeChild::DeallocShmem(ipc::Shmem& aShmem) {
-  if (InImageBridgeChildThread()) {
+  if (InForwarderThread()) {
     if (!CanSend()) {
       return false;
     }
@@ -898,7 +900,7 @@ bool ImageBridgeChild::CanPostTask() const {
 }
 
 void ImageBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle) {
-  if (!InImageBridgeChildThread()) {
+  if (!InForwarderThread()) {
     // If we can't post a task, then we definitely cannot send, so there's
     // no reason to queue up this send.
     if (!CanPostTask()) {
@@ -927,7 +929,7 @@ void ImageBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle) {
 }
 
 bool ImageBridgeChild::CanSend() const {
-  MOZ_ASSERT(InImageBridgeChildThread());
+  MOZ_ASSERT(InForwarderThread());
   return mCanSend;
 }
 

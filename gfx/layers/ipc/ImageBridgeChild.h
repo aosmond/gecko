@@ -161,7 +161,7 @@ class ImageBridgeChild : public PImageBridgeChild,
    */
   nsCOMPtr<nsISerialEventTarget> GetThread() const override;
 
-  base::ProcessId GetParentPid() const override { return OtherPid(); }
+  base::ProcessId GetParentPid() const final { return OtherPid(); }
 
   PTextureChild* AllocPTextureChild(
       const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
@@ -185,26 +185,27 @@ class ImageBridgeChild : public PImageBridgeChild,
       const CompositableHandle& aHandle, const uint32_t& aFrames);
 
   // Create an ImageClient from any thread.
-  RefPtr<ImageClient> CreateImageClient(CompositableType aType,
-                                        ImageContainer* aImageContainer);
+  virtual RefPtr<ImageClient> CreateImageClient(
+      CompositableType aType, ImageContainer* aImageContainer);
 
   // Create an ImageClient from the ImageBridge thread.
   RefPtr<ImageClient> CreateImageClientNow(CompositableType aType,
                                            ImageContainer* aImageContainer);
 
-  void UpdateImageClient(RefPtr<ImageContainer> aContainer);
+  virtual void UpdateImageClient(RefPtr<ImageContainer> aContainer);
 
-  void UpdateCompositable(const RefPtr<ImageContainer> aContainer,
-                          const RemoteTextureId aTextureId,
-                          const RemoteTextureOwnerId aOwnerId,
-                          const gfx::IntSize aSize, const TextureFlags aFlags);
+  virtual void UpdateCompositable(const RefPtr<ImageContainer> aContainer,
+                                  const RemoteTextureId aTextureId,
+                                  const RemoteTextureOwnerId aOwnerId,
+                                  const gfx::IntSize aSize,
+                                  const TextureFlags aFlags);
 
   /**
    * Flush all Images sent to CompositableHost.
    */
   void FlushAllImages(ImageClient* aClient, ImageContainer* aContainer);
 
-  bool IPCOpen() const override { return mCanSend; }
+  bool IPCOpen() const final { return mCanSend; }
 
  protected:
   /**
@@ -218,6 +219,8 @@ class ImageBridgeChild : public PImageBridgeChild,
                              RefPtr<ImageClient>* result,
                              CompositableType aType,
                              ImageContainer* aImageContainer);
+
+  void FlushAllImagesNow(ImageClient* aClient, ImageContainer* aContainer);
 
   void FlushAllImagesSync(SynchronousTask* aTask, ImageClient* aClient,
                           ImageContainer* aContainer);
@@ -256,7 +259,7 @@ class ImageBridgeChild : public PImageBridgeChild,
                                        const gfx::IntSize aSize,
                                        const TextureFlags aFlags) override;
 
-  void ReleaseCompositable(const CompositableHandle& aHandle) override;
+  virtual void ReleaseCompositable(const CompositableHandle& aHandle) override;
 
   void ForgetImageContainer(const CompositableHandle& aHandle);
 
