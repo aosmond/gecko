@@ -281,8 +281,6 @@ class CompositableHandle final {
   friend struct IPC::ParamTraits<mozilla::layers::CompositableHandle>;
 
  public:
-  static CompositableHandle GetNext();
-
   CompositableHandle() : mHandle(0) {}
   CompositableHandle(const CompositableHandle& aOther) = default;
   explicit CompositableHandle(uint64_t aHandle) : mHandle(aHandle) {}
@@ -295,6 +293,7 @@ class CompositableHandle final {
   bool operator!=(const CompositableHandle& aOther) const {
     return !(*this == aOther);
   }
+  uint32_t Namespace() const { return uint32_t(mHandle >> 32); }
   uint64_t Value() const { return mHandle; }
 
  private:

@@ -317,7 +317,8 @@ class ImageBridgeChild final : public PImageBridgeChild,
   wr::MaybeExternalImageId GetNextExternalImageId() override;
 
  protected:
-  explicit ImageBridgeChild(uint32_t aNamespace);
+  explicit ImageBridgeChild(uint32_t aNamespace,
+                            uint32_t aCompositableNamespace);
   bool DispatchAllocShmemInternal(size_t aSize, Shmem* aShmem, bool aUnsafe);
 
   void Bind(Endpoint<PImageBridgeChild>&& aEndpoint);
@@ -339,6 +340,8 @@ class ImageBridgeChild final : public PImageBridgeChild,
 
  private:
   uint32_t mNamespace;
+  uint32_t mCompositableNamespace;
+  uint32_t mNextCompositableId = 0;
 
   CompositableTransaction* mTxn;
 
