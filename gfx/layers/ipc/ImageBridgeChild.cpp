@@ -12,6 +12,7 @@
 #include "ImageContainer.h"     // for ImageContainer
 #include "SynchronousTask.h"
 #include "mozilla/Assertions.h"        // for MOZ_ASSERT, etc
+#include "mozilla/Atomics.h"
 #include "mozilla/Monitor.h"           // for Monitor, MonitorAutoLock
 #include "mozilla/ReentrantMonitor.h"  // for ReentrantMonitor, etc
 #include "mozilla/StaticMutex.h"
@@ -185,6 +186,7 @@ void ImageBridgeChild::CancelWaitForNotifyNotUsed(uint64_t aTextureId) {
 static StaticMutex sImageBridgeSingletonLock MOZ_UNANNOTATED;
 static StaticRefPtr<ImageBridgeChild> sImageBridgeChildSingleton;
 static StaticRefPtr<nsIThread> sImageBridgeChildThread;
+static Atomic<uint32_t> sImageBridgeChildNextID(0);
 
 // dispatched function
 void ImageBridgeChild::ShutdownStep1(SynchronousTask* aTask) {
@@ -934,12 +936,11 @@ void ImageBridgeChild::HandleFatalError(const char* aMsg) {
 }
 
 wr::MaybeExternalImageId ImageBridgeChild::GetNextExternalImageId() {
-  static uint32_t sNextID = 1;
-  ++sNextID;
-  MOZ_RELEASE_ASSERT(sNextID != UINT32_MAX);
+  uint32_t id = ++sImageBridgeChildNextID;
+  MOZ_RELEASE_ASSERT(id != UINT32_MAX);
 
   uint64_t imageId = mNamespace;
-  imageId = imageId << 32 | sNextID;
+  imageId = imageId << 32 | id;
   return Some(wr::ToExternalImageId(imageId));
 }
 

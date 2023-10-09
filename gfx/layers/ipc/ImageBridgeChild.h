@@ -104,9 +104,9 @@ bool InImageBridgeChildThread();
  * thread is not used at all (except for the very first transaction that
  * provides the CompositableHost with an AsyncID).
  */
-class ImageBridgeChild final : public PImageBridgeChild,
-                               public CompositableForwarder,
-                               public TextureForwarder {
+class ImageBridgeChild : public PImageBridgeChild,
+                         public CompositableForwarder,
+                         public TextureForwarder {
   friend class ImageContainer;
 
   typedef nsTArray<AsyncParentMessageData> AsyncParentMessageArray;
@@ -206,7 +206,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
 
   bool IPCOpen() const override { return mCanSend; }
 
- private:
+ protected:
   /**
    * This must be called by the static function DeleteImageBridgeSync defined
    * in ImageBridgeChild.cpp ONLY.
@@ -338,7 +338,6 @@ class ImageBridgeChild final : public PImageBridgeChild,
 
   static void ShutdownSingleton();
 
- private:
   uint32_t mNamespace;
   uint32_t mCompositableNamespace;
   uint32_t mNextCompositableId = 0;
