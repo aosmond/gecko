@@ -9,6 +9,7 @@
 
 #include <stddef.h>  // for size_t
 #include <stdint.h>  // for uint32_t, uint64_t
+#include <unordered_map>
 #include "CompositableTransactionParent.h"
 #include "mozilla/Assertions.h"  // for MOZ_ASSERT_HELPER2
 #include "mozilla/Attributes.h"  // for override
@@ -39,7 +40,8 @@ class ImageBridgeParent final : public PImageBridgeParent,
   typedef nsTArray<OpDestroy> OpDestroyArray;
 
  protected:
-  ImageBridgeParent(nsISerialEventTarget* aThread, ProcessId aChildProcessId);
+  ImageBridgeParent(nsISerialEventTarget* aThread, ProcessId aChildProcessId,
+                    uint32_t aCompositableNamespace);
 
  public:
   NS_IMETHOD_(MozExternalRefCountType) AddRef() override {
@@ -56,7 +58,8 @@ class ImageBridgeParent final : public PImageBridgeParent,
 
   static ImageBridgeParent* CreateSameProcess();
   static bool CreateForGPUProcess(Endpoint<PImageBridgeParent>&& aEndpoint);
-  static bool CreateForContent(Endpoint<PImageBridgeParent>&& aEndpoint);
+  static bool CreateForContent(Endpoint<PImageBridgeParent>&& aEndpoint,
+                               uint32_t aCompositableNamespace);
   static void Shutdown();
 
   IShmemAllocator* AsShmemAllocator() override { return this; }
@@ -108,12 +111,11 @@ class ImageBridgeParent final : public PImageBridgeParent,
 
   bool IsSameProcess() const override;
 
-  static already_AddRefed<ImageBridgeParent> GetInstance(ProcessId aId);
+  static already_AddRefed<ImageBridgeParent> GetInstance(
+      ProcessId aId, uint32_t aCompositableNamespace);
 
   static bool NotifyImageComposites(
       nsTArray<ImageCompositeNotificationInfo>& aNotifications);
-
-  bool UsesWebRenderTextureHostWrapper() const override { return false; }
 
   bool IPCOpen() const override { return !mClosed; }
 
@@ -128,12 +130,32 @@ class ImageBridgeParent final : public PImageBridgeParent,
   void DeferredDestroy();
   nsCOMPtr<nsISerialEventTarget> mThread;
 
+  uint32_t mCompositableNamespace;
   bool mClosed;
+
+  struct ImageBridgeMapKey {
+    base::ProcessId mPid = base::kInvalidProcessId;
+    uint32_t mCompositableNamespace = 0;
+
+    bool operator==(const ImageBridgeMapKey& aOther) const {
+      return mPid == aOther.mPid &&
+             mCompositableNamespace == aOther.mCompositableNamespace;
+    }
+
+    struct HashFn {
+      std::size_t operator()(const ImageBridgeMapKey& aKey) const {
+        return std::hash<base::ProcessId>{}(aKey.mPid) ^
+               std::hash<uint32_t>{}(aKey.mCompositableNamespace);
+      }
+    };
+  };
 
   /**
    * Map of all living ImageBridgeParent instances
    */
-  typedef std::map<base::ProcessId, ImageBridgeParent*> ImageBridgeMap;
+  typedef std::unordered_map<ImageBridgeMapKey, ImageBridgeParent*,
+                             ImageBridgeMapKey::HashFn>
+      ImageBridgeMap;
   static ImageBridgeMap sImageBridges;
 
   RefPtr<CompositorThreadHolder> mCompositorThreadHolder;

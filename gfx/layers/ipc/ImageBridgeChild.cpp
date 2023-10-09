@@ -242,13 +242,16 @@ void ImageBridgeChild::CreateImageClientSync(SynchronousTask* aTask,
   *result = CreateImageClientNow(aType, aImageContainer);
 }
 
-ImageBridgeChild::ImageBridgeChild(uint32_t aNamespace)
+ImageBridgeChild::ImageBridgeChild(uint32_t aNamespace,
+                                   uint32_t aCompositableNamespace)
     : mNamespace(aNamespace),
+      mCompositableNamespace(aCompositableNamespace),
       mCanSend(false),
       mDestroyed(false),
       mFwdTransactionId(0),
       mContainerMapLock("ImageBridgeChild.mContainerMapLock") {
   MOZ_ASSERT(mNamespace);
+  MOZ_RELEASE_ASSERT(mCompositableNamespace != UINT32_MAX);
   MOZ_ASSERT(NS_IsMainThread());
 
   mTxn = new CompositableTransaction();
@@ -268,7 +271,10 @@ void ImageBridgeChild::Connect(CompositableClient* aCompositable,
   MOZ_ASSERT(InImageBridgeChildThread());
   MOZ_ASSERT(CanSend());
 
-  CompositableHandle handle = CompositableHandle::GetNext();
+  uint64_t id = ++mNextCompositableId;
+  MOZ_RELEASE_ASSERT(id != UINT32_MAX);
+  id |= (static_cast<uint64_t>(mCompositableNamespace) << 32);
+  CompositableHandle handle(id);
 
   // ImageClient of ImageContainer provides aImageContainer.
   // But offscreen canvas does not provide it.
@@ -447,7 +453,8 @@ bool ImageBridgeChild::InitForContent(Endpoint<PImageBridgeChild>&& aEndpoint,
     sImageBridgeChildThread = thread.forget();
   }
 
-  RefPtr<ImageBridgeChild> child = new ImageBridgeChild(aNamespace);
+  RefPtr<ImageBridgeChild> child =
+      new ImageBridgeChild(aNamespace, /* aCompositableNamespace */ 0);
 
   sImageBridgeChildThread->Dispatch(NS_NewRunnableFunction(
       "layers::ImageBridgeChild::Bind",
@@ -552,7 +559,8 @@ void ImageBridgeChild::InitSameProcess(uint32_t aNamespace) {
                      "Failed to start ImageBridgeChild thread!");
   sImageBridgeChildThread = thread.forget();
 
-  RefPtr<ImageBridgeChild> child = new ImageBridgeChild(aNamespace);
+  RefPtr<ImageBridgeChild> child =
+      new ImageBridgeChild(aNamespace, /* aCompositableNamespace */ 0);
   RefPtr<ImageBridgeParent> parent = ImageBridgeParent::CreateSameProcess();
 
   RefPtr<Runnable> runnable =
@@ -580,7 +588,8 @@ void ImageBridgeChild::InitWithGPUProcess(
                      "Failed to start ImageBridgeChild thread!");
   sImageBridgeChildThread = thread.forget();
 
-  RefPtr<ImageBridgeChild> child = new ImageBridgeChild(aNamespace);
+  RefPtr<ImageBridgeChild> child =
+      new ImageBridgeChild(aNamespace, /* aCompositableNamespace */ 0);
 
   sImageBridgeChildThread->Dispatch(NS_NewRunnableFunction(
       "layers::ImageBridgeChild::Bind",
