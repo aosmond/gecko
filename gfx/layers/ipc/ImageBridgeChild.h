@@ -146,13 +146,15 @@ class ImageBridgeChild : public PImageBridgeChild,
    *
    * can be called from any thread.
    */
-  static RefPtr<ImageBridgeChild> GetSingleton();
+  static RefPtr<ImageBridgeChild> GetSingleton(bool aPreferThreadLocal = false);
 
   static void IdentifyCompositorTextureHost(
       const TextureFactoryIdentifier& aIdentifier);
 
   void BeginTransaction();
   void EndTransaction();
+
+  uint32_t GetNamespace() const { return mNamespace; }
 
   /**
    * Returns the ImageBridgeChild's thread.
@@ -203,7 +205,7 @@ class ImageBridgeChild : public PImageBridgeChild,
   /**
    * Flush all Images sent to CompositableHost.
    */
-  void FlushAllImages(ImageClient* aClient, ImageContainer* aContainer);
+  virtual void FlushAllImages(ImageClient* aClient, ImageContainer* aContainer);
 
   bool IPCOpen() const final { return mCanSend; }
 

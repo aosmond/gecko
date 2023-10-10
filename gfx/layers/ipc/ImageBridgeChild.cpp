@@ -18,6 +18,7 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPtr.h"  // for StaticRefPtr
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/gfx/Point.h"  // for IntSize
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/ipc/Endpoint.h"
@@ -25,6 +26,7 @@
 #include "mozilla/layers/CompositableClient.h"  // for CompositableChild, etc
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ISurfaceAllocator.h"  // for ISurfaceAllocator
+#include "mozilla/layers/ImageBridgeWorkerChild.h"
 #include "mozilla/layers/ImageClient.h"        // for ImageClient
 #include "mozilla/layers/LayersMessages.h"     // for CompositableOperation
 #include "mozilla/layers/TextureClient.h"      // for TextureClient
@@ -252,7 +254,6 @@ ImageBridgeChild::ImageBridgeChild(uint32_t aNamespace,
       mContainerMapLock("ImageBridgeChild.mContainerMapLock") {
   MOZ_ASSERT(mNamespace);
   MOZ_RELEASE_ASSERT(mCompositableNamespace != UINT32_MAX);
-  MOZ_ASSERT(NS_IsMainThread());
 
   mTxn = new CompositableTransaction();
 }
@@ -296,7 +297,16 @@ void ImageBridgeChild::ForgetImageContainer(const CompositableHandle& aHandle) {
 }
 
 /* static */
-RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton() {
+RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton(
+    bool aPreferThreadLocal /* = false */) {
+  if (aPreferThreadLocal) {
+    // We only create threadlocal instances for workers.
+    dom::WorkerPrivate* wp = dom::GetCurrentThreadWorkerPrivate();
+    if (wp) {
+      return ImageBridgeWorkerChild::Get(wp);
+    }
+  }
+
   StaticMutexAutoLock lock(sImageBridgeSingletonLock);
   return sImageBridgeChildSingleton;
 }
@@ -929,7 +939,6 @@ void ImageBridgeChild::ReleaseCompositable(const CompositableHandle& aHandle) {
 }
 
 bool ImageBridgeChild::CanSend() const {
-  MOZ_ASSERT(InForwarderThread());
   return mCanSend;
 }
 
