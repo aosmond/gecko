@@ -159,7 +159,7 @@ class ImageBridgeChild final : public PImageBridgeChild,
    *
    * Can be called from any thread.
    */
-  nsISerialEventTarget* GetThread() const override;
+  nsCOMPtr<nsISerialEventTarget> GetThread() const override;
 
   base::ProcessId GetParentPid() const override { return OtherPid(); }
 
