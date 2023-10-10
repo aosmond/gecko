@@ -1689,7 +1689,8 @@ bool CanvasRenderingContext2D::TrySharedTarget(
         !mAllowAcceleration || GetEffectiveWillReadFrequently());
   } else if (mOffscreenCanvas &&
              StaticPrefs::gfx_canvas_remote_allow_offscreen()) {
-    RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton();
+    RefPtr<ImageBridgeChild> imageBridge =
+        ImageBridgeChild::GetSingleton(/* aPreferThreadLocal */ true);
     if (NS_WARN_IF(!imageBridge)) {
       return false;
     }
