@@ -160,7 +160,8 @@ void ImageContainer::EnsureImageClient() {
     return;
   }
 
-  RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton();
+  RefPtr<ImageBridgeChild> imageBridge =
+      ImageBridgeChild::GetSingleton(mPreferThreadLocal);
   if (imageBridge) {
     mImageClient =
         imageBridge->CreateImageClient(CompositableType::IMAGE, this);
@@ -174,16 +175,17 @@ void ImageContainer::EnsureImageClient() {
   }
 }
 
-ImageContainer::ImageContainer(Mode flag)
+ImageContainer::ImageContainer(ImageContainerFlags aFlags)
     : mRecursiveMutex("ImageContainer.mRecursiveMutex"),
       mGenerationCounter(++sGenerationCounter),
       mPaintCount(0),
       mDroppedImageCount(0),
       mImageFactory(new ImageFactory()),
       mRecycleBin(new BufferRecycleBin()),
-      mIsAsync(flag == ASYNCHRONOUS),
+      mIsAsync(!!(aFlags & ImageContainerFlags::Asynchronous)),
+      mPreferThreadLocal(!!(aFlags & ImageContainerFlags::PreferThreadLocal)),
       mCurrentProducerID(-1) {
-  if (flag == ASYNCHRONOUS) {
+  if (mIsAsync) {
     mNotifyCompositeListener = new ImageContainerListener(this);
     EnsureImageClient();
   }
@@ -197,6 +199,7 @@ ImageContainer::ImageContainer(const CompositableHandle& aHandle)
       mImageFactory(nullptr),
       mRecycleBin(nullptr),
       mIsAsync(true),
+      mPreferThreadLocal(false),
       mAsyncContainerHandle(aHandle),
       mCurrentProducerID(-1) {
   MOZ_ASSERT(mAsyncContainerHandle);
@@ -208,7 +211,7 @@ ImageContainer::~ImageContainer() {
   }
   if (mAsyncContainerHandle) {
     if (RefPtr<ImageBridgeChild> imageBridge =
-            ImageBridgeChild::GetSingleton()) {
+            ImageBridgeChild::GetSingleton(mPreferThreadLocal)) {
       imageBridge->ForgetImageContainer(mAsyncContainerHandle);
     }
   }
@@ -237,7 +240,6 @@ Maybe<SurfaceDescriptor> Image::GetDescFromTexClient(
 
 already_AddRefed<ImageContainerListener>
 ImageContainer::GetImageContainerListener() const {
-  MOZ_ASSERT(InImageBridgeChildThread());
   return do_AddRef(mNotifyCompositeListener);
 }
 
@@ -323,7 +325,7 @@ void ImageContainer::SetCurrentImages(const nsTArray<NonOwningImage>& aImages) {
   RecursiveMutexAutoLock lock(mRecursiveMutex);
   if (mIsAsync) {
     if (RefPtr<ImageBridgeChild> imageBridge =
-            ImageBridgeChild::GetSingleton()) {
+            ImageBridgeChild::GetSingleton(mPreferThreadLocal)) {
       imageBridge->UpdateImageClient(this);
     }
   }
@@ -339,7 +341,7 @@ void ImageContainer::ClearAllImages() {
     // Let ImageClient release all TextureClients. This doesn't return
     // until ImageBridge has called ClearCurrentImageFromImageBridge.
     if (RefPtr<ImageBridgeChild> imageBridge =
-            ImageBridgeChild::GetSingleton()) {
+            ImageBridgeChild::GetSingleton(mPreferThreadLocal)) {
       imageBridge->FlushAllImages(imageClient, this);
     }
     return;
