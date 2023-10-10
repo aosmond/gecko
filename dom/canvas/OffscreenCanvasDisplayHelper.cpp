@@ -60,7 +60,9 @@ void OffscreenCanvasDisplayHelper::UpdateContext(
     OffscreenCanvas* aOffscreenCanvas, RefPtr<ThreadSafeWorkerRef>&& aWorkerRef,
     CanvasContextType aType, const Maybe<int32_t>& aChildId) {
   RefPtr<layers::ImageContainer> imageContainer =
-      MakeRefPtr<layers::ImageContainer>(layers::ImageContainer::ASYNCHRONOUS);
+      MakeRefPtr<layers::ImageContainer>(
+          layers::ImageContainerFlags::Asynchronous |
+          layers::ImageContainerFlags::PreferThreadLocal);
 
   MutexAutoLock lock(mMutex);
 
@@ -182,7 +184,8 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
       break;
   }
 
-  auto imageBridge = layers::ImageBridgeChild::GetSingleton();
+  auto imageBridge =
+      layers::ImageBridgeChild::GetSingleton(/* aPreferThreadLocal */ true);
   if (!imageBridge) {
     return false;
   }

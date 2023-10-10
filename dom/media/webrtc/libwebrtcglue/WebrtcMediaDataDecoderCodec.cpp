@@ -20,7 +20,7 @@ WebrtcMediaDataDecoder::WebrtcMediaDataDecoder(nsACString& aCodecMimeType,
       mTaskQueue(TaskQueue::Create(do_AddRef(mThreadPool),
                                    "WebrtcMediaDataDecoder::mTaskQueue")),
       mImageContainer(MakeAndAddRef<layers::ImageContainer>(
-          layers::ImageContainer::ASYNCHRONOUS)),
+          layers::ImageContainerFlags::Asynchronous)),
       mFactory(new PDMFactory()),
       mTrackType(TrackInfo::kUndefinedTrack),
       mCodecType(aCodecMimeType),
