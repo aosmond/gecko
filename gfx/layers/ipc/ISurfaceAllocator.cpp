@@ -86,7 +86,7 @@ bool FixedSizeSmallShmemSectionAllocator::AllocShmemSection(
 
   // We may be called off the owning IPDL thread. This should generally only
   // happen if mShmProvider is ImageBridgeChild.
-  if (nsISerialEventTarget* target = mShmProvider->GetThread()) {
+  if (nsCOMPtr<nsISerialEventTarget> target = mShmProvider->GetThread()) {
     if (!target->IsOnCurrentThread()) {
       bool success = false;
       SynchronousTask task(
@@ -208,7 +208,7 @@ void FixedSizeSmallShmemSectionAllocator::DeallocShmemSection(
 
   // We may be called off the owning IPDL thread. This should generally only
   // happen if mShmProvider is ImageBridgeChild.
-  if (nsISerialEventTarget* target = mShmProvider->GetThread()) {
+  if (nsCOMPtr<nsISerialEventTarget> target = mShmProvider->GetThread()) {
     if (!target->IsOnCurrentThread()) {
       SynchronousTask task(
           "FixedSizeSmallShmemSectionAllocator::DeallocShmemSection");
@@ -233,7 +233,7 @@ void FixedSizeSmallShmemSectionAllocator::DeallocShmemSection(
 void FixedSizeSmallShmemSectionAllocator::ShrinkShmemSectionHeap() {
   // We may be called off the owning IPDL thread. This should generally only
   // happen if mShmProvider is ImageBridgeChild.
-  if (nsISerialEventTarget* target = mShmProvider->GetThread()) {
+  if (nsCOMPtr<nsISerialEventTarget> target = mShmProvider->GetThread()) {
     if (!target->IsOnCurrentThread()) {
       SynchronousTask task(
           "FixedSizeSmallShmemSectionAllocator::ShrinkShmemSectionHeap");
