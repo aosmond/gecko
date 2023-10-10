@@ -465,12 +465,12 @@ void DeallocateTextureClient(TextureDeallocParams params) {
 
   if (params.allocator) {
     ipdlThread = params.allocator->GetThread();
-    if (!ipdlThread) {
+    /*if (!ipdlThread) {
       // An allocator with no thread means we are too late in the shutdown
       // sequence.
       gfxCriticalError() << "Texture deallocated too late during shutdown";
       return;
-    }
+    }*/
   }
 
   // First make sure that the work is happening on the IPDL thread.
