@@ -45,7 +45,7 @@ void VideoFrame::TakeFrom(VideoFrame* aFrame) {
 already_AddRefed<Image> VideoFrame::CreateBlackImage(
     const gfx::IntSize& aSize) {
   RefPtr<ImageContainer> container =
-      MakeAndAddRef<ImageContainer>(ImageContainer::ASYNCHRONOUS);
+      MakeAndAddRef<ImageContainer>(ImageContainerFlags::Asynchronous);
   RefPtr<PlanarYCbCrImage> image = container->CreatePlanarYCbCrImage();
   if (!image) {
     return nullptr;

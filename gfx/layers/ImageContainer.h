@@ -15,6 +15,7 @@
 #include "mozilla/RecursiveMutex.h"  // for RecursiveMutex, etc
 #include "mozilla/ThreadSafeWeakPtr.h"
 #include "mozilla/TimeStamp.h"  // for TimeStamp
+#include "mozilla/TypedEnumBits.h"
 #include "mozilla/gfx/Point.h"  // For IntSize
 #include "mozilla/gfx/Rect.h"
 #include "mozilla/gfx/Types.h"           // For ColorDepth
@@ -270,6 +271,14 @@ class ImageContainerListener final {
   ImageContainer* mImageContainer MOZ_GUARDED_BY(mLock);
 };
 
+enum class ImageContainerFlags : uint8_t {
+  None = 0,
+  Asynchronous = (1 << 0),
+  PreferThreadLocal = (1 << 1),
+};
+
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(ImageContainerFlags);
+
 /**
  * A class that manages Images for an ImageLayer. The only reason
  * we need a separate class here is that ImageLayers aren't threadsafe
@@ -298,11 +307,10 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
  public:
   MOZ_DECLARE_REFCOUNTED_TYPENAME(ImageContainer)
 
-  enum Mode { SYNCHRONOUS = 0x0, ASYNCHRONOUS = 0x01 };
-
   static const uint64_t sInvalidAsyncContainerId = 0;
 
-  explicit ImageContainer(ImageContainer::Mode flag = SYNCHRONOUS);
+  explicit ImageContainer(
+      ImageContainerFlags aFlags = ImageContainerFlags::None);
 
   /**
    * Create ImageContainer just to hold another ASYNCHRONOUS ImageContainer's
@@ -641,6 +649,7 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
   RefPtr<ImageClient> mImageClient MOZ_GUARDED_BY(mRecursiveMutex);
 
   const bool mIsAsync;
+  const bool mPreferThreadLocal;
   CompositableHandle mAsyncContainerHandle MOZ_GUARDED_BY(mRecursiveMutex);
 
   // ProducerID for last current image(s)
