@@ -168,12 +168,18 @@ already_AddRefed<TextureClient> TextureClientRecycleAllocator::CreateOrRecycle(
       if (!textureHolder->GetTextureClient()->GetAllocator()->IPCOpen() ||
           !aHelper.IsCompatible(textureHolder->GetTextureClient())) {
         // Release TextureClient.
-        RefPtr<Runnable> task =
-            new TextureClientReleaseTask(textureHolder->GetTextureClient());
-        textureHolder->ClearTextureClient();
-        textureHolder = nullptr;
-        mKnowsCompositor->GetTextureForwarder()->GetThread()->Dispatch(
-            task.forget());
+        nsCOMPtr<nsISerialEventTarget> target =
+            mKnowsCompositor->GetTextureForwarder()->GetThread();
+        if (target) {
+          auto task = MakeRefPtr<TextureClientReleaseTask>(
+              textureHolder->GetTextureClient());
+          textureHolder->ClearTextureClient();
+          textureHolder = nullptr;
+          target->Dispatch(task.forget());
+        } else {
+          textureHolder->ClearTextureClient();
+          textureHolder = nullptr;
+        }
       } else {
         textureHolder->GetTextureClient()->RecycleTexture(
             aHelper.mTextureFlags);
