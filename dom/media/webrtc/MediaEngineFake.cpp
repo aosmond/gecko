@@ -301,7 +301,7 @@ nsresult MediaEngineFakeVideoSource::Start() {
 
   if (!mImageContainer) {
     mImageContainer = MakeAndAddRef<layers::ImageContainer>(
-        layers::ImageContainer::ASYNCHRONOUS);
+        layers::ImageContainerFlags::Asynchronous);
   }
 
   // Start timer for subsequent frames

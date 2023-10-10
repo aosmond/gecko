@@ -53,7 +53,7 @@ DecoderAgent::DecoderAgent(Id aId, UniquePtr<TrackInfo>&& aInfo)
       mOwnerThread(GetCurrentSerialEventTarget()),
       mPDMFactory(MakeRefPtr<PDMFactory>()),
       mImageContainer(MakeAndAddRef<layers::ImageContainer>(
-          layers::ImageContainer::ASYNCHRONOUS)),
+          layers::ImageContainerFlags::Asynchronous)),
       mDecoder(nullptr),
       mState(State::Unconfigured) {
   MOZ_ASSERT(mInfo);
