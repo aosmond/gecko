@@ -1414,7 +1414,7 @@ class MediaPipelineReceiveVideo::PipelineListener
                    PrincipalHandle aPrincipalHandle, PrincipalPrivacy aPrivacy)
       : GenericReceiveListener(std::move(aSource), std::move(aTrackingId)),
         mImageContainer(
-            MakeAndAddRef<ImageContainer>(ImageContainer::ASYNCHRONOUS)),
+            MakeAndAddRef<ImageContainer>(ImageContainerFlags::Asynchronous)),
         mMutex("MediaPipelineReceiveVideo::PipelineListener::mMutex"),
         mPrincipalHandle(std::move(aPrincipalHandle)),
         mPrivacy(aPrivacy) {}
