@@ -118,7 +118,7 @@ void ImageBridgeWorkerChild::ActorDestroy(ActorDestroyReason aReason) {
 
 nsCOMPtr<nsISerialEventTarget> ImageBridgeWorkerChild::GetThread() const {
   if (!mWorkerRef) {
-    return nullptr;
+    return GetCurrentSerialEventTarget();
   }
 
   MOZ_RELEASE_ASSERT(mWorkerRef->Private()->IsOnCurrentThread());
