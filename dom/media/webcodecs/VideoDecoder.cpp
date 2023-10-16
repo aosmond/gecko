@@ -318,7 +318,7 @@ static Maybe<VideoPixelFormat> GuessPixelFormat(layers::Image* aImage) {
     }
     if (layers::GPUVideoImage* image = aImage->AsGPUVideoImage()) {
       RefPtr<layers::ImageBridgeChild> imageBridge =
-          layers::ImageBridgeChild::GetSingleton();
+          layers::ImageBridgeChild::GetTrueSingleton();
       layers::TextureClient* texture = image->GetTextureClient(imageBridge);
       if (NS_WARN_IF(!texture)) {
         return Nothing();

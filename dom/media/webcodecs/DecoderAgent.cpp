@@ -90,7 +90,7 @@ RefPtr<DecoderAgent::ConfigurePromise> DecoderAgent::Configure(
   SetState(State::Configuring);
 
   RefPtr<layers::KnowsCompositor> knowsCompositor =
-      layers::ImageBridgeChild::GetSingleton();
+      layers::ImageBridgeChild::GetTrueSingleton();
   // Bug 1839993: FFmpegDataDecoder ignores all decode errors when draining so
   // WPT cannot receive error callbacks. Forcibly enable LowLatency for now to
   // get the decoded results immediately to avoid this.

@@ -297,6 +297,12 @@ void ImageBridgeChild::ForgetImageContainer(const CompositableHandle& aHandle) {
 }
 
 /* static */
+RefPtr<ImageBridgeChild> ImageBridgeChild::GetTrueSingleton() {
+  StaticMutexAutoLock lock(sImageBridgeSingletonLock);
+  return sImageBridgeChildSingleton;
+}
+
+/* static */
 RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton(
     bool aPreferThreadLocal /* = false */) {
   if (aPreferThreadLocal) {
@@ -307,6 +313,7 @@ RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton(
     }
   }
 
+  MOZ_RELEASE_ASSERT(!dom::GetCurrentThreadWorkerPrivate());
   StaticMutexAutoLock lock(sImageBridgeSingletonLock);
   return sImageBridgeChildSingleton;
 }
