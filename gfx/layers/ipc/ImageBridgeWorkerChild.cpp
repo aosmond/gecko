@@ -51,7 +51,8 @@ void ImageBridgeWorkerChild::ActorDestroy(ActorDestroyReason aReason) {
     return bridgeWeak;
   }
 
-  RefPtr<ImageBridgeChild> bridgeSingleton = ImageBridgeChild::GetSingleton();
+  RefPtr<ImageBridgeChild> bridgeSingleton =
+      ImageBridgeChild::GetTrueSingleton();
   if (NS_WARN_IF(!bridgeSingleton)) {
     return nullptr;
   }

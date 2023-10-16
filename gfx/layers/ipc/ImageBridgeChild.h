@@ -147,6 +147,7 @@ class ImageBridgeChild : public PImageBridgeChild,
    * can be called from any thread.
    */
   static RefPtr<ImageBridgeChild> GetSingleton(bool aPreferThreadLocal = false);
+  static RefPtr<ImageBridgeChild> GetTrueSingleton();
 
   static void IdentifyCompositorTextureHost(
       const TextureFactoryIdentifier& aIdentifier);
