@@ -360,7 +360,6 @@ APZHandledResult::APZHandledResult(APZHandledPlace aPlace,
                                    const AsyncPanZoomController* aTarget,
                                    bool aPopulateDirectionsForUnhandled)
     : mPlace(aPlace) {
-  MOZ_ASSERT(aTarget);
   switch (aPlace) {
     case APZHandledPlace::Unhandled:
       if (aTarget && aPopulateDirectionsForUnhandled) {
@@ -375,8 +374,8 @@ APZHandledResult::APZHandledResult(APZHandledPlace aPlace,
       }
       break;
     case APZHandledPlace::HandledByRoot: {
-      MOZ_ASSERT(aTarget->IsRootContent());
       if (aTarget) {
+        MOZ_ASSERT(aTarget->IsRootContent());
         mScrollableDirections = aTarget->ScrollableDirections();
         mOverscrollDirections = aTarget->GetAllowedHandoffDirections();
       }
