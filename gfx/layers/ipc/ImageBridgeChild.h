@@ -313,6 +313,9 @@ class ImageBridgeChild : public PImageBridgeChild,
       LayersBackend aLayersBackend, TextureFlags aFlags, uint64_t aSerial,
       wr::MaybeExternalImageId& aExternalImageId) override;
 
+  already_AddRefed<TextureReadLock> CreateBlockingTextureReadLock() override;
+  already_AddRefed<TextureReadLock> CreateNonBlockingTextureReadLock() override;
+
   bool IsSameProcess() const override;
 
   void UpdateFwdTransactionId() override { ++mFwdTransactionId; }

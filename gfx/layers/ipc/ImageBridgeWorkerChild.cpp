@@ -169,6 +169,26 @@ void ImageBridgeWorkerChild::FlushAllImages(ImageClient* aClient,
   ImageBridgeChild::FlushAllImagesNow(aClient, aContainer);
 }
 
+already_AddRefed<TextureReadLock>
+ImageBridgeWorkerChild::CreateBlockingTextureReadLock() {
+  if (!mWorkerRef) {
+    return nullptr;
+  }
+
+  MOZ_RELEASE_ASSERT(mWorkerRef->Private()->IsOnCurrentThread());
+  return TextureForwarder::CreateBlockingTextureReadLock();
+}
+
+already_AddRefed<TextureReadLock>
+ImageBridgeWorkerChild::CreateNonBlockingTextureReadLock() {
+  if (!mWorkerRef) {
+    return nullptr;
+  }
+
+  MOZ_RELEASE_ASSERT(mWorkerRef->Private()->IsOnCurrentThread());
+  return TextureForwarder::CreateNonBlockingTextureReadLock();
+}
+
 void ImageBridgeWorkerChild::ReleaseCompositable(
     const CompositableHandle& aHandle) {
   if (!mWorkerRef) {
