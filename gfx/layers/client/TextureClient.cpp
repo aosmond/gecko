@@ -698,13 +698,20 @@ void TextureClient::Unlock() {
 }
 
 void TextureClient::EnableReadLock() {
+  if (mReadLock) {
+    return;
+  }
+
+  TextureForwarder* fwd = mAllocator->GetTextureForwarder();
+  if (NS_WARN_IF(!fwd)) {
+    gfxCriticalError() << "TextureClient::EnableReadLock no forwarder";
+    return;
+  }
+
+  mReadLock = fwd->CreateNonBlockingTextureReadLock();
   if (!mReadLock) {
-    if (mAllocator->GetTileLockAllocator()) {
-      mReadLock = NonBlockingTextureReadLock::Create(mAllocator);
-    } else {
-      // IPC is down
-      gfxCriticalError() << "TextureClient::EnableReadLock IPC is down";
-    }
+    // IPC is down
+    gfxCriticalError() << "TextureClient::EnableReadLock IPC is down";
   }
 }
 
@@ -1517,6 +1524,29 @@ class CrossProcessSemaphoreReadLock : public TextureReadLock {
 };
 
 // static
+already_AddRefed<TextureReadLock> TextureClient::CreateBlockingReadLock(
+    TextureForwarder* aForwarder) {
+  if (!aForwarder) {
+    return nullptr;
+  }
+  return MakeAndAddRef<CrossProcessSemaphoreReadLock>();
+}
+
+// static
+already_AddRefed<TextureReadLock> TextureClient::CreateNonBlockingReadLock(
+    TextureForwarder* aForwarder) {
+  if (!aForwarder || !aForwarder->GetTileLockAllocator()) {
+    return nullptr;
+  }
+  if (aForwarder->IsSameProcess()) {
+    // If our compositor is in the same process, we can save some cycles by not
+    // using shared memory.
+    return MakeAndAddRef<MemoryTextureReadLock>();
+  }
+  return MakeAndAddRef<ShmemTextureReadLock>(aForwarder);
+}
+
+// static
 already_AddRefed<TextureReadLock> TextureReadLock::Deserialize(
     ReadLockDescriptor&& aDescriptor, ISurfaceAllocator* aAllocator) {
   switch (aDescriptor.type()) {
@@ -1691,9 +1721,17 @@ bool CrossProcessSemaphoreReadLock::Serialize(ReadLockDescriptor& aOutput,
 }
 
 void TextureClient::EnableBlockingReadLock() {
-  if (!mReadLock) {
-    mReadLock = new CrossProcessSemaphoreReadLock();
+  if (mReadLock) {
+    return;
   }
+
+  TextureForwarder* fwd = mAllocator->GetTextureForwarder();
+  if (NS_WARN_IF(!fwd)) {
+    gfxCriticalError() << "TextureClient::EnableReadLock no forwarder";
+    return;
+  }
+
+  mReadLock = fwd->CreateBlockingTextureReadLock();
 }
 
 bool UpdateYCbCrTextureClient(TextureClient* aTexture,

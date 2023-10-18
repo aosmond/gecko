@@ -98,6 +98,7 @@ class CompositorBridgeChild final : public PCompositorBridgeChild,
       const SurfaceDescriptor& aSharedData, ReadLockDescriptor&& aReadLock,
       LayersBackend aLayersBackend, TextureFlags aFlags, uint64_t aSerial,
       wr::MaybeExternalImageId& aExternalImageId) override;
+  TextureForwarder* GetTextureForwarder() override { return this; }
 
   void EndCanvasTransaction();
 

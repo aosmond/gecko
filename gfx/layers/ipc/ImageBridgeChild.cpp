@@ -692,6 +692,48 @@ RefPtr<ImageClient> ImageBridgeChild::CreateImageClientNow(
   return client;
 }
 
+already_AddRefed<TextureReadLock>
+ImageBridgeChild::CreateBlockingTextureReadLock() {
+  if (InForwarderThread()) {
+    return TextureForwarder::CreateBlockingTextureReadLock();
+  }
+
+  SynchronousTask task("CreateBlockingTextureReadLock Lock");
+
+  RefPtr<TextureReadLock> result = nullptr;
+
+  sImageBridgeChildThread->Dispatch(NS_NewRunnableFunction(
+      "layers::ImageBridgeChild::CreateBlockingTextureReadLock",
+      [&, self = RefPtr{this}]() {
+        result = TextureForwarder::CreateBlockingTextureReadLock();
+      }));
+
+  task.Wait();
+
+  return result.forget();
+}
+
+already_AddRefed<TextureReadLock>
+ImageBridgeChild::CreateNonBlockingTextureReadLock() {
+  if (InForwarderThread()) {
+    return TextureForwarder::CreateNonBlockingTextureReadLock();
+  }
+
+  SynchronousTask task("CreateNonBlockingTextureReadLock Lock");
+
+  RefPtr<TextureReadLock> result = nullptr;
+
+  sImageBridgeChildThread->Dispatch(NS_NewRunnableFunction(
+      "layers::ImageBridgeChild::CreateNonBlockingTextureReadLock",
+      [&, self = RefPtr{this}]() {
+        result = TextureForwarder::CreateNonBlockingTextureReadLock();
+      }));
+
+  task.Wait();
+
+  return result.forget();
+}
+
 bool ImageBridgeChild::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
   if (!InForwarderThread()) {
     return DispatchAllocShmemInternal(aSize, aShmem,
