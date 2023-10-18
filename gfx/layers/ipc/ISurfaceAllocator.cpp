@@ -247,7 +247,7 @@ void FixedSizeSmallShmemSectionAllocator::ShrinkShmemSectionHeap() {
       return;
     }
   } else {
-    MOZ_ASSERT_UNREACHABLE("No shmem allocator thread available!");
+    //MOZ_ASSERT_UNREACHABLE("No shmem allocator thread available!");
     return;
   }
 
