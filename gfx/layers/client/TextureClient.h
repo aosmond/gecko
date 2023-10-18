@@ -489,6 +489,11 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
    */
   static already_AddRefed<TextureClient> AsTextureClient(PTextureChild* actor);
 
+  static already_AddRefed<TextureReadLock> CreateBlockingReadLock(
+      TextureForwarder* aForwarder);
+  static already_AddRefed<TextureReadLock> CreateNonBlockingReadLock(
+      TextureForwarder* aForwarder);
+
   /**
    * TextureFlags contain important information about various aspects
    * of the texture, like how its liferime is managed, and how it

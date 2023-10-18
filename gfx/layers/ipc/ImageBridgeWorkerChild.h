@@ -44,6 +44,9 @@ class ImageBridgeWorkerChild final : public ImageBridgeChild {
   void FlushAllImages(ImageClient* aClient,
                       ImageContainer* aContainer) override;
 
+  already_AddRefed<TextureReadLock> CreateBlockingTextureReadLock() override;
+  already_AddRefed<TextureReadLock> CreateNonBlockingTextureReadLock() override;
+
  protected:
   ~ImageBridgeWorkerChild() override;
   void Destroy();
