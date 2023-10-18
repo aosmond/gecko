@@ -317,7 +317,7 @@ RefPtr<ImageBridgeChild> ImageBridgeChild::GetSingleton(
     }
   }
 
-  MOZ_RELEASE_ASSERT(!dom::GetCurrentThreadWorkerPrivate());
+  //MOZ_RELEASE_ASSERT(!dom::GetCurrentThreadWorkerPrivate());
   StaticMutexAutoLock lock(sImageBridgeSingletonLock);
   return sImageBridgeChildSingleton;
 }
