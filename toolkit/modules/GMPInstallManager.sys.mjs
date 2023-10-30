@@ -12,7 +12,8 @@ import {
   GMPPrefs,
   GMPUtils,
   GMP_PLUGIN_IDS,
-  WIDEVINE_ID,
+  WIDEVINE_L1_ID,
+  WIDEVINE_L3_ID,
 } from "resource://gre/modules/GMPUtils.sys.mjs";
 
 import { ProductAddonChecker } from "resource://gre/modules/addons/ProductAddonChecker.sys.mjs";
@@ -41,6 +42,10 @@ const LOCAL_GMP_SOURCES = [
     id: "gmp-widevinecdm",
     src: "chrome://global/content/gmp-sources/widevinecdm.json",
   },
+  {
+    id: "gmp-widevinecdm-l1",
+    src: "chrome://global/content/gmp-sources/widevinecdm_l1.json",
+  },
 ];
 
 function downloadJSON(uri) {
@@ -67,10 +72,14 @@ function downloadJSON(uri) {
  * If downloading from the network fails (AUS server is down),
  * load the sources from local build configuration.
  */
-function downloadLocalConfig() {
+function downloadLocalConfig(sources) {
+  if (!sources.length) {
+    return Promise.resolve({ addons: [] });
+  }
+
   let log = getScopedLogger("GMPInstallManager.downloadLocalConfig");
   return Promise.all(
-    LOCAL_GMP_SOURCES.map(conf => {
+    sources.map(conf => {
       return downloadJSON(conf.src).then(addons => {
         let platforms = addons.vendors[conf.id].platforms;
         let target = Services.appinfo.OS + "_" + lazy.UpdateUtils.ABI;
@@ -100,18 +109,14 @@ function downloadLocalConfig() {
           hashValue: details.hashValue,
           version: addons.vendors[conf.id].version,
           size: details.filesize,
+          usedFallback: true,
         };
       });
     })
   ).then(addons => {
     // Some filters may not match this platform so
     // filter those out
-    addons = addons.filter(x => x !== false);
-
-    return {
-      usedFallback: true,
-      addons,
-    };
+    return { addons: addons.filter(x => x !== false) };
   });
 }
 
@@ -342,7 +347,7 @@ GMPInstallManager.prototype = {
         } else {
           this.recordUpdateXmlTelemetryForCertPinning(false, err);
         }
-        return downloadLocalConfig();
+        return downloadLocalConfig(LOCAL_GMP_SOURCES);
       });
 
     addonPromise.then(
@@ -453,10 +458,30 @@ GMPInstallManager.prototype = {
       }
     }
 
+    let forcedSources = LOCAL_GMP_SOURCES.filter(function (gmpSource) {
+      return GMPPrefs.getBool(
+        GMPPrefs.KEY_PLUGIN_FORCE_INSTALL,
+        false,
+        gmpSource.id
+      );
+    });
+
     try {
-      let { usedFallback, addons } = await this.checkForAddons();
+      let { addons } = await this.checkForAddons();
       this._updateLastCheck();
       log.info("Found " + addons.length + " addons advertised.");
+
+      let forcedConfigs = await downloadLocalConfig(
+        forcedSources.filter(function (gmpSource) {
+          return !addons.find(gmpAddon => gmpAddon.id == gmpSource.id);
+        })
+      );
+      let forcedAddons = forcedConfigs.addons.map(
+        config => new GMPAddon(config)
+      );
+      log.info("Forced " + forcedAddons.length + " addons.");
+      addons = addons.concat(forcedAddons);
+
       let addonsToInstall = addons.filter(function (gmpAddon) {
         log.info("Found addon: " + gmpAddon.toString());
 
@@ -477,7 +502,7 @@ GMPInstallManager.prototype = {
 
         // Do not install from fallback if already installed as it
         // may be a downgrade
-        if (usedFallback && gmpAddon.isUpdate) {
+        if (gmpAddon.usedFallback && gmpAddon.isUpdate) {
           log.info(
             "Addon |" +
               gmpAddon.id +
@@ -579,6 +604,7 @@ GMPInstallManager.prototype = {
  */
 export function GMPAddon(addon) {
   let log = getScopedLogger("GMPAddon.constructor");
+  this.usedFallback = false;
   for (let name of Object.keys(addon)) {
     this[name] = addon[name];
   }
@@ -629,7 +655,7 @@ GMPAddon.prototype = {
     );
   },
   get isEME() {
-    return this.id == WIDEVINE_ID;
+    return this.id == WIDEVINE_L1_ID || this.id == WIDEVINE_L3_ID;
   },
   get isOpenH264() {
     return this.id == "gmp-gmpopenh264";
@@ -681,6 +707,7 @@ GMPExtractor.prototype = {
       worker.terminate();
       if (msg.data.result != "success") {
         log.error("Failed to extract zip file: " + zipURI);
+        log.error("Exception: " + msg.data.exception);
         return deferredPromise.reject({
           target: this,
           status: msg.data.exception,
