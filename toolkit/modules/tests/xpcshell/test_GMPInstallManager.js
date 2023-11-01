@@ -128,7 +128,9 @@ add_test(function test_checkForAddons_uninitWithoutInstall() {
     () => installManager.checkForAddons()
   );
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -145,7 +147,9 @@ add_test(function test_checkForAddons_noResponse() {
     () => installManager.checkForAddons()
   );
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -161,7 +165,7 @@ add_task(async function test_checkForAddons_noAddonsElement() {
     myRequest,
     () => installManager.checkForAddons()
   );
-  Assert.equal(res.addons.length, 0);
+  Assert.equal(res.length, 0);
   installManager.uninit();
 });
 
@@ -175,7 +179,7 @@ add_task(async function test_checkForAddons_emptyAddonsElement() {
     myRequest,
     () => installManager.checkForAddons()
   );
-  Assert.equal(res.addons.length, 0);
+  Assert.equal(res.length, 0);
   installManager.uninit();
 });
 
@@ -193,7 +197,9 @@ add_test(function test_checkForAddons_wrongResponseXML() {
     () => installManager.checkForAddons()
   );
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -210,7 +216,9 @@ add_test(function test_checkForAddons_404Error() {
     () => installManager.checkForAddons()
   );
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -239,7 +247,9 @@ add_test(function test_checkForAddons_abort() {
   }, 100);
 
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -259,7 +269,9 @@ add_test(function test_checkForAddons_timeout() {
     () => installManager.checkForAddons()
   );
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -292,7 +304,9 @@ add_test(function test_checkForAddons_bad_ssl() {
     () => installManager.checkForAddons()
   );
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     if (PREF_KEY_URL_OVERRIDE_BACKUP) {
       Preferences.set(GMPPrefs.KEY_URL_OVERRIDE, PREF_KEY_URL_OVERRIDE_BACKUP);
@@ -316,7 +330,9 @@ add_test(function test_checkForAddons_notXML() {
   );
 
   promise.then(res => {
-    Assert.ok(res.usedFallback);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     installManager.uninit();
     run_next_test();
   });
@@ -343,8 +359,8 @@ add_task(async function test_checkForAddons_singleAddon() {
     myRequest,
     () => installManager.checkForAddons()
   );
-  Assert.equal(res.addons.length, 1);
-  let gmpAddon = res.addons[0];
+  Assert.equal(res.length, 1);
+  let gmpAddon = res[0];
   Assert.equal(gmpAddon.id, "gmp-gmpopenh264");
   Assert.equal(gmpAddon.URL, "http://127.0.0.1:8011/gmp-gmpopenh264-1.1.zip");
   Assert.equal(gmpAddon.hashFunction, "sha256");
@@ -381,8 +397,8 @@ add_task(async function test_checkForAddons_singleAddonWithSize() {
     myRequest,
     () => installManager.checkForAddons()
   );
-  Assert.equal(res.addons.length, 1);
-  let gmpAddon = res.addons[0];
+  Assert.equal(res.length, 1);
+  let gmpAddon = res[0];
   Assert.equal(gmpAddon.id, "openh264-plugin-no-at-symbol");
   Assert.equal(gmpAddon.URL, "http://127.0.0.1:8011/gmp-gmpopenh264-1.1.zip");
   Assert.equal(gmpAddon.hashFunction, "sha256");
@@ -457,8 +473,8 @@ add_task(
       myRequest,
       () => installManager.checkForAddons()
     );
-    Assert.equal(res.addons.length, 7);
-    let gmpAddon = res.addons[0];
+    Assert.equal(res.length, 7);
+    let gmpAddon = res[0];
     Assert.equal(gmpAddon.id, "gmp-gmpopenh264");
     Assert.equal(gmpAddon.URL, "http://127.0.0.1:8011/gmp-gmpopenh264-1.1.zip");
     Assert.equal(gmpAddon.hashFunction, "sha256");
@@ -470,7 +486,7 @@ add_task(
     Assert.ok(gmpAddon.isValid);
     Assert.ok(!gmpAddon.isInstalled);
 
-    gmpAddon = res.addons[1];
+    gmpAddon = res[1];
     Assert.equal(gmpAddon.id, "NOT-gmp-gmpopenh264");
     Assert.equal(
       gmpAddon.URL,
@@ -485,9 +501,9 @@ add_task(
     Assert.ok(gmpAddon.isValid);
     Assert.ok(!gmpAddon.isInstalled);
 
-    for (let i = 2; i < res.addons.length; i++) {
-      Assert.ok(!res.addons[i].isValid);
-      Assert.ok(!res.addons[i].isInstalled);
+    for (let i = 2; i < res.length; i++) {
+      Assert.ok(!res[i].isValid);
+      Assert.ok(!res[i].isInstalled);
     }
     installManager.uninit();
   }
@@ -518,8 +534,8 @@ add_task(async function test_checkForAddons_updatesWithAddons() {
     myRequest,
     () => installManager.checkForAddons()
   );
-  Assert.equal(res.addons.length, 1);
-  let gmpAddon = res.addons[0];
+  Assert.equal(res.length, 1);
+  let gmpAddon = res[0];
   Assert.equal(gmpAddon.id, "gmp-gmpopenh264");
   Assert.equal(gmpAddon.URL, "http://127.0.0.1:8011/gmp-gmpopenh264-1.1.zip");
   Assert.equal(gmpAddon.hashFunction, "sha256");
@@ -553,13 +569,16 @@ add_task(async function test_checkForAddons_contentSignatureSuccess() {
     // Smoke test the results are as expected.
     // If the checkForAddons fails we'll get a fallback config,
     // so we'll get incorrect addons and these asserts will fail.
-    Assert.equal(res.usedFallback, false);
-    Assert.equal(res.addons.length, 5);
-    Assert.equal(res.addons[0].id, "test1");
-    Assert.equal(res.addons[1].id, "test2");
-    Assert.equal(res.addons[2].id, "test3");
-    Assert.equal(res.addons[3].id, "test4");
-    Assert.equal(res.addons[4].id, undefined);
+    Assert.equal(res.length, 5);
+    Assert.equal(res[0].id, "test1");
+    Assert.equal(res[0].usedFallback, false);
+    Assert.equal(res[1].id, "test2");
+    Assert.equal(res[1].usedFallback, false);
+    Assert.equal(res[2].id, "test3");
+    Assert.equal(res[2].usedFallback, false);
+    Assert.equal(res[3].id, "test4");
+    Assert.equal(res[3].usedFallback, false);
+    Assert.equal(res[4].id, undefined);
   } catch (e) {
     Assert.ok(false, "checkForAddons should succeed");
   }
@@ -613,15 +632,17 @@ add_task(async function test_checkForAddons_contentSignatureFailure() {
     // Smoke test the results are as expected.
     // Check addons will succeed above, but it will have fallen back to local
     // config. So the results will not be those from the HTTP server.
-    Assert.equal(res.usedFallback, true);
+    for (let addon in res) {
+      Assert(addon.usedFallback);
+    }
     // Some platforms don't have fallback config for all GMPs, but we should
     // always get at least 1.
-    Assert.greaterOrEqual(res.addons.length, 1);
-    if (res.addons.length == 1) {
-      Assert.equal(res.addons[0].id, "gmp-widevinecdm");
+    Assert.greaterOrEqual(res.length, 1);
+    if (res.length == 1) {
+      Assert.equal(res[0].id, "gmp-widevinecdm");
     } else {
-      Assert.equal(res.addons[0].id, "gmp-gmpopenh264");
-      Assert.equal(res.addons[1].id, "gmp-widevinecdm");
+      Assert.equal(res[0].id, "gmp-gmpopenh264");
+      Assert.equal(res[1].id, "gmp-widevinecdm");
     }
   } catch (e) {
     Assert.ok(false, "checkForAddons should succeed");
@@ -989,8 +1010,8 @@ async function test_checkForAddons_installAddon(
     myRequest,
     () => installManager.checkForAddons()
   );
-  Assert.equal(res.addons.length, 1);
-  let gmpAddon = res.addons[0];
+  Assert.equal(res.length, 1);
+  let gmpAddon = res[0];
   Assert.ok(!gmpAddon.isInstalled);
 
   try {
@@ -1136,8 +1157,8 @@ add_test(function test_installAddon_noServer() {
   );
   checkPromise.then(
     res => {
-      Assert.equal(res.addons.length, 1);
-      let gmpAddon = res.addons[0];
+      Assert.equal(res.length, 1);
+      let gmpAddon = res[0];
 
       GMPInstallManager.overrideLeaveDownloadedZip = true;
       let installPromise = installManager.installAddon(gmpAddon);

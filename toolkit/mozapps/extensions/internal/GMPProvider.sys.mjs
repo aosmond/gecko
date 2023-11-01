@@ -425,7 +425,7 @@ GMPWrapper.prototype = {
       try {
         let installManager = new lazy.GMPInstallManager();
         let res = await installManager.checkForAddons();
-        let update = res.addons.find(addon => addon.id === this._plugin.id);
+        let update = res.find(addon => addon.id === this._plugin.id);
         if (update && update.isValid && !update.isInstalled) {
           this._log.trace(
             "findUpdates() - found update for " +

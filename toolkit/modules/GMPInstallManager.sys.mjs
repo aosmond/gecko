@@ -601,6 +601,7 @@ GMPInstallManager.prototype = {
  */
 export function GMPAddon(addon) {
   let log = getScopedLogger("GMPAddon.constructor");
+  this.usedFallback = false;
   for (let name of Object.keys(addon)) {
     this[name] = addon[name];
   }
