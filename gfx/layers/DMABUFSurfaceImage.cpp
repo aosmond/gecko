@@ -53,6 +53,11 @@ already_AddRefed<gfx::SourceSurface> DMABUFSurfaceImage::GetAsSourceSurface() {
   return mSurface->GetAsSourceSurface();
 }
 
+Maybe<SurfaceDescriptor> DMABUFSurfaceImage::GetAsShmemDesc(
+    mozilla::ipc::IShmemAllocator* aAllocator) {
+  return mSurface->GetAsShmemDesc(aAllocator);
+}
+
 TextureClient* DMABUFSurfaceImage::GetTextureClient(
     KnowsCompositor* aKnowsCompositor) {
   if (!mTextureClient) {

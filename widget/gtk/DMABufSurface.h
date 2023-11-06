@@ -12,6 +12,7 @@
 #include "GLTypes.h"
 #include "nsISupportsImpl.h"
 #include "mozilla/gfx/Types.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/Mutex.h"
 
 typedef void* EGLImageKHR;
@@ -32,6 +33,9 @@ typedef void* EGLSyncKHR;
 namespace mozilla {
 namespace gfx {
 class DataSourceSurface;
+}
+namespace ipc {
+class IShmemAllocator;
 }
 namespace layers {
 class SurfaceDescriptor;
@@ -105,6 +109,9 @@ class DMABufSurface {
   GetAsSourceSurface() {
     return nullptr;
   }
+
+  virtual mozilla::Maybe<mozilla::layers::SurfaceDescriptor> GetAsShmemDesc(
+      mozilla::ipc::IShmemAllocator* aAllocator);
 
   virtual mozilla::gfx::YUVColorSpace GetYUVColorSpace() {
     return mozilla::gfx::YUVColorSpace::Default;
@@ -312,7 +319,10 @@ class DMABufSurfaceYUV : public DMABufSurface {
   bool Serialize(mozilla::layers::SurfaceDescriptor& aOutDescriptor);
 
   DMABufSurfaceYUV* GetAsDMABufSurfaceYUV() { return this; };
-  already_AddRefed<mozilla::gfx::DataSourceSurface> GetAsSourceSurface();
+  already_AddRefed<mozilla::gfx::DataSourceSurface> GetAsSourceSurface()
+      override;
+  mozilla::Maybe<mozilla::layers::SurfaceDescriptor> GetAsShmemDesc(
+      mozilla::ipc::IShmemAllocator* aAllocator) override;
 
   int GetWidth(int aPlane = 0) { return mWidth[aPlane]; }
   int GetHeight(int aPlane = 0) { return mHeight[aPlane]; }

@@ -24,6 +24,8 @@ class DMABUFSurfaceImage : public Image {
   DMABufSurface* GetSurface() { return mSurface; }
   gfx::IntSize GetSize() const override;
   already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() override;
+  Maybe<SurfaceDescriptor> GetAsShmemDesc(
+      mozilla::ipc::IShmemAllocator* aAllocator) override;
   TextureClient* GetTextureClient(KnowsCompositor* aKnowsCompositor) override;
 
  private:

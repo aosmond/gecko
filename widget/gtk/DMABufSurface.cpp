@@ -250,6 +250,11 @@ DMABufSurface::~DMABufSurface() {
   GlobalRefCountDelete();
 }
 
+Maybe<SurfaceDescriptor> DMABufSurface::GetAsShmemDesc(
+    mozilla::ipc::IShmemAllocator* aAllocator) {
+  return Nothing();
+}
+
 already_AddRefed<DMABufSurface> DMABufSurface::CreateDMABufSurface(
     const mozilla::layers::SurfaceDescriptor& aDesc) {
   const SurfaceDescriptorDMABuf& desc = aDesc.get_SurfaceDescriptorDMABuf();
@@ -1650,6 +1655,11 @@ DMABufSurfaceYUV::GetAsSourceSurface() {
   ReadPixelsIntoDataSurface(context, source);
 
   return source.forget();
+}
+
+Maybe<SurfaceDescriptor> DMABufSurfaceYUV::GetAsShmemDesc(
+    mozilla::ipc::IShmemAllocator* aAllocator) {
+  return Nothing();
 }
 
 #if 0
