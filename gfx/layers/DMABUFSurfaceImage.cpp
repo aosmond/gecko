@@ -53,6 +53,12 @@ already_AddRefed<gfx::SourceSurface> DMABUFSurfaceImage::GetAsSourceSurface() {
   return mSurface->GetAsSourceSurface();
 }
 
+nsresult DMABUFSurfaceImage::BuildSurfaceDescriptorBuffer(
+    SurfaceDescriptorBuffer& aSdBuffer,
+    const std::function<MemoryOrShmem(uint32_t)>& aAllocate) {
+  return mSurface->BuildSurfaceDescriptorBuffer(aSdBuffer, aAllocate);
+}
+
 TextureClient* DMABUFSurfaceImage::GetTextureClient(
     KnowsCompositor* aKnowsCompositor) {
   if (!mTextureClient) {

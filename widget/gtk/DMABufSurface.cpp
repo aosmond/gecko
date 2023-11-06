@@ -1693,6 +1693,7 @@ nsresult DMABufSurfaceYUV::BuildSurfaceDescriptorBuffer(
   int32_t stride = ImageDataSerializer::ComputeRGBStride(format, size.width);
   size_t length = ImageDataSerializer::ComputeRGBBufferSize(size, format);
 
+  aSdBuffer.desc() = RGBDescriptor(size, format);
   aSdBuffer.data() = aAllocate(length);
 
   uint8_t* buffer;
