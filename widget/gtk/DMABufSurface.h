@@ -7,6 +7,7 @@
 #ifndef DMABufSurface_h__
 #define DMABufSurface_h__
 
+#include <functional>
 #include <stdint.h>
 #include "mozilla/widget/va_drmcommon.h"
 #include "GLTypes.h"
@@ -34,7 +35,9 @@ namespace gfx {
 class DataSourceSurface;
 }
 namespace layers {
+class MemoryOrShmem;
 class SurfaceDescriptor;
+class SurfaceDescriptorBuffer;
 class SurfaceDescriptorDMABuf;
 }  // namespace layers
 namespace gl {
@@ -105,6 +108,10 @@ class DMABufSurface {
   GetAsSourceSurface() {
     return nullptr;
   }
+
+  virtual nsresult BuildSurfaceDescriptorBuffer(
+      mozilla::layers::SurfaceDescriptorBuffer& aSdBuffer,
+      const std::function<mozilla::layers::MemoryOrShmem(uint32_t)>& aAllocate);
 
   virtual mozilla::gfx::YUVColorSpace GetYUVColorSpace() {
     return mozilla::gfx::YUVColorSpace::Default;
@@ -314,6 +321,11 @@ class DMABufSurfaceYUV final : public DMABufSurface {
 
   DMABufSurfaceYUV* GetAsDMABufSurfaceYUV() override { return this; };
   already_AddRefed<mozilla::gfx::DataSourceSurface> GetAsSourceSurface()
+      override;
+
+  nsresult BuildSurfaceDescriptorBuffer(
+      mozilla::layers::SurfaceDescriptorBuffer& aSdBuffer,
+      const std::function<mozilla::layers::MemoryOrShmem(uint32_t)>& aAllocate)
       override;
 
   int GetWidth(int aPlane = 0) override { return mWidth[aPlane]; }

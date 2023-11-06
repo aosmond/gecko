@@ -884,6 +884,12 @@ void DMABufSurface::Unmap(int aPlane) {
   }
 }
 
+nsresult DMABufSurface::BuildSurfaceDescriptorBuffer(
+    SurfaceDescriptorBuffer& aSdBuffer,
+    const std::function<MemoryOrShmem(uint32_t)>& aAllocate) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
 #ifdef DEBUG
 void DMABufSurfaceRGBA::DumpToFile(const char* pFile) {
   uint32_t stride;
@@ -1650,6 +1656,12 @@ DMABufSurfaceYUV::GetAsSourceSurface() {
   ReadPixelsIntoDataSurface(context, source);
 
   return source.forget();
+}
+
+nsresult DMABufSurfaceYUV::BuildSurfaceDescriptorBuffer(
+    SurfaceDescriptorBuffer& aSdBuffer,
+    const std::function<MemoryOrShmem(uint32_t)>& aAllocate) {
+  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 #if 0
