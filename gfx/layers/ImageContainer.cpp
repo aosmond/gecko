@@ -214,6 +214,12 @@ ImageContainer::~ImageContainer() {
   }
 }
 
+nsresult Image::BuildSurfaceDescriptorBuffer(
+    SurfaceDescriptorBuffer& aSdBuffer,
+    const std::function<MemoryOrShmem(uint32_t)>& aAllocate) {
+  return NS_ERROR_NOT_IMPLEMENTED;
+}
+
 Maybe<SurfaceDescriptor> Image::GetDesc() { return GetDescFromTexClient(); }
 
 Maybe<SurfaceDescriptor> Image::GetDescFromTexClient(

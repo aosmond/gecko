@@ -129,6 +129,10 @@ class Image {
 
   virtual already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() = 0;
 
+  virtual nsresult BuildSurfaceDescriptorBuffer(
+      SurfaceDescriptorBuffer& aSdBuffer,
+      const std::function<MemoryOrShmem(uint32_t)>& aAllocate);
+
   virtual bool IsValid() const { return true; }
 
   /**
@@ -829,9 +833,9 @@ class PlanarYCbCrImage : public Image {
    * Build a SurfaceDescriptorBuffer with this image.  A function to allocate
    * a MemoryOrShmem with the given capacity must be provided.
    */
-  virtual nsresult BuildSurfaceDescriptorBuffer(
+  nsresult BuildSurfaceDescriptorBuffer(
       SurfaceDescriptorBuffer& aSdBuffer,
-      const std::function<MemoryOrShmem(uint32_t)>& aAllocate);
+      const std::function<MemoryOrShmem(uint32_t)>& aAllocate) override;
 
  protected:
   already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() override;
