@@ -214,6 +214,11 @@ ImageContainer::~ImageContainer() {
   }
 }
 
+Maybe<SurfaceDescriptor> Image::GetAsShmemDesc(
+    mozilla::ipc::IShmemAllocator* aAllocator) {
+  return Nothing();
+}
+
 Maybe<SurfaceDescriptor> Image::GetDesc() { return GetDescFromTexClient(); }
 
 Maybe<SurfaceDescriptor> Image::GetDescFromTexClient(

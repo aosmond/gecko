@@ -42,6 +42,10 @@ typedef void* HANDLE;
 
 namespace mozilla {
 
+namespace ipc {
+class IShmemAllocator;
+}
+
 namespace layers {
 
 class GPUVideoImage;
@@ -128,6 +132,9 @@ class Image {
   virtual void SetIsDRM(bool aIsDRM) { mIsDRM = aIsDRM; }
 
   virtual already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() = 0;
+
+  virtual Maybe<SurfaceDescriptor> GetAsShmemDesc(
+      mozilla::ipc::IShmemAllocator* aAllocator);
 
   virtual bool IsValid() const { return true; }
 
