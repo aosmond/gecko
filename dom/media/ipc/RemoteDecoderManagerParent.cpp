@@ -289,6 +289,29 @@ mozilla::ipc::IPCResult RemoteDecoderManagerParent::RecvReadback(
     return IPC_OK();
   }
 
+  // Let's try reading directly into the shmem first to avoid extra copies.
+  SurfaceDescriptorBuffer sdb;
+  nsresult rv =
+      image->BuildSurfaceDescriptorBuffer(sdb, [&](uint32_t aBufferSize) {
+        Shmem buffer;
+        if (!AllocShmem(aBufferSize, &buffer)) {
+          return MemoryOrShmem();
+        }
+        return MemoryOrShmem(std::move(buffer));
+      });
+
+  switch (rv) {
+    case NS_OK:
+      *aResult = std::move(sdb);
+      return IPC_OK();
+    case NS_ERROR_NOT_IMPLEMENTED:
+      break;
+    default:
+      *aResult = null_t();
+      return IPC_OK();
+  }
+
+  // Fallback to reading to a SourceSurface and copying that into a shmem.
   RefPtr<SourceSurface> source = image->GetAsSourceSurface();
   if (!source) {
     *aResult = null_t();
