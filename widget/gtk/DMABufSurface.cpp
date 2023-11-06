@@ -44,6 +44,7 @@
 #include "GLReadTexImageHelper.h"
 #include "nsGtkUtils.h"
 
+#include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/LayersSurfaces.h"
 #include "mozilla/ScopeExit.h"
 
@@ -1685,7 +1686,30 @@ DMABufSurfaceYUV::GetAsSourceSurface() {
 nsresult DMABufSurfaceYUV::BuildSurfaceDescriptorBuffer(
     SurfaceDescriptorBuffer& aSdBuffer,
     const std::function<MemoryOrShmem(uint32_t)>& aAllocate) {
-  return NS_ERROR_NOT_IMPLEMENTED;
+  LOGDMABUF(("DMABufSurfaceYUV::BuildSurfaceDescriptorBuffer UID %d", mUID));
+
+  gfx::IntSize size(GetWidth(), GetHeight());
+  const auto format = gfx::SurfaceFormat::B8G8R8A8;
+  int32_t stride = ImageDataSerializer::ComputeRGBStride(format, size.width);
+  size_t length = ImageDataSerializer::ComputeRGBBufferSize(size, format);
+
+  aSdBuffer.data() = aAllocate(length);
+
+  uint8_t* buffer;
+  const MemoryOrShmem& memOrShmem = aSdBuffer.data();
+  switch (memOrShmem.type()) {
+    case MemoryOrShmem::Tuintptr_t:
+      buffer = reinterpret_cast<uint8_t*>(memOrShmem.get_uintptr_t());
+      break;
+    case MemoryOrShmem::TShmem:
+      buffer = memOrShmem.get_Shmem().get<uint8_t>();
+      break;
+    default:
+      LOGDMABUF(("BuildSurfaceDescriptorBuffer: Failed to allocate buffer"));
+      return NS_ERROR_OUT_OF_MEMORY;
+  }
+
+  return ReadIntoBuffer(buffer, stride, size, format);
 }
 
 #if 0
