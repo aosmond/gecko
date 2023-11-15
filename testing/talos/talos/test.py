@@ -637,6 +637,27 @@ class glvideo(PageloaderTest):
 
 
 @register_test()
+class canvas2dvideo(PageloaderTest):
+    """
+    Canvas2D video texture update with 1080p video.
+    Measures mean tick time across 100 ticks.
+    (each tick is drawImage(<video>)+setTimeout(0))
+    """
+
+    tpmanifest = "${talos}/tests/canvas2d/canvas2dvideo.manifest"
+    tpcycles = 1
+    tppagecycles = 5
+    tploadnocache = True
+    tpmozafterpaint = False
+    tpchrome = False
+    timeout = 600
+    gecko_profile_interval = 2
+    win_counters = w7_counters = linux_counters = mac_counters = None
+    filters = filter.ignore_first.prepare(1) + filter.median.prepare()
+    unit = "ms"
+
+
+@register_test()
 class tp5n(PageloaderTest):
     """
     Tests the time it takes Firefox to load the tp5 web page test set.

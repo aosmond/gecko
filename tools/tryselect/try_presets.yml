@@ -294,5 +294,6 @@ webrender-perf:
         - "'-qr 'g1"
         - "'-qr 'g4"
         - "'-qr 'tp5"
+        - "'-qr 'talos-canvas2d"
         - "'-qr 'talos-webgl"
         - "'-qr 'motionmark-animometer"
