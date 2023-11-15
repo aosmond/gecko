@@ -58,6 +58,46 @@ talos-bcv-profiling:
             - --suite=bcv
             - --gecko-profile
 
+talos-canvas2d:
+    description: Talos Canvas2D
+    try-name: canvas2d
+    treeherder-symbol: T(canvas2d)
+    variants:
+        - webrender-sw
+    run-on-projects:
+        by-variant:
+            webrender-sw:
+                by-test-platform:
+                    (linux1804|windows10|macosx1015)-64-shippable-qr.*: [mozilla-beta, trunk]
+                    default: []
+            default:
+                by-test-platform:
+                    windows.*-32.*: []
+                    (linux|windows10-64|macos)(?!.*shippable).*: []
+                    (linux|windows10-64|macos)(?!.*-qr).*: []
+                    default: [mozilla-beta, trunk]
+    max-run-time: 2100
+    mozharness:
+        extra-options:
+            by-test-platform:
+                windows10-64-ref-hw.*:
+                    - --suite=canvas2d
+                    - --skip-preflight
+                default:
+                    - --suite=canvas2d
+
+talos-canvas2d-profiling:
+    description: Talos Canvas2D with gecko profiling
+    try-name: canvas2d
+    treeherder-symbol: T-Prof(canvas2d)
+    tier: 2
+    run-on-projects: []
+    max-run-time: 1800
+    mozharness:
+        extra-options:
+            - --suite=canvas2d
+            - --gecko-profile
+
 talos-chrome:
     description: Talos chrome
     try-name: chromez

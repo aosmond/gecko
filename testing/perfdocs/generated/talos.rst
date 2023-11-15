@@ -1113,6 +1113,230 @@ For the sample commands found below, note that the capitalization used is import
 
 
 
+.. dropdown:: canvas2dvideo
+   :class-container: anchor-id-canvas2dvideo
+
+   * contact: :aosmond and gfx
+   * source: `canvas2dvideo <https://dxr.mozilla.org/mozilla-central/source/testing/talos/talos/tests/canvas2d/benchmarks/video>`__
+   * type: `Page load`_
+   * data: 5 cycles of the entire benchmark, each subtest will have 5 data points (see below)
+   * summarization: Canvas2D video texture update with 1080p video. Measures mean tick time across 100 ticks.
+      * subtest: `ignore first`_ data point, then take the `median`_ of the remaining 4; `source:
+        test.py <https://dxr.mozilla.org/mozilla-central/source/testing/talos/talos/test.py#l522>`__
+      * suite: `geometric mean`_ of the 4 subtest results.
+   * **Lower is better**
+   * **Example Data**
+
+   .. code-block::
+
+      0;Mean tick time across 100 ticks: ;54.6916;49.0534;51.21645;51.239650000000005;52.44295
+
+   * description:
+      | This test playbacks a video file and ask Canvas2D to draw video frames as
+        Canvas2D textures for 100 ticks. It collects the mean tick time across 100
+        ticks to measure how much time it will spend for a video texture upload
+        to be a Canvas2D texture (ctx.drawImage). We run it for 5 times and ignore
+        the first found. Lower results are better.
+   * gecko_profile_interval: 2
+   * linux_counters: None
+   * mac_counters: None
+   * timeout: 600
+   * tpchrome: False
+   * tpcycles: 1
+   * tploadnocache: True
+   * tpmanifest: ${talos}/tests/canvas2d/canvas2dvideo.manifest
+   * tpmozafterpaint: False
+   * tppagecycles: 5
+   * unit: ms
+   * w7_counters: None
+   * win_counters: None
+   * Command
+
+   .. code-block::
+
+      ./mach talos-test -a canvas2dvideo
+
+   * **Test Task**:
+
+   .. list-table:: **test-linux1804-64-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+
+
+   .. list-table:: **test-linux1804-64-shippable-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ✅
+        - ✅
+        - ❌
+        - ✅
+      * - **talos-canvas2d-profiling**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ✅
+        - ✅
+        - ❌
+        - ✅
+
+
+   .. list-table:: **test-macosx1015-64-shippable-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ✅
+        - ✅
+        - ❌
+        - ✅
+      * - **talos-canvas2d-profiling**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ✅
+        - ✅
+        - ❌
+        - ✅
+
+
+   .. list-table:: **test-windows10-32-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+
+
+   .. list-table:: **test-windows10-32-shippable-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+
+
+   .. list-table:: **test-windows10-64-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+
+
+   .. list-table:: **test-windows10-64-ref-hw-2017-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+      * - **talos-canvas2d-swr**
+        - ❌
+        - ❌
+        - ❌
+        - ❌
+
+
+   .. list-table:: **test-windows10-64-shippable-qr/opt**
+      :widths: 30 15 15 15 15
+      :header-rows: 1
+
+      * - **Test Name**
+        - mozilla-central
+        - autoland
+        - mozilla-release
+        - mozilla-beta
+      * - **talos-canvas2d**
+        - ✅
+        - ✅
+        - ❌
+        - ✅
+      * - **talos-canvas2d-swr**
+        - ✅
+        - ✅
+        - ❌
+        - ✅
+
+
+
 .. dropdown:: cpstartup
    :class-container: anchor-id-cpstartup
 

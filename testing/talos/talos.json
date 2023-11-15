@@ -90,6 +90,9 @@
     "webgl": {
       "tests": ["glterrain", "glvideo", "motionmark_webgl"]
     },
+    "canvas2d": {
+      "tests": ["canvas2dvideo"]
+    },
     "xperf": {
       "tests": ["tp5n"],
       "pagesets_name": "tp5n.zip",
