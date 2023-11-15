@@ -121,6 +121,47 @@ def calculate_widevinecdm_json(version: str, url_base: str) -> str:
         )
 
 
+def calculate_widevinecdm_l1_json(
+    version: str, version_hash: str, dir_hash: str, url_base: str
+) -> str:
+    # fmt: off
+    cdms = [
+        {"target": "WINNT_x86_64-msvc", "fileName": "{url_base}/{dir_hash}_{version}/neifaoindggfcjicffkgpmnlppeffabd_{version}_win64_{version_hash}.crx3"},
+        {"target": "WINNT_x86_64-msvc-x64", "alias": "WINNT_x86_64-msvc"},
+        {"target": "WINNT_x86_64-msvc-x64-asan", "alias": "WINNT_x86_64-msvc"},
+    ]
+    # fmt: on
+    try:
+        fetch_data_for_cdms(
+            cdms,
+            {
+                "url_base": url_base,
+                "version": version,
+                "version_hash": version_hash,
+                "dir_hash": dir_hash,
+            },
+        )
+    except Exception as e:
+        logging.error("calculate_widevinecdm_json: could not create JSON due to: %s", e)
+        return ""
+    else:
+        return (
+            "{\n"
+            + '  "hashFunction": "sha512",\n'
+            + '  "name": "Widevine-L1-{}",\n'.format(version)
+            + '  "schema_version": 1000,\n'
+            + '  "vendors": {\n'
+            + '    "gmp-widevinecdm-l1": {\n'
+            + '      "platforms": {\n'
+            + generate_json_for_cdms(cdms)
+            + "      },\n"
+            + '      "version": "{}"\n'.format(version)
+            + "    }\n"
+            + "  }\n"
+            + "}"
+        )
+
+
 def main():
     examples = """examples:
   python dom/media/tools/generateGmpJson.py widevine 4.10.2557.0 >toolkit/content/gmp-sources/widevinecdm.json
@@ -134,6 +175,7 @@ def main():
     parser.add_argument("plugin", help="which plugin: openh264, widevine")
     parser.add_argument("version", help="version of plugin")
     parser.add_argument("revision", help="revision hash of plugin", nargs="?")
+    parser.add_argument("dirrevision", help="revision hash of plugin dir", nargs="?")
     parser.add_argument("--url", help="override base URL from which to fetch plugins")
     args = parser.parse_args()
 
@@ -145,6 +187,10 @@ def main():
         url_base = "https://redirector.gvt1.com/edgedl/widevine-cdm"
         if args.revision is not None:
             parser.error("widevine cannot use revision")
+    elif args.plugin == "widevine-l1":
+        url_base = "https://redirector.gvt1.com/edgedl/release2/chrome_component"
+        if args.revision is None or args.dirrevision is None:
+            parser.error("widevine l1 needs revision and dirrevision")
     else:
         parser.error("plugin not recognized")
 
@@ -158,6 +204,10 @@ def main():
         json_result = calculate_gmpopenh264_json(args.version, args.revision, url_base)
     elif args.plugin == "widevine":
         json_result = calculate_widevinecdm_json(args.version, url_base)
+    elif args.plugin == "widevine-l1":
+        json_result = calculate_widevinecdm_l1_json(
+            args.version, args.revision, args.dirrevision, url_base
+        )
 
     try:
         json.loads(json_result)
