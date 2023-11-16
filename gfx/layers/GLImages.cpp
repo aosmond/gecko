@@ -13,7 +13,10 @@
 #include "GLReadTexImageHelper.h"
 #include "GLLibraryEGL.h"
 #include "mozilla/gfx/Logging.h"
-#include "mozilla/layers/LayersSurfaces.h"
+
+#ifdef MOZ_WIDGET_ANDROID
+#  include "mozilla/layers/LayersSurfaces.h"
+#endif
 
 using namespace mozilla;
 using namespace mozilla::gl;
@@ -22,9 +25,7 @@ namespace mozilla::layers {
 
 static RefPtr<GLContext> sSnapshotContext;
 
-nsresult GLImage::ReadIntoBuffer(uint8_t* aData, int32_t aStride,
-                                 const gfx::IntSize& aSize,
-                                 gfx::SurfaceFormat aFormat) {
+already_AddRefed<gfx::SourceSurface> GLImage::GetAsSourceSurface() {
   MOZ_ASSERT(NS_IsMainThread(), "Should be on the main thread");
 
   if (!sSnapshotContext) {
@@ -32,7 +33,7 @@ nsresult GLImage::ReadIntoBuffer(uint8_t* aData, int32_t aStride,
     sSnapshotContext = GLContextProvider::CreateHeadless({}, &discardFailureId);
     if (!sSnapshotContext) {
       NS_WARNING("Failed to create snapshot GLContext");
-      return NS_ERROR_FAILURE;
+      return nullptr;
     }
   }
 
@@ -40,8 +41,9 @@ nsresult GLImage::ReadIntoBuffer(uint8_t* aData, int32_t aStride,
   ScopedTexture scopedTex(sSnapshotContext);
   ScopedBindTexture boundTex(sSnapshotContext, scopedTex.Texture());
 
+  gfx::IntSize size = GetSize();
   sSnapshotContext->fTexImage2D(LOCAL_GL_TEXTURE_2D, 0, LOCAL_GL_RGBA,
-                                aSize.width, aSize.height, 0, LOCAL_GL_RGBA,
+                                size.width, size.height, 0, LOCAL_GL_RGBA,
                                 LOCAL_GL_UNSIGNED_BYTE, nullptr);
 
   ScopedFramebufferForTexture autoFBForTex(sSnapshotContext,
@@ -49,62 +51,27 @@ nsresult GLImage::ReadIntoBuffer(uint8_t* aData, int32_t aStride,
   if (!autoFBForTex.IsComplete()) {
     gfxCriticalError()
         << "GetAsSourceSurface: ScopedFramebufferForTexture failed.";
-    return NS_ERROR_FAILURE;
+    return nullptr;
   }
 
   const gl::OriginPos destOrigin = gl::OriginPos::TopLeft;
   {
     const ScopedBindFramebuffer bindFB(sSnapshotContext, autoFBForTex.FB());
-    if (!sSnapshotContext->BlitHelper()->BlitImageToFramebuffer(this, aSize,
+    if (!sSnapshotContext->BlitHelper()->BlitImageToFramebuffer(this, size,
                                                                 destOrigin)) {
-      return NS_ERROR_FAILURE;
+      return nullptr;
     }
   }
 
+  RefPtr<gfx::DataSourceSurface> source =
+      gfx::Factory::CreateDataSourceSurface(size, gfx::SurfaceFormat::B8G8R8A8);
+  if (NS_WARN_IF(!source)) {
+    return nullptr;
+  }
+
   ScopedBindFramebuffer bind(sSnapshotContext, autoFBForTex.FB());
-  ReadPixelsIntoBuffer(sSnapshotContext, aData, aStride, aSize, aFormat);
-  return NS_OK;
-}
-
-already_AddRefed<gfx::SourceSurface> GLImage::GetAsSourceSurface() {
-  MOZ_ASSERT(NS_IsMainThread(), "Should be on the main thread");
-
-  gfx::IntSize size = GetSize();
-  auto format = gfx::SurfaceFormat::B8G8R8A8;
-  RefPtr<gfx::DataSourceSurface> dest =
-      gfx::Factory::CreateDataSourceSurface(size, format);
-  if (NS_WARN_IF(!dest)) {
-    return nullptr;
-  }
-
-  gfx::DataSourceSurface::ScopedMap map(dest, gfx::DataSourceSurface::WRITE);
-  if (NS_WARN_IF(!map.IsMapped())) {
-    return nullptr;
-  }
-
-  nsresult rv = ReadIntoBuffer(map.GetData(), map.GetStride(), size, format);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return nullptr;
-  }
-
-  return dest.forget();
-}
-
-nsresult GLImage::BuildSurfaceDescriptorBuffer(
-    SurfaceDescriptorBuffer& aSdBuffer, BuildSdbFlags aFlags,
-    const std::function<MemoryOrShmem(uint32_t)>& aAllocate) {
-  gfx::IntSize size = GetSize();
-  auto format = gfx::SurfaceFormat::B8G8R8A8;
-
-  uint8_t* buffer = nullptr;
-  int32_t stride = 0;
-  nsresult rv = AllocateSurfaceDescriptorBufferRgb(
-      size, format, buffer, aSdBuffer, stride, aAllocate);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return rv;
-  }
-
-  return ReadIntoBuffer(buffer, stride, size, format);
+  ReadPixelsIntoDataSurface(sSnapshotContext, source);
+  return source.forget();
 }
 
 #ifdef MOZ_WIDGET_ANDROID
