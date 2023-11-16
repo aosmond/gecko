@@ -631,6 +631,7 @@ class glvideo(PageloaderTest):
     tpchrome = False
     timeout = 600
     gecko_profile_interval = 2
+    gecko_profile_extra_threads = "CanvasRenderer,CanvasWorker,MediaSupervisor"
     win_counters = w7_counters = linux_counters = mac_counters = None
     filters = filter.ignore_first.prepare(1) + filter.median.prepare()
     unit = "ms"
@@ -652,6 +653,7 @@ class canvas2dvideo(PageloaderTest):
     tpchrome = False
     timeout = 600
     gecko_profile_interval = 2
+    gecko_profile_extra_threads = "CanvasRenderer,CanvasWorker,MediaSupervisor"
     win_counters = w7_counters = linux_counters = mac_counters = None
     filters = filter.ignore_first.prepare(1) + filter.median.prepare()
     unit = "ms"
