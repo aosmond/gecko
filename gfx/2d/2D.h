@@ -14,7 +14,6 @@
 #include "Quaternion.h"
 #include "UserData.h"
 #include "FontVariation.h"
-#include <functional>
 #include <vector>
 
 // GenericRefCountedBase allows us to hold on to refcounted objects of any type
@@ -85,8 +84,6 @@ namespace mozilla {
 class Mutex;
 
 namespace layers {
-class MemoryOrShmem;
-class SurfaceDescriptorBuffer;
 class TextureData;
 }  // namespace layers
 
@@ -2257,11 +2254,6 @@ class GFX2D_API Factory {
   static already_AddRefed<DataSourceSurface>
   CreateBGRA8DataSourceSurfaceForD3D11Texture(ID3D11Texture2D* aSrcTexture,
                                               uint32_t aArrayIndex = 0);
-
-  static nsresult CreateSdbForD3D11Texture(
-      ID3D11Texture2D* aSrcTexture, const IntSize& aSrcSize,
-      layers::SurfaceDescriptorBuffer& aSdBuffer,
-      const std::function<layers::MemoryOrShmem(uint32_t)>& aAllocate);
 
   static bool ReadbackTexture(layers::TextureData* aDestCpuTexture,
                               ID3D11Texture2D* aSrcTexture);
