@@ -12,6 +12,7 @@
 #include "mozilla/StaticPtr.h"    // for StaticRefPtr
 #include "mozilla/StaticMutex.h"  // for StaticMutex
 #include "mozilla/RefPtr.h"       // for already_AddRefed
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/layers/PCompositorManagerParent.h"
 #include "nsTArray.h"  // for AutoTArray
 
@@ -31,7 +32,7 @@ class CompositorManagerParent final : public PCompositorManagerParent {
  public:
   static already_AddRefed<CompositorManagerParent> CreateSameProcess();
   static bool Create(Endpoint<PCompositorManagerParent>&& aEndpoint,
-                     bool aIsRoot);
+                     dom::ContentParentId aChildId, bool aIsRoot);
   static void Shutdown();
 
   static already_AddRefed<CompositorBridgeParent>
@@ -72,12 +73,14 @@ class CompositorManagerParent final : public PCompositorManagerParent {
   static void ShutdownInternal();
 #endif
 
-  CompositorManagerParent();
+  explicit CompositorManagerParent(dom::ContentParentId aChildId);
   virtual ~CompositorManagerParent();
 
   void Bind(Endpoint<PCompositorManagerParent>&& aEndpoint, bool aIsRoot);
 
   void DeferredDestroy();
+
+  dom::ContentParentId mChildId;
 
   RefPtr<CompositorThreadHolder> mCompositorThreadHolder;
 
