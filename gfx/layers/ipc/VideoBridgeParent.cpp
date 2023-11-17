@@ -228,6 +228,14 @@ bool VideoBridgeParent::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {
 }
 
 bool VideoBridgeParent::DeallocShmem(ipc::Shmem& aShmem) {
+  if (!CompositorThreadHolder::IsInCompositorThread()) {
+    CompositorThread()->Dispatch(NS_NewRunnableFunction(
+        "gfx::layers::VideoBridgeParent::DeallocShmem",
+        [self = RefPtr{this}, shmem = std::move(aShmem)] mutable {
+          self->DeallocShmem(shmem);
+        }));
+    return true;
+  }
   if (mClosed) {
     return false;
   }
