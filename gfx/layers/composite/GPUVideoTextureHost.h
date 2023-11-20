@@ -15,7 +15,8 @@ namespace layers {
 class GPUVideoTextureHost : public TextureHost {
  public:
   static GPUVideoTextureHost* CreateFromDescriptor(
-      TextureFlags aFlags, const SurfaceDescriptorGPUVideo& aDescriptor);
+      uint64_t aContentId, TextureFlags aFlags,
+      const SurfaceDescriptorGPUVideo& aDescriptor);
 
   virtual ~GPUVideoTextureHost();
 
@@ -71,13 +72,16 @@ class GPUVideoTextureHost : public TextureHost {
 
   bool NeedsDeferredDeletion() const override;
 
+  uint64_t GetContentId() const { return mContentId; }
+
  protected:
-  GPUVideoTextureHost(TextureFlags aFlags,
+  GPUVideoTextureHost(uint64_t aContentId, TextureFlags aFlags,
                       const SurfaceDescriptorGPUVideo& aDescriptor);
 
   TextureHost* EnsureWrappedTextureHost();
 
   RefPtr<TextureHost> mWrappedTextureHost;
+  uint64_t mContentId;
   SurfaceDescriptorGPUVideo mDescriptor;
 };
 

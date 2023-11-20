@@ -119,6 +119,10 @@ CompositorBridgeParentBase::~CompositorBridgeParentBase() = default;
 
 ProcessId CompositorBridgeParentBase::GetChildProcessId() { return OtherPid(); }
 
+uint64_t CompositorBridgeParentBase::GetContentId() {
+  return mCompositorManager->ChildId();
+}
+
 void CompositorBridgeParentBase::NotifyNotUsed(PTextureParent* aTexture,
                                                uint64_t aTransactionId) {
   RefPtr<TextureHost> texture = TextureHost::AsTextureHost(aTexture);

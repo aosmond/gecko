@@ -74,6 +74,7 @@ class ImageBridgeParent final : public PImageBridgeParent,
                      uint64_t aTransactionId) override;
 
   base::ProcessId GetChildProcessId() override { return OtherPid(); }
+  uint64_t GetContentId() override { return mChildId; }
 
   // PImageBridge
   mozilla::ipc::IPCResult RecvUpdate(EditArray&& aEdits,

@@ -356,7 +356,8 @@ already_AddRefed<TextureHost> CreateBackendIndependentTextureHost(
       MOZ_ASSERT(aDesc.get_SurfaceDescriptorGPUVideo().type() ==
                  SurfaceDescriptorGPUVideo::TSurfaceDescriptorRemoteDecoder);
       result = GPUVideoTextureHost::CreateFromDescriptor(
-          aFlags, aDesc.get_SurfaceDescriptorGPUVideo());
+          aDeallocator->GetContentId(), aFlags,
+          aDesc.get_SurfaceDescriptorGPUVideo());
       break;
     }
     default: {

@@ -2755,6 +2755,11 @@ base::ProcessId WebRenderBridgeParent::GetChildProcessId() {
   return OtherPid();
 }
 
+uint64_t WebRenderBridgeParent::GetContentId() {
+  MOZ_ASSERT(mCompositorBridge);
+  return mCompositorBridge->GetContentId();
+}
+
 bool WebRenderBridgeParent::IsSameProcess() const {
   return OtherPid() == base::GetCurrentProcId();
 }

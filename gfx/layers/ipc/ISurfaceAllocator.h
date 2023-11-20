@@ -101,6 +101,8 @@ class ISurfaceAllocator {
 
   virtual bool UsesWebRenderBridge() const { return false; }
 
+  virtual uint64_t GetContentId() { return UINT64_MAX; }
+
  protected:
   void Finalize() {}
 

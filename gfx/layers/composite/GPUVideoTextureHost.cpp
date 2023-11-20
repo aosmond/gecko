@@ -17,8 +17,11 @@ namespace mozilla {
 namespace layers {
 
 GPUVideoTextureHost::GPUVideoTextureHost(
-    TextureFlags aFlags, const SurfaceDescriptorGPUVideo& aDescriptor)
-    : TextureHost(TextureHostType::Unknown, aFlags), mDescriptor(aDescriptor) {
+    uint64_t aContentId, TextureFlags aFlags,
+    const SurfaceDescriptorGPUVideo& aDescriptor)
+    : TextureHost(TextureHostType::Unknown, aFlags),
+      mContentId(aContentId),
+      mDescriptor(aDescriptor) {
   MOZ_COUNT_CTOR(GPUVideoTextureHost);
 }
 
@@ -27,8 +30,9 @@ GPUVideoTextureHost::~GPUVideoTextureHost() {
 }
 
 GPUVideoTextureHost* GPUVideoTextureHost::CreateFromDescriptor(
-    TextureFlags aFlags, const SurfaceDescriptorGPUVideo& aDescriptor) {
-  return new GPUVideoTextureHost(aFlags, aDescriptor);
+    uint64_t aContentId, TextureFlags aFlags,
+    const SurfaceDescriptorGPUVideo& aDescriptor) {
+  return new GPUVideoTextureHost(aContentId, aFlags, aDescriptor);
 }
 
 TextureHost* GPUVideoTextureHost::EnsureWrappedTextureHost() {
@@ -45,8 +49,7 @@ TextureHost* GPUVideoTextureHost::EnsureWrappedTextureHost() {
     return nullptr;
   }
 
-  uint64_t contentId = TextureHost::GetTextureContentId(mActor);
-  mWrappedTextureHost = parent->LookupTexture(contentId, sd.handle());
+  mWrappedTextureHost = parent->LookupTexture(mContentId, sd.handle());
 
   if (!mWrappedTextureHost) {
     // The TextureHost hasn't been registered yet. This is due to a race

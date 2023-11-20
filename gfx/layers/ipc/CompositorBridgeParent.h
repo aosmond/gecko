@@ -124,6 +124,7 @@ class CompositorBridgeParentBase : public PCompositorBridgeParent,
 
   // HostIPCAllocator
   base::ProcessId GetChildProcessId() override;
+  uint64_t GetContentId() override;
   void NotifyNotUsed(PTextureParent* aTexture,
                      uint64_t aTransactionId) override;
   void SendAsyncMessage(
