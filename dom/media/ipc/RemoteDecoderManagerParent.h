@@ -57,6 +57,8 @@ class RemoteDecoderManagerParent final
   // Can be called from manager thread only
   PDMFactory& EnsurePDMFactory();
 
+  const dom::ContentParentId& GetChildId() const { return mChildId; }
+
  protected:
   PRemoteDecoderParent* AllocPRemoteDecoderParent(
       const RemoteDecoderInfoIPDL& aRemoteDecoderInfo,

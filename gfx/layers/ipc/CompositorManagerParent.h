@@ -64,6 +64,8 @@ class CompositorManagerParent final : public PCompositorManagerParent {
 
   static void NotifyWebRenderError(wr::WebRenderError aError);
 
+  const dom::ContentParentId& ChildId() const { return mChildId; }
+
  private:
   static StaticRefPtr<CompositorManagerParent> sInstance;
   static StaticMutex sMutex MOZ_UNANNOTATED;

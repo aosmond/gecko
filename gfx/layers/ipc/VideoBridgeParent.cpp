@@ -7,6 +7,7 @@
 #include "VideoBridgeParent.h"
 #include "CompositorThread.h"
 #include "mozilla/DataMutex.h"
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/layers/TextureHost.h"
 #include "mozilla/layers/VideoBridgeUtils.h"
@@ -146,10 +147,10 @@ void VideoBridgeParent::ReleaseCompositorThread() {
 PTextureParent* VideoBridgeParent::AllocPTextureParent(
     const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
     const LayersBackend& aLayersBackend, const TextureFlags& aFlags,
-    const uint64_t& aSerial) {
-  PTextureParent* parent =
-      TextureHost::CreateIPDLActor(this, aSharedData, std::move(aReadLock),
-                                   aLayersBackend, aFlags, aSerial, Nothing());
+    const uint64_t& aContentId, const uint64_t& aSerial) {
+  PTextureParent* parent = TextureHost::CreateIPDLActor(
+      this, aSharedData, std::move(aReadLock), aLayersBackend, aFlags,
+      dom::ContentParentId(aContentId), aSerial, Nothing());
 
   if (!parent) {
     return nullptr;

@@ -210,7 +210,7 @@ class CompositorBridgeParentBase : public PCompositorBridgeParent,
 
   bool mCanSend;
 
- private:
+ protected:
   RefPtr<CompositorManagerParent> mCompositorManager;
 };
 

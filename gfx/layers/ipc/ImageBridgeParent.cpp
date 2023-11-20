@@ -294,7 +294,7 @@ PTextureParent* ImageBridgeParent::AllocPTextureParent(
     const LayersBackend& aLayersBackend, const TextureFlags& aFlags,
     const uint64_t& aSerial, const wr::MaybeExternalImageId& aExternalImageId) {
   return TextureHost::CreateIPDLActor(this, aSharedData, std::move(aReadLock),
-                                      aLayersBackend, aFlags, aSerial,
+                                      aLayersBackend, aFlags, mChildId, aSerial,
                                       aExternalImageId);
 }
 

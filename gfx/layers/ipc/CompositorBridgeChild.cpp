@@ -504,8 +504,8 @@ CompositorBridgeChild::GetTileLockAllocator() {
 
 PTextureChild* CompositorBridgeChild::CreateTexture(
     const SurfaceDescriptor& aSharedData, ReadLockDescriptor&& aReadLock,
-    LayersBackend aLayersBackend, TextureFlags aFlags, uint64_t aSerial,
-    wr::MaybeExternalImageId& aExternalImageId) {
+    LayersBackend aLayersBackend, TextureFlags aFlags, uint64_t aContentId,
+    uint64_t aSerial, wr::MaybeExternalImageId& aExternalImageId) {
   PTextureChild* textureChild =
       AllocPTextureChild(aSharedData, aReadLock, aLayersBackend, aFlags,
                          LayersId{0} /* FIXME */, aSerial, aExternalImageId);
