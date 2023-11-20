@@ -44,7 +44,9 @@ TextureHost* GPUVideoTextureHost::EnsureWrappedTextureHost() {
     // crashes.
     return nullptr;
   }
-  mWrappedTextureHost = parent->LookupTexture(sd.handle());
+
+  uint64_t contentId = TextureHost::GetTextureContentId(mActor);
+  mWrappedTextureHost = parent->LookupTexture(contentId, sd.handle());
 
   if (!mWrappedTextureHost) {
     // The TextureHost hasn't been registered yet. This is due to a race

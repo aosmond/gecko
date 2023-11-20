@@ -160,6 +160,14 @@ uint64_t TextureHost::GetTextureSerial(PTextureParent* actor) {
   return static_cast<TextureParent*>(actor)->mSerial;
 }
 
+// static
+uint64_t TextureHost::GetTextureContentId(PTextureParent* actor) {
+  if (!actor) {
+    return UINT64_MAX;
+  }
+  return static_cast<TextureParent*>(actor)->mContentId;
+}
+
 PTextureParent* TextureHost::GetIPDLActor() { return mActor; }
 
 void TextureHost::SetLastFwdTransactionId(uint64_t aTransactionId) {
