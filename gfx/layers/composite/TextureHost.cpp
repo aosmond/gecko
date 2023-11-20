@@ -160,6 +160,14 @@ uint64_t TextureHost::GetTextureSerial(PTextureParent* actor) {
   return static_cast<TextureParent*>(actor)->mSerial;
 }
 
+// static
+dom::ContentParentId TextureHost::GetTextureContentId(PTextureParent* actor) {
+  if (!actor) {
+    return dom::ContentParentId();
+  }
+  return static_cast<TextureParent*>(actor)->mContentId;
+}
+
 PTextureParent* TextureHost::GetIPDLActor() { return mActor; }
 
 void TextureHost::SetLastFwdTransactionId(uint64_t aTransactionId) {
@@ -348,7 +356,8 @@ already_AddRefed<TextureHost> CreateBackendIndependentTextureHost(
       MOZ_ASSERT(aDesc.get_SurfaceDescriptorGPUVideo().type() ==
                  SurfaceDescriptorGPUVideo::TSurfaceDescriptorRemoteDecoder);
       result = GPUVideoTextureHost::CreateFromDescriptor(
-          aFlags, aDesc.get_SurfaceDescriptorGPUVideo());
+          aDeallocator->GetContentId(), aFlags,
+          aDesc.get_SurfaceDescriptorGPUVideo());
       break;
     }
     default: {

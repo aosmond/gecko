@@ -547,6 +547,8 @@ class TextureHost : public AtomicRefCountedWithFinalize<TextureHost> {
 
   static uint64_t GetTextureSerial(PTextureParent* actor);
 
+  static dom::ContentParentId GetTextureContentId(PTextureParent* actor);
+
   /**
    * Return a pointer to the IPDLActor.
    *
