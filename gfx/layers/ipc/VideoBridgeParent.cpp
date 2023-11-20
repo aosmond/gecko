@@ -146,10 +146,10 @@ void VideoBridgeParent::ReleaseCompositorThread() {
 PTextureParent* VideoBridgeParent::AllocPTextureParent(
     const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
     const LayersBackend& aLayersBackend, const TextureFlags& aFlags,
-    const uint64_t& aSerial) {
-  PTextureParent* parent =
-      TextureHost::CreateIPDLActor(this, aSharedData, std::move(aReadLock),
-                                   aLayersBackend, aFlags, aSerial, Nothing());
+    const dom::ContentParentId& aContentId, const uint64_t& aSerial) {
+  PTextureParent* parent = TextureHost::CreateIPDLActor(
+      this, aSharedData, std::move(aReadLock), aLayersBackend, aFlags,
+      aContentId, aSerial, Nothing());
 
   if (!parent) {
     return nullptr;

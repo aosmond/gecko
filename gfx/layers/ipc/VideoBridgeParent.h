@@ -38,6 +38,7 @@ class VideoBridgeParent final : public PVideoBridgeParent,
                                       ReadLockDescriptor& aReadLock,
                                       const LayersBackend& aLayersBackend,
                                       const TextureFlags& aFlags,
+                                      const dom::ContentParentId& aContentId,
                                       const uint64_t& aSerial);
   bool DeallocPTextureParent(PTextureParent* actor);
 
