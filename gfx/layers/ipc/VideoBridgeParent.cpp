@@ -30,6 +30,7 @@ VideoBridgeParent::VideoBridgeParent(VideoBridgeSource aSource)
     : mMonitor("VideoBridgeParent::mMonitor"),
       mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()),
       mClosed(false) {
+  printf_stderr("[AO] [%p] VideoBridgeParent::VideoBridgeParent -- enter\n", this);
   auto videoBridgeFromProcess = sVideoBridgeFromProcess.Lock();
   switch (aSource) {
     case VideoBridgeSource::RddProcess:
@@ -43,6 +44,7 @@ VideoBridgeParent::VideoBridgeParent(VideoBridgeSource aSource)
 }
 
 VideoBridgeParent::~VideoBridgeParent() {
+  printf_stderr("[AO] [%p] VideoBridgeParent::~VideoBridgeParent -- enter\n", this);
   auto videoBridgeFromProcess = sVideoBridgeFromProcess.Lock();
   for (auto& bridgeParent : *videoBridgeFromProcess) {
     if (bridgeParent == this) {
@@ -63,6 +65,7 @@ void VideoBridgeParent::Open(Endpoint<PVideoBridgeParent>&& aEndpoint,
 }
 
 void VideoBridgeParent::Bind(Endpoint<PVideoBridgeParent>&& aEndpoint) {
+  printf_stderr("[AO] [%p] VideoBridgeParent::Bind -- enter\n", this);
   if (!aEndpoint.Bind(this)) {
     // We can't recover from this.
     MOZ_CRASH("Failed to bind VideoBridgeParent to endpoint");
@@ -113,16 +116,22 @@ already_AddRefed<TextureHost> VideoBridgeParent::LookupTexture(
     const dom::ContentParentId& aContentId, uint64_t aSerial) {
   MonitorAutoLock lock(mMonitor);
 
+  printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- enter %lx[%lx]\n", this, uint64_t(aContentId), aSerial);
+
   // We raced shutting down the actor.
   if (NS_WARN_IF(!mCompositorThreadHolder)) {
+    printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- no comp thread holder\n", this);
     return nullptr;
   }
 
   auto* actor = mTextureMap[aSerial];
   if (actor) {
     if (NS_WARN_IF(aContentId != TextureHost::GetTextureContentId(actor))) {
+      auto id = TextureHost::GetTextureContentId(actor);
+      printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- mismatch id %lx vs %lx\n", this, uint64_t(aContentId), uint64_t(id));
       return nullptr;
     }
+    printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- actor %p\n", this, actor);
     return do_AddRef(TextureHost::AsTextureHost(actor));
   }
 
@@ -130,6 +139,7 @@ already_AddRefed<TextureHost> VideoBridgeParent::LookupTexture(
   // the IPC calls for the update on.
   if (NS_WARN_IF(mCompositorThreadHolder->IsInThread())) {
     MOZ_ASSERT_UNREACHABLE("Should never call on Compositor thread!");
+    printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- comp thread\n", this);
     return nullptr;
   }
 
@@ -166,17 +176,22 @@ already_AddRefed<TextureHost> VideoBridgeParent::LookupTexture(
 
   actor = mTextureMap[aSerial];
   if (!actor) {
+    printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- timeout\n", this);
     return nullptr;
   }
 
-  if (NS_WARN_IF(aContentId != TextureHost::GetTextureContentId(actor))) {
+  auto id = TextureHost::GetTextureContentId(actor);
+  if (NS_WARN_IF(aContentId != id)) {
+    printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- mismatch id %lx vs %lx, delayed\n", this, uint64_t(aContentId), uint64_t(id));
     return nullptr;
   }
 
+  printf_stderr("[AO] [%p] VideoBridgeParent::LookupTexture -- actor, delayed %p\n", this, actor);
   return do_AddRef(TextureHost::AsTextureHost(actor));
 }
 
 void VideoBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
+  printf_stderr("[AO] [%p] VideoBridgeParent::ActorDestroy -- enter\n", this);
   bool shutdown = sVideoBridgeParentShutDown;
 
   if (!shutdown && aWhy == AbnormalShutdown) {
@@ -195,6 +210,7 @@ void VideoBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
 
 /* static */
 void VideoBridgeParent::Shutdown() {
+  printf_stderr("[AO] VideoBridgeParent::Shutdown -- enter\n");
   CompositorThread()->Dispatch(NS_NewRunnableFunction(
       "VideoBridgeParent::Shutdown",
       []() -> void { VideoBridgeParent::ShutdownInternal(); }));
@@ -202,6 +218,7 @@ void VideoBridgeParent::Shutdown() {
 
 /* static */
 void VideoBridgeParent::ShutdownInternal() {
+  printf_stderr("[AO] VideoBridgeParent::ShutdownInternal -- enter\n");
   sVideoBridgeParentShutDown = true;
 
   nsTArray<RefPtr<VideoBridgeParent>> bridges;
@@ -220,6 +237,7 @@ void VideoBridgeParent::ShutdownInternal() {
   for (auto& bridge : bridges) {
     bridge->Close();
   }
+  printf_stderr("[AO] VideoBridgeParent::ShutdownInternal -- exit\n");
 }
 
 /* static */
@@ -235,14 +253,17 @@ void VideoBridgeParent::UnregisterExternalImages() {
 }
 
 void VideoBridgeParent::DoUnregisterExternalImages() {
+  printf_stderr("[AO] [%p] VideoBridgeParent::DoUnregisterExternalImages -- enter\n", this);
   const ManagedContainer<PTextureParent>& textures = ManagedPTextureParent();
   for (const auto& key : textures) {
     RefPtr<TextureHost> texture = TextureHost::AsTextureHost(key);
 
     if (texture) {
+      printf_stderr("[AO] [%p] VideoBridgeParent::DoUnregisterExternalImages -- texture %p actor %p\n", this, texture.get(), texture->GetIPDLActor());
       texture->MaybeDestroyRenderTexture();
     }
   }
+  printf_stderr("[AO] [%p] VideoBridgeParent::DoUnregisterExternalImages -- exit\n", this);
 }
 
 PTextureParent* VideoBridgeParent::AllocPTextureParent(
@@ -252,6 +273,7 @@ PTextureParent* VideoBridgeParent::AllocPTextureParent(
   PTextureParent* parent = TextureHost::CreateIPDLActor(
       this, aSharedData, std::move(aReadLock), aLayersBackend, aFlags,
       aContentId, aSerial, Nothing());
+  printf_stderr("[AO] [%p] VideoBridgeParent::AllocPTextureParent -- add texture %p %lx[%lx]\n", this, parent, uint64_t(aContentId), aSerial);
 
   if (!parent) {
     return nullptr;
@@ -265,6 +287,7 @@ PTextureParent* VideoBridgeParent::AllocPTextureParent(
 
 bool VideoBridgeParent::DeallocPTextureParent(PTextureParent* actor) {
   MonitorAutoLock lock(mMonitor);
+  printf_stderr("[AO] [%p] VideoBridgeParent::DellocPTextureParent -- remove texture %p\n", this, actor);
   mTextureMap.erase(TextureHost::GetTextureSerial(actor));
   return TextureHost::DestroyIPDLActor(actor);
 }
