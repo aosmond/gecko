@@ -906,6 +906,7 @@ bool TexUnpackSurface::TexOrSubImage(bool isSubImage, bool needsRespec,
       }
       RefPtr<layers::TextureHost> texture =
           parent->LookupTexture(webgl->GetContentId(), sdrd.handle());
+      printf_stderr("[AO] texture %p\n", texture.get());
       if (!texture) {
         gfxCriticalNote << "TexUnpackSurface failed to get TextureHost";
         return false;
