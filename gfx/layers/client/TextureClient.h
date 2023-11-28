@@ -623,7 +623,12 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
 
   TextureReadLock* GetReadLock() { return mReadLock; }
 
-  bool IsReadLocked() const;
+  bool IsReadLocked();
+
+  bool ShouldReadLock() const {
+    return bool(mFlags & (TextureFlags::NON_BLOCKING_READ_LOCK |
+                          TextureFlags::BLOCKING_READ_LOCK));
+  }
 
   bool TryReadLock();
   void ReadUnlock();
@@ -664,6 +669,7 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
       LayersBackend aLayersBackend, TextureFlags aTextureFlags,
       TextureAllocationFlags flags = ALLOC_DEFAULT);
 
+  void EnsureHasReadLock();
   void EnableReadLock();
   void EnableBlockingReadLock();
 
