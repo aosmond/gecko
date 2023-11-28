@@ -75,14 +75,40 @@ using namespace mozilla::gl;
 using namespace mozilla::gfx;
 
 struct TextureDeallocParams {
-  TextureData* data;
+  TextureData* data = nullptr;
   RefPtr<TextureChild> actor;
+  RefPtr<TextureReadLock> readLock;
   RefPtr<LayersIPCChannel> allocator;
-  bool clientDeallocation;
-  bool syncDeallocation;
+  bool clientDeallocation = false;
+  bool syncDeallocation = false;
+
+  TextureDeallocParams() = default;
+  TextureDeallocParams(const TextureDeallocParams&) = delete;
+  TextureDeallocParams& operator=(const TextureDeallocParams&) = delete;
+
+  TextureDeallocParams(TextureDeallocParams&& aOther)
+      : data(aOther.data),
+        actor(std::move(aOther.actor)),
+        readLock(std::move(aOther.readLock)),
+        allocator(std::move(aOther.allocator)),
+        clientDeallocation(aOther.clientDeallocation),
+        syncDeallocation(aOther.syncDeallocation) {
+    aOther.data = nullptr;
+  }
+
+  TextureDeallocParams& operator=(TextureDeallocParams&& aOther) {
+    data = aOther.data;
+    aOther.data = nullptr;
+    actor = std::move(aOther.actor);
+    readLock = std::move(aOther.readLock);
+    allocator = std::move(aOther.allocator);
+    clientDeallocation = aOther.clientDeallocation;
+    syncDeallocation = aOther.syncDeallocation;
+    return *this;
+  }
 };
 
-void DeallocateTextureClient(TextureDeallocParams params);
+void DeallocateTextureClient(TextureDeallocParams& params);
 
 /**
  * TextureChild is the content-side incarnation of the PTexture IPDL actor.
@@ -236,7 +262,7 @@ class TextureChild final : PTextureChild {
   bool mUsesImageBridge;
 
   friend class TextureClient;
-  friend void DeallocateTextureClient(TextureDeallocParams params);
+  friend void DeallocateTextureClient(TextureDeallocParams& params);
 };
 
 static inline gfx::BackendType BackendTypeForBackendSelector(
@@ -431,21 +457,12 @@ void TextureChild::Destroy(const TextureDeallocParams& aParams) {
 /* static */
 Atomic<uint64_t> TextureClient::sSerialCounter(0);
 
-static void DeallocateTextureClientSyncProxy(TextureDeallocParams params,
-                                             ReentrantMonitor* aBarrier,
-                                             bool* aDone) {
-  DeallocateTextureClient(params);
-  ReentrantMonitorAutoEnter autoMon(*aBarrier);
-  *aDone = true;
-  aBarrier->NotifyAll();
-}
-
 /// The logic for synchronizing a TextureClient's deallocation goes here.
 ///
 /// This funciton takes care of dispatching work to the right thread using
 /// a synchronous proxy if needed, and handles client/host deallocation.
-void DeallocateTextureClient(TextureDeallocParams params) {
-  if (!params.actor && !params.data) {
+void DeallocateTextureClient(TextureDeallocParams& params) {
+  if (!params.actor && !params.readLock && !params.data) {
     // Nothing to do
     return;
   }
@@ -469,15 +486,22 @@ void DeallocateTextureClient(TextureDeallocParams params) {
       bool done = false;
       ReentrantMonitor barrier MOZ_UNANNOTATED("DeallocateTextureClient");
       ReentrantMonitorAutoEnter autoMon(barrier);
-      ipdlThread->Dispatch(NewRunnableFunction(
-          "DeallocateTextureClientSyncProxyRunnable",
-          DeallocateTextureClientSyncProxy, params, &barrier, &done));
+      ipdlThread->Dispatch(NS_NewRunnableFunction(
+          "DeallocateTextureClientSyncProxyRunnable", [&]() {
+            DeallocateTextureClient(params);
+            ReentrantMonitorAutoEnter autoMonInner(barrier);
+            done = true;
+            barrier.NotifyAll();
+          }));
       while (!done) {
         barrier.Wait();
       }
     } else {
-      ipdlThread->Dispatch(NewRunnableFunction(
-          "DeallocateTextureClientRunnable", DeallocateTextureClient, params));
+      ipdlThread->Dispatch(
+          NS_NewRunnableFunction("DeallocateTextureClientRunnable",
+                                 [params = std::move(params)]() mutable {
+                                   DeallocateTextureClient(params);
+                                 }));
     }
     // The work has been forwarded to the IPDL thread, we are done.
     return;
@@ -492,6 +516,11 @@ void DeallocateTextureClient(TextureDeallocParams params) {
     // This should ideally not happen outside of gtest, but some shutdown
     // raciness could put us in this situation.
     params.allocator = nullptr;
+  }
+
+  if (params.readLock) {
+    // This should be the last reference to the object, which will destroy it.
+    params.readLock = nullptr;
   }
 
   if (!actor) {
@@ -515,10 +544,9 @@ void TextureClient::Destroy() {
   }
 
   mBorrowedDrawTarget = nullptr;
-  mReadLock = nullptr;
 
-  RefPtr<TextureChild> actor = mActor;
-  mActor = nullptr;
+  RefPtr<TextureChild> actor = std::move(mActor);
+  RefPtr<TextureReadLock> readLock = std::move(mReadLock);
 
   if (actor && !actor->mDestroyed.compareExchange(false, true)) {
     actor->Unlock();
@@ -528,9 +556,10 @@ void TextureClient::Destroy() {
   TextureData* data = mData;
   mData = nullptr;
 
-  if (data || actor) {
+  if (data || actor || readLock) {
     TextureDeallocParams params;
-    params.actor = actor;
+    params.actor = std::move(actor);
+    params.readLock = std::move(readLock);
     params.allocator = mAllocator;
     params.clientDeallocation = !!(mFlags & TextureFlags::DEALLOCATE_CLIENT);
     params.data = data;
@@ -542,8 +571,8 @@ void TextureClient::Destroy() {
     // Release the lock before calling DeallocateTextureClient because the
     // latter may wait for the main thread which could create a dead-lock.
 
-    if (actor) {
-      actor->Unlock();
+    if (params.actor) {
+      params.actor->Unlock();
     }
 
     DeallocateTextureClient(params);
