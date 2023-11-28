@@ -98,6 +98,7 @@
 #include "mozilla/gfx/PatternHelpers.h"
 #include "mozilla/gfx/Swizzle.h"
 #include "mozilla/layers/PersistentBufferProvider.h"
+#include "mozilla/layers/SourceSurfaceDescriptor.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/RestyleManager.h"
@@ -5345,6 +5346,10 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
                                        &imgSize, &intrinsicImgSize, &cropRect);
   }
 
+  const bool drawSelf =
+      (element && element == mCanvasElement) ||
+      (offscreenCanvas && offscreenCanvas == mOffscreenCanvas);
+
   DirectDrawInfo drawInfo;
 
   if (!srcSurf) {
@@ -5367,7 +5372,16 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       }
     }
 
-    srcSurf = res.GetSourceSurface();
+    if (!drawSelf && res.mLayersImage && !res.mImageRequest &&
+        mTarget->GetBackendType() == BackendType::RECORDING) {
+      srcSurf =
+          layers::SourceSurfaceDescriptor::CreateForCanvas(res.mLayersImage);
+    }
+
+    if (!srcSurf) {
+      srcSurf = res.GetSourceSurface();
+    }
+
     if (!srcSurf && !res.mDrawInfo.mImgContainer) {
       // https://html.spec.whatwg.org/#check-the-usability-of-the-image-argument:
       //
@@ -5490,8 +5504,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
 
   if (srcSurf) {
     gfx::Rect sourceRect(aSx, aSy, aSw, aSh);
-    if ((element && element == mCanvasElement) ||
-        (offscreenCanvas && offscreenCanvas == mOffscreenCanvas)) {
+    if (drawSelf) {
       // srcSurf is a snapshot of mTarget. If we draw to mTarget now, we'll
       // trigger a COW copy of the whole canvas into srcSurf. That's a huge
       // waste if sourceRect doesn't cover the whole canvas.
