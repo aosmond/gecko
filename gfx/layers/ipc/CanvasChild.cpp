@@ -70,9 +70,8 @@ bool CanvasChild::Init() {
     return false;
   }
 
-  RefPtr<dom::StrongWorkerRef> workerRef = dom::StrongWorkerRef::Create(
-      workerPrivate, "CanvasChild::Init",
-      [self = RefPtr{this}]() { self->Destroy(); });
+  RefPtr<dom::StrongWorkerRef> workerRef =
+      dom::StrongWorkerRef::CreateForcibly(workerPrivate, "CanvasChild::Init");
   if (NS_WARN_IF(!workerRef)) {
     return false;
   }
