@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "CanvasManagerChild.h"
+#include "mozilla/dom/CanvasRenderingContext2D.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/gfx/2D.h"
@@ -39,6 +40,11 @@ void CanvasManagerChild::ActorDestroy(ActorDestroyReason aReason) {
 }
 
 void CanvasManagerChild::Destroy() {
+  std::set<CanvasRenderingContext2D*> activeCanvas = std::move(mActiveCanvas);
+  for (auto& i : activeCanvas) {
+    i->OnShutdown();
+  }
+
   if (mActiveResourceTracker) {
     mActiveResourceTracker->AgeAllGenerations();
     mActiveResourceTracker.reset();
@@ -151,6 +157,16 @@ void CanvasManagerChild::Destroy() {
   }
 
   return sLocalManager.get();
+}
+
+void CanvasManagerChild::AddShutdownObserver(
+    dom::CanvasRenderingContext2D* aCanvas) {
+  mActiveCanvas.insert(aCanvas);
+}
+
+void CanvasManagerChild::RemoveShutdownObserver(
+    dom::CanvasRenderingContext2D* aCanvas) {
+  mActiveCanvas.erase(aCanvas);
 }
 
 void CanvasManagerChild::EndCanvasTransaction() {

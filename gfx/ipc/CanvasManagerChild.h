@@ -10,9 +10,11 @@
 #include "mozilla/gfx/PCanvasManagerChild.h"
 #include "mozilla/gfx/Types.h"
 #include "mozilla/ThreadLocal.h"
+#include <set>
 
 namespace mozilla {
 namespace dom {
+class CanvasRenderingContext2D;
 class IPCWorkerRef;
 class WorkerPrivate;
 }  // namespace dom
@@ -47,6 +49,9 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   static bool CreateParent(
       mozilla::ipc::Endpoint<PCanvasManagerParent>&& aEndpoint);
 
+  void AddShutdownObserver(dom::CanvasRenderingContext2D* aCanvas);
+  void RemoveShutdownObserver(dom::CanvasRenderingContext2D* aCanvas);
+
   bool IsCanvasActive() { return mActive; }
   void EndCanvasTransaction();
   void DeactivateCanvas();
@@ -67,6 +72,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   RefPtr<layers::CanvasChild> mCanvasChild;
   RefPtr<webgpu::WebGPUChild> mWebGPUChild;
   UniquePtr<layers::ActiveResourceTracker> mActiveResourceTracker;
+  std::set<dom::CanvasRenderingContext2D*> mActiveCanvas;
   const uint32_t mId;
   bool mActive = true;
 

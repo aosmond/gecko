@@ -582,7 +582,6 @@ void CanvasEventRingBuffer::ReturnRead(char* aOut, size_t aSize) {
 CanvasDrawEventRecorder::CanvasDrawEventRecorder() = default;
 
 CanvasDrawEventRecorder::~CanvasDrawEventRecorder() {
-  MOZ_ASSERT(!mWorkerRef);
   MOZ_ASSERT(mRecordedTextures.IsEmpty());
 }
 
@@ -595,9 +594,8 @@ bool CanvasDrawEventRecorder::Init(
 
   if (dom::WorkerPrivate* workerPrivate =
           dom::GetCurrentThreadWorkerPrivate()) {
-    RefPtr<dom::StrongWorkerRef> strongRef = dom::StrongWorkerRef::Create(
-        workerPrivate, "CanvasDrawEventRecorder::Init",
-        [self = RefPtr{this}]() { self->DetachResources(); });
+    RefPtr<dom::StrongWorkerRef> strongRef =
+        dom::StrongWorkerRef::CreateForcibly(workerPrivate, __func__);
     if (NS_WARN_IF(!strongRef)) {
       return false;
     }
@@ -632,10 +630,8 @@ void CanvasDrawEventRecorder::DetachResources() {
   DrawEventRecorderPrivate::DetachResources();
   mOutputStream.Destroy();
 
-  {
-    auto lockedPendingDeletions = mPendingDeletions.Lock();
-    mWorkerRef = nullptr;
-  }
+  auto lockedPendingDeletions = mPendingDeletions.Lock();
+  mWorkerRef = nullptr;
 }
 
 bool CanvasDrawEventRecorder::IsOnOwningThread() {
