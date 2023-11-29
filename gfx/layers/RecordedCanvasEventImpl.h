@@ -11,6 +11,7 @@
 #include "mozilla/gfx/RecordingTypes.h"
 #include "mozilla/layers/CanvasTranslator.h"
 #include "mozilla/layers/CompositorTypes.h"
+#include "mozilla/layers/LayersSurfaces.h"
 #include "mozilla/layers/TextureClient.h"
 
 namespace mozilla {
@@ -40,6 +41,7 @@ const EventType REMOVE_SURFACE_ALIAS = EventType(EventType::LAST + 9);
 const EventType DEVICE_CHANGE_ACKNOWLEDGED = EventType(EventType::LAST + 10);
 const EventType NEXT_TEXTURE_ID = EventType(EventType::LAST + 11);
 const EventType TEXTURE_DESTRUCTION = EventType(EventType::LAST + 12);
+const EventType SURFACE_DESCRIPTOR_CREATION = EventType(EventType::LAST + 13);
 
 class RecordedCanvasBeginTransaction final
     : public RecordedEventDerived<RecordedCanvasBeginTransaction> {
@@ -576,6 +578,26 @@ RecordedTextureDestruction::RecordedTextureDestruction(S& aStream)
   ReadElement(aStream, mTextureId);
 }
 
+class RecordedSurfaceDescriptorCreation final
+    : public RecordedEventDerived<RecordedSurfaceDescriptorCreation> {
+ public:
+  explicit RecordedSurfaceDescriptorCreation(const SurfaceDescriptor& aDesc)
+      : RecordedEventDerived(SURFACE_DESCRIPTOR_CREATION), mDesc(aDesc) {}
+
+  template <class S>
+  MOZ_IMPLICIT RecordedSurfaceDescriptorCreation(S& aStream);
+
+  bool PlayCanvasEvent(CanvasTranslator* aTranslator) const;
+
+  template <class S>
+  void Record(S& aStream) const;
+
+  std::string GetName() const final { return "RecordedSurfaceDescriptorCreation"; }
+
+ private:
+  SurfaceDescriptor mDesc;
+};
+
 #define FOR_EACH_CANVAS_EVENT(f)                                   \
   f(CANVAS_BEGIN_TRANSACTION, RecordedCanvasBeginTransaction);     \
   f(CANVAS_END_TRANSACTION, RecordedCanvasEndTransaction);         \
@@ -589,7 +611,8 @@ RecordedTextureDestruction::RecordedTextureDestruction(S& aStream)
   f(REMOVE_SURFACE_ALIAS, RecordedRemoveSurfaceAlias);             \
   f(DEVICE_CHANGE_ACKNOWLEDGED, RecordedDeviceChangeAcknowledged); \
   f(NEXT_TEXTURE_ID, RecordedNextTextureId);                       \
-  f(TEXTURE_DESTRUCTION, RecordedTextureDestruction);
+  f(TEXTURE_DESTRUCTION, RecordedTextureDestruction);              \
+  f(SURFACE_DESCRIPTOR_CREATION, RecordedSurfaceDescriptorCreation);
 
 }  // namespace layers
 }  // namespace mozilla
