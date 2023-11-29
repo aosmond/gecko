@@ -686,7 +686,9 @@ bool TextureClient::TryReadLock() {
 }
 
 void TextureClient::ReadUnlock() {
-  MOZ_ASSERT(ShouldReadLock());
+  if (!ShouldReadLock()) {
+    return;
+  }
 
   if (nsCOMPtr<nsISerialEventTarget> thread = mAllocator->GetThread()) {
     if (!thread->IsOnCurrentThread()) {
