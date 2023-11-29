@@ -623,7 +623,7 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
 
   TextureReadLock* GetReadLock() { return mReadLock; }
 
-  bool IsReadLocked() const;
+  bool IsReadLocked() const { return mIsReadLocked; }
 
   bool ShouldReadLock() const {
     return bool(mFlags & (TextureFlags::NON_BLOCKING_READ_LOCK |
@@ -669,6 +669,7 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
       LayersBackend aLayersBackend, TextureFlags aTextureFlags,
       TextureAllocationFlags flags = ALLOC_DEFAULT);
 
+  void EnsureHasReadLock();
   void EnableReadLock();
   void EnableBlockingReadLock();
 
@@ -715,11 +716,8 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
 #ifdef DEBUG
   uint32_t mExpectedDtRefs;
 #endif
-  // This member tracks whether or not TextureClient::InitIPDLActor has been
-  // called.
-  Atomic<bool> mHasInitActor;
   bool mIsLocked;
-  bool mIsReadLocked;
+  Atomic<bool> mIsReadLocked;
   // This member tracks that the texture was written into until the update
   // is sent to the compositor. We need this remember to lock mReadLock on
   // behalf of the compositor just before sending the notification.
