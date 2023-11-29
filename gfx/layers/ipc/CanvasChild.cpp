@@ -7,6 +7,10 @@
 #include "CanvasChild.h"
 
 #include "MainThreadUtils.h"
+#include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerPrivate.h"
+#include "mozilla/dom/WorkerRef.h"
+#include "mozilla/dom/WorkerRunnable.h"
 #include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DrawTargetRecording.h"
 #include "mozilla/gfx/Tools.h"
@@ -51,9 +55,33 @@ class RingBufferWriterServices final
   WeakPtr<CanvasChild> mCanvasChild;
 };
 
-CanvasChild::CanvasChild() = default;
+CanvasChild::CanvasChild() : mMutex("CanvasChild::mMutex"){};
 
 CanvasChild::~CanvasChild() { NS_ASSERT_OWNINGTHREAD(CanvasChild); }
+
+bool CanvasChild::Init() {
+  if (NS_IsMainThread()) {
+    return true;
+  }
+
+  dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
+  if (NS_WARN_IF(!workerPrivate)) {
+    MOZ_ASSERT_UNREACHABLE("Can only create on main or DOM worker threads!");
+    return false;
+  }
+
+  RefPtr<dom::StrongWorkerRef> workerRef = dom::StrongWorkerRef::Create(
+      workerPrivate, "CanvasChild::Init",
+      [self = RefPtr{this}]() { self->Destroy(); });
+  if (NS_WARN_IF(!workerRef)) {
+    return false;
+  }
+
+  MutexAutoLock lock(mMutex);
+  mWorkerRef = MakeAndAddRef<dom::ThreadSafeWorkerRef>(workerRef);
+  mIsOnWorker = true;
+  return true;
+}
 
 static void NotifyCanvasDeviceReset() {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
@@ -122,6 +150,9 @@ void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
     mRecorder->DetachResources();
     mRecorder = nullptr;
   }
+
+  MutexAutoLock lock(mMutex);
+  mWorkerRef = nullptr;
 }
 
 void CanvasChild::ResumeTranslation() {
@@ -138,6 +169,9 @@ void CanvasChild::Destroy() {
   if (CanSend()) {
     Send__delete__(this);
   }
+
+  MutexAutoLock lock(mMutex);
+  mWorkerRef = nullptr;
 }
 
 void CanvasChild::OnTextureWriteLock() {
@@ -153,6 +187,40 @@ void CanvasChild::OnTextureWriteLock() {
 }
 
 void CanvasChild::OnTextureForwarded() {
+  if (mIsOnWorker) {
+    MutexAutoLock lock(mMutex);
+    if (NS_WARN_IF(!mWorkerRef)) {
+      // We have begun shutdown or destroyed the actor.
+      return;
+    }
+
+    if (!mWorkerRef->Private()->IsOnCurrentThread()) {
+      class ForwardedRunnable final : public dom::WorkerRunnable {
+       public:
+        ForwardedRunnable(dom::WorkerPrivate* aWorkerPrivate,
+                          CanvasChild* aCanvasChild)
+            : dom::WorkerRunnable(aWorkerPrivate), mCanvasChild(aCanvasChild) {}
+
+        bool WorkerRun(JSContext*, dom::WorkerPrivate*) override {
+          mCanvasChild->OnTextureForwarded();
+          return true;
+        }
+
+       private:
+        RefPtr<CanvasChild> mCanvasChild;
+      };
+
+      auto task = MakeRefPtr<ForwardedRunnable>(mWorkerRef->Private(), this);
+      task->Dispatch();
+      return;
+    }
+  } else if (!NS_IsMainThread()) {
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "CanvasChild::OnTextureForwarded",
+        [self = RefPtr{this}]() { self->OnTextureForwarded(); }));
+    return;
+  }
+
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
 
   // We drop mRecorder in ActorDestroy to break the reference cycle.
