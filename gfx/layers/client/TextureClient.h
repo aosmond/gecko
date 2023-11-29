@@ -623,7 +623,7 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
 
   TextureReadLock* GetReadLock() { return mReadLock; }
 
-  bool IsReadLocked() const;
+  bool IsReadLocked();
 
   bool ShouldReadLock() const {
     return bool(mFlags & (TextureFlags::NON_BLOCKING_READ_LOCK |
@@ -717,7 +717,6 @@ class TextureClient : public AtomicRefCountedWithFinalize<TextureClient> {
 #endif
   // This member tracks whether or not TextureClient::InitIPDLActor has been
   // called.
-  Atomic<bool> mHasInitActor;
   bool mIsLocked;
   bool mIsReadLocked;
   // This member tracks that the texture was written into until the update
