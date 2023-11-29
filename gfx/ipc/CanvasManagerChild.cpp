@@ -180,10 +180,15 @@ RefPtr<layers::CanvasChild> CanvasManagerChild::GetCanvasChild() {
   }
 
   if (!mCanvasChild) {
-    mCanvasChild = MakeAndAddRef<layers::CanvasChild>();
-    if (!SendPCanvasConstructor(mCanvasChild)) {
-      mCanvasChild = nullptr;
+    auto canvasChild = MakeRefPtr<layers::CanvasChild>();
+    if (NS_WARN_IF(!canvasChild->Init())) {
+      return nullptr;
     }
+    if (NS_WARN_IF(!SendPCanvasConstructor(canvasChild))) {
+      mCanvasChild->Destroy();
+      return nullptr;
+    }
+    mCanvasChild = std::move(canvasChild);
   }
 
   return mCanvasChild;
