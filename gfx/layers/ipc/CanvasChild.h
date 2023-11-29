@@ -11,11 +11,16 @@
 #include "mozilla/ipc/CrossProcessSemaphore.h"
 #include "mozilla/layers/PCanvasChild.h"
 #include "mozilla/layers/SourceSurfaceSharedData.h"
+#include "mozilla/Mutex.h"
 #include "mozilla/WeakPtr.h"
 #include "nsRefPtrHashtable.h"
 #include "nsTArray.h"
 
 namespace mozilla {
+
+namespace dom {
+class ThreadSafeWorkerRef;
+}
 
 namespace gfx {
 class SourceSurface;
@@ -26,9 +31,15 @@ class CanvasDrawEventRecorder;
 
 class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
  public:
-  NS_INLINE_DECL_REFCOUNTING(CanvasChild)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasChild)
+  NS_DECL_OWNINGTHREAD
 
-  CanvasChild();
+  explicit CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef);
+
+  /**
+   * @returns true if initialization was successful.
+   */
+  bool Init();
 
   /**
    * @returns true if remote canvas has been deactivated due to failure.
@@ -144,6 +155,8 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   static bool mDeactivated;
   static bool mInForeground;
 
+  Mutex mMutex;
+  RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
   RefPtr<CanvasDrawEventRecorder> mRecorder;
   TextureType mTextureType = TextureType::Unknown;
   uint32_t mLastWriteLockCheckpoint = 0;
@@ -151,6 +164,7 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   std::vector<RefPtr<gfx::SourceSurface>> mLastTransactionExternalSurfaces;
   bool mIsInTransaction = false;
   bool mHasOutstandingWriteLock = false;
+  bool mIsOnWorker = false;
 };
 
 }  // namespace layers
