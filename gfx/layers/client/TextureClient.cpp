@@ -94,8 +94,8 @@ struct TextureDeallocParams {
         readLock(std::move(aOther.readLock)),
         allocator(std::move(aOther.allocator)),
         clientDeallocation(aOther.clientDeallocation),
-        syncDeallocation(aOther.syncDeallocation)
-      : selfDeleting(aOther.selfDeleting) {
+        syncDeallocation(aOther.syncDeallocation),
+        selfDeleting(aOther.selfDeleting) {
     aOther.data = nullptr;
   }
 
@@ -605,28 +605,71 @@ void TextureClient::UnlockActor() const {
   }
 }
 
-bool TextureClient::IsReadLocked() const {
-  if (!ShouldReadLock() || !mHasInitActor) {
-    return false;
+void TextureClient::EnsureHasReadLock() {
+  if (mFlags & TextureFlags::NON_BLOCKING_READ_LOCK) {
+    MOZ_ASSERT(!(mFlags & TextureFlags::BLOCKING_READ_LOCK));
+    EnableReadLock();
+  } else if (mFlags & TextureFlags::BLOCKING_READ_LOCK) {
+    MOZ_ASSERT(!(mFlags & TextureFlags::NON_BLOCKING_READ_LOCK));
+    EnableBlockingReadLock();
   }
-  if (NS_WARN_IF(!mReadLock)) {
-    MOZ_ASSERT_UNREACHABLE("Expected readlock but has none!");
-    return false;
-  }
-  MOZ_ASSERT(mReadLock->AsNonBlockingLock(),
-             "Can only check locked for non-blocking locks!");
-  return mReadLock->AsNonBlockingLock()->GetReadCount() > 1;
 }
 
 bool TextureClient::TryReadLock() {
-  if (!ShouldReadLock() || mIsReadLocked || !mHasInitActor) {
+  if (!ShouldReadLock()) {
     return true;
   }
 
-  if (NS_WARN_IF(!mReadLock)) {
-    MOZ_ASSERT_UNREACHABLE("Expected readlock but has none!");
+  if (nsCOMPtr<nsISerialEventTarget> thread = mAllocator->GetThread()) {
+    if (!thread->IsOnCurrentThread()) {
+      MOZ_ASSERT(mAllocator->UsesImageBridge());
+
+      class LockRunnable final : public Runnable {
+       public:
+        explicit LockRunnable(TextureClient* aTexture)
+            : Runnable("TextureClient::TryReadLock"),
+              mMonitor("LockRunnable::mMonitor"),
+              mTexture(aTexture) {}
+
+        NS_IMETHOD Run() override {
+          MonitorAutoLock lock(mMonitor);
+          mResult = mTexture->TryReadLock();
+          mComplete = true;
+          lock.NotifyAll();
+          return NS_OK;
+        }
+
+        bool Wait() {
+          MonitorAutoLock lock(mMonitor);
+          while (!mComplete) {
+            lock.Wait();
+          }
+          return mResult;
+        }
+
+       private:
+        Monitor mMonitor;
+        RefPtr<TextureClient> mTexture MOZ_GUARDED_BY(mMonitor);
+        bool mResult MOZ_GUARDED_BY(mMonitor) = false;
+        bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
+      };
+
+      auto task = MakeRefPtr<LockRunnable>(this);
+      thread->Dispatch(do_AddRef(task));
+      return task->Wait();
+    }
+  } else {
+    // We must be in the process of shutting down.
+    return false;
+  }
+
+  if (mReadLockCount > 0) {
+    ++mReadLockCount;
     return true;
   }
+
+  EnsureHasReadLock();
+  MOZ_ASSERT(mReadLock);
 
   if (mReadLock->AsNonBlockingLock()) {
     if (IsReadLocked()) {
@@ -638,18 +681,35 @@ bool TextureClient::TryReadLock() {
     return false;
   }
 
-  mIsReadLocked = true;
+  ++mReadLockCount;
   return true;
 }
 
 void TextureClient::ReadUnlock() {
-  if (!mIsReadLocked) {
+  if (!ShouldReadLock()) {
     return;
   }
-  MOZ_ASSERT(ShouldReadLock());
+
+  if (nsCOMPtr<nsISerialEventTarget> thread = mAllocator->GetThread()) {
+    if (!thread->IsOnCurrentThread()) {
+      MOZ_ASSERT(mAllocator->UsesImageBridge());
+      thread->Dispatch(NS_NewRunnableFunction(
+          "TextureClient::ReadUnlock",
+          [self = RefPtr{this}]() { self->ReadUnlock(); }));
+      return;
+    }
+  } else {
+    // We must be in the process of shutting down.
+    return;
+  }
+
+  if (mReadLockCount == 0) {
+    return;
+  }
+
   MOZ_ASSERT(mReadLock);
   mReadLock->ReadUnlock();
-  mIsReadLocked = false;
+  --mReadLockCount;
 }
 
 bool TextureClient::Lock(OpenMode aMode) {
@@ -1032,8 +1092,6 @@ bool TextureClient::InitIPDLActor(CompositableForwarder* aForwarder) {
   MOZ_ASSERT(aForwarder && aForwarder->GetTextureForwarder()->GetThread() ==
                                mAllocator->GetThread());
 
-  auto cleanupInitActor = MakeScopeExit([&]() { mHasInitActor = true; });
-
   if (mActor && !mActor->IPCOpen()) {
     return false;
   }
@@ -1080,13 +1138,7 @@ bool TextureClient::InitIPDLActor(CompositableForwarder* aForwarder) {
       aForwarder->GetTextureForwarder()->GetNextExternalImageId();
 
   ReadLockDescriptor readLockDescriptor = null_t();
-  if (mFlags & TextureFlags::NON_BLOCKING_READ_LOCK) {
-    MOZ_ASSERT(!(mFlags & TextureFlags::BLOCKING_READ_LOCK));
-    EnableReadLock();
-  } else if (mFlags & TextureFlags::BLOCKING_READ_LOCK) {
-    MOZ_ASSERT(!(mFlags & TextureFlags::NON_BLOCKING_READ_LOCK));
-    EnableBlockingReadLock();
-  }
+  EnsureHasReadLock();
   if (mReadLock) {
     mReadLock->Serialize(readLockDescriptor, GetAllocator()->GetParentPid());
   }
@@ -1377,9 +1429,8 @@ TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags,
       mExpectedDtRefs(0)
 #endif
       ,
-      mHasInitActor(false),
       mIsLocked(false),
-      mIsReadLocked(false),
+      mReadLockCount(0),
       mUpdated(false),
       mAddedToCompositableClient(false),
       mFwdTransactionId(0),
