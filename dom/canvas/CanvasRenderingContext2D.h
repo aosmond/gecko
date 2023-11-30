@@ -68,7 +68,6 @@ class Optional;
 
 struct CanvasBidiProcessor;
 class CanvasDrawObserver;
-class CanvasShutdownObserver;
 
 class DOMMatrix;
 class DOMMatrixReadOnly;
@@ -565,7 +564,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   virtual UniquePtr<uint8_t[]> GetImageBuffer(
       int32_t* out_format, gfx::IntSize* out_imageSize) override;
 
-  virtual void OnShutdown();
+  void OnShutdown();
 
   /**
    * Update CurrentState().filter with the filter description for
@@ -831,11 +830,12 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   // Whether the application expects to use operations that perform poorly with
   // acceleration.
   bool mWillReadFrequently = false;
+  // Whether or not we have already shutdown.
+  bool mHasShutdown = false;
 
-  RefPtr<CanvasShutdownObserver> mShutdownObserver;
-  virtual void AddShutdownObserver();
-  virtual void RemoveShutdownObserver();
-  virtual bool AlreadyShutDown() const { return !mShutdownObserver; }
+  void AddShutdownObserver();
+  void RemoveShutdownObserver();
+  bool AlreadyShutDown() const { return mHasShutdown; }
 
   /**
    * Flag to avoid duplicate calls to InvalidateFrame. Set to true whenever
