@@ -1212,8 +1212,8 @@ void CanvasRenderingContext2D::AddShutdownObserver() {
 }
 
 void CanvasRenderingContext2D::RemoveShutdownObserver() {
-  auto* const canvasManager = CanvasManagerChild::Get();
-  if (NS_WARN_IF(!canvasManager)) {
+  auto* const canvasManager = CanvasManagerChild::MaybeGet();
+  if (!canvasManager) {
     return;
   }
 
