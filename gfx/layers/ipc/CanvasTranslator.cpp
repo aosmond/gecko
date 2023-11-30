@@ -366,7 +366,9 @@ bool CanvasTranslator::CreateReferenceTexture() {
     return false;
   }
 
+  printf_stderr("[AO] CanvasTranslator::CreateReferenceTexture -- lock\n");
   mReferenceTextureData->Lock(OpenMode::OPEN_READ_WRITE);
+  printf_stderr("[AO] CanvasTranslator::CreateReferenceTexture -- lock acquired\n");
   mBaseDT = mReferenceTextureData->BorrowDrawTarget();
   if (!mBaseDT) {
     // We might get a null draw target due to a device failure, just return
@@ -446,7 +448,9 @@ already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
     TextureData* textureData = CreateTextureData(mTextureType, aSize, aFormat);
     if (textureData) {
       MOZ_DIAGNOSTIC_ASSERT(mNextTextureId >= 0, "No texture ID set");
+      printf_stderr("[AO] CanvasTranslator::CreateDrawTarget -- lock\n");
       textureData->Lock(OpenMode::OPEN_READ_WRITE);
+      printf_stderr("[AO] CanvasTranslator::CreateDrawTarget -- lock acquired\n");
       mTextureDatas[mNextTextureId] = UniquePtr<TextureData>(textureData);
       gfx::CanvasManagerParent::AddReplayTexture(this, mNextTextureId,
                                                  textureData);

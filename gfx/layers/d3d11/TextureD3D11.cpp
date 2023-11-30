@@ -300,6 +300,7 @@ D3D11TextureData::D3D11TextureData(ID3D11Texture2D* aTexture,
 
 static void DestroyDrawTarget(RefPtr<DrawTarget>& aDT,
                               RefPtr<ID3D11Texture2D>& aTexture) {
+  printf_stderr("[AO] DestroyDrawTarget -- enter\n");
   // An Azure DrawTarget needs to be locked when it gets nullptr'ed as this is
   // when it calls EndDraw. This EndDraw should not execute anything so it
   // shouldn't -really- need the lock but the debug layer chokes on this.
@@ -310,6 +311,7 @@ static void DestroyDrawTarget(RefPtr<DrawTarget>& aDT,
   AutoSerializeWithMoz2D serializeWithMoz2D(BackendType::DIRECT2D1_1);
   UnlockD3DTexture(aTexture.get(), SerializeWithMoz2D::No);
   aTexture = nullptr;
+  printf_stderr("[AO] DestroyDrawTarget -- exit\n");
 }
 
 D3D11TextureData::~D3D11TextureData() {

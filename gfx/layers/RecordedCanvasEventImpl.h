@@ -160,7 +160,9 @@ inline bool RecordedTextureLock::PlayCanvasEvent(
     return false;
   }
 
+  printf_stderr("[AO] RecordedTextureLock::PlayCanvasEvent -- lock\n");
   textureData->Lock(mMode);
+  printf_stderr("[AO] RecordedTextureLock::PlayCanvasEvent -- lock acquired\n");
   return true;
 }
 
