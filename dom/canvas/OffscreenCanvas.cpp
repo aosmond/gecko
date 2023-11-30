@@ -66,11 +66,15 @@ OffscreenCanvas::OffscreenCanvas(
       mDisplay(aDisplay) {}
 
 OffscreenCanvas::~OffscreenCanvas() {
+  Destroy();
+  NS_ReleaseOnMainThread("OffscreenCanvas::mExpandedReader",
+                         mExpandedReader.forget());
+}
+
+void OffscreenCanvas::Destroy() {
   if (mDisplay) {
     mDisplay->DestroyCanvas();
   }
-  NS_ReleaseOnMainThread("OffscreenCanvas::mExpandedReader",
-                         mExpandedReader.forget());
 }
 
 JSObject* OffscreenCanvas::WrapObject(JSContext* aCx,
