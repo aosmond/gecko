@@ -579,7 +579,9 @@ void CanvasEventRingBuffer::ReturnRead(char* aOut, size_t aSize) {
   mWrite->returnCount = readCount;
 }
 
-CanvasDrawEventRecorder::CanvasDrawEventRecorder() = default;
+CanvasDrawEventRecorder::CanvasDrawEventRecorder(
+    dom::ThreadSafeWorkerRef* aWorkerRef)
+    : mWorkerRef(aWorkerRef), mIsOnWorker(!!aWorkerRef) {}
 
 CanvasDrawEventRecorder::~CanvasDrawEventRecorder() {
   MOZ_ASSERT(!mWorkerRef);
@@ -592,19 +594,6 @@ bool CanvasDrawEventRecorder::Init(
     CrossProcessSemaphoreHandle* aWriterSem,
     UniquePtr<CanvasEventRingBuffer::WriterServices> aWriterServices) {
   NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-
-  if (dom::WorkerPrivate* workerPrivate =
-          dom::GetCurrentThreadWorkerPrivate()) {
-    RefPtr<dom::StrongWorkerRef> strongRef =
-        dom::StrongWorkerRef::CreateForcibly(workerPrivate, __func__);
-    if (NS_WARN_IF(!strongRef)) {
-      return false;
-    }
-
-    auto lockedPendingDeletions = mPendingDeletions.Lock();
-    mWorkerRef = new dom::ThreadSafeWorkerRef(strongRef);
-    mOnWorker = true;
-  }
 
   return mOutputStream.InitWriter(aOtherPid, aHandle, aReaderSem, aWriterSem,
                                   std::move(aWriterServices));
@@ -644,7 +633,7 @@ bool CanvasDrawEventRecorder::IsOnOwningThread() {
     return mWorkerRef->Private()->IsOnCurrentThread();
   }
 
-  MOZ_RELEASE_ASSERT(!mOnWorker, "Worker already shutdown!");
+  MOZ_RELEASE_ASSERT(!mIsOnWorker, "Worker already shutdown!");
   return NS_IsMainThread();
 }
 
@@ -652,7 +641,7 @@ void CanvasDrawEventRecorder::QueueProcessPendingDeletionsLocked(
     RefPtr<CanvasDrawEventRecorder>&& aRecorder) {
   if (!mWorkerRef) {
     MOZ_RELEASE_ASSERT(
-        !mOnWorker,
+        !mIsOnWorker,
         "QueueProcessPendingDeletionsLocked called after worker shutdown!");
 
     NS_DispatchToMainThread(NS_NewRunnableFunction(
@@ -714,7 +703,7 @@ void CanvasDrawEventRecorder::AddPendingDeletion(
     bool wasEmpty = lockedPendingDeletions->empty();
     lockedPendingDeletions->emplace_back(std::move(aPendingDeletion));
 
-    MOZ_RELEASE_ASSERT(!mOnWorker || mWorkerRef,
+    MOZ_RELEASE_ASSERT(!mIsOnWorker || mWorkerRef,
                        "AddPendingDeletion called after worker shutdown!");
 
     // If we are not on the owning thread, we must queue an event to run the

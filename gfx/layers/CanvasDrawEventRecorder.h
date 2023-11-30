@@ -278,7 +278,7 @@ class CanvasEventRingBuffer final : public gfx::EventRingBuffer {
 class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(CanvasDrawEventRecorder, final)
-  explicit CanvasDrawEventRecorder();
+  explicit CanvasDrawEventRecorder(dom::ThreadSafeWorkerRef* aWorkerRef);
   ~CanvasDrawEventRecorder() override;
 
   bool Init(base::ProcessId aOtherPid, ipc::SharedMemoryBasic::Handle* aHandle,
@@ -378,7 +378,7 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
       RefPtr<CanvasDrawEventRecorder>&& aRecorder);
 
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
-  bool mOnWorker = false;
+  bool mIsOnWorker = false;
   nsTHashSet<RecordedTextureData*> mRecordedTextures;
   nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
       mRecordedSurfaces;
