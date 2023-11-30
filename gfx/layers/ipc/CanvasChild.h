@@ -34,7 +34,7 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasChild)
   NS_DECL_OWNINGTHREAD
 
-  CanvasChild();
+  explicit CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef);
 
   /**
    * @returns true if initialization was successful.

@@ -199,12 +199,9 @@ RefPtr<layers::CanvasChild> CanvasManagerChild::GetCanvasChild() {
   }
 
   if (!mCanvasChild) {
-    auto canvasChild = MakeRefPtr<layers::CanvasChild>();
-    if (NS_WARN_IF(!canvasChild->Init())) {
-      return nullptr;
-    }
+    auto canvasChild = MakeRefPtr<layers::CanvasChild>(mWorkerRef);
     if (NS_WARN_IF(!SendPCanvasConstructor(canvasChild))) {
-      mCanvasChild->Destroy();
+      canvasChild->Destroy();
       return nullptr;
     }
     mCanvasChild = std::move(canvasChild);

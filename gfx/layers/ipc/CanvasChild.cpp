@@ -55,32 +55,12 @@ class RingBufferWriterServices final
   WeakPtr<CanvasChild> mCanvasChild;
 };
 
-CanvasChild::CanvasChild() : mMutex("CanvasChild::mMutex"){};
+CanvasChild::CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef)
+    : mMutex("CanvasChild::mMutex"),
+      mWorkerRef(aWorkerRef),
+      mIsOnWorker(!!aWorkerRef){};
 
 CanvasChild::~CanvasChild() { NS_ASSERT_OWNINGTHREAD(CanvasChild); }
-
-bool CanvasChild::Init() {
-  if (NS_IsMainThread()) {
-    return true;
-  }
-
-  dom::WorkerPrivate* workerPrivate = dom::GetCurrentThreadWorkerPrivate();
-  if (NS_WARN_IF(!workerPrivate)) {
-    MOZ_ASSERT_UNREACHABLE("Can only create on main or DOM worker threads!");
-    return false;
-  }
-
-  RefPtr<dom::StrongWorkerRef> workerRef =
-      dom::StrongWorkerRef::CreateForcibly(workerPrivate, "CanvasChild::Init");
-  if (NS_WARN_IF(!workerRef)) {
-    return false;
-  }
-
-  MutexAutoLock lock(mMutex);
-  mWorkerRef = MakeAndAddRef<dom::ThreadSafeWorkerRef>(workerRef);
-  mIsOnWorker = true;
-  return true;
-}
 
 static void NotifyCanvasDeviceReset() {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
