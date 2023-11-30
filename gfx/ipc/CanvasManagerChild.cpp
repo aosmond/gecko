@@ -182,6 +182,7 @@ void CanvasManagerChild::EndCanvasTransaction() {
 }
 
 void CanvasManagerChild::DeactivateCanvas() {
+  MOZ_ASSERT_UNREACHABLE("Deactive remote canvas?!?!");
   mActive = false;
   if (mCanvasChild) {
     mCanvasChild->Destroy();
