@@ -1195,6 +1195,10 @@ void CanvasRenderingContext2D::OnShutdown() {
     provider->OnShutdown();
   }
 
+  if (mOffscreenCanvas) {
+    mOffscreenCanvas->Destroy();
+  }
+
   mHasShutdown = true;
 }
 
