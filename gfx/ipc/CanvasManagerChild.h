@@ -15,7 +15,7 @@
 namespace mozilla {
 namespace dom {
 class CanvasRenderingContext2D;
-class IPCWorkerRef;
+class ThreadSafeWorkerRef;
 class WorkerPrivate;
 }  // namespace dom
 
@@ -68,7 +68,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   ~CanvasManagerChild();
   void Destroy();
 
-  RefPtr<mozilla::dom::IPCWorkerRef> mWorkerRef;
+  RefPtr<mozilla::dom::ThreadSafeWorkerRef> mWorkerRef;
   RefPtr<layers::CanvasChild> mCanvasChild;
   RefPtr<webgpu::WebGPUChild> mWebGPUChild;
   UniquePtr<layers::ActiveResourceTracker> mActiveResourceTracker;

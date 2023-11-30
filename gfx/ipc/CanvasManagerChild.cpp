@@ -24,7 +24,7 @@ namespace mozilla::gfx {
 // The IPDL actor holds a strong reference to CanvasManagerChild which we use
 // to keep it alive. The owning thread will tell us to close when it is
 // shutdown, either via CanvasManagerChild::Shutdown for the main thread, or
-// via a shutdown callback from IPCWorkerRef for worker threads.
+// via a shutdown callback from ThreadSafeWorkerRef for worker threads.
 MOZ_THREAD_LOCAL(CanvasManagerChild*) CanvasManagerChild::sLocalManager;
 
 Atomic<uint32_t> CanvasManagerChild::sNextId(1);
@@ -118,14 +118,16 @@ void CanvasManagerChild::Destroy() {
   auto manager = MakeRefPtr<CanvasManagerChild>(sNextId++);
 
   if (worker) {
-    // The IPCWorkerRef will let us know when the worker is shutting down. This
-    // will let us clear our threadlocal reference and close the actor. We rely
-    // upon an explicit shutdown for the main thread.
-    manager->mWorkerRef = IPCWorkerRef::Create(
+    // The ThreadSafeWorkerRef will let us know when the worker is shutting
+    // down. This will let us clear our threadlocal reference and close the
+    // actor. We rely upon an explicit shutdown for the main thread.
+    RefPtr<StrongWorkerRef> workerRef = StrongWorkerRef::Create(
         worker, "CanvasManager", [manager]() { manager->Destroy(); });
-    if (NS_WARN_IF(!manager->mWorkerRef)) {
+    if (NS_WARN_IF(!workerRef)) {
       return nullptr;
     }
+
+    manager->mWorkerRef = new ThreadSafeWorkerRef(workerRef);
   }
 
   if (NS_WARN_IF(!childEndpoint.Bind(manager))) {
