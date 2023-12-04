@@ -66,6 +66,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
 
  private:
   ~CanvasManagerChild();
+  void DestroyInternal();
   void Destroy();
 
   RefPtr<mozilla::dom::ThreadSafeWorkerRef> mWorkerRef;

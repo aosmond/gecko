@@ -34,13 +34,14 @@ CanvasManagerChild::CanvasManagerChild(uint32_t aId) : mId(aId) {}
 CanvasManagerChild::~CanvasManagerChild() = default;
 
 void CanvasManagerChild::ActorDestroy(ActorDestroyReason aReason) {
+  DestroyInternal();
   if (sLocalManager.get() == this) {
     sLocalManager.set(nullptr);
   }
   mWorkerRef = nullptr;
 }
 
-void CanvasManagerChild::Destroy() {
+void CanvasManagerChild::DestroyInternal() {
   std::set<CanvasRenderingContext2D*> activeCanvas = std::move(mActiveCanvas);
   for (auto& i : activeCanvas) {
     i->OnShutdown();
@@ -55,6 +56,10 @@ void CanvasManagerChild::Destroy() {
     mCanvasChild->Destroy();
     mCanvasChild = nullptr;
   }
+}
+
+void CanvasManagerChild::Destroy() {
+  DestroyInternal();
 
   // The caller has a strong reference. ActorDestroy will clear sLocalManager
   // and mWorkerRef.
