@@ -894,16 +894,21 @@ bool TextureClient::OnForwardedToHost() {
     mData->OnForwardedToHost();
   }
 
-  MOZ_ASSERT_IF(ShouldReadLock(), mReadLock);
-  if (mReadLock && mUpdated) {
+  if (!ShouldReadLock() || !mUpdated) {
+    return false;
+  }
+
+  {
+    MutexAutoLock lock(mMutex);
+    EnsureHasReadLock();
+    MOZ_ASSERT(mReadLock);
     // Take a read lock on behalf of the TextureHost. The latter will unlock
     // after the shared data is available again for drawing.
     mReadLock->ReadLock();
-    mUpdated = false;
-    return true;
   }
 
-  return false;
+  mUpdated = false;
+  return true;
 }
 
 TextureClient::~TextureClient() {
@@ -1217,9 +1222,13 @@ bool TextureClient::InitIPDLActor(CompositableForwarder* aForwarder) {
       aForwarder->GetTextureForwarder()->GetNextExternalImageId();
 
   ReadLockDescriptor readLockDescriptor = null_t();
-  EnsureHasReadLock();
-  if (mReadLock) {
-    mReadLock->Serialize(readLockDescriptor, GetAllocator()->GetParentPid());
+
+  {
+    MutexAutoLock lock(mMutex);
+    EnsureHasReadLock();
+    if (mReadLock) {
+      mReadLock->Serialize(readLockDescriptor, GetAllocator()->GetParentPid());
+    }
   }
 
   PTextureChild* actor = aForwarder->GetTextureForwarder()->CreateTexture(
@@ -1286,8 +1295,12 @@ bool TextureClient::InitIPDLActor(KnowsCompositor* aKnowsCompositor) {
       aKnowsCompositor->GetTextureForwarder()->GetNextExternalImageId();
 
   ReadLockDescriptor readLockDescriptor = null_t();
-  if (mReadLock) {
-    mReadLock->Serialize(readLockDescriptor, GetAllocator()->GetParentPid());
+  {
+    MutexAutoLock lock(mMutex);
+    EnsureHasReadLock();
+    if (mReadLock) {
+      mReadLock->Serialize(readLockDescriptor, GetAllocator()->GetParentPid());
+    }
   }
 
   PTextureChild* actor =
