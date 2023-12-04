@@ -13,6 +13,7 @@
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/dom/WorkerRunnable.h"
 #include "mozilla/layers/CanvasChild.h"
+#include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/TextureRecorded.h"
 #include "mozilla/layers/SharedSurfacesChild.h"
 #include "nsThreadUtils.h"
@@ -614,6 +615,16 @@ void CanvasDrawEventRecorder::DetachResources() {
     RefPtr<SourceSurfaceCanvasRecording> surface(entry.GetData());
     if (surface) {
       surface->DestroyOnOwningThread();
+    }
+  }
+
+  // There may be pending deletions waiting on the ImageBridgeChild thread for
+  // this recorder. Let's make sure we handle any outstanding events before
+  // destroying our worker reference.
+  if (mIsOnWorker) {
+    if (RefPtr<ImageBridgeChild> imageBridge =
+            ImageBridgeChild::GetSingleton()) {
+      imageBridge->FlushEvents();
     }
   }
 
