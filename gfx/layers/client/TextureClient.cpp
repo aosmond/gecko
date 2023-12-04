@@ -562,7 +562,6 @@ void TextureClient::Destroy() {
   RefPtr<TextureReadLock> readLock;
   {
     MutexAutoLock lock(mMutex);
-    MOZ_ASSERT(!mIsReadLocked);
     readLock = std::move(mReadLock);
   }
 
@@ -1781,8 +1780,6 @@ bool MemoryTextureReadLock::Serialize(ReadLockDescriptor& aOutput,
 }
 
 bool MemoryTextureReadLock::ReadLock() {
-  NS_ASSERT_OWNINGTHREAD(MemoryTextureReadLock);
-
   ++mReadCount;
   return true;
 }
@@ -1795,7 +1792,6 @@ int32_t MemoryTextureReadLock::ReadUnlock() {
 }
 
 int32_t MemoryTextureReadLock::GetReadCount() {
-  NS_ASSERT_OWNINGTHREAD(MemoryTextureReadLock);
   return mReadCount;
 }
 
@@ -1829,7 +1825,6 @@ bool ShmemTextureReadLock::Serialize(ReadLockDescriptor& aOutput,
 }
 
 bool ShmemTextureReadLock::ReadLock() {
-  NS_ASSERT_OWNINGTHREAD(ShmemTextureReadLock);
   if (!mAllocSuccess) {
     return false;
   }
@@ -1858,7 +1853,6 @@ int32_t ShmemTextureReadLock::ReadUnlock() {
 }
 
 int32_t ShmemTextureReadLock::GetReadCount() {
-  NS_ASSERT_OWNINGTHREAD(ShmemTextureReadLock);
   if (!mAllocSuccess) {
     return 0;
   }

@@ -186,9 +186,6 @@ class TextureReadLock {
   virtual LockType GetType() = 0;
 
   virtual NonBlockingTextureReadLock* AsNonBlockingLock() { return nullptr; }
-
- protected:
-  NS_DECL_OWNINGTHREAD
 };
 
 class NonBlockingTextureReadLock : public TextureReadLock {
