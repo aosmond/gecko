@@ -14,6 +14,7 @@
 
 namespace mozilla {
 namespace dom {
+class CanvasPattern;
 class CanvasRenderingContext2D;
 class ThreadSafeWorkerRef;
 class WorkerPrivate;
@@ -52,6 +53,9 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   void AddShutdownObserver(dom::CanvasRenderingContext2D* aCanvas);
   void RemoveShutdownObserver(dom::CanvasRenderingContext2D* aCanvas);
 
+  void AddShutdownObserver(dom::CanvasPattern* aPattern);
+  void RemoveShutdownObserver(dom::CanvasPattern* aPattern);
+
   bool IsCanvasActive() { return mActive; }
   void EndCanvasTransaction();
   void DeactivateCanvas();
@@ -74,6 +78,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   RefPtr<webgpu::WebGPUChild> mWebGPUChild;
   UniquePtr<layers::ActiveResourceTracker> mActiveResourceTracker;
   std::set<dom::CanvasRenderingContext2D*> mActiveCanvas;
+  std::set<dom::CanvasPattern*> mActiveCanvasPattern;
   const uint32_t mId;
   bool mActive = true;
 

@@ -5,6 +5,7 @@
 #include "CanvasPattern.h"
 
 #include "mozilla/dom/CanvasRenderingContext2D.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 
 namespace mozilla::dom {
 CanvasPattern::CanvasPattern(CanvasRenderingContext2D* aContext,
@@ -16,7 +17,22 @@ CanvasPattern::CanvasPattern(CanvasRenderingContext2D* aContext,
       mPrincipal(principalForSecurityCheck),
       mForceWriteOnly(forceWriteOnly),
       mCORSUsed(CORSUsed),
-      mRepeat(aRepeat) {}
+      mRepeat(aRepeat) {
+  if (auto* cm = gfx::CanvasManagerChild::Get()) {
+    cm->AddShutdownObserver(this);
+  }
+}
 
-CanvasPattern::~CanvasPattern() = default;
+CanvasPattern::~CanvasPattern() {
+  if (auto* cm = gfx::CanvasManagerChild::MaybeGet()) {
+    cm->RemoveShutdownObserver(this);
+  }
+}
+
+void CanvasPattern::OnShutdown() {
+  mPrincipal = nullptr;
+  mSurface = nullptr;
+  mContext = nullptr;
+}
+
 }  // namespace mozilla::dom

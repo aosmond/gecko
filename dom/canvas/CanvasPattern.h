@@ -42,6 +42,8 @@ class CanvasPattern final : public nsWrapperCache {
 
   CanvasRenderingContext2D* GetParentObject() { return mContext; }
 
+  void OnShutdown();
+
   // WebIDL
   void SetTransform(const DOMMatrix2DInit& aInit, ErrorResult& aError);
 

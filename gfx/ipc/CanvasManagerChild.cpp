@@ -6,6 +6,7 @@
 
 #include "CanvasManagerChild.h"
 #include "mozilla/AppShutdown.h"
+#include "mozilla/dom/CanvasPattern.h"
 #include "mozilla/dom/CanvasRenderingContext2D.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
@@ -42,6 +43,12 @@ void CanvasManagerChild::ActorDestroy(ActorDestroyReason aReason) {
 }
 
 void CanvasManagerChild::DestroyInternal() {
+  std::set<CanvasPattern*> activeCanvasPattern =
+      std::move(mActiveCanvasPattern);
+  for (auto& i : activeCanvasPattern) {
+    i->OnShutdown();
+  }
+
   std::set<CanvasRenderingContext2D*> activeCanvas = std::move(mActiveCanvas);
   for (auto& i : activeCanvas) {
     i->OnShutdown();
@@ -183,6 +190,14 @@ void CanvasManagerChild::AddShutdownObserver(
 void CanvasManagerChild::RemoveShutdownObserver(
     dom::CanvasRenderingContext2D* aCanvas) {
   mActiveCanvas.erase(aCanvas);
+}
+
+void CanvasManagerChild::AddShutdownObserver(dom::CanvasPattern* aPattern) {
+  mActiveCanvasPattern.insert(aPattern);
+}
+
+void CanvasManagerChild::RemoveShutdownObserver(dom::CanvasPattern* aPattern) {
+  mActiveCanvasPattern.erase(aPattern);
 }
 
 void CanvasManagerChild::EndCanvasTransaction() {
