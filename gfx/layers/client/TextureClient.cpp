@@ -558,7 +558,13 @@ void TextureClient::Destroy() {
   mBorrowedDrawTarget = nullptr;
 
   RefPtr<TextureChild> actor = std::move(mActor);
-  RefPtr<TextureReadLock> readLock = std::move(mReadLock);
+
+  RefPtr<TextureReadLock> readLock;
+  {
+    MutexAutoLock lock(mMutex);
+    MOZ_ASSERT(!mIsReadLocked);
+    readLock = std::move(mReadLock);
+  }
 
   if (actor && !actor->mDestroyed.compareExchange(false, true)) {
     actor->Unlock();
@@ -619,54 +625,66 @@ bool TextureClient::IsReadLocked() {
     return false;
   }
 
-  if (nsCOMPtr<nsISerialEventTarget> thread = mAllocator->GetThread()) {
-    if (!thread->IsOnCurrentThread()) {
-      MOZ_ASSERT(mAllocator->UsesImageBridge());
+  nsCOMPtr<nsISerialEventTarget> thread;
 
-      class StatusRunnable final : public Runnable {
-       public:
-        explicit StatusRunnable(TextureClient* aTexture)
-            : Runnable("TextureClient::IsReadLocked"),
-              mMonitor("StatusRunnable::mMonitor"),
-              mTexture(aTexture) {}
-
-        NS_IMETHOD Run() override {
-          MonitorAutoLock lock(mMonitor);
-          mResult = mTexture->IsReadLocked();
-          mComplete = true;
-          lock.NotifyAll();
-          return NS_OK;
-        }
-
-        bool Wait() {
-          MonitorAutoLock lock(mMonitor);
-          while (!mComplete) {
-            lock.Wait();
-          }
-          return mResult;
-        }
-
-       private:
-        Monitor mMonitor;
-        RefPtr<TextureClient> mTexture MOZ_GUARDED_BY(mMonitor);
-        bool mResult MOZ_GUARDED_BY(mMonitor) = false;
-        bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
-      };
-
-      auto task = MakeRefPtr<StatusRunnable>(this);
-      thread->Dispatch(do_AddRef(task));
-      return task->Wait();
+  {
+    MutexAutoLock lock(mMutex);
+    if (mReadLock) {
+      MOZ_ASSERT(mReadLock->AsNonBlockingLock(),
+                 "Can only check locked for non-blocking locks!");
+      return mReadLock->AsNonBlockingLock()->GetReadCount() > 1;
     }
-  } else {
-    // We must be in the process of shutting down.
-    return false;
+
+    thread = mAllocator->GetThread();
+    if (!thread) {
+      // We must be in the process of shutting down.
+      return false;
+    }
+
+    if (thread->IsOnCurrentThread()) {
+      EnsureHasReadLock();
+      MOZ_ASSERT(mReadLock);
+      MOZ_ASSERT(mReadLock->AsNonBlockingLock(),
+                 "Can only check locked for non-blocking locks!");
+      return mReadLock->AsNonBlockingLock()->GetReadCount() > 1;
+    }
   }
 
-  EnsureHasReadLock();
-  MOZ_ASSERT(mReadLock);
-  MOZ_ASSERT(mReadLock->AsNonBlockingLock(),
-             "Can only check locked for non-blocking locks!");
-  return mReadLock->AsNonBlockingLock()->GetReadCount() > 1;
+  MOZ_ASSERT(mAllocator->UsesImageBridge());
+
+  class StatusRunnable final : public Runnable {
+   public:
+    explicit StatusRunnable(TextureClient* aTexture)
+        : Runnable("TextureClient::IsReadLocked"),
+          mMonitor("StatusRunnable::mMonitor"),
+          mTexture(aTexture) {}
+
+    NS_IMETHOD Run() override {
+      MonitorAutoLock lock(mMonitor);
+      mResult = mTexture->IsReadLocked();
+      mComplete = true;
+      lock.NotifyAll();
+      return NS_OK;
+    }
+
+    bool Wait() {
+      MonitorAutoLock lock(mMonitor);
+      while (!mComplete) {
+        lock.Wait();
+      }
+      return mResult;
+    }
+
+   private:
+    Monitor mMonitor;
+    RefPtr<TextureClient> mTexture MOZ_GUARDED_BY(mMonitor);
+    bool mResult MOZ_GUARDED_BY(mMonitor) = false;
+    bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
+  };
+
+  auto task = MakeRefPtr<StatusRunnable>(this);
+  thread->Dispatch(do_AddRef(task));
+  return task->Wait();
 }
 
 bool TextureClient::TryReadLock() {
@@ -674,68 +692,87 @@ bool TextureClient::TryReadLock() {
     return true;
   }
 
-  if (nsCOMPtr<nsISerialEventTarget> thread = mAllocator->GetThread()) {
-    if (!thread->IsOnCurrentThread()) {
-      MOZ_ASSERT(mAllocator->UsesImageBridge());
+  nsCOMPtr<nsISerialEventTarget> thread;
 
-      class LockRunnable final : public Runnable {
-       public:
-        explicit LockRunnable(TextureClient* aTexture)
-            : Runnable("TextureClient::TryReadLock"),
-              mMonitor("LockRunnable::mMonitor"),
-              mTexture(aTexture) {}
-
-        NS_IMETHOD Run() override {
-          MonitorAutoLock lock(mMonitor);
-          mResult = mTexture->TryReadLock();
-          mComplete = true;
-          lock.NotifyAll();
-          return NS_OK;
-        }
-
-        bool Wait() {
-          MonitorAutoLock lock(mMonitor);
-          while (!mComplete) {
-            lock.Wait();
-          }
-          return mResult;
-        }
-
-       private:
-        Monitor mMonitor;
-        RefPtr<TextureClient> mTexture MOZ_GUARDED_BY(mMonitor);
-        bool mResult MOZ_GUARDED_BY(mMonitor) = false;
-        bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
-      };
-
-      auto task = MakeRefPtr<LockRunnable>(this);
-      thread->Dispatch(do_AddRef(task));
-      return task->Wait();
+  {
+    MutexAutoLock lock(mMutex);
+    if (mIsReadLocked) {
+      return true;
     }
-  } else {
-    // We must be in the process of shutting down.
-    return false;
-  }
 
-  if (mIsReadLocked) {
-    return true;
-  }
+    if (mReadLock) {
+      if (mReadLock->AsNonBlockingLock() &&
+          mReadLock->AsNonBlockingLock()->GetReadCount() > 1) {
+        return false;
+      }
 
-  EnsureHasReadLock();
-  MOZ_ASSERT(mReadLock);
+      if (!mReadLock->TryReadLock(TimeDuration::FromMilliseconds(500))) {
+        return false;
+      }
 
-  if (mReadLock->AsNonBlockingLock()) {
-    if (IsReadLocked()) {
+      mIsReadLocked = true;
+      return true;
+    }
+
+    thread = mAllocator->GetThread();
+    if (!thread) {
+      // We must be in the process of shutting down.
       return false;
     }
+
+    if (thread->IsOnCurrentThread()) {
+      EnsureHasReadLock();
+      MOZ_ASSERT(mReadLock);
+
+      if (mReadLock->AsNonBlockingLock() &&
+          mReadLock->AsNonBlockingLock()->GetReadCount() > 1) {
+        return false;
+      }
+
+      if (!mReadLock->TryReadLock(TimeDuration::FromMilliseconds(500))) {
+        return false;
+      }
+
+      mIsReadLocked = true;
+      return true;
+    }
   }
 
-  if (!mReadLock->TryReadLock(TimeDuration::FromMilliseconds(500))) {
-    return false;
-  }
+  MOZ_ASSERT(mAllocator->UsesImageBridge());
 
-  mIsReadLocked = true;
-  return true;
+  class LockRunnable final : public Runnable {
+   public:
+    explicit LockRunnable(TextureClient* aTexture)
+        : Runnable("TextureClient::TryReadLock"),
+          mMonitor("LockRunnable::mMonitor"),
+          mTexture(aTexture) {}
+
+    NS_IMETHOD Run() override {
+      MonitorAutoLock lock(mMonitor);
+      mResult = mTexture->TryReadLock();
+      mComplete = true;
+      lock.NotifyAll();
+      return NS_OK;
+    }
+
+    bool Wait() {
+      MonitorAutoLock lock(mMonitor);
+      while (!mComplete) {
+        lock.Wait();
+      }
+      return mResult;
+    }
+
+   private:
+    Monitor mMonitor;
+    RefPtr<TextureClient> mTexture MOZ_GUARDED_BY(mMonitor);
+    bool mResult MOZ_GUARDED_BY(mMonitor) = false;
+    bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
+  };
+
+  auto task = MakeRefPtr<LockRunnable>(this);
+  thread->Dispatch(do_AddRef(task));
+  return task->Wait();
 }
 
 void TextureClient::ReadUnlock() {
@@ -743,18 +780,7 @@ void TextureClient::ReadUnlock() {
     return;
   }
 
-  if (nsCOMPtr<nsISerialEventTarget> thread = mAllocator->GetThread()) {
-    if (!thread->IsOnCurrentThread()) {
-      MOZ_ASSERT(mAllocator->UsesImageBridge());
-      thread->Dispatch(NS_NewRunnableFunction(
-          "TextureClient::ReadUnlock",
-          [self = RefPtr{this}]() { self->ReadUnlock(); }));
-      return;
-    }
-  } else {
-    // We must be in the process of shutting down.
-    return;
-  }
+  MutexAutoLock lock(mMutex);
 
   if (!mIsReadLocked) {
     return;
@@ -1472,6 +1498,7 @@ already_AddRefed<TextureClient> TextureClient::CreateForYCbCr(
 TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags,
                              LayersIPCChannel* aAllocator)
     : AtomicRefCountedWithFinalize("TextureClient"),
+      mMutex("TextureClient::mMutex"),
       mAllocator(aAllocator),
       mActor(nullptr),
       mData(aData),
