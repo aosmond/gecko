@@ -274,6 +274,9 @@ already_AddRefed<nsICanvasRenderingContextInternal>
 OffscreenCanvas::CreateContext(CanvasContextType aContextType) {
   RefPtr<nsICanvasRenderingContextInternal> ret =
       CanvasRenderingContextHelper::CreateContext(aContextType);
+  if (NS_WARN_IF(!ret)) {
+    return nullptr;
+  }
 
   ret->SetOffscreenCanvas(this);
   return ret.forget();

@@ -1099,7 +1099,13 @@ CanvasRenderingContext2D::~CanvasRenderingContext2D() {
   }
 }
 
-void CanvasRenderingContext2D::Initialize() { AddShutdownObserver(); }
+nsresult CanvasRenderingContext2D::Initialize() {
+  if (NS_WARN_IF(!AddShutdownObserver())) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return NS_OK;
+}
 
 JSObject* CanvasRenderingContext2D::WrapObject(
     JSContext* aCx, JS::Handle<JSObject*> aGivenProto) {
@@ -1202,13 +1208,15 @@ void CanvasRenderingContext2D::OnShutdown() {
   mHasShutdown = true;
 }
 
-void CanvasRenderingContext2D::AddShutdownObserver() {
+bool CanvasRenderingContext2D::AddShutdownObserver() {
   auto* const canvasManager = CanvasManagerChild::Get();
   if (NS_WARN_IF(!canvasManager)) {
-    return;
+    mHasShutdown = true;
+    return false;
   }
 
   canvasManager->AddShutdownObserver(this);
+  return true;
 }
 
 void CanvasRenderingContext2D::RemoveShutdownObserver() {
@@ -1839,6 +1847,10 @@ void CanvasRenderingContext2D::ReturnTarget(bool aForceReset) {
 NS_IMETHODIMP
 CanvasRenderingContext2D::InitializeWithDrawTarget(
     nsIDocShell* aShell, NotNull<gfx::DrawTarget*> aTarget) {
+  if (NS_WARN_IF(!AddShutdownObserver())) {
+    return NS_ERROR_FAILURE;
+  }
+
   RemovePostRefreshObserver();
   mDocShell = aShell;
   AddPostRefreshObserverIfNecessary();
