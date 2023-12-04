@@ -10,8 +10,6 @@
 #include "mozilla/gfx/DrawEventRecorder.h"
 #include "mozilla/ipc/CrossProcessSemaphore.h"
 #include "mozilla/ipc/SharedMemoryBasic.h"
-#include "mozilla/layers/SourceSurfaceCanvasRecording.h"
-#include "mozilla/layers/WebRenderBridgeChild.h"
 
 namespace mozilla {
 namespace dom {
@@ -19,7 +17,6 @@ class ThreadSafeWorkerRef;
 }
 
 namespace layers {
-class RecordedTextureData;
 
 static const uint8_t kCheckpointEventType = -1;
 static const uint8_t kDropBufferEventType = -2;
@@ -300,37 +297,6 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
     aEvent.RecordToStream(mOutputStream);
   }
 
-  void TrackRecordedTexture(RecordedTextureData* aTextureData) {
-    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-    DebugOnly<bool> rv = mRecordedTextures.EnsureInserted(aTextureData);
-    MOZ_ASSERT(rv, "Texture is already in set!");
-  }
-
-  void UntrackRecordedTexture(RecordedTextureData* aTextureData) {
-    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-    mRecordedTextures.Remove(aTextureData);
-  }
-
-  void TrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
-    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-    mRecordedSurfaces.InsertOrUpdate(aSurface, aSurface);
-  }
-
-  void UntrackDestroyedRecordedSurface(void* aSurface) {
-    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-    ThreadSafeWeakPtr<SourceSurfaceCanvasRecording> weakRef =
-        mRecordedSurfaces.Get(aSurface);
-    RefPtr<SourceSurfaceCanvasRecording> strongRef(weakRef);
-    if (!strongRef) {
-      mRecordedSurfaces.Remove(aSurface);
-    }
-  }
-
-  void UntrackRecordedSurface(SourceSurfaceCanvasRecording* aSurface) {
-    NS_ASSERT_OWNINGTHREAD(CanvasDrawEventRecorder);
-    mRecordedSurfaces.Remove(aSurface);
-  }
-
   void AddPendingDeletion(std::function<void()>&& aPendingDeletion) override;
 
   void StoreSourceSurfaceRecording(gfx::SourceSurface* aSurface,
@@ -379,9 +345,6 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate {
 
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef;
   bool mIsOnWorker = false;
-  nsTHashSet<RecordedTextureData*> mRecordedTextures;
-  nsTHashMap<void*, ThreadSafeWeakPtr<SourceSurfaceCanvasRecording>>
-      mRecordedSurfaces;
   CanvasEventRingBuffer mOutputStream;
 };
 

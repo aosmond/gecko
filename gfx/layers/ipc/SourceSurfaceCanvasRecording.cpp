@@ -35,7 +35,6 @@ SourceSurfaceCanvasRecording::~SourceSurfaceCanvasRecording() {
       [recorder = std::move(mRecorder), surfaceAlias,
        aliasedSurface = std::move(mRecordedSurface),
        canvasChild = std::move(mCanvasChild)]() -> void {
-        recorder->UntrackDestroyedRecordedSurface(surfaceAlias);
         recorder->RemoveStoredObject(surfaceAlias);
         recorder->RecordEvent(RecordedRemoveSurfaceAlias(surfaceAlias));
       });
@@ -48,7 +47,6 @@ void SourceSurfaceCanvasRecording::Init() {
   // It's important that AddStoredObject is called first because that will
   // run any pending processing required by recorded objects that have been
   // deleted off the main thread.
-  mRecorder->TrackRecordedSurface(this);
   mRecorder->AddStoredObject(this);
   mRecorder->RecordEvent(RecordedAddSurfaceAlias(this, mRecordedSurface));
 }
@@ -56,7 +54,6 @@ void SourceSurfaceCanvasRecording::Init() {
 void SourceSurfaceCanvasRecording::DestroyOnOwningThread() {
   if (mRecorder) {
     ReferencePtr surfaceAlias = this;
-    mRecorder->UntrackRecordedSurface(this);
     mRecorder->RemoveStoredObject(surfaceAlias);
     mRecorder->RecordEvent(RecordedRemoveSurfaceAlias(surfaceAlias));
     mRecorder = nullptr;

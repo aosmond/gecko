@@ -19,6 +19,7 @@
 #include "mozilla/ipc/Endpoint.h"
 #include "mozilla/ipc/ProcessChild.h"
 #include "mozilla/layers/CanvasDrawEventRecorder.h"
+#include "mozilla/layers/SourceSurfaceCanvasRecording.h"
 #include "nsIObserverService.h"
 #include "RecordedCanvasEventImpl.h"
 

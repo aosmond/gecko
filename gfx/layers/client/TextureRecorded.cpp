@@ -52,8 +52,6 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
     return false;
   }
 
-  recorder->TrackRecordedTexture(this);
-
   MutexAutoLock lock(mMutex);
   mRecorder = std::move(recorder);
   mCanvasChild = std::move(canvasChild);
@@ -65,10 +63,6 @@ void RecordedTextureData::DestroyOnOwningThreadLocked() {
   // because the TextureData might need to destroy its DrawTarget within a lock.
   mSnapshot = nullptr;
   mDT = nullptr;
-  if (mRecorder) {
-    mRecorder->UntrackRecordedTexture(this);
-    mRecorder = nullptr;
-  }
   if (mCanvasChild) {
     mCanvasChild->RecordEvent(RecordedTextureDestruction(mTextureId));
     mCanvasChild = nullptr;
