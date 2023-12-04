@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "CanvasManagerChild.h"
+#include "mozilla/AppShutdown.h"
 #include "mozilla/dom/CanvasRenderingContext2D.h"
 #include "mozilla/dom/WorkerPrivate.h"
 #include "mozilla/dom/WorkerRef.h"
@@ -128,6 +129,14 @@ void CanvasManagerChild::Destroy() {
     }
 
     manager->mWorkerRef = new ThreadSafeWorkerRef(workerRef);
+  } else if (NS_IsMainThread()) {
+    if (NS_WARN_IF(
+            AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed))) {
+      return nullptr;
+    }
+  } else {
+    MOZ_ASSERT_UNREACHABLE("Can only be used on main or DOM worker threads!");
+    return nullptr;
   }
 
   if (NS_WARN_IF(!childEndpoint.Bind(manager))) {
