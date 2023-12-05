@@ -134,24 +134,46 @@ already_AddRefed<TextureHost> VideoBridgeParent::LookupTexture(
   }
 
   // Canvas may have raced ahead of VideoBridgeParent setting up the
-  // PTextureParent IPDL object. This should happen only rarely/briefly.
-  TimeDuration timeout = TimeDuration::FromMilliseconds(
-      StaticPrefs::media_video_bridge_texture_timeout_ms());
-  while (!mClosed) {
-    if (lock.Wait(timeout) == CVStatus::Timeout) {
-      break;
-    }
+  // PTextureParent IPDL object. This should happen only rarely/briefly. Since
+  // we know that the PTexture constructor must be in the send queue, we can
+  // block until the IPDL ping comes back.
+  bool complete = false;
 
-    actor = mTextureMap[aSerial];
-    if (actor) {
-      if (NS_WARN_IF(aContentId != TextureHost::GetTextureContentId(actor))) {
-        return nullptr;
-      }
-      return do_AddRef(TextureHost::AsTextureHost(actor));
-    }
+  auto resolve = [&](void_t&&) {
+    MonitorAutoLock lock(mMonitor);
+    complete = true;
+    lock.NotifyAll();
+  };
+
+  auto reject = [&](ipc::ResponseRejectReason) {
+    MonitorAutoLock lock(mMonitor);
+    complete = true;
+    lock.NotifyAll();
+  };
+
+  mCompositorThreadHolder->Dispatch(
+      NS_NewRunnableFunction("VideoBridgeParent::LookupTexture", [&]() {
+        if (CanSend()) {
+          SendPing(std::move(resolve), std::move(reject));
+        } else {
+          reject(ipc::ResponseRejectReason::ChannelClosed);
+        }
+      }));
+
+  while (!complete) {
+    lock.Wait();
   }
 
-  return nullptr;
+  actor = mTextureMap[aSerial];
+  if (!actor) {
+    return nullptr;
+  }
+
+  if (NS_WARN_IF(aContentId != TextureHost::GetTextureContentId(actor))) {
+    return nullptr;
+  }
+
+  return do_AddRef(TextureHost::AsTextureHost(actor));
 }
 
 void VideoBridgeParent::ActorDestroy(ActorDestroyReason aWhy) {
