@@ -24,6 +24,7 @@ web-platform-tests:
     - web-platform-tests-wdspec
     - web-platform-tests-webgpu
     - web-platform-tests-canvas
+    - web-platform-tests-canvas-accel
 
 web-platform-tests-backlog:
     - web-platform-tests-backlog

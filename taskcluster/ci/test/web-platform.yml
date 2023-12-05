@@ -334,6 +334,50 @@ web-platform-tests-canvas:
             - --tag=canvas
             - --exclude-tag=webgpu
 
+web-platform-tests-canvas-accel:
+    description: "Web platform Accelerated canvas test run"
+    suite: web-platform-tests
+    treeherder-symbol: W(canvas-accel)
+    virtualization: virtual-with-gpu
+    tier:
+        by-test-platform:
+            android-em-7.0-x86_64-qr/debug-isolated-process: 3
+            default: default
+    chunks:
+        by-test-platform:
+            windows.*: 2
+            .*tsan.*: 2
+            linux.*/debug: 2
+            linux.*asan.*: 2
+            default: 1
+    max-run-time:
+        by-test-platform:
+            .*tsan.*: 3600
+            default: 1800
+    run-on-projects:
+        by-test-platform:
+            android.*: []
+            .*wayland.*: []
+            default: built-projects
+    mozharness:
+        chunked: true
+        extra-options:
+            - --test-type=testharness
+            - --skip-implementation-status=backlog
+            - --skip-implementation-status=not-implementing
+            - --skip-timeout
+            - --skip-crash
+            # Because we have a separate job for them, don't run the (core)
+            # webgpu/* tests in the main WPT runs. (but still run tests in dirs
+            # other than webgpu/* that are tagged webgpu, e.g. canvas tests)
+            - --default-exclude
+            - --tag=canvas
+            - --exclude-tag=webgpu
+            - --setpref=gfx.canvas.accelerated=true
+            - --setpref=gfx.canvas.accelerated.force-enabled=true
+            - --setpref=gfx.canvas.accelerated.max-size=0
+            - --setpref=gfx.canvas.accelerated.min-size=0
+
 web-platform-tests-reftest-backlog:
     description: "Web platform reftest (backlog) run"
     schedules-component: web-platform-tests-reftest
