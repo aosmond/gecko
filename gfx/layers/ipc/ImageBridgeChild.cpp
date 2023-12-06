@@ -517,6 +517,7 @@ void ImageBridgeChild::Bind(Endpoint<PImageBridgeChild>&& aEndpoint) {
 void ImageBridgeChild::BindSameProcess(RefPtr<ImageBridgeParent> aParent) {
   Open(aParent, aParent->GetThread(), mozilla::ipc::ChildSide);
 
+  mSectionAllocator = MakeUnique<FixedSizeSmallShmemSectionAllocator>(this);
   mCanSend = true;
 }
 
