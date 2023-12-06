@@ -2587,12 +2587,14 @@ RecordedFillGlyphs::RecordedFillGlyphs(S& aStream)
   ReadPatternData(aStream, mPattern);
   ReadElement(aStream, mNumGlyphs);
   if (!aStream.good() || mNumGlyphs <= 0) {
+    gfxCriticalNote << "[AO] RecordedFillGlyphs bad stream or no glyphs "
+                    << mNumGlyphs;
     return;
   }
 
   mGlyphs = new (fallible) Glyph[mNumGlyphs];
   if (!mGlyphs) {
-    gfxCriticalNote << "RecordedFillGlyphs failed to allocate glyphs of size "
+    gfxCriticalNote << "[AO] RecordedFillGlyphs failed to allocate glyphs of size "
                     << mNumGlyphs;
     aStream.SetIsBad();
   } else {
@@ -3670,12 +3672,14 @@ inline RecordedFontData::~RecordedFontData() { delete[] mData; }
 
 inline bool RecordedFontData::PlayEvent(Translator* aTranslator) const {
   if (!mData) {
+    gfxCriticalNote << "[AO] RecordedFontData::PlayEvent -- null data";
     return false;
   }
 
   RefPtr<NativeFontResource> fontResource = Factory::CreateNativeFontResource(
       mData, mFontDetails.size, mType, aTranslator->GetFontContext());
   if (!fontResource) {
+    gfxCriticalNote << "[AO] RecordedFontData::PlayEvent -- no font resource";
     return false;
   }
 
@@ -3690,6 +3694,7 @@ void RecordedFontData::Record(S& aStream) const {
   WriteElement(aStream, mType);
   WriteElement(aStream, mFontDetails.fontDataKey);
   if (!mData) {
+    gfxCriticalNote << "[AO] RecordedFontData::RecordedFontData -- recording empty data";
     WriteElement(aStream, 0);
   } else {
     WriteElement(aStream, mFontDetails.size);
@@ -3707,7 +3712,7 @@ inline void RecordedFontData::SetFontData(const uint8_t* aData, uint32_t aSize,
   mData = new (fallible) uint8_t[aSize];
   if (!mData) {
     gfxCriticalNote
-        << "RecordedFontData failed to allocate data for recording of size "
+        << "[AO] RecordedFontData failed to allocate data for recording of size "
         << aSize;
   } else {
     memcpy(mData, aData, aSize);
@@ -3719,6 +3724,7 @@ inline void RecordedFontData::SetFontData(const uint8_t* aData, uint32_t aSize,
 
 inline bool RecordedFontData::GetFontDetails(RecordedFontDetails& fontDetails) {
   if (!mGetFontFileDataSucceeded) {
+    gfxCriticalNote << "[AO] RecordedFontData::GetFontDetails -- font file data failed";
     return false;
   }
 
@@ -3735,13 +3741,14 @@ RecordedFontData::RecordedFontData(S& aStream)
   ReadElement(aStream, mFontDetails.fontDataKey);
   ReadElement(aStream, mFontDetails.size);
   if (!mFontDetails.size || !aStream.good()) {
+    gfxCriticalNote << "[AO] RecordedFontData::RecordedFontData -- bad stream or size " << mFontDetails.size;
     return;
   }
 
   mData = new (fallible) uint8_t[mFontDetails.size];
   if (!mData) {
     gfxCriticalNote
-        << "RecordedFontData failed to allocate data for playback of size "
+        << "[AO] RecordedFontData failed to allocate data for playback of size "
         << mFontDetails.size;
     aStream.SetIsBad();
   } else {
