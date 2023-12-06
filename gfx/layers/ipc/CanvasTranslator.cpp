@@ -340,7 +340,7 @@ bool CanvasTranslator::TranslateRecording() {
       // We're going to wait for the next event, so take the opportunity to
       // flush the rendering.
       Flush();
-      if (!mStream->WaitForDataToRead(kReadEventTimeout, 0)) {
+      if (!mStream->WaitForDataToRead(kReadEventTimeout, 20)) {
         return true;
       }
     }

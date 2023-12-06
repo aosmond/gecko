@@ -249,6 +249,7 @@ void CanvasEventRingBuffer::read(char* const aOut, const size_t aSize) {
   char* curSrcPtr = aOut;
   size_t remainingToRead = aSize;
   if (remainingToRead > mAvailable) {
+    printf_stderr("[AO] [%d] [%p] read -- remainingToRead %zu, mAvailable %u, first\n", base::GetCurrentProcId(), this, aSize, mAvailable);
     if (!WaitForAndRecalculateAvailableData()) {
       return;
     }
@@ -265,6 +266,7 @@ void CanvasEventRingBuffer::read(char* const aOut, const size_t aSize) {
     IncrementReadCountBy(mAvailable);
     curSrcPtr += mAvailable;
     remainingToRead -= mAvailable;
+    printf_stderr("[AO] [%d] [%p] read -- remainingToRead %zu, mAvailable %u, second\n", base::GetCurrentProcId(), this, aSize, mAvailable);
     if (!WaitForAndRecalculateAvailableData()) {
       return;
     }
@@ -362,6 +364,7 @@ bool CanvasEventRingBuffer::WaitForDataToRead(TimeDuration aTimeout,
     return true;
   }
 
+  printf_stderr("[AO] [%d] [%p] WaitForDataToRead -- retry %d, timeout %f\n", base::GetCurrentProcId(), this, aRetryCount, aTimeout.ToMilliseconds());
   mRead->state = State::Waiting;
   do {
     if (mReaderSemaphore->Wait(Some(aTimeout))) {
@@ -372,6 +375,7 @@ bool CanvasEventRingBuffer::WaitForDataToRead(TimeDuration aTimeout,
     if (mReaderServices->WriterClosed()) {
       // Something has gone wrong on the writing side, just return false so
       // that we can hopefully recover.
+      printf_stderr("[AO] [%d] [%p] WaitForDataToRead -- writer closed!\n", base::GetCurrentProcId(), this);
       return false;
     }
   } while (aRetryCount-- > 0);
@@ -386,6 +390,7 @@ bool CanvasEventRingBuffer::WaitForDataToRead(TimeDuration aTimeout,
     return true;
   }
 
+  printf_stderr("[AO] [%d] [%p] WaitForDataToRead -- writer closed!\n", base::GetCurrentProcId(), this);
   return false;
 }
 
@@ -477,6 +482,8 @@ bool CanvasEventRingBuffer::WaitForReadCount(uint32_t aReadCount,
       return true;
     }
   } while (--spinCount != 0);
+
+  printf_stderr("[AO] [%d] [%p] WaitForReadCount -- aReadCount %u, mOurCount %u, requiredDifference %u, timeout %f\n", base::GetCurrentProcId(), this, aReadCount, mOurCount, requiredDifference, aTimeout.ToMilliseconds());
 
   // Double-check that the reader isn't waiting.
   CheckAndSignalReader();
