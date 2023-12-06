@@ -282,12 +282,12 @@ class Rebuild(TryConfig):
         if not rebuild:
             return
 
-        if kwargs.get("full") and rebuild > 3:
+        if kwargs.get("full") and rebuild > 10:
             print(
-                "warning: limiting --rebuild to 3 when using --full. "
+                "warning: limiting --rebuild to 10 when using --full. "
                 "Use custom push actions to add more."
             )
-            rebuild = 3
+            rebuild = 10
 
         return {
             "rebuild": rebuild,
