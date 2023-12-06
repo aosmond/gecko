@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "RecordingTypes.h"
+#include "mozilla/UniquePtr.h"
 #include "mozilla/gfx/Point.h"
 #include "mozilla/gfx/Types.h"
 #include "mozilla/ipc/ByteBuf.h"
@@ -246,8 +247,11 @@ class EventRingBuffer {
       aRecordedEvent->Record(writer);
       UpdateWriteTotalsBy(size.mTotalSize);
     } else {
-      WriteElement(*this, aRecordedEvent->GetType());
-      aRecordedEvent->Record(*this);
+      auto buf = MakeUnique<char[]>(size.mTotalSize);
+      MemWriter writer(buf.get());
+      WriteElement(writer, aRecordedEvent->GetType());
+      aRecordedEvent->Record(writer);
+      UpdateWriteTotalsBy(size.mTotalSize);
     }
   }
 
