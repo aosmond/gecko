@@ -661,7 +661,10 @@ bool TextureClient::IsReadLocked() {
 
     if (thread->IsOnCurrentThread()) {
       EnsureHasReadLock();
-      MOZ_ASSERT(mReadLock);
+      if (NS_WARN_IF(!mReadLock)) {
+        MOZ_ASSERT(!mAllocator->IPCOpen());
+        return false;
+      }
       MOZ_ASSERT(mReadLock->AsNonBlockingLock(),
                  "Can only check locked for non-blocking locks!");
       return mReadLock->AsNonBlockingLock()->GetReadCount() > 1;
@@ -716,7 +719,11 @@ bool TextureClient::TryReadLock() {
 
     if (thread->IsOnCurrentThread()) {
       EnsureHasReadLock();
-      MOZ_ASSERT(mReadLock);
+
+      if (NS_WARN_IF(!mReadLock)) {
+        MOZ_ASSERT(!mAllocator->IPCOpen());
+        return false;
+      }
 
       if (mReadLock->AsNonBlockingLock() &&
           mReadLock->AsNonBlockingLock()->GetReadCount() > 1) {
@@ -849,13 +856,8 @@ void TextureClient::Unlock() {
 
 void TextureClient::EnableReadLock() {
   MOZ_ASSERT(ShouldReadLock());
-  if (!mReadLock) {
-    if (mAllocator->GetTileLockAllocator()) {
-      mReadLock = NonBlockingTextureReadLock::Create(mAllocator);
-    } else {
-      // IPC is down
-      gfxCriticalError() << "TextureClient::EnableReadLock IPC is down";
-    }
+  if (!mReadLock && mAllocator->GetTileLockAllocator()) {
+    mReadLock = NonBlockingTextureReadLock::Create(mAllocator);
   }
 }
 
@@ -871,7 +873,12 @@ bool TextureClient::OnForwardedToHost() {
   {
     MutexAutoLock lock(mMutex);
     EnsureHasReadLock();
-    MOZ_ASSERT(mReadLock);
+
+    if (NS_WARN_IF(!mReadLock)) {
+      MOZ_ASSERT(!mAllocator->IPCOpen());
+      return false;
+    }
+
     // Take a read lock on behalf of the TextureHost. The latter will unlock
     // after the shared data is available again for drawing.
     mReadLock->ReadLock();
