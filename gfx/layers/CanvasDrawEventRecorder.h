@@ -124,6 +124,7 @@ class CanvasEventRingBuffer final : public gfx::EventRingBuffer {
   bool WriterFailed() const { return mWrite && mWrite->state == State::Failed; }
 
   void SetIsBad() final {
+    MOZ_CRASH("Bad stream!");
     mGood = false;
     mRead->state = State::Failed;
   }

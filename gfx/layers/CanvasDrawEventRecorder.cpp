@@ -45,12 +45,14 @@ bool CanvasEventRingBuffer::InitBuffer(
   mSharedMemory = MakeAndAddRef<ipc::SharedMemoryBasic>();
   if (NS_WARN_IF(!mSharedMemory->Create(shmemSize)) ||
       NS_WARN_IF(!mSharedMemory->Map(shmemSize))) {
+    MOZ_CRASH("Failed to create or map shmem!");
     mGood = false;
     return false;
   }
 
   *aReadHandle = mSharedMemory->TakeHandle();
   if (NS_WARN_IF(!*aReadHandle)) {
+    MOZ_CRASH("Failed to get shmem handle!");
     mGood = false;
     return false;
   }
@@ -84,6 +86,7 @@ bool CanvasEventRingBuffer::InitWriter(
     CrossProcessSemaphoreHandle* aWriterSem,
     UniquePtr<WriterServices> aWriterServices) {
   if (!InitBuffer(aOtherPid, aReadHandle)) {
+    MOZ_CRASH("Failed to init buffer!");
     return false;
   }
 
@@ -92,6 +95,7 @@ bool CanvasEventRingBuffer::InitWriter(
   *aReaderSem = mReaderSemaphore->CloneHandle();
   mReaderSemaphore->CloseHandle();
   if (!IsHandleValid(*aReaderSem)) {
+    MOZ_CRASH("Invalid reader handle!");
     return false;
   }
   mWriterSemaphore.reset(
@@ -99,6 +103,7 @@ bool CanvasEventRingBuffer::InitWriter(
   *aWriterSem = mWriterSemaphore->CloneHandle();
   mWriterSemaphore->CloseHandle();
   if (!IsHandleValid(*aWriterSem)) {
+    MOZ_CRASH("Invalid writer handle!");
     return false;
   }
 
@@ -114,6 +119,7 @@ bool CanvasEventRingBuffer::InitReader(
     CrossProcessSemaphoreHandle aWriterSem,
     UniquePtr<ReaderServices> aReaderServices) {
   if (!SetNewBuffer(std::move(aReadHandle))) {
+    MOZ_CRASH("Failed to set new buffer!");
     return false;
   }
 
@@ -145,6 +151,7 @@ bool CanvasEventRingBuffer::SetNewBuffer(
   if (NS_WARN_IF(!mSharedMemory->SetHandle(
           std::move(aReadHandle), ipc::SharedMemory::RightsReadWrite)) ||
       NS_WARN_IF(!mSharedMemory->Map(shmemSize))) {
+    MOZ_CRASH("Failed to set/map handle!");
     mGood = false;
     return false;
   }
@@ -160,6 +167,7 @@ bool CanvasEventRingBuffer::SetNewBuffer(
 
 bool CanvasEventRingBuffer::WaitForAndRecalculateAvailableSpace() {
   if (!good()) {
+    MOZ_CRASH("Bad stream!");
     return false;
   }
 
@@ -220,6 +228,7 @@ void CanvasEventRingBuffer::UpdateWriteTotalsBy(uint32_t aCount) {
 
 bool CanvasEventRingBuffer::WaitForAndRecalculateAvailableData() {
   if (!good()) {
+    MOZ_CRASH("Bad stream!");
     return false;
   }
 
@@ -313,7 +322,7 @@ void CanvasEventRingBuffer::CheckAndSignalReader() {
         }
         return;
       default:
-        MOZ_ASSERT_UNREACHABLE("Invalid waiting state.");
+        MOZ_CRASH("Invalid waiting state!");
         return;
     }
   } while (true);
@@ -483,7 +492,7 @@ bool CanvasEventRingBuffer::WaitForReadCount(uint32_t aReadCount,
   // Wait unless we detect the reading side has closed.
   while (!mWriterServices->ReaderClosed() && mRead->state != State::Failed) {
     if (mWriterSemaphore->Wait(Some(aTimeout))) {
-      MOZ_ASSERT(mOurCount - mRead->count <= requiredDifference);
+      MOZ_RELEASE_ASSERT(mOurCount - mRead->count <= requiredDifference);
       return true;
     }
   }
@@ -492,6 +501,7 @@ bool CanvasEventRingBuffer::WaitForReadCount(uint32_t aReadCount,
   // reason (e.g. shutdown), so mark us as failed so the reader is aware.
   mWrite->state = State::Failed;
   mGood = false;
+  MOZ_CRASH("Bad stream!");
   return false;
 }
 
