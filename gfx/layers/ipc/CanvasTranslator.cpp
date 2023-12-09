@@ -50,7 +50,8 @@ TextureData* CanvasTranslator::CreateTextureData(TextureType aTextureType,
   return textureData;
 }
 
-CanvasTranslator::CanvasTranslator() {
+CanvasTranslator::CanvasTranslator(const dom::ContentParentId& aContentId)
+    : mContentId(aContentId) {
   mMaxSpinCount = StaticPrefs::gfx_canvas_remote_max_spin_count();
   mNextEventTimeout = TimeDuration::FromMilliseconds(
       StaticPrefs::gfx_canvas_remote_event_timeout_ms());
@@ -302,6 +303,7 @@ void CanvasTranslator::ActorDestroy(ActorDestroyReason why) {
 
 void CanvasTranslator::FinishShutdown() {
   MOZ_ASSERT(gfx::CanvasRenderThread::IsInCanvasRenderThread());
+  gfx::CanvasManagerParent::RemoveReplayTextures(mContentId);
 }
 
 bool CanvasTranslator::CheckDeactivated() {
@@ -606,7 +608,7 @@ already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
       MOZ_DIAGNOSTIC_ASSERT(mNextTextureId >= 0, "No texture ID set");
       textureData->Lock(OpenMode::OPEN_READ_WRITE);
       mTextureDatas[mNextTextureId] = UniquePtr<TextureData>(textureData);
-      gfx::CanvasManagerParent::AddReplayTexture(this, mNextTextureId,
+      gfx::CanvasManagerParent::AddReplayTexture(mContentId, mNextTextureId,
                                                  textureData);
       dt = textureData->BorrowDrawTarget();
     }
@@ -622,7 +624,7 @@ void CanvasTranslator::RemoveTexture(int64_t aTextureId) {
 
   // It is possible that the texture from the content process has never been
   // forwarded from the GPU process, so make sure its descriptor is removed.
-  gfx::CanvasManagerParent::RemoveReplayTexture(this, aTextureId);
+  gfx::CanvasManagerParent::RemoveReplayTexture(mContentId, aTextureId);
 }
 
 TextureData* CanvasTranslator::LookupTextureData(int64_t aTextureId) {

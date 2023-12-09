@@ -19,11 +19,8 @@
 
 namespace mozilla::gfx {
 
-CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
-
-StaticMonitor CanvasManagerParent::sReplayTexturesMonitor;
-nsTArray<CanvasManagerParent::ReplayTexture>
-    CanvasManagerParent::sReplayTextures;
+StaticMonitor CanvasManagerParent::sManagerMonitor;
+CanvasManagerParent::ManagerMap CanvasManagerParent::sManagers;
 bool CanvasManagerParent::sReplayTexturesEnabled(true);
 
 /* static */ void CanvasManagerParent::Init(
@@ -57,19 +54,20 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
 }
 
 /* static */ void CanvasManagerParent::ShutdownInternal() {
-  nsTArray<RefPtr<CanvasManagerParent>> actors(sManagers.Count());
-  // Do a copy since Close will remove the entry from the set.
-  for (const auto& actor : sManagers) {
-    actors.AppendElement(actor);
+  nsTArray<RefPtr<CanvasManagerParent>> actors;
+
+  {
+    StaticMonitorAutoLock lock(sManagerMonitor);
+    // Do a copy since Close will remove the entry from the set.
+    actors.SetCapacity(sManagers.size());
+    for (const auto& i : sManagers) {
+      actors.AppendElement(i.second);
+    }
   }
 
   for (auto const& actor : actors) {
     actor->Close();
   }
-
-  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
-  sReplayTextures.Clear();
-  lock.NotifyAll();
 }
 
 /* static */ void CanvasManagerParent::DisableRemoteCanvas() {
@@ -96,16 +94,20 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
   MOZ_ASSERT(CanvasRenderThread::IsInCanvasRenderThread());
 
   AutoTArray<RefPtr<layers::CanvasTranslator>, 16> actors;
-  for (const auto& manager : sManagers) {
-    for (const auto& canvas : manager->ManagedPCanvasParent()) {
-      actors.AppendElement(static_cast<layers::CanvasTranslator*>(canvas));
-    }
-  }
 
   {
-    StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+    StaticMonitorAutoLock lock(sManagerMonitor);
+
+    for (const auto& i : sManagers) {
+      const auto& manager = i.second;
+      manager->mReplayTextures.Clear();
+
+      for (const auto& canvas : manager->ManagedPCanvasParent()) {
+        actors.AppendElement(static_cast<layers::CanvasTranslator*>(canvas));
+      }
+    }
+
     sReplayTexturesEnabled = false;
-    sReplayTextures.Clear();
   }
 
   for (const auto& actor : actors) {
@@ -113,67 +115,76 @@ bool CanvasManagerParent::sReplayTexturesEnabled(true);
   }
 
   {
-    StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+    StaticMonitorAutoLock lock(sManagerMonitor);
     lock.NotifyAll();
   }
 }
 
 /* static */ void CanvasManagerParent::AddReplayTexture(
-    layers::CanvasTranslator* aOwner, int64_t aTextureId,
+    const dom::ContentParentId& aContentId, int64_t aTextureId,
     layers::TextureData* aTextureData) {
+  StaticMonitorAutoLock lock(sManagerMonitor);
+  auto i = sManagers.find(uint64_t(aContentId));
+  if (NS_WARN_IF(i == sManagers.end())) {
+    // If the manager is gone, then we must be on the verge of destroying.
+    return;
+  }
+
   auto desc = MakeUnique<layers::SurfaceDescriptor>();
   if (!aTextureData->Serialize(*desc)) {
     MOZ_CRASH("Failed to serialize");
   }
 
-  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
-  sReplayTextures.AppendElement(
-      ReplayTexture{aOwner, aTextureId, std::move(desc)});
+  i->second->mReplayTextures.AppendElement(
+      ReplayTexture{aTextureId, std::move(desc)});
   lock.NotifyAll();
 }
 
 /* static */ void CanvasManagerParent::RemoveReplayTexture(
-    layers::CanvasTranslator* aOwner, int64_t aTextureId) {
-  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+    const dom::ContentParentId& aContentId, int64_t aTextureId) {
+  StaticMonitorAutoLock lock(sManagerMonitor);
+  auto i = sManagers.find(uint64_t(aContentId));
+  if (NS_WARN_IF(i == sManagers.end())) {
+    // If the manager is gone, then it must already be removed.
+    return;
+  }
 
-  auto i = sReplayTextures.Length();
-  while (i > 0) {
-    --i;
-    const auto& texture = sReplayTextures[i];
-    if (texture.mOwner == aOwner && texture.mId == aTextureId) {
-      sReplayTextures.RemoveElementAt(i);
+  CanvasManagerParent* manager = i->second;
+  auto k = manager->mReplayTextures.Length();
+  while (k > 0) {
+    --k;
+    const auto& texture = manager->mReplayTextures[k];
+    if (texture.mId == aTextureId) {
+      manager->mReplayTextures.RemoveElementAt(k);
       break;
     }
   }
 }
 
 /* static */ void CanvasManagerParent::RemoveReplayTextures(
-    layers::CanvasTranslator* aOwner) {
-  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
-
-  auto i = sReplayTextures.Length();
-  while (i > 0) {
-    --i;
-    const auto& texture = sReplayTextures[i];
-    if (texture.mOwner == aOwner) {
-      sReplayTextures.RemoveElementAt(i);
-    }
+    const dom::ContentParentId& aContentId) {
+  StaticMonitorAutoLock lock(sManagerMonitor);
+  auto i = sManagers.find(uint64_t(aContentId));
+  if (NS_WARN_IF(i == sManagers.end())) {
+    // If the manager is gone, then it must already be removed.
+    return;
   }
+
+  i->second->mReplayTextures.Clear();
 }
 
-/* static */ UniquePtr<layers::SurfaceDescriptor>
-CanvasManagerParent::TakeReplayTexture(base::ProcessId aOtherPid,
-                                       int64_t aTextureId) {
+UniquePtr<layers::SurfaceDescriptor> CanvasManagerParent::TakeReplayTexture(
+    int64_t aTextureId) {
   // While in theory this could be relatively expensive, the array is most
   // likely very small as the textures are removed during each composite.
-  auto i = sReplayTextures.Length();
+  auto i = mReplayTextures.Length();
   while (i > 0) {
     --i;
-    const auto& texture = sReplayTextures[i];
-    if (texture.mOwner->OtherPid() == aOtherPid && texture.mId == aTextureId) {
+    const auto& texture = mReplayTextures[i];
+    if (texture.mId == aTextureId) {
       UniquePtr<layers::SurfaceDescriptor> desc =
-          std::move(sReplayTextures[i].mDesc);
-      sReplayTextures.RemoveElementAt(i);
+          std::move(mReplayTextures[i].mDesc);
+      mReplayTextures.RemoveElementAt(i);
       return desc;
     }
   }
@@ -181,12 +192,25 @@ CanvasManagerParent::TakeReplayTexture(base::ProcessId aOtherPid,
 }
 
 /* static */ UniquePtr<layers::SurfaceDescriptor>
-CanvasManagerParent::WaitForReplayTexture(base::ProcessId aOtherPid,
-                                          int64_t aTextureId) {
-  StaticMonitorAutoLock lock(sReplayTexturesMonitor);
+CanvasManagerParent::WaitForReplayTexture(
+    const dom::ContentParentId& aContentId, int64_t aTextureId) {
+  MOZ_ASSERT(!CanvasRenderThread::IsInCanvasRenderThread());
+
+  StaticMonitorAutoLock lock(sManagerMonitor);
+
+  auto i = sManagers.find(uint64_t(aContentId));
+  if (NS_WARN_IF(i == sManagers.end())) {
+    return nullptr;
+  }
+
+  RefPtr<CanvasManagerParent> manager = i->second;
 
   UniquePtr<layers::SurfaceDescriptor> desc;
-  while (!(desc = TakeReplayTexture(aOtherPid, aTextureId))) {
+  while (!(desc = manager->TakeReplayTexture(aTextureId))) {
+    if (NS_WARN_IF(!manager->CanSend())) {
+      return nullptr;
+    }
+
     if (NS_WARN_IF(!sReplayTexturesEnabled)) {
       return nullptr;
     }
@@ -215,11 +239,15 @@ void CanvasManagerParent::Bind(Endpoint<PCanvasManagerParent>&& aEndpoint) {
     return;
   }
 
-  sManagers.Insert(this);
+  StaticMonitorAutoLock lock(sManagerMonitor);
+  MOZ_RELEASE_ASSERT(
+      sManagers.try_emplace(uint64_t(mContentId), RefPtr{this}).second);
 }
 
 void CanvasManagerParent::ActorDestroy(ActorDestroyReason aWhy) {
-  sManagers.Remove(this);
+  StaticMonitorAutoLock lock(sManagerMonitor);
+  sManagers.erase(uint64_t(mContentId));
+  sManagerMonitor.NotifyAll();
 }
 
 already_AddRefed<dom::PWebGLParent> CanvasManagerParent::AllocPWebGLParent() {
@@ -249,7 +277,7 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvInitialize(
 
 already_AddRefed<layers::PCanvasParent>
 CanvasManagerParent::AllocPCanvasParent() {
-  return MakeAndAddRef<layers::CanvasTranslator>();
+  return MakeAndAddRef<layers::CanvasTranslator>(mContentId);
 }
 
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
@@ -261,11 +289,15 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
   }
 
   IProtocol* actor = nullptr;
-  for (CanvasManagerParent* i : sManagers) {
-    if (i->OtherPidMaybeInvalid() == OtherPidMaybeInvalid() &&
-        i->mId == aManagerId) {
-      actor = i->Lookup(aProtocolId);
-      break;
+
+  {
+    StaticMonitorAutoLock lock(sManagerMonitor);
+    for (const auto& i : sManagers) {
+      const auto& manager = i.second;
+      if (manager->mContentId == mContentId && manager->mId == aManagerId) {
+        actor = manager->Lookup(aProtocolId);
+        break;
+      }
     }
   }
 

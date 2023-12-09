@@ -32,17 +32,17 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   static void DisableRemoteCanvas();
 
-  static void AddReplayTexture(layers::CanvasTranslator* aOwner,
+  static void AddReplayTexture(const dom::ContentParentId& aContentId,
                                int64_t aTextureId,
                                layers::TextureData* aTextureData);
 
-  static void RemoveReplayTexture(layers::CanvasTranslator* aOwner,
+  static void RemoveReplayTexture(const dom::ContentParentId& aContentId,
                                   int64_t aTextureId);
 
-  static void RemoveReplayTextures(layers::CanvasTranslator* aOwner);
+  static void RemoveReplayTextures(const dom::ContentParentId& aContentId);
 
   static UniquePtr<layers::SurfaceDescriptor> WaitForReplayTexture(
-      base::ProcessId aOtherPid, int64_t aTextureId);
+      const dom::ContentParentId& aContentId, int64_t aTextureId);
 
   explicit CanvasManagerParent(const dom::ContentParentId& aContentId);
 
@@ -60,31 +60,28 @@ class CanvasManagerParent final : public PCanvasManagerParent {
       webgl::FrontBufferSnapshotIpc* aResult);
 
  private:
-  static UniquePtr<layers::SurfaceDescriptor> TakeReplayTexture(
-      base::ProcessId aOtherPid, int64_t aTextureId)
-      MOZ_REQUIRES(sReplayTexturesMonitor);
+  UniquePtr<layers::SurfaceDescriptor> TakeReplayTexture(int64_t aTextureId)
+      MOZ_REQUIRES(sManagerMonitor);
 
   static void ShutdownInternal();
   static void DisableRemoteCanvasInternal();
 
   ~CanvasManagerParent() override;
 
-  const dom::ContentParentId mContentId;
-  uint32_t mId = 0;
+  using ManagerMap = std::map<uint64_t, RefPtr<CanvasManagerParent>>;
 
-  using ManagerSet = nsTHashSet<RefPtr<CanvasManagerParent>>;
-  static ManagerSet sManagers;
+  static StaticMonitor sManagerMonitor;
+  static ManagerMap sManagers MOZ_GUARDED_BY(sManagerMonitor);
+  static bool sReplayTexturesEnabled MOZ_GUARDED_BY(sManagerMonitor);
 
   struct ReplayTexture {
-    RefPtr<layers::CanvasTranslator> mOwner;
     int64_t mId;
     UniquePtr<layers::SurfaceDescriptor> mDesc;
   };
 
-  static StaticMonitor sReplayTexturesMonitor;
-  static nsTArray<ReplayTexture> sReplayTextures
-      MOZ_GUARDED_BY(sReplayTexturesMonitor);
-  static bool sReplayTexturesEnabled MOZ_GUARDED_BY(sReplayTexturesMonitor);
+  nsTArray<ReplayTexture> mReplayTextures MOZ_GUARDED_BY(sManagerMonitor);
+  const dom::ContentParentId mContentId;
+  uint32_t mId = 0;
 };
 
 }  // namespace gfx

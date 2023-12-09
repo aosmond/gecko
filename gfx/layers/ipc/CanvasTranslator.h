@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/gfx/InlineTranslator.h"
 #include "mozilla/gfx/RecordedEvent.h"
 #include "CanvasChild.h"
@@ -36,7 +37,7 @@ class CanvasTranslator final : public gfx::InlineTranslator,
 
   friend class PProtocolParent;
 
-  CanvasTranslator();
+  explicit CanvasTranslator(const dom::ContentParentId& aContentId);
 
   /**
    * Dispatches a runnable to the preferred task queue or thread.
@@ -316,6 +317,7 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   UniquePtr<CrossProcessSemaphore> mReaderSemaphore;
   TextureType mTextureType = TextureType::Unknown;
   UniquePtr<TextureData> mReferenceTextureData;
+  dom::ContentParentId mContentId;
   // Sometimes during device reset our reference DrawTarget can be null, so we
   // hold the BackendType separately.
   gfx::BackendType mBackendType = gfx::BackendType::NONE;
