@@ -485,8 +485,7 @@ mozilla::ipc::IPCResult GPUParent::RecvInitSandboxTesting(
 mozilla::ipc::IPCResult GPUParent::RecvInitCompositorManager(
     Endpoint<PCompositorManagerParent>&& aEndpoint, uint32_t aNamespace) {
   CompositorManagerParent::Create(std::move(aEndpoint), ContentParentId(),
-                                  aNamespace,
-                                  /* aIsRoot */ true);
+                                  aNamespace, /* aIsRoot */ true);
   return IPC_OK();
 }
 

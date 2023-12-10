@@ -1151,7 +1151,6 @@ bool GPUProcessManager::CreateContentBridges(
     ipc::Endpoint<PRemoteDecoderManagerChild>* aOutVideoManager,
     dom::ContentParentId aChildId, nsTArray<uint32_t>* aNamespaces) {
   const uint32_t cmNamespace = AllocateNamespace();
-  aNamespaces->AppendElement(AllocateNamespace());
   if (!CreateContentCompositorManager(aOtherProcess, aChildId, cmNamespace,
                                       aOutCompositor) ||
       !CreateContentImageBridge(aOtherProcess, aChildId, aOutImageBridge) ||
