@@ -251,5 +251,11 @@ mozilla::ipc::IPCResult CompositorManagerChild::RecvNotifyWebRenderError(
   return IPC_OK();
 }
 
+mozilla::ipc::IPCResult CompositorManagerChild::RecvPing(
+    PingResolver&& aResolver) {
+  aResolver(void_t{});
+  return IPC_OK();
+}
+
 }  // namespace layers
 }  // namespace mozilla

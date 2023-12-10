@@ -92,6 +92,8 @@ class CompositorManagerChild : public PCompositorManagerChild {
   mozilla::ipc::IPCResult RecvNotifyWebRenderError(
       const WebRenderError&& aError);
 
+  mozilla::ipc::IPCResult RecvPing(PingResolver&& aResolver);
+
  private:
   static StaticRefPtr<CompositorManagerChild> sInstance;
   static Atomic<base::ProcessId> sOtherPid;
