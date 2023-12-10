@@ -21,13 +21,9 @@
 namespace mozilla {
 namespace layers {
 
-StaticRefPtr<CompositorManagerParent> CompositorManagerParent::sInstance;
 StaticMutex CompositorManagerParent::sMutex;
-
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
-StaticAutoPtr<nsTArray<CompositorManagerParent*>>
-    CompositorManagerParent::sActiveActors;
-#endif
+StaticRefPtr<CompositorManagerParent> CompositorManagerParent::sInstance;
+CompositorManagerParent::ManagerMap CompositorManagerParent::sManagers;
 
 /* static */
 already_AddRefed<CompositorManagerParent>
@@ -142,15 +138,11 @@ void CompositorManagerParent::BindComplete(bool aIsRoot) {
 
   StaticMutexAutoLock lock(sMutex);
   if (aIsRoot) {
+    MOZ_ASSERT(!sInstance);
     sInstance = this;
   }
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
-  if (!sActiveActors) {
-    sActiveActors = new nsTArray<CompositorManagerParent*>();
-  }
-  sActiveActors->AppendElement(this);
-#endif
+  MOZ_RELEASE_ASSERT(sManagers.try_emplace(mNamespace, this).second);
 }
 
 void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {
@@ -165,46 +157,39 @@ void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {
     sInstance = nullptr;
   }
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
-  if (sActiveActors) {
-    sActiveActors->RemoveElement(this);
-  }
-#endif
+  MOZ_RELEASE_ASSERT(sManagers.erase(mNamespace) > 0);
 }
 
 void CompositorManagerParent::DeferredDestroy() {
   mCompositorThreadHolder = nullptr;
 }
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
 /* static */
 void CompositorManagerParent::ShutdownInternal() {
-  UniquePtr<nsTArray<CompositorManagerParent*>> actors;
+  nsTArray<RefPtr<CompositorManagerParent>> actors;
 
   // We move here because we may attempt to acquire the same lock during the
-  // destroy to remove the reference in sActiveActors.
+  // destroy to remove the reference in sManagers.
   {
     StaticMutexAutoLock lock(sMutex);
-    actors = WrapUnique(sActiveActors.forget());
-  }
-
-  if (actors) {
-    for (auto& actor : *actors) {
-      actor->Close();
+    actors.SetCapacity(sManagers.size());
+    for (auto& i : sManagers) {
+      actors.AppendElement(i.second);
     }
   }
+
+  for (auto& actor : actors) {
+    actor->Close();
+  }
 }
-#endif  // COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
 
 /* static */
 void CompositorManagerParent::Shutdown() {
   MOZ_ASSERT(NS_IsMainThread());
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
   CompositorThread()->Dispatch(NS_NewRunnableFunction(
       "layers::CompositorManagerParent::Shutdown",
       []() -> void { CompositorManagerParent::ShutdownInternal(); }));
-#endif
 }
 
 already_AddRefed<PCompositorBridgeParent>
