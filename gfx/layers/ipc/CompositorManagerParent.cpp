@@ -31,7 +31,7 @@ StaticAutoPtr<nsTArray<CompositorManagerParent*>>
 
 /* static */
 already_AddRefed<CompositorManagerParent>
-CompositorManagerParent::CreateSameProcess() {
+CompositorManagerParent::CreateSameProcess(uint32_t aNamespace) {
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
   StaticMutexAutoLock lock(sMutex);
@@ -48,7 +48,7 @@ CompositorManagerParent::CreateSameProcess() {
   // process case because if we open from the child perspective, we can do it
   // on the main thread and complete before we return the manager handles.
   RefPtr<CompositorManagerParent> parent =
-      new CompositorManagerParent(dom::ContentParentId());
+      new CompositorManagerParent(dom::ContentParentId(), aNamespace);
   parent->SetOtherProcessId(base::GetCurrentProcId());
   return parent.forget();
 }
@@ -56,7 +56,7 @@ CompositorManagerParent::CreateSameProcess() {
 /* static */
 bool CompositorManagerParent::Create(
     Endpoint<PCompositorManagerParent>&& aEndpoint,
-    dom::ContentParentId aChildId, bool aIsRoot) {
+    dom::ContentParentId aChildId, uint32_t aNamespace, bool aIsRoot) {
   MOZ_ASSERT(NS_IsMainThread());
 
   // We are creating a manager for the another process, inside the GPU process
@@ -68,7 +68,7 @@ bool CompositorManagerParent::Create(
   }
 
   RefPtr<CompositorManagerParent> bridge =
-      new CompositorManagerParent(aChildId);
+      new CompositorManagerParent(aChildId, aNamespace);
 
   RefPtr<Runnable> runnable =
       NewRunnableMethod<Endpoint<PCompositorManagerParent>&&, bool>(
@@ -119,9 +119,10 @@ CompositorManagerParent::CreateSameProcessWidgetCompositorBridge(
 }
 
 CompositorManagerParent::CompositorManagerParent(
-    dom::ContentParentId aContentId)
-    : mContentId(aContentId),
-      mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {}
+    dom::ContentParentId aContentId, uint32_t aNamespace)
+    : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()),
+      mContentId(aContentId),
+      mNamespace(aNamespace) {}
 
 CompositorManagerParent::~CompositorManagerParent() = default;
 
@@ -259,12 +260,20 @@ CompositorManagerParent::AllocPCompositorBridgeParent(
 
 mozilla::ipc::IPCResult CompositorManagerParent::RecvAddSharedSurface(
     const wr::ExternalImageId& aId, SurfaceDescriptorShared&& aDesc) {
+  if (NS_WARN_IF(!OwnsExternalImageId(aId))) {
+    return IPC_OK();
+  }
+
   SharedSurfacesParent::Add(aId, std::move(aDesc), OtherPid());
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult CompositorManagerParent::RecvRemoveSharedSurface(
     const wr::ExternalImageId& aId) {
+  if (NS_WARN_IF(!OwnsExternalImageId(aId))) {
+    return IPC_OK();
+  }
+
   SharedSurfacesParent::Remove(aId);
   return IPC_OK();
 }

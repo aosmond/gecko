@@ -30,9 +30,11 @@ class CompositorManagerParent final : public PCompositorManagerParent {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CompositorManagerParent, final)
 
  public:
-  static already_AddRefed<CompositorManagerParent> CreateSameProcess();
+  static already_AddRefed<CompositorManagerParent> CreateSameProcess(
+      uint32_t aNamespace);
   static bool Create(Endpoint<PCompositorManagerParent>&& aEndpoint,
-                     dom::ContentParentId aContentId, bool aIsRoot);
+                     dom::ContentParentId aContentId, uint32_t aNamespace,
+                     bool aIsRoot);
   static void Shutdown();
 
   static already_AddRefed<CompositorBridgeParent>
@@ -66,6 +68,10 @@ class CompositorManagerParent final : public PCompositorManagerParent {
 
   const dom::ContentParentId& GetContentId() const { return mContentId; }
 
+  bool OwnsExternalImageId(const wr::ExternalImageId& aId) const {
+    return mNamespace == static_cast<uint32_t>(wr::AsUint64(aId) >> 32);
+  }
+
  private:
   static StaticRefPtr<CompositorManagerParent> sInstance;
   static StaticMutex sMutex MOZ_UNANNOTATED;
@@ -75,18 +81,17 @@ class CompositorManagerParent final : public PCompositorManagerParent {
   static void ShutdownInternal();
 #endif
 
-  explicit CompositorManagerParent(dom::ContentParentId aChildId);
+  CompositorManagerParent(dom::ContentParentId aChildId, uint32_t aNamespace);
   virtual ~CompositorManagerParent();
 
   void Bind(Endpoint<PCompositorManagerParent>&& aEndpoint, bool aIsRoot);
 
   void DeferredDestroy();
 
-  dom::ContentParentId mContentId;
-
   RefPtr<CompositorThreadHolder> mCompositorThreadHolder;
-
   AutoTArray<RefPtr<CompositorBridgeParent>, 1> mPendingCompositorBridges;
+  dom::ContentParentId mContentId;
+  uint32_t mNamespace;
 };
 
 }  // namespace layers
