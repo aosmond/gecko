@@ -11,7 +11,7 @@
 #include <stdint.h>               // for uint32_t
 #include "mozilla/Attributes.h"   // for override
 #include "mozilla/StaticPtr.h"    // for StaticRefPtr
-#include "mozilla/StaticMutex.h"  // for StaticMutex
+#include "mozilla/StaticMonitor.h"  // for StaticMonitor
 #include "mozilla/RefPtr.h"       // for already_AddRefed
 #include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/layers/PCompositorManagerParent.h"
@@ -63,6 +63,8 @@ class CompositorManagerParent final : public PCompositorManagerParent {
 
   static void NotifyWebRenderError(wr::WebRenderError aError);
 
+  static void WaitForPing(const wr::ExternalImageId& aId);
+
   const dom::ContentParentId& GetContentId() const { return mContentId; }
 
   bool OwnsExternalImageId(const wr::ExternalImageId& aId) const {
@@ -70,12 +72,13 @@ class CompositorManagerParent final : public PCompositorManagerParent {
   }
 
  private:
-  static StaticMutex sMutex;
-  static StaticRefPtr<CompositorManagerParent> sInstance MOZ_GUARDED_BY(sMutex);
+  static StaticMonitor sMonitor;
+  static StaticRefPtr<CompositorManagerParent> sInstance
+      MOZ_GUARDED_BY(sMonitor);
 
   // Indexed by namespace.
   using ManagerMap = std::map<uint32_t, CompositorManagerParent*>;
-  static ManagerMap sManagers MOZ_GUARDED_BY(sMutex);
+  static ManagerMap sManagers MOZ_GUARDED_BY(sMonitor);
 
   static void ShutdownInternal();
 

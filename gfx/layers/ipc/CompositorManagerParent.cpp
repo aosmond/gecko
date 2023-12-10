@@ -21,7 +21,7 @@
 namespace mozilla {
 namespace layers {
 
-StaticMutex CompositorManagerParent::sMutex;
+StaticMonitor CompositorManagerParent::sMonitor;
 StaticRefPtr<CompositorManagerParent> CompositorManagerParent::sInstance;
 CompositorManagerParent::ManagerMap CompositorManagerParent::sManagers;
 
@@ -30,7 +30,7 @@ already_AddRefed<CompositorManagerParent>
 CompositorManagerParent::CreateSameProcess(uint32_t aNamespace) {
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
 
   // We are creating a manager for the UI process, inside the combined GPU/UI
   // process. It is created more-or-less the same but we retain a reference to
@@ -98,7 +98,7 @@ CompositorManagerParent::CreateSameProcessWidgetCompositorBridge(
 
   // Note that the static mutex not only is used to protect sInstance, but also
   // mPendingCompositorBridges.
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (NS_WARN_IF(!sInstance)) {
     return nullptr;
   }
@@ -136,7 +136,7 @@ void CompositorManagerParent::BindComplete(bool aIsRoot) {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread() ||
              NS_IsMainThread());
 
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (aIsRoot) {
     MOZ_ASSERT(!sInstance);
     sInstance = this;
@@ -152,7 +152,7 @@ void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {
       NewRunnableMethod("layers::CompositorManagerParent::DeferredDestroy",
                         this, &CompositorManagerParent::DeferredDestroy));
 
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (sInstance == this) {
     sInstance = nullptr;
   }
@@ -171,7 +171,7 @@ void CompositorManagerParent::ShutdownInternal() {
   // We move here because we may attempt to acquire the same lock during the
   // destroy to remove the reference in sManagers.
   {
-    StaticMutexAutoLock lock(sMutex);
+    StaticMonitorAutoLock lock(sMonitor);
     actors.SetCapacity(sManagers.size());
     for (auto& i : sManagers) {
       actors.AppendElement(i.second);
@@ -190,6 +190,52 @@ void CompositorManagerParent::Shutdown() {
   CompositorThread()->Dispatch(NS_NewRunnableFunction(
       "layers::CompositorManagerParent::Shutdown",
       []() -> void { CompositorManagerParent::ShutdownInternal(); }));
+}
+
+/* static */ void CompositorManagerParent::WaitForPing(
+    const wr::ExternalImageId& aId) {
+  MOZ_ASSERT(!CompositorThreadHolder::IsInCompositorThread());
+
+  // When a SourceSurfaceSharedData is created, it will always dispatch to the
+  // main thread to be shared via the CompositorManagerChild with the compositor
+  // process. Provided we send a ping from a non-Compositor thread in the
+  // compositor process, the ping can only be processed after clearing the main
+  // thread's event queue, and any incoming IPDL messages. So if the caller came
+  // too early looking for an external image, we can just lookup the owning
+  // CompositorManagerParent, issue and ping and block until the ping returns.
+
+  bool complete = false;
+
+  auto resolve = [&](void_t&&) {
+    StaticMonitorAutoLock lock(sMonitor);
+    complete = true;
+    lock.NotifyAll();
+  };
+
+  auto reject = [&](ipc::ResponseRejectReason) {
+    StaticMonitorAutoLock lock(sMonitor);
+    complete = true;
+    lock.NotifyAll();
+  };
+
+  CompositorThread()->Dispatch(
+      NS_NewRunnableFunction("CompositorManagerParent::Ping", [&]() {
+        StaticMonitorAutoLock lock(sMonitor);
+
+        uint32_t extNamespace = static_cast<uint32_t>(wr::AsUint64(aId) >> 32);
+        auto i = sManagers.find(extNamespace);
+        if (i == sManagers.end()) {
+          reject(ipc::ResponseRejectReason::ChannelClosed);
+          return;
+        }
+
+        i->second->SendPing(std::move(resolve), std::move(reject));
+      }));
+
+  StaticMonitorAutoLock lock(sMonitor);
+  while (!complete) {
+    lock.Wait();
+  }
 }
 
 already_AddRefed<PCompositorBridgeParent>
@@ -227,7 +273,7 @@ CompositorManagerParent::AllocPCompositorBridgeParent(
 
       // Note that the static mutex not only is used to protect sInstance, but
       // also mPendingCompositorBridges.
-      StaticMutexAutoLock lock(sMutex);
+      StaticMonitorAutoLock lock(sMonitor);
       if (mPendingCompositorBridges.IsEmpty()) {
         break;
       }
@@ -321,7 +367,7 @@ mozilla::ipc::IPCResult CompositorManagerParent::RecvInitCanvasManager(
 void CompositorManagerParent::NotifyWebRenderError(wr::WebRenderError aError) {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
 
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (NS_WARN_IF(!sInstance)) {
     return;
   }
