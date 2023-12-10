@@ -42,7 +42,7 @@ void CompositorManagerChild::InitSameProcess(uint32_t aNamespace,
   }
 
   RefPtr<CompositorManagerParent> parent =
-      CompositorManagerParent::CreateSameProcess();
+      CompositorManagerParent::CreateSameProcess(aNamespace);
   RefPtr<CompositorManagerChild> child =
       new CompositorManagerChild(parent, aProcessToken, aNamespace);
   if (NS_WARN_IF(!child->CanSend())) {
@@ -248,6 +248,12 @@ mozilla::ipc::IPCResult CompositorManagerChild::RecvNotifyWebRenderError(
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
   GPUProcessManager::Get()->NotifyWebRenderError(aError);
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult CompositorManagerChild::RecvPing(
+    PingResolver&& aResolver) {
+  aResolver(void_t{});
   return IPC_OK();
 }
 

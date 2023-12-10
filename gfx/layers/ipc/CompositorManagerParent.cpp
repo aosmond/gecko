@@ -21,20 +21,16 @@
 namespace mozilla {
 namespace layers {
 
+StaticMonitor CompositorManagerParent::sMonitor;
 StaticRefPtr<CompositorManagerParent> CompositorManagerParent::sInstance;
-StaticMutex CompositorManagerParent::sMutex;
-
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
-StaticAutoPtr<nsTArray<CompositorManagerParent*>>
-    CompositorManagerParent::sActiveActors;
-#endif
+CompositorManagerParent::ManagerMap CompositorManagerParent::sManagers;
 
 /* static */
 already_AddRefed<CompositorManagerParent>
-CompositorManagerParent::CreateSameProcess() {
+CompositorManagerParent::CreateSameProcess(uint32_t aNamespace) {
   MOZ_ASSERT(XRE_IsParentProcess());
   MOZ_ASSERT(NS_IsMainThread());
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
 
   // We are creating a manager for the UI process, inside the combined GPU/UI
   // process. It is created more-or-less the same but we retain a reference to
@@ -48,7 +44,7 @@ CompositorManagerParent::CreateSameProcess() {
   // process case because if we open from the child perspective, we can do it
   // on the main thread and complete before we return the manager handles.
   RefPtr<CompositorManagerParent> parent =
-      new CompositorManagerParent(dom::ContentParentId());
+      new CompositorManagerParent(dom::ContentParentId(), aNamespace);
   parent->SetOtherProcessId(base::GetCurrentProcId());
   return parent.forget();
 }
@@ -56,7 +52,7 @@ CompositorManagerParent::CreateSameProcess() {
 /* static */
 bool CompositorManagerParent::Create(
     Endpoint<PCompositorManagerParent>&& aEndpoint,
-    dom::ContentParentId aChildId, bool aIsRoot) {
+    dom::ContentParentId aChildId, uint32_t aNamespace, bool aIsRoot) {
   MOZ_ASSERT(NS_IsMainThread());
 
   // We are creating a manager for the another process, inside the GPU process
@@ -68,7 +64,7 @@ bool CompositorManagerParent::Create(
   }
 
   RefPtr<CompositorManagerParent> bridge =
-      new CompositorManagerParent(aChildId);
+      new CompositorManagerParent(aChildId, aNamespace);
 
   RefPtr<Runnable> runnable =
       NewRunnableMethod<Endpoint<PCompositorManagerParent>&&, bool>(
@@ -102,7 +98,7 @@ CompositorManagerParent::CreateSameProcessWidgetCompositorBridge(
 
   // Note that the static mutex not only is used to protect sInstance, but also
   // mPendingCompositorBridges.
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (NS_WARN_IF(!sInstance)) {
     return nullptr;
   }
@@ -119,9 +115,10 @@ CompositorManagerParent::CreateSameProcessWidgetCompositorBridge(
 }
 
 CompositorManagerParent::CompositorManagerParent(
-    dom::ContentParentId aContentId)
-    : mContentId(aContentId),
-      mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()) {}
+    dom::ContentParentId aContentId, uint32_t aNamespace)
+    : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()),
+      mContentId(aContentId),
+      mNamespace(aNamespace) {}
 
 CompositorManagerParent::~CompositorManagerParent() = default;
 
@@ -139,17 +136,13 @@ void CompositorManagerParent::BindComplete(bool aIsRoot) {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread() ||
              NS_IsMainThread());
 
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (aIsRoot) {
+    MOZ_ASSERT(!sInstance);
     sInstance = this;
   }
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
-  if (!sActiveActors) {
-    sActiveActors = new nsTArray<CompositorManagerParent*>();
-  }
-  sActiveActors->AppendElement(this);
-#endif
+  MOZ_RELEASE_ASSERT(sManagers.try_emplace(mNamespace, this).second);
 }
 
 void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {
@@ -159,51 +152,90 @@ void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {
       NewRunnableMethod("layers::CompositorManagerParent::DeferredDestroy",
                         this, &CompositorManagerParent::DeferredDestroy));
 
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (sInstance == this) {
     sInstance = nullptr;
   }
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
-  if (sActiveActors) {
-    sActiveActors->RemoveElement(this);
-  }
-#endif
+  MOZ_RELEASE_ASSERT(sManagers.erase(mNamespace) > 0);
 }
 
 void CompositorManagerParent::DeferredDestroy() {
   mCompositorThreadHolder = nullptr;
 }
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
 /* static */
 void CompositorManagerParent::ShutdownInternal() {
-  UniquePtr<nsTArray<CompositorManagerParent*>> actors;
+  nsTArray<RefPtr<CompositorManagerParent>> actors;
 
   // We move here because we may attempt to acquire the same lock during the
-  // destroy to remove the reference in sActiveActors.
+  // destroy to remove the reference in sManagers.
   {
-    StaticMutexAutoLock lock(sMutex);
-    actors = WrapUnique(sActiveActors.forget());
-  }
-
-  if (actors) {
-    for (auto& actor : *actors) {
-      actor->Close();
+    StaticMonitorAutoLock lock(sMonitor);
+    actors.SetCapacity(sManagers.size());
+    for (auto& i : sManagers) {
+      actors.AppendElement(i.second);
     }
   }
+
+  for (auto& actor : actors) {
+    actor->Close();
+  }
 }
-#endif  // COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
 
 /* static */
 void CompositorManagerParent::Shutdown() {
   MOZ_ASSERT(NS_IsMainThread());
 
-#ifdef COMPOSITOR_MANAGER_PARENT_EXPLICIT_SHUTDOWN
   CompositorThread()->Dispatch(NS_NewRunnableFunction(
       "layers::CompositorManagerParent::Shutdown",
       []() -> void { CompositorManagerParent::ShutdownInternal(); }));
-#endif
+}
+
+/* static */ void CompositorManagerParent::WaitForPing(
+    const wr::ExternalImageId& aId) {
+  MOZ_ASSERT(!CompositorThreadHolder::IsInCompositorThread());
+
+  // When a SourceSurfaceSharedData is created, it will always dispatch to the
+  // main thread to be shared via the CompositorManagerChild with the compositor
+  // process. Provided we send a ping from a non-Compositor thread in the
+  // compositor process, the ping can only be processed after clearing the main
+  // thread's event queue, and any incoming IPDL messages. So if the caller came
+  // too early looking for an external image, we can just lookup the owning
+  // CompositorManagerParent, issue and ping and block until the ping returns.
+
+  bool complete = false;
+
+  auto resolve = [&](void_t&&) {
+    StaticMonitorAutoLock lock(sMonitor);
+    complete = true;
+    lock.NotifyAll();
+  };
+
+  auto reject = [&](ipc::ResponseRejectReason) {
+    StaticMonitorAutoLock lock(sMonitor);
+    complete = true;
+    lock.NotifyAll();
+  };
+
+  CompositorThread()->Dispatch(
+      NS_NewRunnableFunction("CompositorManagerParent::Ping", [&]() {
+        StaticMonitorAutoLock lock(sMonitor);
+
+        uint32_t extNamespace = static_cast<uint32_t>(wr::AsUint64(aId) >> 32);
+        auto i = sManagers.find(extNamespace);
+        if (NS_WARN_IF(i == sManagers.end())) {
+          reject(ipc::ResponseRejectReason::ChannelClosed);
+          return;
+        }
+
+        i->second->SendPing(std::move(resolve), std::move(reject));
+      }));
+
+  StaticMonitorAutoLock lock(sMonitor);
+  while (!complete) {
+    lock.Wait();
+  }
 }
 
 already_AddRefed<PCompositorBridgeParent>
@@ -241,7 +273,7 @@ CompositorManagerParent::AllocPCompositorBridgeParent(
 
       // Note that the static mutex not only is used to protect sInstance, but
       // also mPendingCompositorBridges.
-      StaticMutexAutoLock lock(sMutex);
+      StaticMonitorAutoLock lock(sMonitor);
       if (mPendingCompositorBridges.IsEmpty()) {
         break;
       }
@@ -259,12 +291,22 @@ CompositorManagerParent::AllocPCompositorBridgeParent(
 
 mozilla::ipc::IPCResult CompositorManagerParent::RecvAddSharedSurface(
     const wr::ExternalImageId& aId, SurfaceDescriptorShared&& aDesc) {
+  if (NS_WARN_IF(!OwnsExternalImageId(aId))) {
+    MOZ_ASSERT_UNREACHABLE("Wrong namespace?");
+    return IPC_OK();
+  }
+
   SharedSurfacesParent::Add(aId, std::move(aDesc), OtherPid());
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult CompositorManagerParent::RecvRemoveSharedSurface(
     const wr::ExternalImageId& aId) {
+  if (NS_WARN_IF(!OwnsExternalImageId(aId))) {
+    MOZ_ASSERT_UNREACHABLE("Wrong namespace?");
+    return IPC_OK();
+  }
+
   SharedSurfacesParent::Remove(aId);
   return IPC_OK();
 }
@@ -327,7 +369,7 @@ mozilla::ipc::IPCResult CompositorManagerParent::RecvInitCanvasManager(
 void CompositorManagerParent::NotifyWebRenderError(wr::WebRenderError aError) {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
 
-  StaticMutexAutoLock lock(sMutex);
+  StaticMonitorAutoLock lock(sMonitor);
   if (NS_WARN_IF(!sInstance)) {
     return;
   }
