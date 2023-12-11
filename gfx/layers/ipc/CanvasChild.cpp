@@ -81,7 +81,7 @@ CanvasChild::CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef)
       mWorkerRef(aWorkerRef),
       mIsOnWorker(!!aWorkerRef){};
 
-CanvasChild::~CanvasChild() { NS_ASSERT_OWNINGTHREAD(CanvasChild); }
+CanvasChild::~CanvasChild() = default;
 
 static void NotifyCanvasDeviceReset() {
   if (!NS_IsMainThread()) {
@@ -409,8 +409,6 @@ already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
 
 void CanvasChild::ReturnDataSurfaceShmem(
     already_AddRefed<ipc::SharedMemoryBasic> aDataSurfaceShmem) {
-  NS_ASSERT_OWNINGTHREAD(CanvasChild);
-
   RefPtr<ipc::SharedMemoryBasic> data = aDataSurfaceShmem;
   // We can only reuse the latest data surface shmem.
   if (data == mDataSurfaceShmem) {
