@@ -7,11 +7,12 @@
 #ifndef MOZILLA_GFX_SHAREDSURFACESPARENT_H
 #define MOZILLA_GFX_SHAREDSURFACESPARENT_H
 
-#include <stdint.h>                         // for uint32_t
-#include "mozilla/Attributes.h"             // for override
-#include "mozilla/StaticMutex.h"            // for StaticMutex
-#include "mozilla/StaticPtr.h"              // for StaticAutoPtr
-#include "mozilla/RefPtr.h"                 // for already_AddRefed
+#include <stdint.h>               // for uint32_t
+#include "mozilla/Attributes.h"   // for override
+#include "mozilla/StaticMutex.h"  // for StaticMutex
+#include "mozilla/StaticPtr.h"    // for StaticAutoPtr
+#include "mozilla/RefPtr.h"       // for already_AddRefed
+#include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/ipc/SharedMemory.h"       // for SharedMemory, etc
 #include "mozilla/gfx/2D.h"                 // for SurfaceFormat
 #include "mozilla/gfx/Point.h"              // for IntSize
@@ -40,6 +41,11 @@ class SharedSurfacesParent final {
   // Get without increasing the consumer count.
   static already_AddRefed<gfx::DataSourceSurface> Get(
       const wr::ExternalImageId& aId);
+
+  // Get without increasing the consumer count, provided the given content ID
+  // owns the namespace for the external image ID.
+  static already_AddRefed<gfx::DataSourceSurface> Get(
+      const dom::ContentParentId& aContentId, const wr::ExternalImageId& aId);
 
   // Get but also increase the consumer count. Must call Release after finished.
   static already_AddRefed<gfx::DataSourceSurface> Acquire(
@@ -127,6 +133,33 @@ class SharedSurfacesParent final {
   };
 
   MappingTracker mTracker;
+};
+
+/**
+ * Helper class that is used to keep SourceSurfaceSharedDataWrapper objects
+ * around as long as one of the dependent IPDL actors is still alive and may
+ * reference them for a given PCompositorManager namespace.
+ */
+class SharedSurfacesHolder final {
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(SharedSurfacesHolder)
+
+ public:
+  explicit SharedSurfacesHolder(uint32_t aNamespace) : mNamespace(aNamespace) {}
+
+  already_AddRefed<gfx::DataSourceSurface> Get(const wr::ExternalImageId& aId) {
+    uint32_t extNamespace = static_cast<uint32_t>(wr::AsUint64(aId) >> 32);
+    if (NS_WARN_IF(extNamespace != mNamespace)) {
+      MOZ_ASSERT_UNREACHABLE("Wrong namespace?");
+      return nullptr;
+    }
+
+    return SharedSurfacesParent::Get(aId);
+  }
+
+ private:
+  ~SharedSurfacesHolder() { SharedSurfacesParent::RemoveAll(mNamespace); }
+
+  uint32_t mNamespace;
 };
 
 }  // namespace layers

@@ -22,6 +22,7 @@ namespace layers {
 
 class CompositorBridgeParent;
 class CompositorThreadHolder;
+class SharedSurfacesHolder;
 
 class CompositorManagerParent final : public PCompositorManagerParent {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CompositorManagerParent, final)
@@ -40,6 +41,9 @@ class CompositorManagerParent final : public PCompositorManagerParent {
                                           bool aUseExternalSurfaceSize,
                                           const gfx::IntSize& aSurfaceSize,
                                           uint64_t aInnerWindowId);
+
+  static bool OwnsExternalImageId(const dom::ContentParentId& aContentId,
+                                  const wr::ExternalImageId& aId);
 
   static void WaitForSharedSurface(const wr::ExternalImageId& aId);
 
@@ -90,6 +94,7 @@ class CompositorManagerParent final : public PCompositorManagerParent {
   void DeferredDestroy();
 
   RefPtr<CompositorThreadHolder> mCompositorThreadHolder;
+  RefPtr<SharedSurfacesHolder> mSharedSurfacesHolder;
   AutoTArray<RefPtr<CompositorBridgeParent>, 1> mPendingCompositorBridges;
   const dom::ContentParentId mContentId;
   const uint32_t mNamespace;

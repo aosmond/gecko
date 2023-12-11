@@ -350,6 +350,30 @@ nsresult SharedSurfacesChild::Share(SourceSurface* aSurface,
   return rv;
 }
 
+/* static */ nsresult SharedSurfacesChild::Share(
+    gfx::SourceSurface* aSurface, Maybe<SurfaceDescriptor>& aDesc) {
+  if (!aSurface) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  // TODO(aosmond): With a refactor of how we store the external image ID, we
+  // could probably make it safe to access off the main thread. This would be
+  // useful for OffscreenCanvas on DOM workers.
+  if (!NS_IsMainThread()) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  wr::ExternalImageId id;
+  nsresult rv = Share(aSurface, id);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  aDesc = Some(SurfaceDescriptorExternalImage(
+      wr::ExternalImageSource::SharedSurfaces, id));
+  return NS_OK;
+}
+
 /* static */
 void SharedSurfacesChild::Unshare(const wr::ExternalImageId& aId,
                                   bool aReleaseId,

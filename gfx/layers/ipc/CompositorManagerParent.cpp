@@ -117,6 +117,7 @@ CompositorManagerParent::CreateSameProcessWidgetCompositorBridge(
 CompositorManagerParent::CompositorManagerParent(
     dom::ContentParentId aContentId, uint32_t aNamespace)
     : mCompositorThreadHolder(CompositorThreadHolder::GetSingleton()),
+      mSharedSurfacesHolder(MakeRefPtr<SharedSurfacesHolder>(aNamespace)),
       mContentId(aContentId),
       mNamespace(aNamespace) {}
 
@@ -146,8 +147,6 @@ void CompositorManagerParent::BindComplete(bool aIsRoot) {
 }
 
 void CompositorManagerParent::ActorDestroy(ActorDestroyReason aReason) {
-  SharedSurfacesParent::RemoveAll(mNamespace);
-
   GetCurrentSerialEventTarget()->Dispatch(
       NewRunnableMethod("layers::CompositorManagerParent::DeferredDestroy",
                         this, &CompositorManagerParent::DeferredDestroy));
@@ -191,6 +190,20 @@ void CompositorManagerParent::Shutdown() {
   CompositorThread()->Dispatch(NS_NewRunnableFunction(
       "layers::CompositorManagerParent::Shutdown",
       []() -> void { CompositorManagerParent::ShutdownInternal(); }));
+}
+
+/* static */ bool CompositorManagerParent::OwnsExternalImageId(
+    const dom::ContentParentId& aContentId, const wr::ExternalImageId& aId) {
+  uint32_t extNamespace = static_cast<uint32_t>(wr::AsUint64(aId) >> 32);
+
+  StaticMonitorAutoLock lock(sMonitor);
+
+  const auto i = sManagers.find(extNamespace);
+  if (NS_WARN_IF(i == sManagers.end())) {
+    return false;
+  }
+
+  return i->second->mContentId == aContentId;
 }
 
 /* static */ void CompositorManagerParent::WaitForSharedSurface(
@@ -349,7 +362,8 @@ mozilla::ipc::IPCResult CompositorManagerParent::RecvReportMemory(
 
 mozilla::ipc::IPCResult CompositorManagerParent::RecvInitCanvasManager(
     Endpoint<PCanvasManagerParent>&& aEndpoint) {
-  gfx::CanvasManagerParent::Init(std::move(aEndpoint), mContentId);
+  gfx::CanvasManagerParent::Init(std::move(aEndpoint), mSharedSurfacesHolder,
+                                 mContentId);
   return IPC_OK();
 }
 
