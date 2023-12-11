@@ -139,6 +139,7 @@ RefPtr<CanvasDrawEventRecorder> CanvasChild::EnsureRecorder(
   MOZ_RELEASE_ASSERT(mRecorder->GetTextureType() == aTextureType,
                      "We only support one remote TextureType currently.");
 
+  MutexAutoLock lock(mMutex);
   EnsureDataSurfaceShmem(aSize, aFormat);
   return mRecorder;
 }
@@ -362,11 +363,19 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
 
   gfx::IntSize ssSize = aSurface->GetSize();
   gfx::SurfaceFormat ssFormat = aSurface->GetFormat();
-  if (!EnsureDataSurfaceShmem(ssSize, ssFormat)) {
-    return nullptr;
+
+  RefPtr<ipc::SharedMemoryBasic> shmem;
+
+  {
+    MutexAutoLock lock(mMutex);
+    if (!EnsureDataSurfaceShmem(ssSize, ssFormat)) {
+      return nullptr;
+    }
+
+    shmem = mDataSurfaceShmem;
+    mDataSurfaceShmemAvailable = false;
   }
 
-  mDataSurfaceShmemAvailable = false;
   RecordEvent(RecordedGetDataForSurface(aSurface));
   auto checkpoint = CreateCheckpoint();
   struct DataShmemHolder {
@@ -374,8 +383,8 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
     RefPtr<CanvasChild> canvasChild;
   };
 
-  auto* data = static_cast<uint8_t*>(mDataSurfaceShmem->memory());
-  auto* closure = new DataShmemHolder{do_AddRef(mDataSurfaceShmem), this};
+  auto* data = static_cast<uint8_t*>(shmem->memory());
+  auto* closure = new DataShmemHolder{std::move(shmem), this};
   auto dataFormatWidth = ssSize.width * BytesPerPixel(ssFormat);
 
   RefPtr<gfx::DataSourceSurface> dataSurface =
@@ -409,6 +418,8 @@ already_AddRefed<gfx::SourceSurface> CanvasChild::WrapSurface(
 
 void CanvasChild::ReturnDataSurfaceShmem(
     already_AddRefed<ipc::SharedMemoryBasic> aDataSurfaceShmem) {
+  MutexAutoLock lock(mMutex);
+
   RefPtr<ipc::SharedMemoryBasic> data = aDataSurfaceShmem;
   // We can only reuse the latest data surface shmem.
   if (data == mDataSurfaceShmem) {

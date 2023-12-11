@@ -152,7 +152,8 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
 
   ~CanvasChild() final;
 
-  bool EnsureDataSurfaceShmem(gfx::IntSize aSize, gfx::SurfaceFormat aFormat);
+  bool EnsureDataSurfaceShmem(gfx::IntSize aSize, gfx::SurfaceFormat aFormat)
+      MOZ_REQUIRES(mMutex);
 
   void ReturnDataSurfaceShmem(
       already_AddRefed<ipc::SharedMemoryBasic> aDataSurfaceShmem);
@@ -167,8 +168,8 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
   RefPtr<CanvasDrawEventRecorder> mRecorder;
 
-  RefPtr<ipc::SharedMemoryBasic> mDataSurfaceShmem;
-  bool mDataSurfaceShmemAvailable = false;
+  RefPtr<ipc::SharedMemoryBasic> mDataSurfaceShmem MOZ_GUARDED_BY(mMutex);
+  bool mDataSurfaceShmemAvailable MOZ_GUARDED_BY(mMutex) = false;
   int64_t mLastWriteLockCheckpoint = 0;
   uint32_t mTransactionsSinceGetDataSurface = kCacheDataSurfaceThreshold;
   std::vector<RefPtr<gfx::SourceSurface>> mLastTransactionExternalSurfaces;
