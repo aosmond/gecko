@@ -102,6 +102,7 @@ class Texture;
 namespace layers {
 class CompositableHost;
 class RemoteTextureOwnerClient;
+class SharedSurfacesHolder;
 class SurfaceDescriptor;
 }  // namespace layers
 
@@ -461,6 +462,8 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
   static void EnumName(GLenum val, nsCString* out_name);
 
   void DummyReadFramebufferOperation();
+
+  layers::SharedSurfacesHolder* GetSharedSurfacesHolder() const;
 
   dom::ContentParentId GetContentId() const;
 
