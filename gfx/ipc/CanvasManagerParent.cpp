@@ -251,7 +251,7 @@ void CanvasManagerParent::ActorDestroy(ActorDestroyReason aWhy) {
 }
 
 already_AddRefed<dom::PWebGLParent> CanvasManagerParent::AllocPWebGLParent() {
-  return MakeAndAddRef<dom::WebGLParent>(mContentId);
+  return MakeAndAddRef<dom::WebGLParent>(mSharedSurfacesHolder, mContentId);
 }
 
 already_AddRefed<webgpu::PWebGPUParent>
