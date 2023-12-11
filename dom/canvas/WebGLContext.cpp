@@ -626,9 +626,16 @@ RefPtr<WebGLContext> WebGLContext::Create(HostWebGLContext& host,
     // cannot block on the Compositor thread, so in that configuration, we would
     // prefer to do the readback from the RDD which is guaranteed to work, and
     // only block the owning thread for WebGL.
+    const bool offCompositorThread = gfx::gfxVars::UseCanvasRenderThread() ||
+                                     !gfx::gfxVars::SupportsThreadsafeGL();
     types[layers::SurfaceDescriptor::TSurfaceDescriptorGPUVideo] =
-        gfx::gfxVars::UseCanvasRenderThread() ||
-        !gfx::gfxVars::SupportsThreadsafeGL();
+        offCompositorThread;
+    // Similarly to the PVideoBridge protocol, we may need to synchronize with
+    // the content process over the PCompositorManager protocol to wait for the
+    // shared surface to be available in the compositor process, and we cannot
+    // block on the Compositor thread.
+    types[layers::SurfaceDescriptor::TSurfaceDescriptorExternalImage] =
+        offCompositorThread;
     if (webgl->gl->IsANGLE()) {
       types[layers::SurfaceDescriptor::TSurfaceDescriptorD3D10] = true;
       types[layers::SurfaceDescriptor::TSurfaceDescriptorDXGIYCbCr] = true;
