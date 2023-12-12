@@ -41,7 +41,7 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
                       CrossProcessSemaphoreHandle&& aWriterSem,
                       const bool& aUseIPDLThread) override {
     RefPtr<CanvasChild> canvasChild(mCanvasChild);
-    if (!canvasChild) {
+    if (NS_WARN_IF(!canvasChild)) {
       return false;
     }
     return canvasChild->SendInitTranslator(

@@ -96,21 +96,21 @@ bool CanvasDrawEventRecorder::Init(TextureType aTextureType,
   mWriterSemaphore.reset(CrossProcessSemaphore::Create("CanvasRecorder", 0));
   auto writerSem = mWriterSemaphore->CloneHandle();
   mWriterSemaphore->CloseHandle();
-  if (!IsHandleValid(writerSem)) {
+  if (NS_WARN_IF(!IsHandleValid(writerSem))) {
     return false;
   }
 
   mReaderSemaphore.reset(CrossProcessSemaphore::Create("CanvasTranslator", 0));
   auto readerSem = mReaderSemaphore->CloneHandle();
   mReaderSemaphore->CloseHandle();
-  if (!IsHandleValid(readerSem)) {
+  if (NS_WARN_IF(!IsHandleValid(readerSem))) {
     return false;
   }
 
-  if (!mHelpers->InitTranslator(aTextureType, std::move(header->handle),
-                                std::move(bufferHandles), mDefaultBufferSize,
-                                std::move(readerSem), std::move(writerSem),
-                                /* aUseIPDLThread */ false)) {
+  if (NS_WARN_IF(!mHelpers->InitTranslator(
+          aTextureType, std::move(header->handle), std::move(bufferHandles),
+          mDefaultBufferSize, std::move(readerSem), std::move(writerSem),
+          /* aUseIPDLThread */ false))) {
     return false;
   }
 
