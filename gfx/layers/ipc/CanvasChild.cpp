@@ -272,7 +272,9 @@ void CanvasChild::DropFreeBuffersWhenDormant() {
 
 void CanvasChild::ClearCachedResources() {
   NS_ASSERT_OWNINGTHREAD(CanvasChild);
-  mRecorder->DropFreeBuffers();
+  if (mRecorder) {
+    mRecorder->DropFreeBuffers();
+  }
 }
 
 bool CanvasChild::ShouldBeCleanedUp() const {
