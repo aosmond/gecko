@@ -75,6 +75,8 @@ class CanvasDrawEventRecorder final : public gfx::DrawEventRecorderPrivate,
    public:
     virtual ~Helpers() = default;
 
+    virtual void Destroy() = 0;
+
     virtual bool InitTranslator(const TextureType& aTextureType,
                                 Handle&& aReadHandle,
                                 nsTArray<Handle>&& aBufferHandles,

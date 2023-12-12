@@ -29,10 +29,17 @@ namespace layers {
 
 class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
  public:
-  explicit RecorderHelpers(const RefPtr<CanvasChild>& aCanvasChild)
+  NS_DECL_OWNINGTHREAD
+
+  explicit RecorderHelpers(CanvasChild* aCanvasChild)
       : mCanvasChild(aCanvasChild) {}
 
-  ~RecorderHelpers() override = default;
+  ~RecorderHelpers() override { MOZ_ASSERT(!mCanvasChild); }
+
+  void Destroy() override {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
+    mCanvasChild = nullptr;
+  }
 
   bool InitTranslator(const TextureType& aTextureType, Handle&& aReadHandle,
                       nsTArray<Handle>&& aBufferHandles,
@@ -40,42 +47,42 @@ class RecorderHelpers final : public CanvasDrawEventRecorder::Helpers {
                       CrossProcessSemaphoreHandle&& aReaderSem,
                       CrossProcessSemaphoreHandle&& aWriterSem,
                       const bool& aUseIPDLThread) override {
-    RefPtr<CanvasChild> canvasChild(mCanvasChild);
-    if (NS_WARN_IF(!canvasChild)) {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
+    if (NS_WARN_IF(!mCanvasChild)) {
       return false;
     }
-    return canvasChild->SendInitTranslator(
+    return mCanvasChild->SendInitTranslator(
         aTextureType, std::move(aReadHandle), std::move(aBufferHandles),
         aBufferSize, std::move(aReaderSem), std::move(aWriterSem),
         aUseIPDLThread);
   }
 
   bool AddBuffer(Handle&& aBufferHandle, const uint64_t& aBufferSize) override {
-    RefPtr<CanvasChild> canvasChild(mCanvasChild);
-    if (!canvasChild) {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
+    if (!mCanvasChild) {
       return false;
     }
-    return canvasChild->SendAddBuffer(std::move(aBufferHandle), aBufferSize);
+    return mCanvasChild->SendAddBuffer(std::move(aBufferHandle), aBufferSize);
   }
 
   bool ReaderClosed() override {
-    RefPtr<CanvasChild> canvasChild(mCanvasChild);
-    if (!canvasChild) {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
+    if (!mCanvasChild) {
       return false;
     }
-    return !canvasChild->CanSend() || ipc::ProcessChild::ExpectingShutdown();
+    return !mCanvasChild->CanSend() || ipc::ProcessChild::ExpectingShutdown();
   }
 
   bool RestartReader() override {
-    RefPtr<CanvasChild> canvasChild(mCanvasChild);
-    if (!canvasChild) {
+    NS_ASSERT_OWNINGTHREAD(RecorderHelpers);
+    if (!mCanvasChild) {
       return false;
     }
-    return canvasChild->SendRestartTranslation();
+    return mCanvasChild->SendRestartTranslation();
   }
 
  private:
-  const ThreadSafeWeakPtr<CanvasChild> mCanvasChild;
+  CanvasChild* MOZ_NON_OWNING_REF mCanvasChild;
 };
 
 CanvasChild::CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef)
@@ -131,7 +138,8 @@ RefPtr<CanvasDrawEventRecorder> CanvasChild::EnsureRecorder(
       recorder = MakeAndAddRef<CanvasDrawEventRecorder>(mWorkerRef);
     }
 
-    if (!recorder->Init(aTextureType, MakeUnique<RecorderHelpers>(this))) {
+    RefPtr<CanvasChild> self(this);
+    if (!recorder->Init(aTextureType, MakeUnique<RecorderHelpers>(self))) {
       recorder->DetachResources();
       return nullptr;
     }
@@ -386,12 +394,11 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
   auto checkpoint = CreateCheckpoint();
   struct DataShmemHolder {
     RefPtr<ipc::SharedMemoryBasic> shmem;
-    ThreadSafeWeakPtr<CanvasChild> canvasChild;
+    RefPtr<CanvasChild> canvasChild;
   };
 
   auto* data = static_cast<uint8_t*>(shmem->memory());
-  auto* closure =
-      new DataShmemHolder{std::move(shmem), ThreadSafeWeakPtr{RefPtr{this}}};
+  auto* closure = new DataShmemHolder{std::move(shmem), this};
   auto dataFormatWidth = ssSize.width * BytesPerPixel(ssFormat);
 
   RefPtr<gfx::DataSourceSurface> dataSurface =
@@ -399,10 +406,8 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
           data, dataFormatWidth, ssSize, ssFormat,
           [](void* aClosure) {
             auto* shmemHolder = static_cast<DataShmemHolder*>(aClosure);
-            RefPtr<CanvasChild> canvasChild(shmemHolder->canvasChild);
-            if (canvasChild) {
-              canvasChild->ReturnDataSurfaceShmem(shmemHolder->shmem.forget());
-            }
+            shmemHolder->canvasChild->ReturnDataSurfaceShmem(
+                shmemHolder->shmem.forget());
             delete shmemHolder;
           },
           closure);

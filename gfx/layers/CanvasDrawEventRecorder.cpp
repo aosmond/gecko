@@ -334,6 +334,10 @@ void CanvasDrawEventRecorder::DetachResources() {
     auto lockedPendingDeletions = mPendingDeletions.Lock();
     mWorkerRef = nullptr;
   }
+
+  if (mHelpers) {
+    mHelpers->Destroy();
+  }
 }
 
 bool CanvasDrawEventRecorder::IsOnOwningThread() {

@@ -12,7 +12,6 @@
 #include "mozilla/layers/PCanvasChild.h"
 #include "mozilla/layers/SourceSurfaceSharedData.h"
 #include "mozilla/Mutex.h"
-#include "mozilla/ThreadSafeWeakPtr.h"
 
 namespace mozilla {
 
@@ -27,8 +26,7 @@ class SourceSurface;
 namespace layers {
 class CanvasDrawEventRecorder;
 
-class CanvasChild final : public PCanvasChild,
-                          public SupportsThreadSafeWeakPtr<CanvasChild> {
+class CanvasChild final : public PCanvasChild {
  public:
   MOZ_DECLARE_REFCOUNTED_TYPENAME(CanvasChild)
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(CanvasChild)
