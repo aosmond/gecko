@@ -248,7 +248,7 @@ void CanvasChild::EndTransaction() {
     RecordEvent(RecordedCanvasEndTransaction());
     mIsInTransaction = false;
     mDormant = false;
-  } else {
+  } else if (mRecorder) {
     // Schedule to drop free buffers if we have no non-empty transactions.
     if (!mDormant) {
       mDormant = true;
