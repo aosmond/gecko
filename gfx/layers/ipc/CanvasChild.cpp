@@ -263,6 +263,7 @@ void CanvasChild::EndTransaction() {
 }
 
 void CanvasChild::DropFreeBuffersWhenDormant() {
+  NS_ASSERT_OWNINGTHREAD(CanvasChild);
   // Drop any free buffers if we have not had any non-empty transactions.
   if (mDormant) {
     mRecorder->DropFreeBuffers();
