@@ -697,13 +697,14 @@ void CanvasTranslator::CacheSnapshotShmem(int64_t aTextureId, bool aDispatch) {
   }
 
   if (gfx::DrawTargetWebgl* webgl = GetDrawTargetWebgl(aTextureId)) {
-    if (Maybe<Shmem> shmem = webgl->GetShmem()) {
+    if (auto shmemHandle = webgl->TakeShmemHandle()) {
       // Lock the DT so that it doesn't get removed while shmem is in transit.
       mTextureInfo[aTextureId].mLocked++;
       nsCOMPtr<nsIThread> thread =
           gfx::CanvasRenderThread::GetCanvasRenderThread();
       RefPtr<CanvasTranslator> translator = this;
-      SendSnapshotShmem(aTextureId, std::move(*shmem))
+      SendSnapshotShmem(aTextureId, std::move(shmemHandle),
+                        webgl->GetShmemSize())
           ->Then(
               thread, __func__,
               [=](bool) { translator->RemoveTexture(aTextureId); },
@@ -729,8 +730,8 @@ already_AddRefed<gfx::DrawTarget> CanvasTranslator::CreateDrawTarget(
     if (EnsureSharedContextWebgl()) {
       mSharedContext->EnterTlsScope();
     }
-    if (RefPtr<gfx::DrawTargetWebgl> webgl = gfx::DrawTargetWebgl::Create(
-            aSize, aFormat, this, mSharedContext)) {
+    if (RefPtr<gfx::DrawTargetWebgl> webgl =
+            gfx::DrawTargetWebgl::Create(aSize, aFormat, mSharedContext)) {
       webgl->BeginFrame(gfx::IntRect());
       dt = webgl.forget().downcast<gfx::DrawTarget>();
       if (dt) {

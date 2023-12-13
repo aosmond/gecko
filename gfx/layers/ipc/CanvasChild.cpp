@@ -381,8 +381,10 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
     // If there is a shmem associated with this snapshot id, then we want to try
     // use that directly without having to allocate a new shmem for retrieval.
     auto it = mTextureInfo.find(aTextureId);
-    if (it != mTextureInfo.end() && it->second.mSnapshotShmem.IsReadable()) {
-      ipc::Shmem& shmem = it->second.mSnapshotShmem;
+    if (it != mTextureInfo.end() && it->second.mSnapshotShmem) {
+      const auto shmemPtr =
+          reinterpret_cast<uint8_t*>(it->second.mSnapshotShmem->memory());
+      MOZ_ASSERT(shmemPtr);
       mRecorder->RecordEvent(RecordedPrepareShmem(aTextureId));
       auto checkpoint = CreateCheckpoint();
       mRecorder->WaitForCheckpoint(checkpoint);
@@ -390,8 +392,8 @@ already_AddRefed<gfx::DataSourceSurface> CanvasChild::GetDataSurface(
       gfx::SurfaceFormat format = aSurface->GetFormat();
       auto stride = ImageDataSerializer::ComputeRGBStride(format, size.width);
       RefPtr<gfx::DataSourceSurface> dataSurface =
-          gfx::Factory::CreateWrappingDataSourceSurface(shmem.get<uint8_t>(),
-                                                        stride, size, format);
+          gfx::Factory::CreateWrappingDataSourceSurface(shmemPtr, stride, size,
+                                                        format);
       return dataSurface.forget();
     }
   }
@@ -475,10 +477,18 @@ bool CanvasChild::RequiresRefresh(int64_t aTextureId) const {
 }
 
 ipc::IPCResult CanvasChild::RecvSnapshotShmem(
-    int64_t aTextureId, Shmem&& aShmem, SnapshotShmemResolver&& aResolve) {
+    int64_t aTextureId, Handle&& aShmemHandle, uint32_t aShmemSize,
+    SnapshotShmemResolver&& aResolve) {
   auto it = mTextureInfo.find(aTextureId);
   if (it != mTextureInfo.end()) {
-    it->second.mSnapshotShmem = std::move(aShmem);
+    auto shmem = MakeRefPtr<ipc::SharedMemoryBasic>();
+    if (NS_WARN_IF(!shmem->SetHandle(std::move(aShmemHandle),
+                                     ipc::SharedMemory::RightsReadOnly)) ||
+        NS_WARN_IF(!shmem->Map(aShmemSize))) {
+      shmem = nullptr;
+    } else {
+      it->second.mSnapshotShmem = std::move(shmem);
+    }
     aResolve(true);
   } else {
     aResolve(false);

@@ -84,7 +84,7 @@ child:
   /**
    * Cache the shmem of the framebuffer for snapshotting.
    */
-  async SnapshotShmem(int64_t aTextureId, Shmem aShmem) returns (bool aSuccess);
+  async SnapshotShmem(int64_t aTextureId, Handle aShmemHandle, uint32_t aShmemSize) returns (bool aSuccess);
 };
 
 } // layers

@@ -46,7 +46,8 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
 
   ipc::IPCResult RecvNotifyRequiresRefresh(int64_t aTextureId);
 
-  ipc::IPCResult RecvSnapshotShmem(int64_t aTextureId, Shmem&& aShmem,
+  ipc::IPCResult RecvSnapshotShmem(int64_t aTextureId, Handle&& aShmemHandle,
+                                   uint32_t aShmemSize,
                                    SnapshotShmemResolver&& aResolve);
 
   /**
@@ -174,7 +175,7 @@ class CanvasChild final : public PCanvasChild, public SupportsWeakPtr {
   uint32_t mTransactionsSinceGetDataSurface = kCacheDataSurfaceThreshold;
   std::vector<RefPtr<gfx::SourceSurface>> mLastTransactionExternalSurfaces;
   struct TextureInfo {
-    ipc::Shmem mSnapshotShmem;
+    RefPtr<mozilla::ipc::SharedMemoryBasic> mSnapshotShmem;
     bool mRequiresRefresh = false;
   };
   std::unordered_map<int64_t, TextureInfo> mTextureInfo;
