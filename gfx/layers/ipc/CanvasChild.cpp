@@ -521,5 +521,15 @@ void CanvasChild::CleanupTexture(int64_t aTextureId) {
   mTextureInfo.erase(aTextureId);
 }
 
+bool CanvasChild::IsOnOwningThread() const {
+  if (!mIsOnWorker) {
+    return NS_IsMainThread();
+  }
+
+  MutexAutoLock lock(mMutex);
+  MOZ_RELEASE_ASSERT(mWorkerRef);
+  return mWorkerRef->Private()->IsOnCurrentThread();
+}
+
 }  // namespace layers
 }  // namespace mozilla

@@ -164,6 +164,8 @@ class CanvasChild final : public PCanvasChild {
 
   void CleanupTexture(int64_t aTextureId);
 
+  bool IsOnOwningThread() const;
+
  protected:
   void ActorDestroy(ActorDestroyReason aWhy) final;
 
@@ -184,7 +186,7 @@ class CanvasChild final : public PCanvasChild {
 
   static bool mDeactivated;
 
-  Mutex mMutex;
+  mutable Mutex mMutex;
   RefPtr<dom::ThreadSafeWorkerRef> mWorkerRef MOZ_GUARDED_BY(mMutex);
   RefPtr<CanvasDrawEventRecorder> mRecorder;
 

@@ -74,14 +74,7 @@ SourceSurfaceCanvasRecording::GetDataSurface() {
 }
 
 bool SourceSurfaceCanvasRecording::IsOnOwningThread() const {
-  // We don't have any way to access the relevant thread/event target, but we
-  // can leverage the thread local state to see if our CanvasChild matches the
-  // the thread local CanvasChild. If so, then we know we are on the owning
-  // thread.
-  if (auto* cm = gfx::CanvasManagerChild::MaybeGet()) {
-    return cm->MaybeGetCanvasChild() == mCanvasChild;
-  }
-  return false;
+  return mCanvasChild->IsOnOwningThread();
 }
 
 void SourceSurfaceCanvasRecording::EnsureDataSurfaceOnOwningThread() {
