@@ -70,11 +70,6 @@ class CanvasChild final : public PCanvasChild {
                                                  TextureType aTextureType);
 
   /**
-   * Send a messsage to our CanvasParent to resume translation.
-   */
-  void ResumeTranslation();
-
-  /**
    * Clean up IPDL actor.
    */
   void Destroy();
