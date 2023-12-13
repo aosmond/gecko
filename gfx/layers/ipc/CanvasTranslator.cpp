@@ -697,7 +697,7 @@ void CanvasTranslator::CacheSnapshotShmem(int64_t aTextureId, bool aDispatch) {
   }
 
   if (gfx::DrawTargetWebgl* webgl = GetDrawTargetWebgl(aTextureId)) {
-    if (Maybe<Shmem> shmem = webgl->GetShmem()) {
+    if (Maybe<Shmem> shmem = webgl->TakeShmem()) {
       // Lock the DT so that it doesn't get removed while shmem is in transit.
       mTextureInfo[aTextureId].mLocked++;
       nsCOMPtr<nsIThread> thread =

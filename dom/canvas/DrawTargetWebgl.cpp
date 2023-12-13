@@ -240,7 +240,7 @@ void DrawTargetWebgl::ClearSnapshot(bool aCopyOnWrite, bool aNeedHandle) {
 DrawTargetWebgl::~DrawTargetWebgl() {
   ClearSnapshot(false);
   if (mSharedContext) {
-    if (mShmem.IsWritable()) {
+    if (mIsShmemValid && mShmem.IsWritable()) {
       // Force any Skia snapshots to copy the shmem before it deallocs.
       mSkia->DetachAllSnapshots();
       if (mShmemAllocator && mShmemAllocator->CanSend()) {
@@ -410,6 +410,7 @@ bool DrawTargetWebgl::Init(const IntSize& size, const SurfaceFormat format,
 
   mSkia = new DrawTargetSkia;
   if (mShmem.IsWritable()) {
+    mIsShmemValid = true;
     auto stride = layers::ImageDataSerializer::ComputeRGBStride(
         SurfaceFormat::B8G8R8A8, size.width);
     if (!mSkia->Init(mShmem.get<uint8_t>(), size, stride,
@@ -437,6 +438,19 @@ bool DrawTargetWebgl::Init(const IntSize& size, const SurfaceFormat format,
 
   SetPermitSubpixelAA(IsOpaque(format));
   return true;
+}
+
+Maybe<mozilla::ipc::Shmem> DrawTargetWebgl::TakeShmem() {
+  if (!mIsShmemValid || !mShmem.IsWritable()) {
+    return Nothing();
+  }
+
+  // Force any Skia snapshots to copy the shmem before it is taken.
+  mSkia->DetachAllSnapshots();
+
+  Maybe<mozilla::ipc::Shmem> shmem(Some(mShmem));
+  mIsShmemValid = false;
+  return shmem.take();
 }
 
 // If a non-recoverable error occurred that would stop the canvas from initing.

@@ -358,6 +358,8 @@ class DrawTargetWebgl : public DrawTarget, public SupportsWeakPtr {
   mozilla::ipc::IProtocol* mShmemAllocator = nullptr;
   // The currently cached snapshot of the WebGL context
   RefPtr<DataSourceSurface> mSnapshot;
+  // Whether the shmem is still valid and should be allocated.
+  bool mIsShmemValid = false;
   // Whether the framebuffer is still in the initially clear state.
   bool mIsClear = true;
   // Whether or not the Skia target has valid contents and is being drawn to
@@ -576,9 +578,7 @@ class DrawTargetWebgl : public DrawTarget, public SupportsWeakPtr {
     return stream.str();
   }
 
-  Maybe<mozilla::ipc::Shmem> GetShmem() const {
-    return mShmem.IsWritable() ? Some(mShmem) : Nothing();
-  }
+  Maybe<mozilla::ipc::Shmem> TakeShmem();
 
  private:
   bool SupportsPattern(const Pattern& aPattern) {
