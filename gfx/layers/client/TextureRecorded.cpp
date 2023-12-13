@@ -6,14 +6,14 @@
 
 #include "TextureRecorded.h"
 
+#include "mozilla/Atomics.h"
 #include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/CanvasDrawEventRecorder.h"
 #include "RecordedCanvasEventImpl.h"
 
-namespace mozilla {
-namespace layers {
+namespace mozilla::layers {
 
 // The texture ID is used in the GPU process both to lookup the real texture in
 // the canvas threads and to lookup the SurfaceDescriptor for that texture in
@@ -21,7 +21,7 @@ namespace layers {
 // recording process), otherwise an old descriptor can be picked up. This means
 // we can't use the pointer in the recording process as an ID like we do for
 // other objects.
-static int64_t sNextRecordedTextureId = 0;
+static Atomic<int64_t> sNextRecordedTextureId(0);
 
 RecordedTextureData::RecordedTextureData(gfx::IntSize aSize,
                                          gfx::SurfaceFormat aFormat)
@@ -63,6 +63,11 @@ bool RecordedTextureData::Init(TextureType aTextureType) {
 void RecordedTextureData::DestroyOnOwningThreadLocked() {
   // We need the translator to drop its reference for the DrawTarget first,
   // because the TextureData might need to destroy its DrawTarget within a lock.
+  if (RefPtr<gfx::SourceSurface> wrapper = do_AddRef(mSnapshotWrapper)) {
+    MOZ_ASSERT(mCanvasChild);
+    mCanvasChild->DetachSurface(wrapper);
+    mSnapshotWrapper = nullptr;
+  }
   mSnapshot = nullptr;
   mDT = nullptr;
   if (mRecorder) {
@@ -258,5 +263,4 @@ bool RecordedTextureData::RequiresRefresh() const {
   return mCanvasChild->RequiresRefresh(mTextureId);
 }
 
-}  // namespace layers
-}  // namespace mozilla
+}  // namespace mozilla::layers
