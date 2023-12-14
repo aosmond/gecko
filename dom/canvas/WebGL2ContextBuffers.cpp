@@ -121,6 +121,7 @@ bool WebGL2Context::GetBufferSubData(GLenum target, uint64_t srcByteOffset,
   ////
 
   const ScopedLazyBind readBind(gl, target, buffer);
+  bool success = true;
 
   if (byteLen) {
     const bool isTF = (target == LOCAL_GL_TRANSFORM_FEEDBACK_BUFFER);
@@ -133,8 +134,13 @@ bool WebGL2Context::GetBufferSubData(GLenum target, uint64_t srcByteOffset,
 
     const auto mappedBytes = gl->fMapBufferRange(
         mapTarget, srcByteOffset, glByteLen, LOCAL_GL_MAP_READ_BIT);
-    memcpy(dest.begin().get(), mappedBytes, dest.length());
-    gl->fUnmapBuffer(mapTarget);
+    if (mappedBytes) {
+      memcpy(dest.begin().get(), mappedBytes, dest.length());
+      gl->fUnmapBuffer(mapTarget);
+    } else {
+      GenerateWarning("MapBufferRange failed.");
+      success = false;
+    }
 
     if (isTF) {
       const GLuint vbo = (mBoundArrayBuffer ? mBoundArrayBuffer->mGLName : 0);
@@ -144,7 +150,7 @@ bool WebGL2Context::GetBufferSubData(GLenum target, uint64_t srcByteOffset,
       gl->fBindTransformFeedback(LOCAL_GL_TRANSFORM_FEEDBACK, tfo);
     }
   }
-  return true;
+  return success;
 }
 
 }  // namespace mozilla
