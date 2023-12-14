@@ -708,8 +708,10 @@ talos-webgl:
                 windows10-64-ref-hw.*:
                     - --suite=webgl
                     - --skip-preflight
+                    - --setpref=dom.media.webcodecs.enabled=true
                 default:
                     - --suite=webgl
+                    - --setpref=dom.media.webcodecs.enabled=true
 
 talos-webgl-profiling:
     description: Talos WebGL with gecko profiling
@@ -724,6 +726,7 @@ talos-webgl-profiling:
         extra-options:
             - --suite=webgl
             - --gecko-profile
+            - --setpref=dom.media.webcodecs.enabled=true
 
 talos-xperf:
     description: Talos xperf
