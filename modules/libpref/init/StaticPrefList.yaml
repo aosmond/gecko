@@ -5618,7 +5618,7 @@
 # Whether to attempt to enable Accelerated Canvas2D regardless of blocklisting.
 - name: gfx.canvas.accelerated.force-enabled
   type: bool
-  value: false
+  value: true
   mirror: always
 
 - name: gfx.canvas.accelerated.async-present
@@ -5653,7 +5653,7 @@
 
 - name: gfx.canvas.accelerated.min-size
   type: RelaxedAtomicInt32
-  value: 128
+  value: 0
   mirror: always
 
 - name: gfx.canvas.accelerated.max-surface-size
