@@ -13,6 +13,7 @@
 #include "GPUVideoImage.h"
 #include "ScopedGLHelpers.h"
 
+#include "mozilla/gfx/D3D11Checks.h"
 #include "mozilla/layers/D3D11ShareHandleImage.h"
 #include "mozilla/layers/D3D11TextureIMFSampleImage.h"
 #include "mozilla/layers/D3D11YCbCrImage.h"
@@ -128,7 +129,7 @@ class BindAnglePlanes final {
                                       (void**)getter_AddRefs(mutex));
         if (mutex) {
           const auto hr = mutex->AcquireSync(0, 100);
-          if (FAILED(hr)) {
+          if (!gfx::D3D11Checks::DidAcquireSyncSucceed(__func__, hr)) {
             NS_WARNING("BindAnglePlanes failed to acquire KeyedMutex.");
             mSuccess = false;
           }

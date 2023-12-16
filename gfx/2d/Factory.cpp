@@ -52,6 +52,7 @@
 #  include "HelpersD2D.h"
 #  include "DXVA2Manager.h"
 #  include "ImageContainer.h"
+#  include "mozilla/gfx/D3D11Checks.h"
 #  include "mozilla/layers/LayersSurfaces.h"
 #  include "mozilla/layers/TextureD3D11.h"
 #  include "nsWindowsHelpers.h"
@@ -1301,7 +1302,7 @@ bool Factory::ReadbackTexture(uint8_t* aDestData, int32_t aDestStride,
                                            (void**)getter_AddRefs(mutex));
   if (SUCCEEDED(hr) && mutex) {
     hr = mutex->AcquireSync(0, 2000);
-    if (hr != S_OK) {
+    if (!D3D11Checks::DidAcquireSyncSucceed(__func__, hr)) {
       gfxWarning() << "Could not acquire DXGI surface lock in 2 seconds";
       return false;
     }

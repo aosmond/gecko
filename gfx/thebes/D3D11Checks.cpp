@@ -87,14 +87,20 @@ bool D3D11Checks::DoesRenderTargetViewNeedRecreating(ID3D11Device* aDevice) {
   {
     // Acquire and clear
     HRESULT hr;
-    AutoTextureLock lock(keyedMutex, hr, INFINITE);
+    AutoTextureLock lock(__func__, keyedMutex, hr, INFINITE);
+    if (NS_WARN_IF(!lock.Succeeded())) {
+      return false;
+    }
     FLOAT color1[4] = {1, 1, 0.5, 1};
     deviceContext->ClearRenderTargetView(offscreenRTView, color1);
   }
 
   {
     HRESULT hr;
-    AutoTextureLock lock(keyedMutex, hr, INFINITE);
+    AutoTextureLock lock(__func__, keyedMutex, hr, INFINITE);
+    if (NS_WARN_IF(!lock.Succeeded())) {
+      return false;
+    }
     FLOAT color2[4] = {1, 1, 0, 1};
 
     deviceContext->ClearRenderTargetView(offscreenRTView, color2);
@@ -254,7 +260,8 @@ static bool DoesTextureSharingWorkInternal(ID3D11Device* device,
   RefPtr<IDXGIKeyedMutex> sourceSharedMutex;
   texture->QueryInterface(__uuidof(IDXGIKeyedMutex),
                           (void**)getter_AddRefs(sourceSharedMutex));
-  if (FAILED(sourceSharedMutex->AcquireSync(0, 30 * 1000))) {
+  HRESULT hr = sourceSharedMutex->AcquireSync(0, 30 * 1000);
+  if (!DidAcquireSyncSucceed(__func__, hr)) {
     gfxCriticalError() << "DoesD3D11TextureSharingWork_SourceMutexTimeout";
     // only wait for 30 seconds
     return false;
@@ -317,9 +324,8 @@ static bool DoesTextureSharingWorkInternal(ID3D11Device* device,
   sharedResource->QueryInterface(__uuidof(IDXGIKeyedMutex),
                                  (void**)getter_AddRefs(sharedMutex));
   {
-    HRESULT hr;
-    AutoTextureLock lock(sharedMutex, hr, 30 * 1000);
-    if (FAILED(hr)) {
+    AutoTextureLock lock(__func__, sharedMutex, hr, 30 * 1000);
+    if (!lock.Succeeded()) {
       gfxCriticalError() << "DoesD3D11TextureSharingWork_AcquireSyncTimeout";
       // only wait for 30 seconds
       return false;
@@ -484,6 +490,24 @@ bool D3D11Checks::DoesRemotePresentWork(IDXGIAdapter* adapter) {
     options += VideoFormatOption::P016;
   }
   return options;
+}
+
+/* static */ bool D3D11Checks::DidAcquireSyncSucceed(const char* aCaller,
+                                                     HRESULT aResult) {
+  MOZ_ASSERT(aCaller);
+  if (aResult == WAIT_TIMEOUT) {
+    gfxCriticalNote << aCaller << " AcquireSync timed out";
+    return false;
+  }
+  if (aResult == WAIT_ABANDONED) {
+    gfxCriticalNote << aCaller << " AcquireSync abandoned";
+    return false;
+  }
+  if (FAILED(aResult)) {
+    gfxCriticalNote << aCaller << " AcquireSync failed " << gfx::hexa(aResult);
+    return false;
+  }
+  return true;
 }
 
 }  // namespace gfx

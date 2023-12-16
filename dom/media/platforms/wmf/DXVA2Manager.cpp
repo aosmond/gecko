@@ -24,6 +24,7 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/gfx/D3D11Checks.h"
 #include "mozilla/gfx/DeviceManagerDx.h"
 #include "mozilla/layers/D3D11ShareHandleImage.h"
 #include "mozilla/layers/D3D11TextureIMFSampleImage.h"
@@ -786,9 +787,9 @@ D3D11DXVA2Manager::CopyToImage(IMFSample* aVideoSample,
   texture->QueryInterface((IDXGIKeyedMutex**)getter_AddRefs(mutex));
 
   {
-    AutoTextureLock(mutex, hr, 2000);
-    if (mutex && (FAILED(hr) || hr == WAIT_TIMEOUT || hr == WAIT_ABANDONED)) {
-      return hr;
+    AutoTextureLock lock("D3D11DXVA2Manager::CopyToImage", mutex, hr, 2000);
+    if (mutex && !lock.Succeeded()) {
+      return E_FAIL;
     }
 
     if (!mutex && mDevice != DeviceManagerDx::Get()->GetCompositorDevice()) {
@@ -981,7 +982,7 @@ D3D11DXVA2Manager::CopyToBGRATexture(ID3D11Texture2D* aInTexture,
     NS_ENSURE_TRUE(SUCCEEDED(hr) && newTexture, E_FAIL);
 
     hr = mutex->AcquireSync(0, 2000);
-    NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
+    NS_ENSURE_TRUE(D3D11Checks::DidAcquireSyncSucceed(__func__, hr), E_FAIL);
 
     mContext->CopyResource(newTexture, inTexture);
 

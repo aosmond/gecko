@@ -8,6 +8,7 @@
 
 #include "YCbCrUtils.h"
 #include "gfx2DGlue.h"
+#include "mozilla/gfx/D3D11Checks.h"
 #include "mozilla/gfx/DeviceManagerDx.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/layers/CompositableClient.h"
@@ -333,7 +334,7 @@ class AutoCheckLockD3D11Texture final {
 
     // Test to see if the keyed mutex has been released
     HRESULT hr = mMutex->AcquireSync(0, 0);
-    if (hr == S_OK || hr == WAIT_ABANDONED) {
+    if (!D3D11Checks::DidAcquireSyncSucceed(__func__, hr)) {
       mIsLocked = true;
       // According to Microsoft documentation:
       // WAIT_ABANDONED - The shared surface and keyed mutex are no longer in a

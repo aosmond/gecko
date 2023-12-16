@@ -987,7 +987,7 @@ void CompositorD3D11::Present() {
 
     if (mutex) {
       hr = mutex->AcquireSync(0, 2000);
-      NS_ENSURE_TRUE_VOID(SUCCEEDED(hr));
+      NS_ENSURE_TRUE_VOID(D3D11Checks::DidAcquireSyncSucceed(__func__, hr));
     }
 
     chain->Present1(
@@ -1001,7 +1001,7 @@ void CompositorD3D11::Present() {
   } else {
     if (mutex) {
       hr = mutex->AcquireSync(0, 2000);
-      NS_ENSURE_TRUE_VOID(SUCCEEDED(hr));
+      NS_ENSURE_TRUE_VOID(D3D11Checks::DidAcquireSyncSucceed(__func__, hr));
     }
 
     hr = mSwapChain->Present(

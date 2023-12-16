@@ -32,6 +32,7 @@ struct D3D11Checks {
   static bool GetDxgiDesc(ID3D11Device* device, DXGI_ADAPTER_DESC* out);
   static bool DoesRemotePresentWork(IDXGIAdapter* adapter);
   static VideoFormatOptionSet FormatOptions(ID3D11Device* device);
+  static bool DidAcquireSyncSucceed(const char* aCaller, HRESULT aResult);
 };
 
 }  // namespace gfx
