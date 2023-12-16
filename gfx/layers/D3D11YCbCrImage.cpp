@@ -8,6 +8,7 @@
 
 #include "YCbCrUtils.h"
 #include "gfx2DGlue.h"
+#include "mozilla/gfx/D3D11Checks.h"
 #include "mozilla/gfx/DeviceManagerDx.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/layers/CompositableClient.h"
@@ -86,6 +87,11 @@ bool D3D11YCbCrImage::SetData(KnowsCompositor* aAllocator,
   AutoLockD3D11Texture lockY(textureY);
   AutoLockD3D11Texture lockCb(textureCb);
   AutoLockD3D11Texture lockCr(textureCr);
+  if (NS_WARN_IF(!lockY.Succeeded()) || NS_WARN_IF(!lockCb.Succeeded()) ||
+      NS_WARN_IF(!lockCr.Succeeded())) {
+    gfxCriticalNote << "D3D11YCbCrImage::SetData failed to lock";
+    return false;
+  }
 
   ctx->UpdateSubresource(textureY, 0, nullptr, aData.mYChannel, aData.mYStride,
                          aData.mYStride * aData.YDataSize().height);
@@ -212,6 +218,11 @@ nsresult D3D11YCbCrImage::ReadIntoBuffer(
     AutoLockD3D11Texture lockY(texY);
     AutoLockD3D11Texture lockCb(texCb);
     AutoLockD3D11Texture lockCr(texCr);
+    if (NS_WARN_IF(!lockY.Succeeded()) || NS_WARN_IF(!lockCb.Succeeded()) ||
+        NS_WARN_IF(!lockCr.Succeeded())) {
+      gfxCriticalNote << "D3D11YCbCrImage::ReadIntoBuffer lock failed";
+      return NS_ERROR_FAILURE;
+    }
     ctx->CopyResource(softTexY, texY);
     ctx->CopyResource(softTexCb, texCb);
     ctx->CopyResource(softTexCr, texCr);
@@ -333,8 +344,9 @@ class AutoCheckLockD3D11Texture final {
 
     // Test to see if the keyed mutex has been released
     HRESULT hr = mMutex->AcquireSync(0, 0);
-    if (hr == S_OK || hr == WAIT_ABANDONED) {
-      mIsLocked = true;
+    mIsLocked = mSyncAcquired =
+        D3D11Checks::DidAcquireSyncSucceed(__func__, hr);
+    if (!mIsLocked && hr == WAIT_ABANDONED) {
       // According to Microsoft documentation:
       // WAIT_ABANDONED - The shared surface and keyed mutex are no longer in a
       // consistent state. If AcquireSync returns this value, you should release

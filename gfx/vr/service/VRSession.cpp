@@ -117,6 +117,8 @@ bool VRSession::SubmitFrame(
           gfxDevCrash(LogReason::D3DLockTimeout) << "D3D lock mutex timeout";
         } else if (hr == WAIT_ABANDONED) {
           gfxCriticalNote << "GFX: D3D11 lock mutex abandoned";
+          mutex->ReleaseSync(0);
+          hr = E_FAIL;
         }
 #  endif
         if (SUCCEEDED(hr)) {
