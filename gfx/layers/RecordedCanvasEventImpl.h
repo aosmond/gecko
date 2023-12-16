@@ -165,8 +165,7 @@ inline bool RecordedTextureLock::PlayCanvasEvent(
     return false;
   }
 
-  textureData->Lock(mMode);
-  return true;
+  return textureData->Lock(mMode);
 }
 
 template <class S>
