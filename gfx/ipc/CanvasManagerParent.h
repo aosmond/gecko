@@ -46,10 +46,8 @@ class CanvasManagerParent final : public PCanvasManagerParent {
   already_AddRefed<layers::PCanvasParent> AllocPCanvasParent();
 
   mozilla::ipc::IPCResult RecvInitialize(const uint32_t& aId);
-  mozilla::ipc::IPCResult RecvGetSnapshot(
-      const uint32_t& aManagerId, const int32_t& aProtocolId,
-      const Maybe<RemoteTextureOwnerId>& aOwnerId,
-      webgl::FrontBufferSnapshotIpc* aResult);
+  mozilla::ipc::IPCResult RecvGetSnapshot(const RemoteTextureOwnerId& aOwnerId,
+                                          SurfaceDescriptorShared* aDesc);
 
  private:
   static void ShutdownInternal();

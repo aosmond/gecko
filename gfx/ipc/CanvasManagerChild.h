@@ -38,9 +38,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
   explicit CanvasManagerChild(uint32_t aId);
   uint32_t Id() const { return mId; }
   already_AddRefed<DataSourceSurface> GetSnapshot(
-      uint32_t aManagerId, int32_t aProtocolId,
-      const Maybe<RemoteTextureOwnerId>& aOwnerId, SurfaceFormat aFormat,
-      bool aPremultiply, bool aYFlip);
+      const RemoteTextureOwnerId& aOwnerId, bool aPremultiply, bool aYFlip);
   void ActorDestroy(ActorDestroyReason aReason) override;
 
   static CanvasManagerChild* Get();
@@ -66,6 +64,7 @@ class CanvasManagerChild final : public PCanvasManagerChild {
 
  private:
   ~CanvasManagerChild();
+  static void DeallocateSnapshot(void* aShmem);
   void DestroyInternal();
   void Destroy();
 

@@ -162,58 +162,10 @@ CanvasManagerParent::AllocPCanvasParent() {
 }
 
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
-    const uint32_t& aManagerId, const int32_t& aProtocolId,
-    const Maybe<RemoteTextureOwnerId>& aOwnerId,
-    webgl::FrontBufferSnapshotIpc* aResult) {
-  if (!aManagerId) {
-    return IPC_FAIL(this, "invalid id");
-  }
-
-  IProtocol* actor = nullptr;
-  for (CanvasManagerParent* i : sManagers) {
-    if (i->mContentId == mContentId && i->mId == aManagerId) {
-      actor = i->Lookup(aProtocolId);
-      break;
-    }
-  }
-
-  if (!actor) {
-    return IPC_FAIL(this, "invalid actor");
-  }
-
-  if (actor->GetSide() != mozilla::ipc::Side::ParentSide) {
-    return IPC_FAIL(this, "unsupported actor");
-  }
-
-  webgl::FrontBufferSnapshotIpc buffer;
-  switch (actor->GetProtocolId()) {
-    case ProtocolId::PWebGLMsgStart: {
-      RefPtr<dom::WebGLParent> webgl = static_cast<dom::WebGLParent*>(actor);
-      mozilla::ipc::IPCResult rv = webgl->GetFrontBufferSnapshot(&buffer, this);
-      if (!rv) {
-        return rv;
-      }
-    } break;
-    case ProtocolId::PWebGPUMsgStart: {
-      RefPtr<webgpu::WebGPUParent> webgpu =
-          static_cast<webgpu::WebGPUParent*>(actor);
-      IntSize size;
-      if (aOwnerId.isNothing()) {
-        return IPC_FAIL(this, "invalid OwnerId");
-      }
-      mozilla::ipc::IPCResult rv =
-          webgpu->GetFrontBufferSnapshot(this, *aOwnerId, buffer.shmem, size);
-      if (!rv) {
-        return rv;
-      }
-      buffer.surfSize.x = static_cast<uint32_t>(size.width);
-      buffer.surfSize.y = static_cast<uint32_t>(size.height);
-    } break;
-    default:
-      return IPC_FAIL(this, "unsupported protocol");
-  }
-
-  *aResult = std::move(buffer);
+    const RemoteTextureOwnerId& aOwnerId,
+    layers::SurfaceDescriptorShared* aDesc) {
+  RemoteTextureMap::Get()->GetLatestBufferSnapshot(aOwnerId, OtherPid(),
+                                                   *aDesc);
   return IPC_OK();
 }
 
