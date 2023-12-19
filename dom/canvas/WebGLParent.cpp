@@ -143,6 +143,15 @@ IPCResult WebGLParent::GetFrontBufferSnapshot(
   return IPC_OK();
 }
 
+Maybe<uvec2> WebGLParent::GetFrontBufferSnapshot(
+    Maybe<Range<uint8_t>> dest, const Maybe<size_t> destStride) const {
+  AUTO_PROFILER_LABEL("WebGLParent::GetFrontBufferSnapshot", GRAPHICS);
+  if (!mHost) {
+    return Nothing();
+  }
+  return mHost->FrontBufferSnapshotInto(dest, destStride);
+}
+
 IPCResult WebGLParent::RecvGetBufferSubData(const GLenum target,
                                             const uint64_t srcByteOffset,
                                             const uint64_t byteSize,

@@ -6,6 +6,7 @@
 
 #include "CanvasChild.h"
 
+#include "gfxPlatform.h"
 #include "MainThreadUtils.h"
 #include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DrawTargetRecording.h"

@@ -319,9 +319,9 @@ already_AddRefed<mozilla::gfx::SourceSurface> CanvasContext::GetSurfaceSnapshot(
     return nullptr;
   }
 
-  MOZ_ASSERT(mRemoteTextureOwnerId.isSome());
   return cm->GetSnapshot(cm->Id(), mBridge->Id(), mRemoteTextureOwnerId,
-                         mGfxFormat, /* aPremultiply */ false,
+                         /* aTextireId */ Nothing(),
+                         /* aPremultiply */ false,
                          /* aYFlip */ false);
 }
 

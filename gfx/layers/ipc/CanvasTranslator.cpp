@@ -965,6 +965,30 @@ void CanvasTranslator::ClearTextureInfo() {
   }
 }
 
+void CanvasTranslator::GetLatestBufferSnapshot(RemoteTextureOwnerId aOwnerId,
+                                               RemoteTextureId aTextureId,
+                                               SurfaceDescriptorShared& aDesc) {
+  if (NS_WARN_IF(!mRemoteTextureOwner) ||
+      NS_WARN_IF(!mRemoteTextureOwner->IsRegistered(aOwnerId))) {
+    return;
+  }
+
+  auto result = mTextureInfo.find(aTextureId.mId);
+  if (NS_WARN_IF(result == mTextureInfo.end())) {
+    return;
+  }
+
+  if (result->second.mDrawTarget &&
+      result->second.mDrawTarget->GetBackendType() == gfx::BackendType::WEBGL) {
+    gfx::DrawTargetWebgl* webgl =
+        static_cast<gfx::DrawTargetWebgl*>(result->second.mDrawTarget.get());
+    webgl->GetLatestBufferSnapshot(aDesc);
+    return;
+  }
+
+  RemoteTextureMap::Get()->GetLatestBufferSnapshot(aOwnerId, OtherPid(), aDesc);
+}
+
 already_AddRefed<gfx::SourceSurface> CanvasTranslator::LookupExternalSurface(
     uint64_t aKey) {
   return mSharedSurfacesHolder->Get(wr::ToExternalImageId(aKey));

@@ -39,6 +39,10 @@ namespace gl {
 class GLContext;
 }  // namespace gl
 
+namespace layers {
+class SurfaceDescriptorShared;
+}  // namespace layers
+
 namespace gfx {
 
 class DataSourceSurface;
@@ -581,6 +585,8 @@ class DrawTargetWebgl : public DrawTarget, public SupportsWeakPtr {
   }
 
   uint32_t GetShmemSize() const { return mShmemSize; }
+
+  void GetLatestBufferSnapshot(layers::SurfaceDescriptorShared& aDesc);
 
  private:
   bool SupportsPattern(const Pattern& aPattern) {

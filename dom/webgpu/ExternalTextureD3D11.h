@@ -33,7 +33,7 @@ class ExternalTextureD3D11 final : public ExternalTexture {
 
   Maybe<layers::SurfaceDescriptor> ToSurfaceDescriptor() override;
 
-  void GetSnapshot(const ipc::Shmem& aDestShmem,
+  void GetSnapshot(const ipc::SharedMemoryBasic& aDestShmem, size_t aDestSize,
                    const gfx::IntSize& aSize) override;
 
  protected:

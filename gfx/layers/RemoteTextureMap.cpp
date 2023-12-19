@@ -10,6 +10,8 @@
 
 #include "CompositableHost.h"
 #include "mozilla/gfx/gfxVars.h"
+#include "mozilla/gfx/Swizzle.h"
+#include "mozilla/ipc/SharedMemoryBasic.h"
 #include "mozilla/layers/AsyncImagePipelineManager.h"
 #include "mozilla/layers/BufferTexture.h"
 #include "mozilla/layers/CompositorThread.h"
@@ -156,14 +158,6 @@ void RemoteTextureOwnerClient::PushDummyTexture(
   RemoteTextureMap::Get()->PushTexture(aTextureId, aOwnerId, mForPid,
                                        std::move(textureData), textureHost,
                                        /* aResourceWrapper */ nullptr);
-}
-
-void RemoteTextureOwnerClient::GetLatestBufferSnapshot(
-    const RemoteTextureOwnerId aOwnerId, const mozilla::ipc::Shmem& aDestShmem,
-    const gfx::IntSize& aSize) {
-  MOZ_ASSERT(IsRegistered(aOwnerId));
-  RemoteTextureMap::Get()->GetLatestBufferSnapshot(aOwnerId, mForPid,
-                                                   aDestShmem, aSize);
 }
 
 UniquePtr<TextureData> RemoteTextureOwnerClient::GetRecycledTextureData(
@@ -387,17 +381,19 @@ bool RemoteTextureMap::RemoveTexture(const RemoteTextureId aTextureId,
 
 void RemoteTextureMap::GetLatestBufferSnapshot(
     const RemoteTextureOwnerId aOwnerId, const base::ProcessId aForPid,
-    const mozilla::ipc::Shmem& aDestShmem, const gfx::IntSize& aSize) {
+    SurfaceDescriptorShared& aDesc) {
   // The compositable ref of remote texture should be updated in mMonitor lock.
   CompositableTextureHostRef textureHostRef;
   RefPtr<TextureHost> releasingTexture;  // Release outside the monitor
   std::shared_ptr<webgpu::ExternalTexture> externalTexture;
+  Maybe<gfx::DataSourceSurface::ScopedMap> surfaceMap;
+  SurfaceFormat format;
+  gfx::IntSize size;
   {
     MonitorAutoLock lock(mMonitor);
 
     auto* owner = GetTextureOwner(lock, aOwnerId, aForPid);
-    if (!owner) {
-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+    if (NS_WARN_IF(!owner)) {
       return;
     }
 
@@ -411,14 +407,17 @@ void RemoteTextureMap::GetLatestBufferSnapshot(
                              : owner->mUsingTextureDataHolders.back().get();
     TextureHost* textureHost = holder->mTextureHost;
 
-    if (textureHost->GetSize() != aSize) {
-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
-    }
-    if (textureHost->GetFormat() != gfx::SurfaceFormat::R8G8B8A8 &&
-        textureHost->GetFormat() != gfx::SurfaceFormat::B8G8R8A8) {
-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
+    size = textureHost->GetSize();
+    format = textureHost->GetFormat();
+    switch (format) {
+      case gfx::SurfaceFormat::R8G8B8A8:
+      case gfx::SurfaceFormat::R8G8B8X8:
+      case gfx::SurfaceFormat::B8G8R8A8:
+      case gfx::SurfaceFormat::B8G8R8X8:
+        break;
+      default:
+        MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+        return;
     }
     if (holder->mResourceWrapper &&
         holder->mResourceWrapper->mExternalTexture) {
@@ -431,27 +430,58 @@ void RemoteTextureMap::GetLatestBufferSnapshot(
       // during memcpy.
       textureHostRef = textureHost;
     } else {
-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
+      RefPtr<gfx::DataSourceSurface> surface = textureHost->GetAsSurface();
+      if (NS_WARN_IF(!surface)) {
+        return;
+      }
+
+      MOZ_ASSERT(surface->GetSize() == size);
+      MOZ_ASSERT(surface->GetFormat() == format);
+
+      surfaceMap.emplace(surface, gfx::DataSourceSurface::READ);
+      if (NS_WARN_IF(!surfaceMap->IsMapped())) {
+        return;
+      }
     }
   }
 
-  if (!textureHostRef) {
+  if (NS_WARN_IF(!textureHostRef)) {
+    return;
+  }
+
+  int32_t stride =
+      layers::ImageDataSerializer::ComputeRGBStride(format, size.width);
+  if (stride < 0 || size.height < 0) {
+    return;
+  }
+
+  size_t len = size_t(stride) * size.height;
+  size_t alignedLen = ipc::SharedMemory::PageAlignedSize(len);
+  auto shmem = MakeRefPtr<ipc::SharedMemoryBasic>();
+  if (NS_WARN_IF(!shmem->Create(alignedLen)) ||
+      NS_WARN_IF(!shmem->Map(alignedLen))) {
     return;
   }
 
   if (externalTexture) {
-    externalTexture->GetSnapshot(aDestShmem, aSize);
+    externalTexture->GetSnapshot(shmem, len, size);
   } else if (auto* bufferTextureHost = textureHostRef->AsBufferTextureHost()) {
-    uint32_t stride = ImageDataSerializer::ComputeRGBStride(
-        bufferTextureHost->GetFormat(), aSize.width);
-    uint32_t bufferSize = stride * aSize.height;
-    uint8_t* dst = aDestShmem.get<uint8_t>();
-    uint8_t* src = bufferTextureHost->GetBuffer();
-
-    MOZ_ASSERT(bufferSize <= aDestShmem.Size<uint8_t>());
-    memcpy(dst, src, bufferSize);
+    const uint8_t* src = bufferTextureHost->GetBuffer();
+    memcpy(shmem->memory(), src, len);
+  } else if (surfaceMap) {
+    MOZ_ASSERT(surfaceMap->IsMapped());
+    if (NS_WARN_IF(!SwizzleData(surfaceMap->GetData(), surfaceMap->GetStride(),
+                                format,
+                                reinterpret_cast<uint8_t*>(shmem->memory()),
+                                stride, format, size))) {
+      return;
+    }
+  } else {
+    MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+    return;
   }
+
+  aDesc = SurfaceDescriptorShared(size, stride, format, shmem->TakeHandle());
 
   {
     MonitorAutoLock lock(mMonitor);

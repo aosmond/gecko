@@ -269,6 +269,10 @@ class CanvasTranslator final : public gfx::InlineTranslator,
 
   void GetDataSurface(uint64_t aSurfaceRef);
 
+  void GetLatestBufferSnapshot(RemoteTextureOwnerId aOwnerId,
+                               RemoteTextureId aTextureId,
+                               SurfaceDescriptorShared& aDesc);
+
  private:
   ~CanvasTranslator();
 

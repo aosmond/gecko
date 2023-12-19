@@ -13,7 +13,7 @@
 namespace mozilla {
 
 namespace ipc {
-class Shmem;
+class SharedMemoryBasic;
 }
 
 namespace webgpu {
@@ -36,8 +36,8 @@ class ExternalTexture {
 
   virtual Maybe<layers::SurfaceDescriptor> ToSurfaceDescriptor() = 0;
 
-  virtual void GetSnapshot(const ipc::Shmem& aDestShmem,
-                           const gfx::IntSize& aSize) {}
+  virtual void GetSnapshot(const ipc::SharedMemoryBasic* aDestShmem,
+                           size_t aDestSize, const gfx::IntSize& aSize) {}
 
   gfx::IntSize GetSize() { return gfx::IntSize(mWidth, mHeight); }
 

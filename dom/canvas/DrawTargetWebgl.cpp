@@ -22,6 +22,7 @@
 #include "mozilla/layers/CanvasRenderer.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/ImageDataSerializer.h"
+#include "mozilla/layers/LayersSurfaces.h"
 #include "mozilla/layers/RemoteTextureMap.h"
 #include "skia/include/core/SkPixmap.h"
 #include "nsContentUtils.h"
@@ -4771,6 +4772,49 @@ void DrawTargetWebgl::PopLayer() {
   MOZ_ASSERT(mLayerDepth > 0);
   --mLayerDepth;
   mSkia->PopLayer();
+}
+
+void DrawTargetWebgl::GetLatestBufferSnapshot(
+    layers::SurfaceDescriptorShared& aDesc) {
+  if (NS_WARN_IF(!PrepareContext(false))) {
+    return;
+  }
+
+  RefPtr<WebGLContext> webgl = mSharedContext->mWebgl;
+  if (NS_WARN_IF(!webgl)) {
+    return;
+  }
+
+  Maybe<uvec2> maybeSize = webgl->FrontBufferSnapshotInto({});
+  if (NS_WARN_IF(!maybeSize)) {
+    return;
+  }
+
+  const auto format = SurfaceFormat::R8G8B8A8;
+  IntSize size(maybeSize->x, maybeSize->y);
+  int32_t stride =
+      layers::ImageDataSerializer::ComputeRGBStride(format, size.width);
+  if (stride < 0) {
+    return;
+  }
+
+  size_t len = size_t(stride) * size.height;
+  size_t alignedLen = ipc::SharedMemory::PageAlignedSize(len);
+  auto shmem = MakeRefPtr<ipc::SharedMemoryBasic>();
+  if (NS_WARN_IF(!shmem->Create(alignedLen)) ||
+      NS_WARN_IF(!shmem->Map(alignedLen))) {
+    return;
+  }
+
+  auto range =
+      Range<uint8_t>{reinterpret_cast<uint8_t*>(shmem->memory()), alignedLen};
+  if (NS_WARN_IF(
+          !webgl->FrontBufferSnapshotInto(Some(range), Some(size_t(stride))))) {
+    return;
+  }
+
+  aDesc = layers::SurfaceDescriptorShared(size, stride, format,
+                                          shmem->TakeHandle());
 }
 
 }  // namespace mozilla::gfx

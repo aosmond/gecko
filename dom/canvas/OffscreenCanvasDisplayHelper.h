@@ -30,6 +30,7 @@ struct OffscreenCanvasDisplayData final {
   bool mIsOpaque = true;
   bool mIsAlphaPremult = true;
   mozilla::gl::OriginPos mOriginPos = gl::OriginPos::TopLeft;
+  Maybe<int32_t> mProtocolId;
   Maybe<layers::RemoteTextureOwnerId> mOwnerId;
 };
 
@@ -46,7 +47,7 @@ class OffscreenCanvasDisplayHelper final {
 
   void UpdateContext(OffscreenCanvas* aOffscreenCanvas,
                      RefPtr<ThreadSafeWorkerRef>&& aWorkerRef,
-                     CanvasContextType aType, const Maybe<int32_t>& aChildId);
+                     CanvasContextType aType);
 
   void FlushForDisplay();
 
@@ -67,10 +68,9 @@ class OffscreenCanvasDisplayHelper final {
   void MaybeQueueInvalidateElement() MOZ_REQUIRES(mMutex);
   void InvalidateElement();
 
-  bool TransformSurface(const gfx::DataSourceSurface::ScopedMap& aSrcMap,
-                        const gfx::DataSourceSurface::ScopedMap& aDstMap,
-                        gfx::SurfaceFormat aFormat, const gfx::IntSize& aSize,
-                        bool aNeedsPremult, gl::OriginPos aOriginPos) const;
+  already_AddRefed<gfx::SourceSurface> TransformSurface(
+      gfx::SourceSurface* aSurface, bool aHasAlpha, bool aIsAlphaPremult,
+      gl::OriginPos aOriginPos) const;
 
   mutable Mutex mMutex;
   HTMLCanvasElement* MOZ_NON_OWNING_REF mCanvasElement MOZ_GUARDED_BY(mMutex);
@@ -83,7 +83,7 @@ class OffscreenCanvasDisplayHelper final {
   OffscreenCanvasDisplayData mData MOZ_GUARDED_BY(mMutex);
   CanvasContextType mType MOZ_GUARDED_BY(mMutex) = CanvasContextType::NoContext;
   Maybe<uint32_t> mContextManagerId MOZ_GUARDED_BY(mMutex);
-  Maybe<int32_t> mContextChildId MOZ_GUARDED_BY(mMutex);
+  Maybe<layers::RemoteTextureId> mFrontBufferTextureId MOZ_GUARDED_BY(mMutex);
   const mozilla::layers::ImageContainer::ProducerID mImageProducerID;
   mozilla::layers::ImageContainer::FrameID mLastFrameID MOZ_GUARDED_BY(mMutex) =
       0;

@@ -126,10 +126,6 @@ class WebGPUParent final : public PWebGPUParent {
   ipc::IPCResult RecvGenerateError(Maybe<RawId> aDeviceId, dom::GPUErrorFilter,
                                    const nsCString& message);
 
-  ipc::IPCResult GetFrontBufferSnapshot(
-      IProtocol* aProtocol, const layers::RemoteTextureOwnerId& aOwnerId,
-      Maybe<Shmem>& aShmem, gfx::IntSize& aSize);
-
   void ActorDestroy(ActorDestroyReason aWhy) override;
 
   struct BufferMapData {

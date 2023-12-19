@@ -182,14 +182,16 @@ class HostWebGLContext final : public SupportsWeakPtr {
 
   // -
 
-  Maybe<uvec2> FrontBufferSnapshotInto(Maybe<Range<uint8_t>> dest) const {
-    return mContext->FrontBufferSnapshotInto(dest);
+  Maybe<uvec2> FrontBufferSnapshotInto(
+      Maybe<Range<uint8_t>> dest,
+      const Maybe<size_t> destStride = Nothing()) const {
+    return mContext->FrontBufferSnapshotInto(dest, destStride);
   }
 
   Maybe<uvec2> FrontBufferSnapshotInto(
-      std::shared_ptr<gl::SharedSurface>& front,
-      Maybe<Range<uint8_t>> dest) const {
-    return mContext->FrontBufferSnapshotInto(front, dest);
+      std::shared_ptr<gl::SharedSurface>& front, Maybe<Range<uint8_t>> dest,
+      const Maybe<size_t> destStride = Nothing()) const {
+    return mContext->FrontBufferSnapshotInto(front, dest, destStride);
   }
 
   void ClearVRSwapChain() const { mContext->ClearVRSwapChain(); }
