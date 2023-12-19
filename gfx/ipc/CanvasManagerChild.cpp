@@ -252,50 +252,48 @@ layers::ActiveResourceTracker* CanvasManagerChild::GetActiveResourceTracker() {
   return mActiveResourceTracker.get();
 }
 
+/* static */ void CanvasManagerChild::DeallocateSnapshot(void* aShmem) {
+  RefPtr<ipc::SharedMemoryBasic> shmem =
+      dont_AddRef(reinterpret_cast<ipc::SharedMemoryBasic*>(aShmem));
+}
+
 already_AddRefed<DataSourceSurface> CanvasManagerChild::GetSnapshot(
     uint32_t aManagerId, int32_t aProtocolId,
-    const Maybe<RemoteTextureOwnerId>& aOwnerId, SurfaceFormat aFormat,
-    bool aPremultiply, bool aYFlip) {
+    const Maybe<RemoteTextureOwnerId>& aOwnerId, bool aPremultiply,
+    bool aYFlip) {
   if (!CanSend()) {
     return nullptr;
   }
 
-  webgl::FrontBufferSnapshotIpc res;
-  if (!SendGetSnapshot(aManagerId, aProtocolId, aOwnerId, &res)) {
+  SurfaceDescriptorShared desc;
+  if (!SendGetSnapshot(aManagerId, aProtocolId, aOwnerId, &desc)) {
     return nullptr;
   }
 
-  if (!res.shmem || !res.shmem->IsReadable()) {
+  if (desc.size().IsEmpty() || desc.stride() <= 0) {
     return nullptr;
   }
 
-  auto guard = MakeScopeExit([&] { DeallocShmem(res.shmem.ref()); });
-
-  if (!res.surfSize.x || !res.surfSize.y || res.surfSize.x > INT32_MAX ||
-      res.surfSize.y > INT32_MAX) {
+  auto shmem = MakeRefPtr<ipc::SharedMemoryBasic>();
+  if (NS_WARN_IF(!shmem->SetHandle(std::move(desc.handle()),
+                                   ipc::SharedMemory::RightsReadWrite))) {
     return nullptr;
   }
 
-  IntSize size(res.surfSize.x, res.surfSize.y);
-  CheckedInt32 stride = CheckedInt32(size.width) * sizeof(uint32_t);
-  if (!stride.isValid()) {
+  size_t len = size_t(desc.stride()) * desc.size().height;
+  size_t alignedLen = ipc::SharedMemory::PageAlignedSize(len);
+  if (NS_WARN_IF(!shmem->Map(alignedLen))) {
     return nullptr;
   }
 
-  CheckedInt32 length = stride * size.height;
-  if (!length.isValid() ||
-      size_t(length.value()) != res.shmem->Size<uint8_t>()) {
-    return nullptr;
-  }
+  RefPtr<DataSourceSurface> surface = Factory::CreateWrappingDataSourceSurface(
+      reinterpret_cast<uint8_t*>(shmem->memory()), desc.stride(), desc.size(),
+      desc.format(), DeallocateSnapshot, shmem.forget().take());
+  MOZ_RELEASE_ASSERT(surface);
 
-  SurfaceFormat format =
-      IsOpaque(aFormat) ? SurfaceFormat::B8G8R8X8 : SurfaceFormat::B8G8R8A8;
-  RefPtr<DataSourceSurface> surface =
-      Factory::CreateDataSourceSurfaceWithStride(size, format, stride.value(),
-                                                 /* aZero */ false);
-  if (!surface) {
-    return nullptr;
-  }
+  SurfaceFormat desiredFormat = IsOpaque(desc.format())
+                                    ? SurfaceFormat::B8G8R8X8
+                                    : SurfaceFormat::B8G8R8A8;
 
   gfx::DataSourceSurface::ScopedMap map(surface,
                                         gfx::DataSourceSurface::READ_WRITE);
@@ -310,25 +308,28 @@ already_AddRefed<DataSourceSurface> CanvasManagerChild::GetSnapshot(
   // that's the representation we need.
   if (aYFlip) {
     if (aPremultiply) {
-      if (!PremultiplyYFlipData(res.shmem->get<uint8_t>(), stride.value(),
-                                aFormat, map.GetData(), map.GetStride(), format,
-                                size)) {
+      if (!PremultiplyYFlipData(map.GetData(), map.GetStride(), desc.format(),
+                                map.GetData(), map.GetStride(), desiredFormat,
+                                desc.size())) {
         return nullptr;
       }
     } else {
-      if (!SwizzleYFlipData(res.shmem->get<uint8_t>(), stride.value(), aFormat,
-                            map.GetData(), map.GetStride(), format, size)) {
+      if (!SwizzleYFlipData(map.GetData(), map.GetStride(), desc.format(),
+                            map.GetData(), map.GetStride(), desiredFormat,
+                            desc.size())) {
         return nullptr;
       }
     }
   } else if (aPremultiply) {
-    if (!PremultiplyData(res.shmem->get<uint8_t>(), stride.value(), aFormat,
-                         map.GetData(), map.GetStride(), format, size)) {
+    if (!PremultiplyData(map.GetData(), map.GetStride(), desc.format(),
+                         map.GetData(), map.GetStride(), desiredFormat,
+                         desc.size())) {
       return nullptr;
     }
   } else {
-    if (!SwizzleData(res.shmem->get<uint8_t>(), stride.value(), aFormat,
-                     map.GetData(), map.GetStride(), format, size)) {
+    if (!SwizzleData(map.GetData(), map.GetStride(), desc.format(),
+                     map.GetData(), map.GetStride(), desiredFormat,
+                     desc.size())) {
       return nullptr;
     }
   }

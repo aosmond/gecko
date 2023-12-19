@@ -9,6 +9,7 @@
 
 #include "mozilla/gfx/DeviceManagerDx.h"
 #include "mozilla/gfx/Logging.h"
+#include "mozilla/ipc/SharedMemoryBasic.h"
 #include "mozilla/layers/ImageDataSerializer.h"
 
 namespace mozilla::webgpu {
@@ -103,7 +104,8 @@ Maybe<layers::SurfaceDescriptor> ExternalTextureD3D11::ToSurfaceDescriptor() {
       /* hasKeyedMutex */ false, /* fenceInfo */ Nothing()));
 }
 
-void ExternalTextureD3D11::GetSnapshot(const ipc::Shmem& aDestShmem,
+void ExternalTextureD3D11::GetSnapshot(const ipc::SharedMemoryBasic* aDestShmem,
+                                       size_t aDestLength,
                                        const gfx::IntSize& aSize) {
   RefPtr<ID3D11Device> device;
   mTexture->GetDevice(getter_AddRefs(device));
@@ -152,9 +154,9 @@ void ExternalTextureD3D11::GetSnapshot(const ipc::Shmem& aDestShmem,
   const uint32_t stride = layers::ImageDataSerializer::ComputeRGBStride(
       gfx::SurfaceFormat::B8G8R8A8, aSize.width);
   uint8_t* src = static_cast<uint8_t*>(map.pData);
-  uint8_t* dst = aDestShmem.get<uint8_t>();
+  uint8_t* dst = reinterpret_cast<uint8_t*>(aDestShmem->memory());
 
-  MOZ_ASSERT(stride * aSize.height <= aDestShmem.Size<uint8_t>());
+  MOZ_ASSERT(stride * aSize.height <= aDestSize);
 
   for (int y = 0; y < aSize.height; y++) {
     memcpy(dst, src, stride);

@@ -231,8 +231,6 @@ void OffscreenCanvas::GetContext(
     return;
   }
 
-  Maybe<int32_t> childId;
-
   MOZ_ASSERT(mCurrentContext);
   switch (mCurrentContextType) {
     case CanvasContextType::OffscreenCanvas2D:
@@ -246,12 +244,8 @@ void OffscreenCanvas::GetContext(
       break;
     case CanvasContextType::WebGL1:
     case CanvasContextType::WebGL2: {
-      auto* webgl = static_cast<ClientWebGLContext*>(mCurrentContext.get());
-      WebGLChild* webglChild = webgl->GetChild();
-      if (webglChild) {
-        childId.emplace(webglChild->Id());
-      }
-      aResult.SetValue().SetAsWebGLRenderingContext() = *webgl;
+      aResult.SetValue().SetAsWebGLRenderingContext() =
+          *static_cast<ClientWebGLContext*>(mCurrentContext.get());
       break;
     }
     case CanvasContextType::WebGPU:
@@ -265,8 +259,7 @@ void OffscreenCanvas::GetContext(
   }
 
   if (mDisplay) {
-    mDisplay->UpdateContext(this, std::move(workerRef), mCurrentContextType,
-                            childId);
+    mDisplay->UpdateContext(this, std::move(workerRef), mCurrentContextType);
   }
 }
 

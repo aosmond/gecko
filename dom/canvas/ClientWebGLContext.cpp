@@ -697,6 +697,10 @@ void ClientWebGLContext::UpdateCanvasParameters() {
   data.mSize = {size.x, size.y};
   data.mDoPaintCallbacks = false;
 
+  if (mNotLost && mNotLost->outOfProcess) {
+    data.mProtocolId.emplace(mNotLost->outOfProcess->Id());
+  }
+
   mOffscreenCanvas->UpdateDisplayData(data);
 }
 

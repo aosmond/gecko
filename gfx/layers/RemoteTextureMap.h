@@ -140,9 +140,6 @@ class RemoteTextureOwnerClient final {
       const std::shared_ptr<webgpu::ExternalTexture>& aExternalTexture);
   void PushDummyTexture(const RemoteTextureId aTextureId,
                         const RemoteTextureOwnerId aOwnerId);
-  void GetLatestBufferSnapshot(const RemoteTextureOwnerId aOwnerId,
-                               const mozilla::ipc::Shmem& aDestShmem,
-                               const gfx::IntSize& aSize);
   UniquePtr<TextureData> GetRecycledTextureData(
       const RemoteTextureOwnerId aOwnerId, gfx::IntSize aSize,
       gfx::SurfaceFormat aFormat, TextureType aTextureType);
@@ -196,8 +193,7 @@ class RemoteTextureMap {
 
   void GetLatestBufferSnapshot(const RemoteTextureOwnerId aOwnerId,
                                const base::ProcessId aForPid,
-                               const mozilla::ipc::Shmem& aDestShmem,
-                               const gfx::IntSize& aSize);
+                               SurfaceDescriptorShared& aDesc);
 
   // aIsSyncMode defines if RemoteTextureMap::GetRemoteTextureForDisplayList()
   // works synchronously.
