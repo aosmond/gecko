@@ -206,6 +206,13 @@ bool RenderDXGITextureHost::EnsureD3D11Texture2D(ID3D11Device* aDevice) {
       textureMap->WaitTextureReady(mGpuProcessTextureId.ref());
       mTexture = textureMap->GetTexture(mGpuProcessTextureId.ref());
       if (mTexture) {
+        mTexture->QueryInterface(
+            (IDXGIKeyedMutex**)getter_AddRefs(mKeyedMutex));
+
+        MOZ_ASSERT(mHasKeyedMutex == !!mKeyedMutex);
+        if (mHasKeyedMutex != !!mKeyedMutex) {
+          gfxCriticalNoteOnce << "KeyedMutex mismatch";
+        }
         return true;
       } else {
         gfxCriticalNote << "GpuProcessTextureId is not valid";
@@ -427,8 +434,10 @@ void RenderDXGITextureHost::DeleteTextureHandle() {
     mTextureHandle[i] = 0;
   }
 
-  mTexture = nullptr;
+  MOZ_DIAGNOSTIC_ASSERT(!mLocked);
+  Unlock();
   mKeyedMutex = nullptr;
+  mTexture = nullptr;
   mSurface = 0;
   mStream = 0;
 }
@@ -720,14 +729,17 @@ void RenderDXGIYCbCrTextureHost::DeleteTextureHandle() {
   }
 
   if (mGL->MakeCurrent()) {
+    MOZ_DIAGNOSTIC_ASSERT(!mLocked);
+    Unlock();
+
     mGL->fDeleteTextures(3, mTextureHandles);
 
     const auto& gle = gl::GLContextEGL::Cast(mGL);
     const auto& egl = gle->mEgl;
     for (int i = 0; i < 3; ++i) {
       mTextureHandles[i] = 0;
-      mTextures[i] = nullptr;
       mKeyedMutexs[i] = nullptr;
+      mTextures[i] = nullptr;
 
       if (mSurfaces[i]) {
         egl->fDestroySurface(mSurfaces[i]);
