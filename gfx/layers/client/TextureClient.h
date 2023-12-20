@@ -243,6 +243,8 @@ class TextureData {
 
   MOZ_COUNTED_DTOR_VIRTUAL(TextureData)
 
+  virtual TextureType GetTextureType() const { return TextureType::Last; }
+
   virtual void FillInfo(TextureData::Info& aInfo) const = 0;
 
   virtual bool Lock(OpenMode aMode) = 0;
