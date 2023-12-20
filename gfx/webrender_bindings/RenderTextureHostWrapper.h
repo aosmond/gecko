@@ -82,6 +82,7 @@ class RenderTextureHostWrapper final : public RenderTextureHostSWGL {
   Maybe<layers::RemoteTextureId> mTextureId;
   Maybe<layers::RemoteTextureOwnerId> mOwnerId;
   Maybe<base::ProcessId> mForPid;
+  bool mLocked = false;
 };
 
 }  // namespace wr

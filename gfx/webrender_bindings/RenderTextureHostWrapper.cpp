@@ -82,12 +82,15 @@ wr::WrExternalImage RenderTextureHostWrapper::Lock(uint8_t aChannelIndex,
     return InvalidToWrExternalImage();
   }
 
-  return mTextureHost->Lock(aChannelIndex, aGL);
+  mLocked = mTextureHost->Lock(aChannelIndex, aGL);
+  return mLocked;
 }
 
 void RenderTextureHostWrapper::Unlock() {
-  if (mTextureHost) {
+  if (mLocked) {
+    MOZ_ASSERT(mTextureHost);
     mTextureHost->Unlock();
+    mLocked = false;
   }
 }
 
