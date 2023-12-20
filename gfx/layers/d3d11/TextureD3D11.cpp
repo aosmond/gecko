@@ -337,18 +337,7 @@ D3D11TextureData::~D3D11TextureData() {
 }
 
 bool D3D11TextureData::Lock(OpenMode aMode) {
-  if (!LockD3DTexture(mTexture.get(), SerializeWithMoz2D::Yes)) {
-    return false;
-  }
-
-  if (NS_IsMainThread()) {
-    if (!PrepareDrawTargetInLock(aMode)) {
-      Unlock();
-      return false;
-    }
-  }
-
-  return true;
+  return LockD3DTexture(mTexture.get(), SerializeWithMoz2D::Yes);
 }
 
 bool D3D11TextureData::PrepareDrawTargetInLock(OpenMode aMode) {
