@@ -161,7 +161,10 @@ class SourceSurfaceCanvasRecording final : public gfx::SourceSurface {
   bool mDetached = false;
 };
 
-CanvasChild::CanvasChild() = default;
+CanvasChild::CanvasChild(dom::ThreadSafeWorkerRef* aWorkerRef)
+    : mMutex("CanvasChild::mMutex"),
+      mWorkerRef(aWorkerRef),
+      mIsOnWorker(!!aWorkerRef){};
 
 CanvasChild::~CanvasChild() = default;
 
@@ -229,6 +232,8 @@ void CanvasChild::ActorDestroy(ActorDestroyReason aWhy) {
   if (mRecorder) {
     mRecorder->DetachResources();
   }
+
+  mWorkerRef = nullptr;
 }
 
 void CanvasChild::Destroy() {
