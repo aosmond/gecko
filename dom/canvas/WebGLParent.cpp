@@ -489,4 +489,14 @@ IPCResult WebGLParent::RecvValidateProgram(ObjectId id, bool* const ret) {
   return IPC_OK();
 }
 
+layers::RemoteTextureOwnerClient* WebGLParent::GetRemoteTextureOwnerClient()
+    const {
+  if (mHost) {
+    if (auto* context = mHost->GetWebGLContext()) {
+      return context->GetRemoteTextureOwnerClient();
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace mozilla::dom

@@ -1276,6 +1276,10 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
                   layers::RemoteTextureTxnType txnType,
                   layers::RemoteTextureTxnId txnId);
 
+  layers::RemoteTextureOwnerClient* GetRemoteTextureOwner() const {
+    return mRemoteTextureOwner;
+  }
+
   // --
 
  protected:

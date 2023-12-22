@@ -17,6 +17,7 @@ class HostWebGLContext;
 class WebGLChild;
 
 namespace layers {
+class RemoteTextureOwnerClient;
 class SharedSurfaceTextureClient;
 class SurfaceDescriptor;
 }  // namespace layers
@@ -106,6 +107,8 @@ class WebGLParent : public PWebGLParent, public SupportsWeakPtr {
   IPCResult RecvIsEnabled(GLenum cap, bool* ret);
   IPCResult RecvOnMemoryPressure();
   IPCResult RecvValidateProgram(ObjectId id, bool* ret);
+
+  layers::RemoteTextureOwnerClient* GetRemoteTextureOwnerClient() const;
 
   // -
 
