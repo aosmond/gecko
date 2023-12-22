@@ -1260,6 +1260,12 @@ class WebGLContext : public VRefCounted, public SupportsWeakPtr {
 
   RefPtr<layers::RemoteTextureOwnerClient> mRemoteTextureOwner;
 
+ public:
+  layers::RemoteTextureOwnerClient* GetRemoteTextureOwner() const {
+    return mRemoteTextureOwner;
+  }
+
+ protected:
   bool PushRemoteTexture(WebGLFramebuffer*, gl::SwapChain&,
                          std::shared_ptr<gl::SharedSurface>,
                          const webgl::SwapChainOptions& options,
