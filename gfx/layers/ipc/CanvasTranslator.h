@@ -138,6 +138,14 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   void DeviceChangeAcknowledged();
 
   /**
+   * Copy the current front buffer into a shmem.
+   */
+  ipc::IPCResult GetFrontBufferSnapshot(
+      const layers::RemoteTextureOwnerId& aOwnerId,
+      gfx::SurfaceFormat& aOutFormat, gfx::IntSize& aOutSize,
+      Maybe<Shmem>& aOutShmem);
+
+  /**
    * Used during playback of events to create DrawTargets. For the
    * CanvasTranslator this means creating TextureDatas and getting the
    * DrawTargets from those.
