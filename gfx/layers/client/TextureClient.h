@@ -20,6 +20,7 @@
 #include "mozilla/RefPtr.h"  // for RefPtr, RefCounted
 #include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/gfx/2D.h"  // for DrawTarget
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/CriticalSection.h"
 #include "mozilla/gfx/Point.h"  // for IntSize
 #include "mozilla/gfx/Types.h"  // for SurfaceFormat

@@ -345,8 +345,11 @@ TextureData* TextureData::Create(TextureForwarder* aAllocator,
                                               aSelector, aAllocFlags);
 
   if (aAllocFlags & ALLOC_FORCE_REMOTE) {
-    RefPtr<CanvasChild> canvasChild = aAllocator->GetCanvasChild();
-    if (canvasChild) {
+    auto* cm = gfx::CanvasManagerChild::Get();
+    if (NS_WARN_IF(!cm)) {
+      return nullptr;
+    }
+    if (RefPtr<CanvasChild> canvasChild = cm->GetCanvasChild()) {
       return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
                                      textureType);
     }
