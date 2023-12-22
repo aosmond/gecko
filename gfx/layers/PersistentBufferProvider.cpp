@@ -6,6 +6,7 @@
 
 #include "PersistentBufferProvider.h"
 
+#include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/KnowsCompositor.h"
 #include "mozilla/layers/RemoteTextureMap.h"
 #include "mozilla/layers/TextureClient.h"
@@ -153,13 +154,13 @@ PersistentBufferProviderAccelerated::Create(gfx::IntSize aSize,
   }
 
   RefPtr<PersistentBufferProviderAccelerated> provider =
-      new PersistentBufferProviderAccelerated(texture);
+      new PersistentBufferProviderAccelerated(texture, remoteTextureOwnerId);
   return provider.forget();
 }
 
 PersistentBufferProviderAccelerated::PersistentBufferProviderAccelerated(
-    const RefPtr<TextureClient>& aTexture)
-    : mTexture(aTexture) {
+    const RefPtr<TextureClient>& aTexture, const RemoteTextureOwnerId& aOwnerId)
+    : mTexture(aTexture), mOwnerId(aOwnerId) {
   MOZ_COUNT_CTOR(PersistentBufferProviderAccelerated);
 }
 
@@ -259,6 +260,16 @@ already_AddRefed<FwdTransactionTracker>
 PersistentBufferProviderAccelerated::UseCompositableForwarder(
     CompositableForwarder* aForwarder) {
   return mTexture->GetInternalData()->UseCompositableForwarder(aForwarder);
+}
+
+void PersistentBufferProviderAccelerated::GetRemoteTextureConfig(
+    Maybe<RemoteTextureOwnerId>& aOwnerId, Maybe<int32_t>& aProtocolId) const {
+  aOwnerId = Some(mOwnerId);
+  if (auto* cm = CanvasManagerChild::Get()) {
+    if (auto* canvasChild = cm->GetCanvasChild()) {
+      aProtocolId = Some(canvasChild->Id());
+    }
+  }
 }
 
 // static

@@ -1585,6 +1585,7 @@ bool CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
   mBufferProvider = std::move(newProvider);
   mBufferNeedsClear = false;
 
+  UpdateDisplayData();
   RegisterAllocation();
   AddZoneWaitingForGC();
 
@@ -1858,6 +1859,24 @@ void CanvasRenderingContext2D::RemoveAssociatedMemory() {
   }
 }
 
+void CanvasRenderingContext2D::UpdateDisplayData() {
+  if (!mOffscreenCanvas) {
+    return;
+  }
+
+  OffscreenCanvasDisplayData data;
+  data.mSize = {mWidth, mHeight};
+  data.mIsOpaque = mOpaque;
+  data.mIsAlphaPremult = true;
+  data.mDoPaintCallbacks = true;
+
+  if (mBufferProvider) {
+    mBufferProvider->GetRemoteTextureConfig(data.mOwnerId, data.mProtocolId);
+  }
+
+  mOffscreenCanvas->UpdateDisplayData(data);
+}
+
 void CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight) {
   // Only free the buffer provider if the size no longer matches.
   bool freeBuffer = aWidth != mWidth || aHeight != mHeight;
@@ -1878,14 +1897,7 @@ void CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight) {
     AddAssociatedMemory();
   }
 
-  if (mOffscreenCanvas) {
-    OffscreenCanvasDisplayData data;
-    data.mSize = {mWidth, mHeight};
-    data.mIsOpaque = mOpaque;
-    data.mIsAlphaPremult = true;
-    data.mDoPaintCallbacks = true;
-    mOffscreenCanvas->UpdateDisplayData(data);
-  }
+  UpdateDisplayData();
 
   if (!mCanvasElement || !mCanvasElement->IsInComposedDoc()) {
     return;

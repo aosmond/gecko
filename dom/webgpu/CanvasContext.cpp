@@ -366,6 +366,9 @@ void CanvasContext::ForceNewFrame() {
     data.mSize = mCanvasSize;
     data.mIsOpaque = false;
     data.mOwnerId = mRemoteTextureOwnerId;
+    if (mBridge) {
+      data.mProtocolId.emplace(mBridge->Id());
+    }
     mOffscreenCanvas->UpdateDisplayData(data);
   }
 }

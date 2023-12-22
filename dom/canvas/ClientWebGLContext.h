@@ -836,12 +836,6 @@ class ClientWebGLContext final : public nsICanvasRenderingContextInternal,
 
   void OnBeforePaintTransaction() override;
 
-  mozilla::dom::WebGLChild* GetChild() const {
-    if (!mNotLost) return nullptr;
-    if (!mNotLost->outOfProcess) return nullptr;
-    return mNotLost->outOfProcess.get();
-  }
-
   // -------------------------------------------------------------------------
   // Client WebGL API call tracking and error message reporting
   // -------------------------------------------------------------------------
