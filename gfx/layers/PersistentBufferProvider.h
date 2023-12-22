@@ -29,7 +29,6 @@ class DrawTarget;
 namespace layers {
 
 class KnowsCompositor;
-struct RemoteTextureOwnerId;
 class TextureClient;
 
 /**
@@ -106,6 +105,9 @@ class PersistentBufferProvider : public RefCounted<PersistentBufferProvider>,
   virtual bool RequiresRefresh() const { return false; }
 
   virtual Maybe<SurfaceDescriptor> GetFrontBuffer() { return Nothing(); }
+
+  virtual void GetRemoteTextureConfig(Maybe<RemoteTextureOwnerId>& aOwnerId,
+                                      Maybe<int32_t>& aProtocolId) {}
 };
 
 class PersistentBufferProviderBasic : public PersistentBufferProvider {
@@ -171,9 +173,13 @@ class PersistentBufferProviderAccelerated : public PersistentBufferProvider {
 
   bool RequiresRefresh() const override;
 
+  void GetRemoteTextureConfig(Maybe<RemoteTextureOwnerId>& aOwnerId,
+                              Maybe<int32_t>& aProtocolId) const override;
+
  protected:
   explicit PersistentBufferProviderAccelerated(
-      const RefPtr<TextureClient>& aTexture);
+      const RefPtr<TextureClient>& aTexture,
+      const RemoteTextureOwnerId& aOwnerId);
   ~PersistentBufferProviderAccelerated() override;
 
   void Destroy();
@@ -182,6 +188,7 @@ class PersistentBufferProviderAccelerated : public PersistentBufferProvider {
 
   RefPtr<gfx::DrawTarget> mDrawTarget;
   RefPtr<gfx::SourceSurface> mSnapshot;
+  RemoteTextureOwnerId mOwnerId;
 };
 
 /**

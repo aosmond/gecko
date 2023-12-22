@@ -59,7 +59,7 @@ RefPtr<layers::ImageContainer> OffscreenCanvasDisplayHelper::GetImageContainer()
 
 void OffscreenCanvasDisplayHelper::UpdateContext(
     OffscreenCanvas* aOffscreenCanvas, RefPtr<ThreadSafeWorkerRef>&& aWorkerRef,
-    CanvasContextType aType, const Maybe<int32_t>& aChildId) {
+    CanvasContextType aType) {
   RefPtr<layers::ImageContainer> imageContainer =
       MakeRefPtr<layers::ImageContainer>(layers::ImageContainer::ASYNCHRONOUS);
 
@@ -68,14 +68,7 @@ void OffscreenCanvasDisplayHelper::UpdateContext(
   mOffscreenCanvas = aOffscreenCanvas;
   mWorkerRef = std::move(aWorkerRef);
   mType = aType;
-  mContextChildId = aChildId;
   mImageContainer = std::move(imageContainer);
-
-  if (aChildId) {
-    mContextManagerId = Some(gfx::CanvasManagerChild::Get()->Id());
-  } else {
-    mContextManagerId.reset();
-  }
 
   MaybeQueueInvalidateElement();
 }
@@ -152,6 +145,11 @@ bool OffscreenCanvasDisplayHelper::CommitFrameToCompositor(
 
   if (aData) {
     mData = aData.ref();
+    if (mData.mProtocolId) {
+      if (auto* cm = gfx::CanvasManagerChild::Get()) {
+        mContextManagerId = Some(cm->Id());
+      }
+    }
     MaybeQueueInvalidateElement();
   }
 
@@ -399,8 +397,8 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {
     isAlphaPremult = mData.mIsAlphaPremult;
     originPos = mData.mOriginPos;
     ownerId = mData.mOwnerId;
+    childId = mData.mProtocolId;
     managerId = mContextManagerId;
-    childId = mContextChildId;
     canvasElement = mCanvasElement;
     surface = mFrontBufferSurface;
   }
