@@ -27,6 +27,7 @@ RecordedTextureData::RecordedTextureData(
 }
 
 RecordedTextureData::~RecordedTextureData() {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
   // We need the translator to drop its reference for the DrawTarget first,
   // because the TextureData might need to destroy its DrawTarget within a lock.
   mDT = nullptr;
@@ -35,6 +36,7 @@ RecordedTextureData::~RecordedTextureData() {
 }
 
 void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
   aInfo.size = mSize;
   aInfo.format = mFormat;
   aInfo.supportsMoz2D = true;
@@ -43,10 +45,13 @@ void RecordedTextureData::FillInfo(TextureData::Info& aInfo) const {
 
 void RecordedTextureData::SetRemoteTextureOwnerId(
     RemoteTextureOwnerId aRemoteTextureOwnerId) {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
   mRemoteTextureOwnerId = aRemoteTextureOwnerId;
 }
 
 bool RecordedTextureData::Lock(OpenMode aMode) {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+
   if (!mCanvasChild->EnsureBeginTransaction()) {
     return false;
   }
@@ -89,6 +94,8 @@ bool RecordedTextureData::Lock(OpenMode aMode) {
 }
 
 void RecordedTextureData::Unlock() {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+
   if ((mLockedMode == OpenMode::OPEN_READ_WRITE) &&
       mCanvasChild->ShouldCacheDataSurface()) {
     mSnapshot = mDT->Snapshot();
@@ -103,6 +110,8 @@ void RecordedTextureData::Unlock() {
 }
 
 already_AddRefed<gfx::DrawTarget> RecordedTextureData::BorrowDrawTarget() {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+
   mSnapshot = nullptr;
   if (RefPtr<gfx::SourceSurface> wrapper = do_AddRef(mSnapshotWrapper)) {
     mCanvasChild->DetachSurface(wrapper);
@@ -112,6 +121,7 @@ already_AddRefed<gfx::DrawTarget> RecordedTextureData::BorrowDrawTarget() {
 }
 
 void RecordedTextureData::EndDraw() {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
   MOZ_ASSERT(mDT->hasOneRef());
   MOZ_ASSERT(mLockedMode == OpenMode::OPEN_READ_WRITE);
 
@@ -122,6 +132,8 @@ void RecordedTextureData::EndDraw() {
 }
 
 already_AddRefed<gfx::SourceSurface> RecordedTextureData::BorrowSnapshot() {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+
   if (RefPtr<gfx::SourceSurface> wrapper = do_AddRef(mSnapshotWrapper)) {
     return wrapper.forget();
   }
@@ -140,15 +152,21 @@ already_AddRefed<gfx::SourceSurface> RecordedTextureData::BorrowSnapshot() {
 
 void RecordedTextureData::ReturnSnapshot(
     already_AddRefed<gfx::SourceSurface> aSnapshot) {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+
   RefPtr<gfx::SourceSurface> snapshot = aSnapshot;
   if (RefPtr<gfx::SourceSurface> wrapper = do_AddRef(mSnapshotWrapper)) {
     mCanvasChild->DetachSurface(wrapper);
   }
 }
 
-void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {}
+void RecordedTextureData::Deallocate(LayersIPCChannel* aAllocator) {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+}
 
 bool RecordedTextureData::Serialize(SurfaceDescriptor& aDescriptor) {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
+
   if (!mRemoteTextureOwnerId.IsValid() || !mLastRemoteTextureId.IsValid()) {
     MOZ_ASSERT_UNREACHABLE("Missing remote texture ids!");
     return false;
@@ -166,12 +184,14 @@ void RecordedTextureData::OnForwardedToHost() {
 }
 
 TextureFlags RecordedTextureData::GetTextureFlags() const {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
   // With WebRender, resource open happens asynchronously on RenderThread.
   // Use WAIT_HOST_USAGE_END to keep TextureClient alive during host side usage.
   return TextureFlags::WAIT_HOST_USAGE_END;
 }
 
 bool RecordedTextureData::RequiresRefresh() const {
+  NS_ASSERT_OWNINGTHREAD(RecordedTextureData);
   return mCanvasChild->RequiresRefresh(mTextureId);
 }
 

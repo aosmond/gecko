@@ -16,6 +16,8 @@ namespace layers {
 
 class RecordedTextureData final : public TextureData {
  public:
+  NS_DECL_OWNINGTHREAD
+
   RecordedTextureData(already_AddRefed<CanvasChild> aCanvasChild,
                       gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
                       TextureType aTextureType);
