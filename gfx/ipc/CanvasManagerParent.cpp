@@ -178,28 +178,9 @@ CanvasManagerParent::AllocPCanvasParent() {
 }
 
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
-    const uint32_t& aManagerId, const int32_t& aProtocolId,
     const Maybe<RemoteTextureOwnerId>& aOwnerId,
-    webgl::FrontBufferSnapshotIpc* aSnapshot, gfx::SurfaceFormat* aFormat) {
-  if (!aManagerId) {
-    return IPC_FAIL(this, "invalid id");
-  }
-
-  IProtocol* actor = nullptr;
-  for (CanvasManagerParent* i : sManagers) {
-    if (i->mContentId == mContentId && i->mId == aManagerId) {
-      actor = i->Lookup(aProtocolId);
-      break;
-    }
-  }
-
-  if (!actor) {
-    return IPC_FAIL(this, "invalid actor");
-  }
-
-  if (actor->GetSide() != mozilla::ipc::Side::ParentSide) {
-    return IPC_FAIL(this, "unsupported actor");
-  }
+    layers::SurfaceDescriptorShared* aDesc) {
+  
 
   webgl::FrontBufferSnapshotIpc buffer;
   switch (actor->GetProtocolId()) {

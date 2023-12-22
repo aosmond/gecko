@@ -507,7 +507,7 @@ nsresult RemoteTextureMap::GetLatestBufferSnapshot(
     TextureHost* textureHost = holder->mTextureHost;
 
     aOutFormat = textureHost->GetFormat();
-    switch (format) {
+    switch (aOutFormat) {
       case gfx::SurfaceFormat::R8G8B8A8:
       case gfx::SurfaceFormat::R8G8B8X8:
       case gfx::SurfaceFormat::B8G8R8A8:
@@ -549,7 +549,7 @@ nsresult RemoteTextureMap::GetLatestBufferSnapshot(
   if (externalTexture) {
     externalTexture->GetSnapshot(aOutShmem, aSize);
   } else if (auto* bufferTextureHost = textureHostRef->AsBufferTextureHost()) {
-    uint8_t* dst = aDestShmem.get<uint8_t>();
+    uint8_t* dst = aOutShmem.get<uint8_t>();
     const uint8_t* src = bufferTextureHost->GetBuffer();
     memcpy(dst, src, len);
   }
