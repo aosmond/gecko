@@ -127,8 +127,9 @@ class WebGPUParent final : public PWebGPUParent {
                                    const nsCString& message);
 
   ipc::IPCResult GetFrontBufferSnapshot(
-      IProtocol* aProtocol, const layers::RemoteTextureOwnerId& aOwnerId,
-      Maybe<Shmem>& aShmem, gfx::IntSize& aSize);
+      const layers::RemoteTextureOwnerId& aOwnerId,
+      gfx::SurfaceFormat& aOutFormat, gfx::IntSize& aOutSize,
+      Maybe<Shmem>& aOutShmem);
 
   void ActorDestroy(ActorDestroyReason aWhy) override;
 

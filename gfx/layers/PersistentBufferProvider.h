@@ -107,7 +107,7 @@ class PersistentBufferProvider : public RefCounted<PersistentBufferProvider>,
   virtual Maybe<SurfaceDescriptor> GetFrontBuffer() { return Nothing(); }
 
   virtual void GetRemoteTextureConfig(Maybe<RemoteTextureOwnerId>& aOwnerId,
-                                      Maybe<int32_t>& aProtocolId) {}
+                                      Maybe<int32_t>& aProtocolId) const {}
 };
 
 class PersistentBufferProviderBasic : public PersistentBufferProvider {

@@ -136,6 +136,14 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   void DeviceChangeAcknowledged();
 
   /**
+   * Copy the current front buffer into a shmem.
+   */
+  ipc::IPCResult GetFrontBufferSnapshot(
+      const layers::RemoteTextureOwnerId& aOwnerId,
+      gfx::SurfaceFormat& aOutFormat, gfx::IntSize& aOutSize,
+      Maybe<Shmem>& aOutShmem);
+
+  /**
    * Set the texture ID that will be used as a lookup for the texture created by
    * the next CreateDrawTarget.
    */
