@@ -6,6 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 include "mozilla/layers/LayersMessageUtils.h";
+include LayersSurfaces;
 include protocol PCanvas;
 include protocol PWebGL;
 include protocol PWebGPU;
@@ -41,11 +42,11 @@ parent:
   // Set the local manager ID for the canvas manager.
   async Initialize(uint32_t aManagerId);
 
-  // Get the front buffer pixels for the given manager/protocol. This is
+  // Get the front buffer pixels for the given remote texture owner. This is
   // intended to be used by the main thread in the content process to block
   // reading without having to block on the worker thread that owns the context
   // instance.
-  sync GetSnapshot(uint32_t aManagerId, int32_t aProtocolId, RemoteTextureOwnerId? ownerId) returns (FrontBufferSnapshotIpc ret);
+  sync GetSnapshot(RemoteTextureOwnerId ownerId) returns (SurfaceDescriptorShared ret);
 };
 
 } // gfx

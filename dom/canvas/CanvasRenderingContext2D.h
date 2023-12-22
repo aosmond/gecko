@@ -605,6 +605,8 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   bool CopyBufferProvider(layers::PersistentBufferProvider& aOld,
                           gfx::DrawTarget& aTarget, gfx::IntRect aCopyRect);
 
+  void UpdateDisplayData();
+
   /**
    * Internal method to complete initialisation, expects mTarget to have been
    * set

@@ -218,12 +218,19 @@ void RemoteTextureOwnerClient::PushDummyTexture(
                                        /* aResourceWrapper */ nullptr);
 }
 
-void RemoteTextureOwnerClient::GetLatestBufferSnapshot(
-    const RemoteTextureOwnerId aOwnerId, const mozilla::ipc::Shmem& aDestShmem,
-    const gfx::IntSize& aSize) {
-  MOZ_ASSERT(IsRegistered(aOwnerId));
-  RemoteTextureMap::Get()->GetLatestBufferSnapshot(aOwnerId, mForPid,
-                                                   aDestShmem, aSize);
+nsresult RemoteTextureOwnerClient::GetLatestBufferSnapshot(
+    const RemoteTextureOwnerId aOwnerId, mozilla::ipc::IProtocol* aProtocol,
+    gfx::SurfaceFormat& aOutFormat, gfx::IntSize& aOutSize,
+    mozilla::ipc::Shmem& aOutShmem) {
+  MOZ_ASSERT(aProtocol);
+  MOZ_ASSERT(aProtocol->CanSend());
+
+  if (NS_WARN_IF(!IsRegistered(aOwnerId))) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  return RemoteTextureMap::Get()->GetLatestBufferSnapshot(
+      aOwnerId, aProtocol, mForPid, aOutFormat, aOutSize, aOutShmem);
 }
 
 UniquePtr<TextureData> RemoteTextureOwnerClient::GetRecycledTextureData(
@@ -472,9 +479,10 @@ bool RemoteTextureMap::RemoveTexture(const RemoteTextureId aTextureId,
   return false;
 }
 
-void RemoteTextureMap::GetLatestBufferSnapshot(
-    const RemoteTextureOwnerId aOwnerId, const base::ProcessId aForPid,
-    const mozilla::ipc::Shmem& aDestShmem, const gfx::IntSize& aSize) {
+nsresult RemoteTextureMap::GetLatestBufferSnapshot(
+    const RemoteTextureOwnerId aOwnerId, mozilla::ipc::IProtocol* aProtocol,
+    const base::ProcessId aForPid, gfx::SurfaceFormat& aOutFormat,
+    gfx::IntSize& aOutSize, mozilla::ipc::Shmem& aOutShmem) {
   // The compositable ref of remote texture should be updated in mMonitor lock.
   CompositableTextureHostRef textureHostRef;
   RefPtr<TextureHost> releasingTexture;  // Release outside the monitor
@@ -485,7 +493,7 @@ void RemoteTextureMap::GetLatestBufferSnapshot(
     auto* owner = GetTextureOwner(lock, aOwnerId, aForPid);
     if (!owner) {
       MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
+      return NS_ERROR_UNEXPECTED;
     }
 
     // Get latest TextureHost of remote Texture.
@@ -498,14 +506,16 @@ void RemoteTextureMap::GetLatestBufferSnapshot(
                              : owner->mUsingTextureDataHolders.back().get();
     TextureHost* textureHost = holder->mTextureHost;
 
-    if (textureHost->GetSize() != aSize) {
-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
-    }
-    if (textureHost->GetFormat() != gfx::SurfaceFormat::R8G8B8A8 &&
-        textureHost->GetFormat() != gfx::SurfaceFormat::B8G8R8A8) {
-      MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
+    aOutFormat = textureHost->GetFormat();
+    switch (aOutFormat) {
+      case gfx::SurfaceFormat::R8G8B8A8:
+      case gfx::SurfaceFormat::R8G8B8X8:
+      case gfx::SurfaceFormat::B8G8R8A8:
+      case gfx::SurfaceFormat::B8G8R8X8:
+        break;
+      default:
+        MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+        return NS_ERROR_NOT_IMPLEMENTED;
     }
     if (holder->mResourceWrapper &&
         holder->mResourceWrapper->mExternalTexture) {
@@ -519,25 +529,29 @@ void RemoteTextureMap::GetLatestBufferSnapshot(
       textureHostRef = textureHost;
     } else {
       MOZ_ASSERT_UNREACHABLE("unexpected to be called");
-      return;
+      return NS_ERROR_UNEXPECTED;
     }
+
+    aOutSize = textureHost->GetSize();
   }
 
   if (!textureHostRef) {
-    return;
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  int32_t stride =
+      layers::ImageDataSerializer::ComputeRGBStride(aOutFormat, aOutSize.width);
+  int32_t len = aOutSize.height * stride;
+  if (NS_WARN_IF(!aProtocol->AllocShmem(len, &aOutShmem))) {
+    return NS_ERROR_OUT_OF_MEMORY;
   }
 
   if (externalTexture) {
-    externalTexture->GetSnapshot(aDestShmem, aSize);
+    externalTexture->GetSnapshot(aOutShmem, aSize);
   } else if (auto* bufferTextureHost = textureHostRef->AsBufferTextureHost()) {
-    uint32_t stride = ImageDataSerializer::ComputeRGBStride(
-        bufferTextureHost->GetFormat(), aSize.width);
-    uint32_t bufferSize = stride * aSize.height;
-    uint8_t* dst = aDestShmem.get<uint8_t>();
-    uint8_t* src = bufferTextureHost->GetBuffer();
-
-    MOZ_ASSERT(bufferSize <= aDestShmem.Size<uint8_t>());
-    memcpy(dst, src, bufferSize);
+    uint8_t* dst = aOutShmem.get<uint8_t>();
+    const uint8_t* src = bufferTextureHost->GetBuffer();
+    memcpy(dst, src, len);
   }
 
   {
@@ -547,6 +561,8 @@ void RemoteTextureMap::GetLatestBufferSnapshot(
     releasingTexture = textureHostRef;
     textureHostRef = nullptr;
   }
+
+  return NS_OK;
 }
 
 void RemoteTextureMap::RegisterTextureOwner(

@@ -1043,27 +1043,17 @@ static void ReadbackPresentCallback(ffi::WGPUBufferMapAsyncStatus status,
 }
 
 ipc::IPCResult WebGPUParent::GetFrontBufferSnapshot(
-    IProtocol* aProtocol, const layers::RemoteTextureOwnerId& aOwnerId,
-    Maybe<Shmem>& aShmem, gfx::IntSize& aSize) {
-  const auto& lookup = mPresentationDataMap.find(aOwnerId);
-  if (lookup == mPresentationDataMap.end() || !mRemoteTextureOwner ||
-      !mRemoteTextureOwner->IsRegistered(aOwnerId)) {
-    return IPC_OK();
+    const layers::RemoteTextureOwnerId& aOwnerId,
+    gfx::SurfaceFormat& aOutFormat, gfx::IntSize& aOutSize,
+    Maybe<Shmem>& aOutShmem) {
+  if (mRemoteTextureOwner) {
+    Shmem shmem;
+    mRemoteTextureOwner->GetLatestBufferSnapshot(aOwnerId, this, aOutFormat,
+                                                 aOutSize, shmem);
+    if (shmem.IsReadable()) {
+      aOutShmem.emplace(std::move(shmem));
+    }
   }
-
-  RefPtr<PresentationData> data = lookup->second.get();
-  aSize = data->mDesc.size();
-  uint32_t stride = layers::ImageDataSerializer::ComputeRGBStride(
-      data->mDesc.format(), aSize.width);
-  uint32_t len = data->mDesc.size().height * stride;
-  Shmem shmem;
-  if (!AllocShmem(len, &shmem)) {
-    return IPC_OK();
-  }
-
-  mRemoteTextureOwner->GetLatestBufferSnapshot(aOwnerId, shmem, aSize);
-  aShmem.emplace(std::move(shmem));
-
   return IPC_OK();
 }
 

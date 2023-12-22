@@ -1126,6 +1126,21 @@ bool CanvasTranslator::PushRemoteTexture(int64_t aTextureId, TextureData* aData,
   return success;
 }
 
+ipc::IPCResult CanvasTranslator::GetFrontBufferSnapshot(
+    const layers::RemoteTextureOwnerId& aOwnerId,
+    gfx::SurfaceFormat& aOutFormat, gfx::IntSize& aOutSize,
+    Maybe<Shmem>& aOutShmem) {
+  if (mRemoteTextureOwner) {
+    Shmem shmem;
+    mRemoteTextureOwner->GetLatestBufferSnapshot(aOwnerId, this, aOutFormat,
+                                                 aOutSize, shmem);
+    if (shmem.IsReadable()) {
+      aOutShmem.emplace(std::move(shmem));
+    }
+  }
+  return IPC_OK();
+}
+
 void CanvasTranslator::ClearTextureInfo() {
   for (auto const& entry : mTextureInfo) {
     if (entry.second.mTextureData) {

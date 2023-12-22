@@ -679,12 +679,21 @@ void ClientWebGLContext::UpdateCanvasParameters() {
   const auto& options = *mInitialOptions;
   const auto& size = DrawingBufferSize();
 
+  if (mRemoteTextureOwnerId.isNothing()) {
+    mRemoteTextureOwnerId = Some(layers::RemoteTextureOwnerId::GetNext());
+  }
+
   mozilla::dom::OffscreenCanvasDisplayData data;
   data.mOriginPos = gl::OriginPos::BottomLeft;
   data.mIsOpaque = !options.alpha;
   data.mIsAlphaPremult = !options.alpha || options.premultipliedAlpha;
   data.mSize = {size.x, size.y};
   data.mDoPaintCallbacks = false;
+  data.mOwnerId = mRemoteTextureOwnerId;
+
+  if (mNotLost && mNotLost->outOfProcess) {
+    data.mProtocolId.emplace(mNotLost->outOfProcess->Id());
+  }
 
   mOffscreenCanvas->UpdateDisplayData(data);
 }

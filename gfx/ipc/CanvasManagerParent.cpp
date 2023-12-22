@@ -178,28 +178,8 @@ CanvasManagerParent::AllocPCanvasParent() {
 }
 
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
-    const uint32_t& aManagerId, const int32_t& aProtocolId,
     const Maybe<RemoteTextureOwnerId>& aOwnerId,
-    webgl::FrontBufferSnapshotIpc* aResult) {
-  if (!aManagerId) {
-    return IPC_FAIL(this, "invalid id");
-  }
-
-  IProtocol* actor = nullptr;
-  for (CanvasManagerParent* i : sManagers) {
-    if (i->mContentId == mContentId && i->mId == aManagerId) {
-      actor = i->Lookup(aProtocolId);
-      break;
-    }
-  }
-
-  if (!actor) {
-    return IPC_FAIL(this, "invalid actor");
-  }
-
-  if (actor->GetSide() != mozilla::ipc::Side::ParentSide) {
-    return IPC_FAIL(this, "unsupported actor");
-  }
+    layers::SurfaceDescriptorShared* aDesc) {
 
   webgl::FrontBufferSnapshotIpc buffer;
   switch (actor->GetProtocolId()) {
@@ -209,6 +189,22 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
       if (!rv) {
         return rv;
       }
+      *aFormat = SurfaceFormat::R8G8B8A8;
+    } break;
+    case ProtocolId::PCanvasMsgStart: {
+      RefPtr<layers::CanvasTranslator> translator =
+          static_cast<layers::CanvasTranslator*>(actor);
+      IntSize size;
+      if (aOwnerId.isNothing()) {
+        return IPC_FAIL(this, "invalid OwnerId");
+      }
+      mozilla::ipc::IPCResult rv = translator->GetFrontBufferSnapshot(
+          *aOwnerId, *aFormat, size, buffer.shmem);
+      if (!rv) {
+        return rv;
+      }
+      buffer.surfSize.x = static_cast<uint32_t>(size.width);
+      buffer.surfSize.y = static_cast<uint32_t>(size.height);
     } break;
     case ProtocolId::PWebGPUMsgStart: {
       RefPtr<webgpu::WebGPUParent> webgpu =
@@ -217,8 +213,8 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
       if (aOwnerId.isNothing()) {
         return IPC_FAIL(this, "invalid OwnerId");
       }
-      mozilla::ipc::IPCResult rv =
-          webgpu->GetFrontBufferSnapshot(this, *aOwnerId, buffer.shmem, size);
+      mozilla::ipc::IPCResult rv = webgpu->GetFrontBufferSnapshot(
+          *aOwnerId, *aFormat, size, buffer.shmem);
       if (!rv) {
         return rv;
       }
