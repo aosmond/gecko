@@ -164,8 +164,8 @@ CanvasManagerParent::AllocPCanvasParent() {
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
     const uint32_t& aManagerId, const int32_t& aProtocolId,
     const Maybe<RemoteTextureOwnerId>& aOwnerId,
-    webgl::FrontBufferSnapshotIpc* aResult) {
-  if (!aManagerId) {
+    layers::SurfaceDescriptorShared* aDesc) {
+  if (NS_WARN_IF(!aManagerId)) {
     return IPC_FAIL(this, "invalid id");
   }
 
@@ -177,43 +177,49 @@ mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
     }
   }
 
-  if (!actor) {
+  if (NS_WARN_IF(!actor)) {
     return IPC_FAIL(this, "invalid actor");
   }
 
-  if (actor->GetSide() != mozilla::ipc::Side::ParentSide) {
+  if (NS_WARN_IF((actor->GetSide() != mozilla::ipc::Side::ParentSide))) {
     return IPC_FAIL(this, "unsupported actor");
   }
 
-  webgl::FrontBufferSnapshotIpc buffer;
+  // In an ideal world, all of the protocols could just read the snapshot
+  // from the remote texture present queue. Unfortunately not all of the
+  // TextureHosts backing it can easily be read back, so we have to manually
+  // readback from WebGL based canvases.
   switch (actor->GetProtocolId()) {
     case ProtocolId::PWebGLMsgStart: {
       RefPtr<dom::WebGLParent> webgl = static_cast<dom::WebGLParent*>(actor);
-      mozilla::ipc::IPCResult rv = webgl->GetFrontBufferSnapshot(&buffer, this);
-      if (!rv) {
-        return rv;
+      Maybe<uvec2> maybeSize = webgl->GetFrontBufferSnapshot({});
+      if (NS_WARN_IF(!maybeSize)) {
+        return IPC_OK();
       }
-    } break;
-    case ProtocolId::PWebGPUMsgStart: {
-      RefPtr<webgpu::WebGPUParent> webgpu =
-          static_cast<webgpu::WebGPUParent*>(actor);
-      IntSize size;
-      if (aOwnerId.isNothing()) {
-        return IPC_FAIL(this, "invalid OwnerId");
+
+      int32_t stride = maybeSize->x * 4;
+      size_t len = size_t(maybeSize->y) * stride;
+      size_t alignedLen = ipc::SharedMemory::PageAlignedSize(len);
+      auto shmem = MakeRefPtr<ipc::SharedMemoryBasic>();
+      if (NS_WARN_IF(!shmem->Create(alignedLen)) ||
+          NS_WARN_IF(!shmem->Map(alignedLen))) {
+        return IPC_OK();
       }
-      mozilla::ipc::IPCResult rv =
-          webgpu->GetFrontBufferSnapshot(this, *aOwnerId, buffer.shmem, size);
-      if (!rv) {
-        return rv;
+
+      auto range =
+          Range<uint8_t>{reinterpret_cast<uint8_t*>(shmem->memory()), len};
+      if (NS_WARN_IF(!webgl->GetFrontBufferSnapshot(Some(range)))) {
+        return IPC_OK();
       }
-      buffer.surfSize.x = static_cast<uint32_t>(size.width);
-      buffer.surfSize.y = static_cast<uint32_t>(size.height);
+
+      IntSize size(maybeSize->x, maybeSize->y);
+      *aDesc = SurfaceDescriptorShared(size, stride, SurfaceFormat::R8G8B8A8,
+                                       shmem->TakeHandle());
     } break;
     default:
       return IPC_FAIL(this, "unsupported protocol");
   }
 
-  *aResult = std::move(buffer);
   return IPC_OK();
 }
 

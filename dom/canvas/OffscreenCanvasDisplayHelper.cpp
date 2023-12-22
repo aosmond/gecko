@@ -401,7 +401,6 @@ OffscreenCanvasDisplayHelper::GetSurfaceSnapshot() {
     // process.
     return gfx::CanvasManagerChild::Get()->GetSnapshot(
         managerId.value(), childId.value(), ownerId,
-        hasAlpha ? gfx::SurfaceFormat::R8G8B8A8 : gfx::SurfaceFormat::R8G8B8X8,
         hasAlpha && !isAlphaPremult, originPos == gl::OriginPos::BottomLeft);
   }
 
