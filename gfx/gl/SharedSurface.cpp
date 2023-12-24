@@ -124,7 +124,7 @@ UniquePtr<SurfaceFactory> SurfaceFactory::Create(
       return nullptr;
 
     case layers::TextureType::EGLImage:
-#ifdef MOZ_WIDGET_ANDROID
+#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GTK)
       if (XRE_IsParentProcess()) {
         return SurfaceFactory_EGLImage::Create(gl);
       }

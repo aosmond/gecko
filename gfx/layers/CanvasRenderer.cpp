@@ -113,9 +113,15 @@ TextureType TexTypeForWebgl(KnowsCompositor* const knowsCompositor) {
 
 #ifdef MOZ_WIDGET_GTK
   if (kIsLinux) {
-    if (!knowsCompositor->UsingSoftwareWebRender() &&
-        widget::DMABufDevice::IsDMABufWebGLEnabled()) {
-      return TextureType::DMABUF;
+    if (!knowsCompositor->UsingSoftwareWebRender()) {
+      if (widget::DMABufDevice::IsDMABufWebGLEnabled()) {
+        printf_stderr("[AO] TexTypeForWebgl -- dmabuf\n");
+        return TextureType::DMABUF;
+      }
+//      if (XRE_IsParentProcess()) {
+        printf_stderr("[AO] TexTypeForWebgl -- eglimage\n");
+        return TextureType::EGLImage;
+//      }
     }
   }
 #endif
@@ -129,6 +135,7 @@ TextureType TexTypeForWebgl(KnowsCompositor* const knowsCompositor) {
     }
   }
 
+  printf_stderr("[AO] TexTypeForWebgl -- unknown\n");
   return TextureType::Unknown;
 }
 

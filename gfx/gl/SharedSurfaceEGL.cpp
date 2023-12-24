@@ -35,8 +35,13 @@ static bool HasEglImageExtensions(const GLContextEGL& gl) {
 UniquePtr<SurfaceFactory_EGLImage> SurfaceFactory_EGLImage::Create(
     GLContext& gl_) {
   auto& gl = *GLContextEGL::Cast(&gl_);
-  if (!HasEglImageExtensions(gl)) return nullptr;
+  if (!HasEglImageExtensions(gl)) {
+    printf_stderr(
+        "[AO] SurfaceFactory_EGLImage::Create -- missing ext support\n");
+    return nullptr;
+  }
 
+  printf_stderr("[AO] SurfaceFactory_EGLImage::Create -- success\n");
   const auto partialDesc = PartialSharedSurfaceDesc{
       &gl, SharedSurfaceType::EGLImageShare, layers::TextureType::EGLImage,
       false,  // Can't recycle, as mSync changes never update TextureHost.
@@ -54,13 +59,21 @@ UniquePtr<SharedSurface_EGLImage> SharedSurface_EGLImage::Create(
   const auto& egl = *(gle->mEgl);
 
   auto fb = MozFramebuffer::Create(desc.gl, desc.size, 0, false);
-  if (!fb) return nullptr;
+  if (!fb) {
+    printf_stderr("[AO] SharedSurface_EGLImage::Create -- no fb\n");
+    return nullptr;
+  }
 
   const auto buffer = reinterpret_cast<EGLClientBuffer>(fb->ColorTex());
   const auto image =
       egl.fCreateImage(context, LOCAL_EGL_GL_TEXTURE_2D, buffer, nullptr);
-  if (!image) return nullptr;
+  if (!image) {
+    printf_stderr(
+        "[AO] SharedSurface_EGLImage::Create -- fCreateImage failed\n");
+    return nullptr;
+  }
 
+  printf_stderr("[AO] SharedSurface_EGLImage::Create -- success\n");
   return AsUnique(new SharedSurface_EGLImage(desc, std::move(fb), image));
 }
 
