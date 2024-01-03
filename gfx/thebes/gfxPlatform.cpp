@@ -2546,6 +2546,11 @@ void gfxPlatform::InitGPUProcessPrefs() {
                          "FEATURE_FAILURE_HEADLESS_MODE"_ns);
     return;
   }
+  if (gNoDeelevate) {
+    gpuProc.ForceDisable(FeatureStatus::Blocked, "No-deelevate mode is enabled",
+                         "FEATURE_FAILURE_NO_DEELEVATE_MODE"_ns);
+    return;
+  }
 
   InitPlatformGPUProcessPrefs();
 }

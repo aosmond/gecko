@@ -530,6 +530,7 @@ static ArgResult CheckArgExists(const char* aArg) {
 
 bool gSafeMode = false;
 bool gFxREmbedded = false;
+bool gNoDeelevate = false;
 
 enum E10sStatus {
   kE10sEnabledByDefault,
@@ -3955,6 +3956,10 @@ int XREMain::XRE_mainInit(bool* aExitFlag) {
 
   if (CheckArgExists("fxr")) {
     gFxREmbedded = true;
+  }
+
+  if (CheckArgExists("no-deelevate")) {
+    gNoDeelevate = true;
   }
 
   if (ChaosMode::isActive(ChaosFeature::Any)) {
