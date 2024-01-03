@@ -41,7 +41,7 @@ crashtest:
     chunks:
         by-test-platform:
             android-em-7.*: 1
-            linux.*64-tsan-qr/opt: 32
+            .*-tsan-qr/opt: 32
             default: 1
     variants:
         - no-fission
@@ -60,7 +60,7 @@ crashtest:
                     macosx101.*64-qr/debug: built-projects
                     linux.*-64-qr/debug: built-projects
                     linux.*-64(-tsan|-asan)-qr/opt: built-projects
-                    windows.*-asan-qr/opt: built-projects
+                    windows.*(-tsan|-asan)-qr/opt: built-projects
                     windows1.*-64.*-qr/debug: built-projects
                     default: []
             no-fission:
@@ -147,7 +147,7 @@ reftest:
         by-test-platform:
             android-em-7.*: 6
             linux1804-64(-shippable|-devedition|-qr)?/opt: 5
-            linux.*64-tsan-qr/opt: 32
+            .*-tsan-qr/opt: 32
             macosx101.*-64-shippable(-qr)?/opt: 3
             macosx101.*-64/debug: 4
             macosx101.*-64(-ccov.*|-qr)/debug: 6
@@ -179,7 +179,7 @@ reftest:
                     linux1804-64-qr/debug: built-projects
                     linux1804-64(-asan|-tsan)-qr/opt: built-projects
                     macosx101.*64-qr/debug: built-projects
-                    windows.*-asan-qr/opt: built-projects
+                    windows.*(-asan|-tsan)-qr/opt: built-projects
                     default: []
             no-fission:
                 by-test-platform:

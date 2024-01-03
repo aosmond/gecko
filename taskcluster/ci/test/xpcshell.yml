@@ -37,7 +37,7 @@ job-defaults:
         requires-signed-builds:
             by-test-platform:
                 macosx1100.*: true
-                windows.*-asan-qr/opt: false    # No XPCShell on ASAN yet
+                windows.*(-asan|-tsan)-qr/opt: false    # No XPCShell on ASAN or TSAN yet
                 windows.*-mingwclang-qr/.*: false
                 windows.*: true
                 default: false

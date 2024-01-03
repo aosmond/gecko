@@ -314,6 +314,13 @@ windows11-64-2009-asan-qr/opt:
     build-platform: win64-asan/opt
     test-sets:
         - windows11-2009-tests
+        - web-platform-tests
+
+windows11-64-2009-tsan-qr/opt:
+    build-platform: win64-tsan/opt
+    test-sets:
+        - windows11-2009-tests
+        - web-platform-tests
 
 windows11-64-2009-mingwclang-qr/debug:
     build-platform: win64-mingwclang/debug

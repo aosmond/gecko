@@ -94,6 +94,10 @@ WINDOWS_WORKER_TYPES = {
         "virtual": "win11-64-2009",
         "virtual-with-gpu": "win11-64-2009-gpu",
     },
+    "windows11-64-2009-tsan-qr": {
+        "virtual": "win11-64-2009",
+        "virtual-with-gpu": "win11-64-2009-gpu",
+    },
     "windows11-64-2009-mingwclang-qr": {
         "virtual": "win11-64-2009",
         "virtual-with-gpu": "win11-64-2009-gpu",
