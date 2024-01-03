@@ -47,39 +47,20 @@ static constexpr uint32_t kDefaultSurfaceFromElementFlags =
     nsLayoutUtils::SFE_EXACT_SIZE_SURFACE |
     nsLayoutUtils::SFE_ALLOW_NON_PREMULT;
 
-Maybe<TexUnpackBlobDesc> FromImageBitmap(const GLenum target, Maybe<uvec3> size,
+Maybe<TexUnpackBlobDesc> FromImageBitmap(const ClientWebGLContext& webgl,
+                                         const GLenum target, Maybe<uvec3> size,
                                          const dom::ImageBitmap& imageBitmap,
                                          ErrorResult* const out_rv) {
   if (imageBitmap.IsWriteOnly()) {
-    out_rv->Throw(NS_ERROR_DOM_SECURITY_ERR);
+    out_rv->ThrowSecurityError(
+        "ImageBitmap is write-only, thus cannot be uploaded.");
     return {};
   }
 
-  const auto cloneData = imageBitmap.ToCloneData();
-  if (!cloneData) {
-    return {};
-  }
-
-  const RefPtr<gfx::DataSourceSurface> surf = cloneData->mSurface;
-  const auto imageSize = *uvec2::FromSize(surf->GetSize());
-  if (!size) {
-    size.emplace(imageSize.x, imageSize.y, 1);
-  }
-
-  // WhatWG "HTML Living Standard" (30 October 2015):
-  // "The getImageData(sx, sy, sw, sh) method [...] Pixels must be returned as
-  // non-premultiplied alpha values."
-  return Some(TexUnpackBlobDesc{target,
-                                size.value(),
-                                cloneData->mAlphaType,
-                                {},
-                                {},
-                                Some(imageSize),
-                                nullptr,
-                                {},
-                                surf,
-                                {},
-                                false});
+  auto sfer = nsLayoutUtils::SurfaceFromImageBitmap(
+      const_cast<dom::ImageBitmap*>(&imageBitmap),
+      kDefaultSurfaceFromElementFlags);
+  return FromSurfaceFromElementResult(webgl, target, size, sfer, out_rv);
 }
 
 static layers::SurfaceDescriptor Flatten(const layers::SurfaceDescriptor& sd) {
