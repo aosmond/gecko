@@ -131,6 +131,10 @@ class DrawEventRecorderPRFileDesc final : public gfx::DrawEventRecorderPrivate {
   explicit DrawEventRecorderPRFileDesc() = default;
   ~DrawEventRecorderPRFileDesc();
 
+  RecorderType GetRecorderType() const final {
+    return RecorderType::PRFILEDESC;
+  }
+
   void RecordEvent(const gfx::RecordedEvent& aEvent) override;
 
   /**
