@@ -747,8 +747,12 @@ already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
 }
 
 void DrawTargetRecording::SetTransform(const Matrix& aTransform) {
-  mRecorder->RecordEvent(this, RecordedSetTransform(aTransform));
+  if (mTransformRecordedOnce && mTransform.ExactlyEquals(aTransform)) {
+    return;
+  }
+  mTransformRecordedOnce = true;
   DrawTarget::SetTransform(aTransform);
+  mRecorder->RecordEvent(this, RecordedSetTransform(aTransform));
 }
 
 already_AddRefed<PathRecording> DrawTargetRecording::EnsurePathStored(
