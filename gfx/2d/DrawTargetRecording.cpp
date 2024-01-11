@@ -740,6 +740,9 @@ already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
 }
 
 void DrawTargetRecording::SetTransform(const Matrix& aTransform) {
+  if (mTransform.ExactlyEquals(aTransform)) {
+    return;
+  }
   mRecorder->RecordEvent(RecordedSetTransform(this, aTransform));
   DrawTarget::SetTransform(aTransform);
 }
