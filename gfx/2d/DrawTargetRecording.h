@@ -366,6 +366,14 @@ class DrawTargetRecording : public DrawTarget {
   DrawTargetRecording(const DrawTargetRecording* aDT, IntRect aRect,
                       SurfaceFormat aFormat);
 
+  void FlushTransform();
+
+  void MaybeFlushTransform() const {
+    if (mTransformDirty) {
+      const_cast<DrawTargetRecording*>(this)->FlushTransform();
+    }
+  }
+
   Path* GetPathForPathRecording(const Path* aPath) const;
   already_AddRefed<PathRecording> EnsurePathStored(const Path* aPath);
   void EnsurePatternDependenciesStored(const Pattern& aPattern);
@@ -373,6 +381,7 @@ class DrawTargetRecording : public DrawTarget {
   RefPtr<DrawEventRecorderPrivate> mRecorder;
   RefPtr<DrawTarget> mFinalDT;
   IntRect mRect;
+  Matrix mRecordedTransform;
 };
 
 }  // namespace gfx
