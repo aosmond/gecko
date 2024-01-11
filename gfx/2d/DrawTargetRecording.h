@@ -18,7 +18,7 @@ struct RemoteTextureOwnerId;
 
 namespace gfx {
 
-class DrawTargetRecording : public DrawTarget {
+class DrawTargetRecording final : public DrawTarget {
  public:
   MOZ_DECLARE_REFCOUNTED_VIRTUAL_TYPENAME(DrawTargetRecording, override)
   DrawTargetRecording(DrawEventRecorder* aRecorder, DrawTarget* aDT,
@@ -338,12 +338,6 @@ class DrawTargetRecording : public DrawTarget {
 
   virtual already_AddRefed<FilterNode> CreateFilter(FilterType aType) override;
 
-  /*
-   * Set a transform on the surface, this transform is applied at drawing time
-   * to both the mask and source of the operation.
-   */
-  virtual void SetTransform(const Matrix& aTransform) override;
-
   /* Tries to get a native surface for a DrawTarget, this may fail if the
    * draw target cannot convert to this surface type.
    */
@@ -366,6 +360,14 @@ class DrawTargetRecording : public DrawTarget {
   DrawTargetRecording(const DrawTargetRecording* aDT, IntRect aRect,
                       SurfaceFormat aFormat);
 
+  void FlushTransform();
+
+  void MaybeFlushTransform() const {
+    if (mTransformDirty) {
+      const_cast<DrawTargetRecording*>(this)->FlushTransform();
+    }
+  }
+
   Path* GetPathForPathRecording(const Path* aPath) const;
   already_AddRefed<PathRecording> EnsurePathStored(const Path* aPath);
   void EnsurePatternDependenciesStored(const Pattern& aPattern);
@@ -373,6 +375,9 @@ class DrawTargetRecording : public DrawTarget {
   RefPtr<DrawEventRecorderPrivate> mRecorder;
   RefPtr<DrawTarget> mFinalDT;
   IntRect mRect;
+
+  // Last transform that was used in the recording.
+  Matrix mRecordedTransform;
 };
 
 }  // namespace gfx
