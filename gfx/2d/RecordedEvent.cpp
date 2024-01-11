@@ -187,16 +187,21 @@ void Translator::DrawDependentSurface(uint64_t aKey, const Rect& aRect) {
   // Construct a new translator, so we can recurse into translating this
   // sub-recording into the same DT. Set an initial transform for the
   // translator, so that all commands get moved into the rect we want to draw.
-  Matrix transform = mCurrentDT->GetTransform();
-  transform.PreTranslate(aRect.TopLeft());
+  Matrix oldTransform = mCurrentDT->GetTransform();
+
+  Matrix dependentTransform = oldTransform;
+  dependentTransform.PreTranslate(aRect.TopLeft());
   InlineTranslator translator(mCurrentDT, nullptr);
-  translator.SetReferenceDrawTargetTransform(transform);
+  translator.SetReferenceDrawTargetTransform(dependentTransform);
 
   translator.SetDependentSurfaces(mDependentSurfaces);
   translator.TranslateRecording((char*)recordedSurface->mRecording.mData,
                                 recordedSurface->mRecording.mLen);
 
   mCurrentDT->PopClip();
+
+  // Reset the transform maintain the API contract.
+  mCurrentDT->SetTransform(oldTransform);
 }
 
 }  // namespace gfx
