@@ -441,6 +441,7 @@ already_AddRefed<SourceSurface> DrawTargetRecording::Snapshot() {
   RefPtr<SourceSurface> retSurf =
       new SourceSurfaceRecording(mRect.Size(), mFormat, mRecorder);
 
+  MaybeFlushTransform();
   mRecorder->RecordEvent(this, RecordedSnapshot(ReferencePtr(retSurf)));
 
   return retSurf.forget();
@@ -451,6 +452,7 @@ already_AddRefed<SourceSurface> DrawTargetRecording::IntoLuminanceSource(
   RefPtr<SourceSurface> retSurf =
       new SourceSurfaceRecording(mRect.Size(), SurfaceFormat::A8, mRecorder);
 
+  MaybeFlushTransform();
   mRecorder->RecordEvent(
       this, RecordedIntoLuminanceSource(retSurf, aLuminanceType, aOpacity));
 
@@ -458,10 +460,12 @@ already_AddRefed<SourceSurface> DrawTargetRecording::IntoLuminanceSource(
 }
 
 void DrawTargetRecording::Flush() {
+  MaybeFlushTransform();
   mRecorder->RecordEvent(this, RecordedFlush());
 }
 
 void DrawTargetRecording::DetachAllSnapshots() {
+  MaybeFlushTransform();
   mRecorder->RecordEvent(this, RecordedDetachAllSnapshots());
 }
 
@@ -520,6 +524,7 @@ already_AddRefed<FilterNode> DrawTargetRecording::CreateFilter(
     FilterType aType) {
   RefPtr<FilterNode> retNode = new FilterNodeRecording(mRecorder);
 
+  MaybeFlushTransform();
   mRecorder->RecordEvent(this, RecordedFilterNodeCreation(retNode, aType));
 
   return retNode.forget();
@@ -655,6 +660,7 @@ already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(
                "EnsureSurfaceStoredRecording.");
   }
 
+  MaybeFlushTransform();
   RefPtr<SourceSurface> retSurf = new SourceSurfaceRecording(
       aSurface->GetSize(), aSurface->GetFormat(), mRecorder, aSurface);
   mRecorder->RecordEvent(const_cast<DrawTargetRecording*>(this),
@@ -701,6 +707,7 @@ DrawTargetRecording::CreateSimilarDrawTargetWithBacking(
 
 already_AddRefed<DrawTarget> DrawTargetRecording::CreateSimilarDrawTarget(
     const IntSize& aSize, SurfaceFormat aFormat) const {
+  MaybeFlushTransform();
   RefPtr<DrawTarget> similarDT;
   if (mFinalDT->CanCreateSimilarDrawTarget(aSize, aFormat)) {
     similarDT =
@@ -727,6 +734,7 @@ bool DrawTargetRecording::CanCreateSimilarDrawTarget(
 
 RefPtr<DrawTarget> DrawTargetRecording::CreateClippedDrawTarget(
     const Rect& aBounds, SurfaceFormat aFormat) {
+  MaybeFlushTransform();
   RefPtr<DrawTarget> similarDT;
   similarDT = new DrawTargetRecording(this, mRect, aFormat);
   mRecorder->RecordEvent(
@@ -739,6 +747,7 @@ already_AddRefed<DrawTarget>
 DrawTargetRecording::CreateSimilarDrawTargetForFilter(
     const IntSize& aMaxSize, SurfaceFormat aFormat, FilterNode* aFilter,
     FilterNode* aSource, const Rect& aSourceRect, const Point& aDestPoint) {
+  MaybeFlushTransform();
   RefPtr<DrawTarget> similarDT;
   if (mFinalDT->CanCreateSimilarDrawTarget(aMaxSize, aFormat)) {
     similarDT = new DrawTargetRecording(this, IntRect(IntPoint(0, 0), aMaxSize),
@@ -764,6 +773,7 @@ already_AddRefed<PathBuilder> DrawTargetRecording::CreatePathBuilder(
 
 already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
     GradientStop* aStops, uint32_t aNumStops, ExtendMode aExtendMode) const {
+  MaybeFlushTransform();
   RefPtr<GradientStops> retStops = new GradientStopsRecording(mRecorder);
 
   mRecorder->RecordEvent(
@@ -819,6 +829,7 @@ already_AddRefed<PathRecording> DrawTargetRecording::EnsurePathStored(
 // This should only be called on the 'root' DrawTargetRecording.
 // Calling it on a child DrawTargetRecordings will cause confusion.
 void DrawTargetRecording::FlushItem(const IntRect& aBounds) {
+  MaybeFlushTransform();
   mRecorder->FlushItem(aBounds);
   // Reinitialize the recorder (FlushItem will write a new recording header)
   // Tell the new recording about our draw target
@@ -832,6 +843,7 @@ void DrawTargetRecording::FlushItem(const IntRect& aBounds) {
   // next drawing command that requires it.
   mRecordedTransform = Matrix();
   mTransformDirty = true;
+  MaybeFlushTransform();
 }
 
 void DrawTargetRecording::EnsurePatternDependenciesStored(
