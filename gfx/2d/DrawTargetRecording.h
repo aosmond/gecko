@@ -170,6 +170,11 @@ class DrawTargetRecording : public DrawTarget {
                           const Pattern& aPattern,
                           const DrawOptions& aOptions = DrawOptions()) override;
 
+  void StrokeGlyphs(ScaledFont* aFont, const GlyphBuffer& aBuffer,
+                    const Pattern& aPattern,
+                    const StrokeOptions& aStrokeOptions = StrokeOptions(),
+                    const DrawOptions& aOptions = DrawOptions()) override;
+
   /*
    * This takes a source pattern and a mask, and composites the source pattern
    * onto the destination surface using the alpha channel of the mask pattern
@@ -185,6 +190,9 @@ class DrawTargetRecording : public DrawTarget {
   virtual void MaskSurface(
       const Pattern& aSource, SourceSurface* aMask, Point aOffset,
       const DrawOptions& aOptions = DrawOptions()) override;
+
+  bool Draw3DTransformedSurface(SourceSurface* aSurface,
+                                const Matrix4x4& aMatrix) override;
 
   /*
    * Push a clip to the DrawTarget.
@@ -301,6 +309,8 @@ class DrawTargetRecording : public DrawTarget {
 
   bool CanCreateSimilarDrawTarget(const IntSize& aSize,
                                   SurfaceFormat aFormat) const override;
+  already_AddRefed<DrawTarget> CreateShadowDrawTarget(
+      const IntSize& aSize, SurfaceFormat aFormat, float aSigma) const override;
   /**
    * Create a similar DrawTarget whose requested size may be clipped based
    * on this DrawTarget's rect transformed to the new target's space.
@@ -354,6 +364,8 @@ class DrawTargetRecording : public DrawTarget {
   virtual bool IsCurrentGroupOpaque() override {
     return mFinalDT->IsCurrentGroupOpaque();
   }
+
+  void SetPermitSubpixelAA(bool aPermitSubpixelAA) override;
 
  private:
   /**

@@ -359,6 +359,12 @@ void DrawTargetRecording::FillGlyphs(ScaledFont* aFont,
                                aBuffer.mNumGlyphs));
 }
 
+  void DrawTargetRecording::StrokeGlyphs(ScaledFont* aFont, const GlyphBuffer& aBuffer,
+                   const Pattern& aPattern,
+                    const StrokeOptions& aStrokeOptions = StrokeOptions(),
+                    const DrawOptions& aOptions = DrawOptions()) {
+  }
+
 void DrawTargetRecording::Mask(const Pattern& aSource, const Pattern& aMask,
                                const DrawOptions& aOptions) {
   EnsurePatternDependenciesStored(aSource);
