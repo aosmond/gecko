@@ -373,7 +373,7 @@ class DrawTargetRecording : public DrawTarget {
   RefPtr<DrawEventRecorderPrivate> mRecorder;
   RefPtr<DrawTarget> mFinalDT;
   IntRect mRect;
-  int32_t mForceRecordTransform = 0;
+  int32_t mForceRecordTransform = 41;
 };
 
 }  // namespace gfx
