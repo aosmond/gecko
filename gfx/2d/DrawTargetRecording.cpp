@@ -197,10 +197,12 @@ DrawTargetRecording::DrawTargetRecording(
     : mRecorder(static_cast<DrawEventRecorderPrivate*>(aRecorder)),
       mFinalDT(aDT),
       mRect(IntPoint(0, 0), aSize) {
+  mFormat = mFinalDT->GetFormat();
   mRecorder->RecordEvent(layers::RecordedCanvasDrawTargetCreation(
       this, aTextureId, aTextureOwnerId, mFinalDT->GetBackendType(), aSize,
       mFinalDT->GetFormat()));
-  mFormat = mFinalDT->GetFormat();
+  const auto& transform = mTransform;
+  mRecorder->RecordEvent(this, RecordedSetTransform(transform));
 }
 
 DrawTargetRecording::DrawTargetRecording(DrawEventRecorder* aRecorder,
@@ -210,17 +212,21 @@ DrawTargetRecording::DrawTargetRecording(DrawEventRecorder* aRecorder,
       mFinalDT(aDT),
       mRect(aRect) {
   MOZ_DIAGNOSTIC_ASSERT(aRecorder->GetRecorderType() != RecorderType::CANVAS);
+  mFormat = mFinalDT->GetFormat();
   RefPtr<SourceSurface> snapshot = aHasData ? mFinalDT->Snapshot() : nullptr;
   mRecorder->RecordEvent(
       RecordedDrawTargetCreation(this, mFinalDT->GetBackendType(), mRect,
                                  mFinalDT->GetFormat(), aHasData, snapshot));
-  mFormat = mFinalDT->GetFormat();
+  const auto& transform = mTransform;
+  mRecorder->RecordEvent(this, RecordedSetTransform(transform));
 }
 
 DrawTargetRecording::DrawTargetRecording(const DrawTargetRecording* aDT,
                                          IntRect aRect, SurfaceFormat aFormat)
     : mRecorder(aDT->mRecorder), mFinalDT(aDT->mFinalDT), mRect(aRect) {
   mFormat = aFormat;
+  const auto& transform = mTransform;
+  mRecorder->RecordEvent(this, RecordedSetTransform(transform));
 }
 
 DrawTargetRecording::~DrawTargetRecording() {
