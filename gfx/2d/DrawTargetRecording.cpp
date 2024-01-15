@@ -579,7 +579,6 @@ void DrawTargetRecording::PushClipRect(const Rect& aRect) {
 void DrawTargetRecording::PopClip() {
   printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedPopClip());
-  mForceRecordTransform = true;
 }
 
 void DrawTargetRecording::PushLayer(bool aOpaque, Float aOpacity,
@@ -616,7 +615,6 @@ void DrawTargetRecording::PushLayerWithBlend(bool aOpaque, Float aOpacity,
 void DrawTargetRecording::PopLayer() {
   printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedPopLayer());
-  mForceRecordTransform = true;
 }
 
 already_AddRefed<SourceSurface>
@@ -790,7 +788,8 @@ already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
 }
 
 void DrawTargetRecording::SetTransform(const Matrix& aTransform) {
-  if (!mForceRecordTransform && mTransform.ExactlyEquals(aTransform)) {
+  const bool match = mTransform.ExactlyEquals(aTransform);
+  if (mForceRecordTransform == 0 && match) {
     printf_stderr(
         "[AO] [%p] DrawTargetRecording::SetTransform -- same [%f %f; %f %f; %f "
         "%f]\n",
@@ -799,14 +798,16 @@ void DrawTargetRecording::SetTransform(const Matrix& aTransform) {
     return;
   }
   printf_stderr(
-      "[AO] [%p] DrawTargetRecording::SetTransform -- force %d, was [%f %f; %f "
+      "[AO] [%p] DrawTargetRecording::SetTransform -- match %d, force %d, was [%f %f; %f "
       "%f; %f "
       "%f] set [%f %f; %f %f; %f %f]\n",
-      this, mForceRecordTransform, mTransform._11, mTransform._12,
+      this, match, mForceRecordTransform, mTransform._11, mTransform._12,
       mTransform._21, mTransform._22, mTransform._31, mTransform._32,
       aTransform._11, aTransform._12, aTransform._21, aTransform._22,
       aTransform._31, aTransform._32);
-  mForceRecordTransform = false;
+  if (mForceRecordTransform > 0) {
+    --mForceRecordTransform;
+  }
   DrawTarget::SetTransform(aTransform);
   mRecorder->RecordEvent(this, RecordedSetTransform(aTransform));
 }
