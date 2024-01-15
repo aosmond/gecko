@@ -1451,6 +1451,7 @@ void DrawTargetSkia::MaskSurface(const Pattern& aSource, SourceSurface* aMask,
 
 bool DrawTarget::Draw3DTransformedSurface(SourceSurface* aSurface,
                                           const Matrix4x4& aMatrix) {
+  printf_stderr("[AO] [%p] DrawTarget::Draw3DTransformedSurface -- whoa\n", this);
   // Composite the 3D transform with the DT's transform.
   Matrix4x4 fullMat = aMatrix * Matrix4x4::From2D(mTransform);
   if (fullMat.IsSingular()) {
