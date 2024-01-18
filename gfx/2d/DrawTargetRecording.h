@@ -359,6 +359,19 @@ class DrawTargetRecording final : public DrawTarget {
     return mFinalDT->IsCurrentGroupOpaque();
   }
 
+  void SetTransform(const Matrix& aTransform) override {
+    printf_stderr(
+        "[AO] [%p] DrawTargetRecording::%s -- [%f %f; %f %f; %f %f]\n", this,
+        __func__, aTransform._11, aTransform._12, aTransform._21,
+        aTransform._22, aTransform._31, aTransform._32);
+    mTransform = aTransform;
+    mTransformDirty = true;
+    if (mTransformFlushCount > 0) {
+      --mTransformFlushCount;
+      MaybeFlushTransform();
+    }
+  }
+
  private:
   /**
    * Used for creating a DrawTargetRecording for a CreateSimilarDrawTarget call.
@@ -400,6 +413,7 @@ class DrawTargetRecording final : public DrawTarget {
 
   // Last transform that was used in the recording.
   mutable Matrix mRecordedTransform;
+  mutable int32_t mTransformFlushCount = -1;
 };
 
 }  // namespace gfx
