@@ -159,6 +159,7 @@ static void ComputeLinearRGBLuminanceMask(
 
 void DrawTarget::PushDeviceSpaceClipRects(const IntRect* aRects,
                                           uint32_t aCount) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   Matrix oldTransform = GetTransform();
   SetTransform(Matrix());
 
@@ -175,6 +176,7 @@ void DrawTarget::PushDeviceSpaceClipRects(const IntRect* aRects,
 void DrawTarget::FillRoundedRect(const RoundedRect& aRect,
                                  const Pattern& aPattern,
                                  const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   RefPtr<Path> path = MakePathForRoundedRect(*this, aRect.rect, aRect.corners);
   Fill(path, aPattern, aOptions);
 }
@@ -183,6 +185,7 @@ void DrawTarget::StrokeCircle(const Point& aOrigin, float radius,
                               const Pattern& aPattern,
                               const StrokeOptions& aStrokeOptions,
                               const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   RefPtr<Path> path = MakePathForCircle(*this, aOrigin, radius);
   Stroke(path, aPattern, aStrokeOptions, aOptions);
 }
@@ -190,6 +193,7 @@ void DrawTarget::StrokeCircle(const Point& aOrigin, float radius,
 void DrawTarget::FillCircle(const Point& aOrigin, float radius,
                             const Pattern& aPattern,
                             const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   RefPtr<Path> path = MakePathForCircle(*this, aOrigin, radius);
   Fill(path, aPattern, aOptions);
 }
@@ -198,12 +202,14 @@ void DrawTarget::StrokeGlyphs(ScaledFont* aFont, const GlyphBuffer& aBuffer,
                               const Pattern& aPattern,
                               const StrokeOptions& aStrokeOptions,
                               const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   RefPtr<Path> path = aFont->GetPathForGlyphs(aBuffer, this);
   Stroke(path, aPattern, aStrokeOptions, aOptions);
 }
 
 already_AddRefed<SourceSurface> DrawTarget::IntoLuminanceSource(
     LuminanceType aMaskType, float aOpacity) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   // The default IntoLuminanceSource implementation needs a format of B8G8R8A8.
   if (mFormat != SurfaceFormat::B8G8R8A8) {
     return nullptr;
@@ -257,6 +263,7 @@ already_AddRefed<SourceSurface> DrawTarget::IntoLuminanceSource(
 }
 
 void DrawTarget::Blur(const AlphaBoxBlur& aBlur) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   uint8_t* data;
   IntSize size;
   int32_t stride;
@@ -275,10 +282,12 @@ void DrawTarget::Blur(const AlphaBoxBlur& aBlur) {
 }
 
 void DrawTarget::PadEdges(const IntRegion& aRegion) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   PadDrawTargetOutFromRegion(this, aRegion);
 }
 
 bool DrawTarget::Unrotate(IntPoint aRotation) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   unsigned char* data;
   IntSize size;
   int32_t stride;
@@ -295,6 +304,7 @@ bool DrawTarget::Unrotate(IntPoint aRotation) {
 }
 
 int32_t ShadowOptions::BlurRadius() const {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   return AlphaBoxBlur::CalculateBlurRadius(Point(mSigma, mSigma)).width;
 }
 
@@ -302,6 +312,7 @@ void DrawTarget::DrawShadow(const Path* aPath, const Pattern& aPattern,
                             const ShadowOptions& aShadow,
                             const DrawOptions& aOptions,
                             const StrokeOptions* aStrokeOptions) {
+  printf_stderr("[AO] [%p] DrawTarget::%s\n", this, __func__);
   // Get the approximate bounds of the source path
   Rect bounds = aPath->GetFastBounds(GetTransform(), aStrokeOptions);
   if (bounds.IsEmpty()) {

@@ -6,6 +6,7 @@
 
 #include "InlineTranslator.h"
 #include "RecordedEventImpl.h"
+#include <sstream>
 
 #include "mozilla/gfx/RecordingTypes.h"
 
@@ -54,6 +55,13 @@ bool InlineTranslator::TranslateRecording(char* aData, size_t aLen) {
             mError = " READ";
             return false;
           }
+
+          std::stringstream strstr;
+          recordedEvent->OutputSimpleEventInfo(strstr);
+          printf_stderr(
+              "[AO] [%p] [%p] InlineTranslator::TranslateRecording -- play "
+              "%s\n",
+              this, mCurrentDT, strstr.str().c_str());
 
           if (!recordedEvent->PlayEvent(this)) {
             mError = " PLAY";
