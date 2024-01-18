@@ -197,6 +197,8 @@ DrawTargetRecording::DrawTargetRecording(
     : mRecorder(static_cast<DrawEventRecorderPrivate*>(aRecorder)),
       mFinalDT(aDT),
       mRect(IntPoint(0, 0), aSize) {
+  printf_stderr(
+      "[AO] [%p] DrawTargetRecording::DrawTargetRecording -- canvas\n", this);
   mRecorder->RecordEvent(layers::RecordedCanvasDrawTargetCreation(
       this, aTextureId, aTextureOwnerId, mFinalDT->GetBackendType(), aSize,
       mFinalDT->GetFormat()));
@@ -209,6 +211,8 @@ DrawTargetRecording::DrawTargetRecording(DrawEventRecorder* aRecorder,
     : mRecorder(static_cast<DrawEventRecorderPrivate*>(aRecorder)),
       mFinalDT(aDT),
       mRect(aRect) {
+  printf_stderr(
+      "[AO] [%p] DrawTargetRecording::DrawTargetRecording -- recorder\n", this);
   MOZ_DIAGNOSTIC_ASSERT(aRecorder->GetRecorderType() != RecorderType::CANVAS);
   RefPtr<SourceSurface> snapshot = aHasData ? mFinalDT->Snapshot() : nullptr;
   mRecorder->RecordEvent(
@@ -220,25 +224,31 @@ DrawTargetRecording::DrawTargetRecording(DrawEventRecorder* aRecorder,
 DrawTargetRecording::DrawTargetRecording(const DrawTargetRecording* aDT,
                                          IntRect aRect, SurfaceFormat aFormat)
     : mRecorder(aDT->mRecorder), mFinalDT(aDT->mFinalDT), mRect(aRect) {
+  printf_stderr(
+      "[AO] [%p] DrawTargetRecording::DrawTargetRecording -- target\n", this);
   mFormat = aFormat;
 }
 
 DrawTargetRecording::~DrawTargetRecording() {
+  printf_stderr("[AO] [%p] DrawTargetRecording::~DrawTargetRecording\n", this);
   mRecorder->RecordEvent(RecordedDrawTargetDestruction(ReferencePtr(this)));
   mRecorder->ClearDrawTarget(this);
 }
 
 void DrawTargetRecording::Link(const char* aDestination, const Rect& aRect) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedLink(aDestination, aRect));
 }
 
 void DrawTargetRecording::Destination(const char* aDestination,
                                       const Point& aPoint) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedDestination(aDestination, aPoint));
 }
 
 void DrawTargetRecording::FillRect(const Rect& aRect, const Pattern& aPattern,
                                    const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsurePatternDependenciesStored(aPattern);
 
   mRecorder->RecordEvent(this, RecordedFillRect(aRect, aPattern, aOptions));
@@ -247,6 +257,7 @@ void DrawTargetRecording::FillRect(const Rect& aRect, const Pattern& aPattern,
 void DrawTargetRecording::StrokeRect(const Rect& aRect, const Pattern& aPattern,
                                      const StrokeOptions& aStrokeOptions,
                                      const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsurePatternDependenciesStored(aPattern);
 
   mRecorder->RecordEvent(
@@ -257,6 +268,7 @@ void DrawTargetRecording::StrokeLine(const Point& aBegin, const Point& aEnd,
                                      const Pattern& aPattern,
                                      const StrokeOptions& aStrokeOptions,
                                      const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsurePatternDependenciesStored(aPattern);
 
   mRecorder->RecordEvent(this, RecordedStrokeLine(aBegin, aEnd, aPattern,
@@ -269,6 +281,7 @@ void DrawTargetRecording::Fill(const Path* aPath, const Pattern& aPattern,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   if (aPath->GetBackendType() == BackendType::RECORDING) {
     const PathRecording* path = static_cast<const PathRecording*>(aPath);
     auto circle = path->AsCircle();
@@ -312,6 +325,7 @@ void DrawTargetRecording::DrawGlyphs(ScaledFont* aFont,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsurePatternDependenciesStored(aPattern);
 
   UserDataKey* userDataKey = reinterpret_cast<UserDataKey*>(mRecorder.get());
@@ -370,6 +384,7 @@ void DrawTargetRecording::FillGlyphs(ScaledFont* aFont,
                                      const GlyphBuffer& aBuffer,
                                      const Pattern& aPattern,
                                      const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   DrawGlyphs(aFont, aBuffer, aPattern, aOptions);
 }
 
@@ -378,11 +393,13 @@ void DrawTargetRecording::StrokeGlyphs(ScaledFont* aFont,
                                        const Pattern& aPattern,
                                        const StrokeOptions& aStrokeOptions,
                                        const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   DrawGlyphs(aFont, aBuffer, aPattern, aOptions, &aStrokeOptions);
 }
 
 void DrawTargetRecording::Mask(const Pattern& aSource, const Pattern& aMask,
                                const DrawOptions& aOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsurePatternDependenciesStored(aSource);
   EnsurePatternDependenciesStored(aMask);
 
@@ -396,6 +413,7 @@ void DrawTargetRecording::MaskSurface(const Pattern& aSource,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsurePatternDependenciesStored(aSource);
   EnsureSurfaceStoredRecording(mRecorder, aMask, "MaskSurface");
 
@@ -407,6 +425,8 @@ void DrawTargetRecording::Stroke(const Path* aPath, const Pattern& aPattern,
                                  const StrokeOptions& aStrokeOptions,
                                  const DrawOptions& aOptions) {
   if (aPath->GetBackendType() == BackendType::RECORDING) {
+    printf_stderr("[AO] [%p] DrawTargetRecording::%s -- recording\n", this,
+                  __func__);
     const PathRecording* path = static_cast<const PathRecording*>(aPath);
     auto circle = path->AsCircle();
     if (circle && circle->closed) {
@@ -427,6 +447,7 @@ void DrawTargetRecording::Stroke(const Path* aPath, const Pattern& aPattern,
     }
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s -- other\n", this, __func__);
   RefPtr<PathRecording> pathRecording = EnsurePathStored(aPath);
   EnsurePatternDependenciesStored(aPattern);
 
@@ -438,6 +459,7 @@ void DrawTargetRecording::DrawShadow(const Path* aPath, const Pattern& aPattern,
                                      const ShadowOptions& aShadow,
                                      const DrawOptions& aOptions,
                                      const StrokeOptions* aStrokeOptions) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<PathRecording> pathRecording = EnsurePathStored(aPath);
   EnsurePatternDependenciesStored(aPattern);
 
@@ -447,6 +469,7 @@ void DrawTargetRecording::DrawShadow(const Path* aPath, const Pattern& aPattern,
 }
 
 already_AddRefed<SourceSurface> DrawTargetRecording::Snapshot() {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<SourceSurface> retSurf =
       new SourceSurfaceRecording(mRect.Size(), mFormat, mRecorder);
 
@@ -457,6 +480,7 @@ already_AddRefed<SourceSurface> DrawTargetRecording::Snapshot() {
 
 already_AddRefed<SourceSurface> DrawTargetRecording::IntoLuminanceSource(
     LuminanceType aLuminanceType, float aOpacity) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<SourceSurface> retSurf =
       new SourceSurfaceRecording(mRect.Size(), SurfaceFormat::A8, mRecorder);
 
@@ -467,10 +491,12 @@ already_AddRefed<SourceSurface> DrawTargetRecording::IntoLuminanceSource(
 }
 
 void DrawTargetRecording::Flush() {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedFlush());
 }
 
 void DrawTargetRecording::DetachAllSnapshots() {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedDetachAllSnapshots());
 }
 
@@ -482,6 +508,7 @@ void DrawTargetRecording::DrawSurface(SourceSurface* aSurface,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsureSurfaceStoredRecording(mRecorder, aSurface, "DrawSurface");
 
   mRecorder->RecordEvent(this, RecordedDrawSurface(aSurface, aDest, aSource,
@@ -490,6 +517,7 @@ void DrawTargetRecording::DrawSurface(SourceSurface* aSurface,
 
 void DrawTargetRecording::DrawDependentSurface(uint64_t aId,
                                                const Rect& aDest) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->AddDependentSurface(aId);
   mRecorder->RecordEvent(this, RecordedDrawDependentSurface(aId, aDest));
 }
@@ -502,6 +530,7 @@ void DrawTargetRecording::DrawSurfaceWithShadow(SourceSurface* aSurface,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsureSurfaceStoredRecording(mRecorder, aSurface, "DrawSurfaceWithShadow");
 
   mRecorder->RecordEvent(
@@ -515,6 +544,7 @@ void DrawTargetRecording::DrawFilter(FilterNode* aNode, const Rect& aSourceRect,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   MOZ_ASSERT(mRecorder->HasStoredObject(aNode));
 
   mRecorder->RecordEvent(
@@ -523,6 +553,7 @@ void DrawTargetRecording::DrawFilter(FilterNode* aNode, const Rect& aSourceRect,
 
 already_AddRefed<FilterNode> DrawTargetRecording::CreateFilter(
     FilterType aType) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<FilterNode> retNode = new FilterNodeRecording(mRecorder);
 
   mRecorder->RecordEvent(this, RecordedFilterNodeCreation(retNode, aType));
@@ -531,6 +562,7 @@ already_AddRefed<FilterNode> DrawTargetRecording::CreateFilter(
 }
 
 void DrawTargetRecording::ClearRect(const Rect& aRect) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedClearRect(aRect));
 }
 
@@ -541,6 +573,7 @@ void DrawTargetRecording::CopySurface(SourceSurface* aSurface,
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   EnsureSurfaceStoredRecording(mRecorder, aSurface, "CopySurface");
 
   mRecorder->RecordEvent(
@@ -552,6 +585,7 @@ void DrawTargetRecording::PushClip(const Path* aPath) {
     return;
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   // The canvas doesn't have a clipRect API so we always end up in the generic
   // path. The D2D backend doesn't have a good way of specializing rectangular
   // clips so we take advantage of the fact that aPath is usually backed by a
@@ -568,10 +602,12 @@ void DrawTargetRecording::PushClip(const Path* aPath) {
 }
 
 void DrawTargetRecording::PushClipRect(const Rect& aRect) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedPushClipRect(aRect));
 }
 
 void DrawTargetRecording::PopClip() {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedPopClip());
 }
 
@@ -580,6 +616,7 @@ void DrawTargetRecording::PushLayer(bool aOpaque, Float aOpacity,
                                     const Matrix& aMaskTransform,
                                     const IntRect& aBounds,
                                     bool aCopyBackground) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   if (aMask) {
     EnsureSurfaceStoredRecording(mRecorder, aMask, "PushLayer");
   }
@@ -595,6 +632,7 @@ void DrawTargetRecording::PushLayerWithBlend(bool aOpaque, Float aOpacity,
                                              const IntRect& aBounds,
                                              bool aCopyBackground,
                                              CompositionOp aCompositionOp) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   if (aMask) {
     EnsureSurfaceStoredRecording(mRecorder, aMask, "PushLayer");
   }
@@ -605,6 +643,7 @@ void DrawTargetRecording::PushLayerWithBlend(bool aOpaque, Float aOpacity,
 }
 
 void DrawTargetRecording::PopLayer() {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   mRecorder->RecordEvent(this, RecordedPopLayer());
 }
 
@@ -613,6 +652,7 @@ DrawTargetRecording::CreateSourceSurfaceFromData(unsigned char* aData,
                                                  const IntSize& aSize,
                                                  int32_t aStride,
                                                  SurfaceFormat aFormat) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<SourceSurface> surface = CreateDataSourceSurfaceWithStrideFromData(
       aSize, aFormat, aStride, aData, aStride);
   if (!surface) {
@@ -624,6 +664,7 @@ DrawTargetRecording::CreateSourceSurfaceFromData(unsigned char* aData,
 
 already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(
     SourceSurface* aSurface) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   // See if we have a previously optimized surface available. We have to do this
   // check before the SurfaceType::RECORDING below, because aSurface might be a
   // SurfaceType::RECORDING from another recorder we have previously optimized.
@@ -662,6 +703,7 @@ already_AddRefed<SourceSurface> DrawTargetRecording::OptimizeSourceSurface(
 already_AddRefed<SourceSurface>
 DrawTargetRecording::CreateSourceSurfaceFromNativeSurface(
     const NativeSurface& aSurface) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   MOZ_ASSERT(false);
   return nullptr;
 }
@@ -669,6 +711,7 @@ DrawTargetRecording::CreateSourceSurfaceFromNativeSurface(
 already_AddRefed<DrawTarget>
 DrawTargetRecording::CreateSimilarDrawTargetWithBacking(
     const IntSize& aSize, SurfaceFormat aFormat) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<DrawTarget> similarDT;
   if (mFinalDT->CanCreateSimilarDrawTarget(aSize, aFormat)) {
     // If the requested similar draw target is too big, then we should try to
@@ -696,6 +739,7 @@ DrawTargetRecording::CreateSimilarDrawTargetWithBacking(
 
 already_AddRefed<DrawTarget> DrawTargetRecording::CreateSimilarDrawTarget(
     const IntSize& aSize, SurfaceFormat aFormat) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<DrawTarget> similarDT;
   if (mFinalDT->CanCreateSimilarDrawTarget(aSize, aFormat)) {
     similarDT =
@@ -717,11 +761,13 @@ already_AddRefed<DrawTarget> DrawTargetRecording::CreateSimilarDrawTarget(
 
 bool DrawTargetRecording::CanCreateSimilarDrawTarget(
     const IntSize& aSize, SurfaceFormat aFormat) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   return mFinalDT->CanCreateSimilarDrawTarget(aSize, aFormat);
 }
 
 RefPtr<DrawTarget> DrawTargetRecording::CreateClippedDrawTarget(
     const Rect& aBounds, SurfaceFormat aFormat) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<DrawTarget> similarDT;
   similarDT = new DrawTargetRecording(this, mRect, aFormat);
   mRecorder->RecordEvent(
@@ -734,6 +780,7 @@ already_AddRefed<DrawTarget>
 DrawTargetRecording::CreateSimilarDrawTargetForFilter(
     const IntSize& aMaxSize, SurfaceFormat aFormat, FilterNode* aFilter,
     FilterNode* aSource, const Rect& aSourceRect, const Point& aDestPoint) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<DrawTarget> similarDT;
   if (mFinalDT->CanCreateSimilarDrawTarget(aMaxSize, aFormat)) {
     similarDT = new DrawTargetRecording(this, IntRect(IntPoint(0, 0), aMaxSize),
@@ -753,12 +800,14 @@ DrawTargetRecording::CreateSimilarDrawTargetForFilter(
 
 already_AddRefed<PathBuilder> DrawTargetRecording::CreatePathBuilder(
     FillRule aFillRule) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   return MakeAndAddRef<PathBuilderRecording>(mFinalDT->GetBackendType(),
                                              aFillRule);
 }
 
 already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
     GradientStop* aStops, uint32_t aNumStops, ExtendMode aExtendMode) const {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s\n", this, __func__);
   RefPtr<GradientStops> retStops = new GradientStopsRecording(mRecorder);
 
   mRecorder->RecordEvent(
@@ -770,8 +819,13 @@ already_AddRefed<GradientStops> DrawTargetRecording::CreateGradientStops(
 
 void DrawTargetRecording::SetTransform(const Matrix& aTransform) {
   if (mTransform.ExactlyEquals(aTransform)) {
+    printf_stderr("[AO] [%p] DrawTargetRecording::%s -- same\n", this,
+                  __func__);
     return;
   }
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s -- [%f %f; %f %f; %f %f]\n",
+                this, __func__, aTransform._11, aTransform._12, aTransform._21,
+                aTransform._22, aTransform._31, aTransform._32);
   DrawTarget::SetTransform(aTransform);
   mRecorder->RecordEvent(this, RecordedSetTransform(aTransform));
 }
@@ -796,6 +850,7 @@ already_AddRefed<PathRecording> DrawTargetRecording::EnsurePathStored(
     mRecorder->AddStoredObject(pathRecording);
   }
 
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s -- same\n", this, __func__);
   // It's important that AddStoredObject or TryAddStoredObject is called before
   // this because that will run any pending processing required by recorded
   // objects that have been deleted off the main thread.
@@ -808,6 +863,7 @@ already_AddRefed<PathRecording> DrawTargetRecording::EnsurePathStored(
 // This should only be called on the 'root' DrawTargetRecording.
 // Calling it on a child DrawTargetRecordings will cause confusion.
 void DrawTargetRecording::FlushItem(const IntRect& aBounds) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s -- same\n", this, __func__);
   mRecorder->FlushItem(aBounds);
   // Reinitialize the recorder (FlushItem will write a new recording header)
   // Tell the new recording about our draw target
@@ -823,6 +879,7 @@ void DrawTargetRecording::FlushItem(const IntRect& aBounds) {
 
 void DrawTargetRecording::EnsurePatternDependenciesStored(
     const Pattern& aPattern) {
+  printf_stderr("[AO] [%p] DrawTargetRecording::%s -- same\n", this, __func__);
   switch (aPattern.GetType()) {
     case PatternType::COLOR:
       // No dependencies here.
