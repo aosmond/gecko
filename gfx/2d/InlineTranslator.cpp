@@ -82,6 +82,11 @@ already_AddRefed<DrawTarget> InlineTranslator::CreateDrawTarget(
 
   RefPtr<DrawTarget> drawTarget = mBaseDT;
   AddDrawTarget(aRefPtr, drawTarget);
+
+  // If we used the DrawTarget, reset the state so that we can make reasonable
+  // assumptions on the recording side.
+  drawTarget->SetTransform(Matrix());
+
   return drawTarget.forget();
 }
 

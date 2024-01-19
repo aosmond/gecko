@@ -831,9 +831,11 @@ void DrawTargetRecording::FlushItem(const IntRect& aBounds) {
       RecordedDrawTargetCreation(this, mFinalDT->GetBackendType(), mRect,
                                  mFinalDT->GetFormat(), false, nullptr));
   mRecorder->SetCurrentDrawTarget(this);
-  // RecordedDrawTargetCreation actually reuses the base DrawTarget for the
-  // recording. As such, we know that the DrawTarget is reused and has the exact
-  // same transform as we left it.
+  // RecordedDrawTargetCreation can actually reuse the base DrawTarget for the
+  // recording. We explicitly clear the transform on the playback side so that
+  // we always infer our local state.
+  mRecordedTransform = Matrix();
+  mTransformDirty = true;
 }
 
 void DrawTargetRecording::EnsurePatternDependenciesStored(
