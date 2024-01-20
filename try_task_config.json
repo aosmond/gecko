@@ -1,0 +1,11 @@
+{
+    "env": {
+        "TRY_SELECTOR": "fuzzy"
+    },
+    "rebuild": 20,
+    "tasks": [
+        "test-linux1804-64-qr/debug-web-platform-tests-reftest-6",
+        "test-linux1804-64-qr/opt-web-platform-tests-reftest-6"
+    ],
+    "version": 1
+}
