@@ -64,9 +64,11 @@ UniquePtr<TextureData> CanvasTranslator::CreateTextureData(
 }
 
 CanvasTranslator::CanvasTranslator(
+    RefPtr<TaskQueue>&& aTaskQueue,
     layers::SharedSurfacesHolder* aSharedSurfacesHolder,
     const dom::ContentParentId& aContentId, uint32_t aManagerId)
-    : mSharedSurfacesHolder(aSharedSurfacesHolder),
+    : mTranslationTaskQueue(std::move(aTaskQueue)),
+      mSharedSurfacesHolder(aSharedSurfacesHolder),
       mMaxSpinCount(StaticPrefs::gfx_canvas_remote_max_spin_count()),
       mContentId(aContentId),
       mManagerId(aManagerId) {
@@ -78,22 +80,6 @@ CanvasTranslator::CanvasTranslator(
 }
 
 CanvasTranslator::~CanvasTranslator() = default;
-
-void CanvasTranslator::DispatchToTaskQueue(
-    already_AddRefed<nsIRunnable> aRunnable) {
-  if (mTranslationTaskQueue) {
-    MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(std::move(aRunnable)));
-  } else {
-    gfx::CanvasRenderThread::Dispatch(std::move(aRunnable));
-  }
-}
-
-bool CanvasTranslator::IsInTaskQueue() const {
-  if (mTranslationTaskQueue) {
-    return mTranslationTaskQueue->IsCurrentThreadIn();
-  }
-  return gfx::CanvasRenderThread::IsInCanvasRenderThread();
-}
 
 static bool CreateAndMapShmem(RefPtr<ipc::SharedMemoryBasic>& aShmem,
                               Handle&& aHandle,
@@ -133,7 +119,7 @@ mozilla::ipc::IPCResult CanvasTranslator::RecvInitTranslator(
     TextureType aTextureType, gfx::BackendType aBackendType,
     Handle&& aReadHandle, nsTArray<Handle>&& aBufferHandles,
     uint64_t aBufferSize, CrossProcessSemaphoreHandle&& aReaderSem,
-    CrossProcessSemaphoreHandle&& aWriterSem, bool aUseIPDLThread) {
+    CrossProcessSemaphoreHandle&& aWriterSem) {
   if (mHeaderShmem) {
     return IPC_FAIL(this, "RecvInitTranslator called twice.");
   }
@@ -166,10 +152,6 @@ mozilla::ipc::IPCResult CanvasTranslator::RecvInitTranslator(
         << "GFX: CanvasTranslator failed creating WebGL shared context";
   }
 
-  if (!aUseIPDLThread) {
-    mTranslationTaskQueue = gfx::CanvasRenderThread::CreateWorkerTaskQueue();
-  }
-
   // Use the first buffer as our current buffer.
   mDefaultBufferSize = aBufferSize;
   auto handleIter = aBufferHandles.begin();
@@ -189,9 +171,10 @@ mozilla::ipc::IPCResult CanvasTranslator::RecvInitTranslator(
     mCanvasShmems.emplace(std::move(newShmem));
   }
 
-  DispatchToTaskQueue(NewRunnableMethod("CanvasTranslator::TranslateRecording",
-                                        this,
-                                        &CanvasTranslator::TranslateRecording));
+  MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
+      NewRunnableMethod("CanvasTranslator::TranslateRecording", this,
+                        &CanvasTranslator::TranslateRecording),
+      AbstractThread::TailDispatch));
   return IPC_OK();
 }
 
@@ -201,9 +184,10 @@ ipc::IPCResult CanvasTranslator::RecvRestartTranslation() {
     return IPC_OK();
   }
 
-  DispatchToTaskQueue(NewRunnableMethod("CanvasTranslator::TranslateRecording",
-                                        this,
-                                        &CanvasTranslator::TranslateRecording));
+  MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
+      NewRunnableMethod("CanvasTranslator::TranslateRecording", this,
+                        &CanvasTranslator::TranslateRecording),
+      AbstractThread::TailDispatch));
 
   return IPC_OK();
 }
@@ -215,17 +199,18 @@ ipc::IPCResult CanvasTranslator::RecvAddBuffer(
     return IPC_OK();
   }
 
-  DispatchToTaskQueue(
+  MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
       NewRunnableMethod<ipc::SharedMemoryBasic::Handle&&, size_t>(
           "CanvasTranslator::AddBuffer", this, &CanvasTranslator::AddBuffer,
-          std::move(aBufferHandle), aBufferSize));
+          std::move(aBufferHandle), aBufferSize),
+      AbstractThread::TailDispatch));
 
   return IPC_OK();
 }
 
 void CanvasTranslator::AddBuffer(ipc::SharedMemoryBasic::Handle&& aBufferHandle,
                                  size_t aBufferSize) {
-  MOZ_ASSERT(IsInTaskQueue());
+  MOZ_ASSERT(mTranslationTaskQueue->IsCurrentThreadIn());
   if (mHeader->readerState == State::Failed) {
     // We failed before we got to the pause event.
     return;
@@ -262,18 +247,19 @@ ipc::IPCResult CanvasTranslator::RecvSetDataSurfaceBuffer(
     return IPC_OK();
   }
 
-  DispatchToTaskQueue(
+  MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
       NewRunnableMethod<ipc::SharedMemoryBasic::Handle&&, size_t>(
           "CanvasTranslator::SetDataSurfaceBuffer", this,
           &CanvasTranslator::SetDataSurfaceBuffer, std::move(aBufferHandle),
-          aBufferSize));
+          aBufferSize),
+      AbstractThread::TailDispatch));
 
   return IPC_OK();
 }
 
 void CanvasTranslator::SetDataSurfaceBuffer(
     ipc::SharedMemoryBasic::Handle&& aBufferHandle, size_t aBufferSize) {
-  MOZ_ASSERT(IsInTaskQueue());
+  MOZ_ASSERT(mTranslationTaskQueue->IsCurrentThreadIn());
   if (mHeader->readerState == State::Failed) {
     // We failed before we got to the pause event.
     return;
@@ -296,7 +282,7 @@ void CanvasTranslator::SetDataSurfaceBuffer(
 }
 
 void CanvasTranslator::GetDataSurface(uint64_t aSurfaceRef) {
-  MOZ_ASSERT(IsInTaskQueue());
+  MOZ_ASSERT(mTranslationTaskQueue->IsCurrentThreadIn());
 
   ReferencePtr surfaceRef = reinterpret_cast<void*>(aSurfaceRef);
   gfx::SourceSurface* surface = LookupSourceSurface(surfaceRef);
@@ -355,19 +341,10 @@ void CanvasTranslator::NextBuffer() {
 void CanvasTranslator::ActorDestroy(ActorDestroyReason why) {
   MOZ_ASSERT(gfx::CanvasRenderThread::IsInCanvasRenderThread());
 
-  if (!mTranslationTaskQueue) {
-    gfx::CanvasRenderThread::Dispatch(
-        NewRunnableMethod("CanvasTranslator::FinishShutdown", this,
-                          &CanvasTranslator::FinishShutdown));
-    return;
-  }
-
   mTranslationTaskQueue->BeginShutdown();
   mTranslationTaskQueue->AwaitShutdownAndIdle();
-  FinishShutdown();
+  ClearTextureInfo();
 }
-
-void CanvasTranslator::FinishShutdown() { ClearTextureInfo(); }
 
 bool CanvasTranslator::CheckDeactivated() {
   if (mDeactivated) {
@@ -535,7 +512,7 @@ bool CanvasTranslator::ReadNextEvent(EventType& aEventType) {
 }
 
 void CanvasTranslator::TranslateRecording() {
-  MOZ_ASSERT(IsInTaskQueue());
+  MOZ_ASSERT(mTranslationTaskQueue->IsCurrentThreadIn());
 
   if (mSharedContext && EnsureSharedContextWebgl()) {
     mSharedContext->EnterTlsScope();
@@ -751,9 +728,11 @@ void CanvasTranslator::NotifyRequiresRefresh(int64_t aTextureId,
     auto& info = mTextureInfo[aTextureId];
     if (!info.mNotifiedRequiresRefresh) {
       info.mNotifiedRequiresRefresh = true;
-      DispatchToTaskQueue(NewRunnableMethod<int64_t, bool>(
-          "CanvasTranslator::NotifyRequiresRefresh", this,
-          &CanvasTranslator::NotifyRequiresRefresh, aTextureId, false));
+      MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
+          NewRunnableMethod<int64_t, bool>(
+              "CanvasTranslator::NotifyRequiresRefresh", this,
+              &CanvasTranslator::NotifyRequiresRefresh, aTextureId, false),
+          AbstractThread::TailDispatch));
     }
     return;
   }
@@ -765,9 +744,11 @@ void CanvasTranslator::NotifyRequiresRefresh(int64_t aTextureId,
 
 void CanvasTranslator::CacheSnapshotShmem(int64_t aTextureId, bool aDispatch) {
   if (aDispatch) {
-    DispatchToTaskQueue(NewRunnableMethod<int64_t, bool>(
-        "CanvasTranslator::CacheSnapshotShmem", this,
-        &CanvasTranslator::CacheSnapshotShmem, aTextureId, false));
+    MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
+        NewRunnableMethod<int64_t, bool>(
+            "CanvasTranslator::CacheSnapshotShmem", this,
+            &CanvasTranslator::CacheSnapshotShmem, aTextureId, false),
+        AbstractThread::TailDispatch));
     return;
   }
 
@@ -831,9 +812,10 @@ ipc::IPCResult CanvasTranslator::RecvClearCachedResources() {
     return IPC_OK();
   }
 
-  DispatchToTaskQueue(
+  MOZ_ALWAYS_SUCCEEDS(mTranslationTaskQueue->Dispatch(
       NewRunnableMethod("CanvasTranslator::ClearCachedResources", this,
-                        &CanvasTranslator::ClearCachedResources));
+                        &CanvasTranslator::ClearCachedResources),
+      AbstractThread::TailDispatch));
   return IPC_OK();
 }
 

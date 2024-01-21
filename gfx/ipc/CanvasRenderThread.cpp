@@ -207,12 +207,18 @@ already_AddRefed<nsIThread> CanvasRenderThread::GetCanvasRenderThread() {
 
 /* static */ already_AddRefed<TaskQueue>
 CanvasRenderThread::CreateWorkerTaskQueue() {
-  if (!sCanvasRenderThread || !sCanvasRenderThread->mWorkers) {
+  if (!sCanvasRenderThread) {
     return nullptr;
   }
 
-  return TaskQueue::Create(do_AddRef(sCanvasRenderThread->mWorkers),
-                           "CanvasWorker")
+  if (sCanvasRenderThread->mWorkers) {
+    return TaskQueue::Create(do_AddRef(sCanvasRenderThread->mWorkers),
+                             "CanvasWorker", /* aSupportsTailDispatch */ true)
+        .forget();
+  }
+
+  return TaskQueue::Create(do_AddRef(sCanvasRenderThread->mThread),
+                           "CanvasWorker", /* aSupportsTailDispatch */ true)
       .forget();
 }
 
