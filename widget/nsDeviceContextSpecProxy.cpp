@@ -126,7 +126,10 @@ nsDeviceContextSpecProxy::EndDocument() {
   Unused << mRemotePrintJob->SendFinalizePrint();
 
   if (mRecorder) {
-    MOZ_ASSERT(!mRecorder->IsOpen());
+    // It might still be open if we called BeginPage without calling EndPage.
+    if (mRecorder->IsOpen()) {
+      mRecorder->Close();
+    }
     mRecorder->DetachResources();
     mRecorder = nullptr;
   }
