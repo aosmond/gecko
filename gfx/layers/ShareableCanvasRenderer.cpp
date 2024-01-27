@@ -88,6 +88,13 @@ void ShareableCanvasRenderer::UpdateCompositableClient() {
   }
 
   if (!IsDirty()) {
+    if (const auto context = mData.GetContext()) {
+      if (const auto& provider = context->GetBufferProvider()) {
+        if (const auto& forwarder = GetForwarder()) {
+          provider->UseCompositableForwarder(forwarder);
+        }
+      }
+    }
     return;
   }
   ResetDirty();
