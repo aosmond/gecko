@@ -47,7 +47,8 @@ static constexpr uint32_t kDefaultSurfaceFromElementFlags =
     nsLayoutUtils::SFE_EXACT_SIZE_SURFACE |
     nsLayoutUtils::SFE_ALLOW_NON_PREMULT;
 
-Maybe<TexUnpackBlobDesc> FromImageBitmap(const GLenum target, Maybe<uvec3> size,
+Maybe<TexUnpackBlobDesc> FromImageBitmap(const ClientWebGLContext& webgl,
+                                         const GLenum target, Maybe<uvec3> size,
                                          const dom::ImageBitmap& imageBitmap,
                                          ErrorResult* const out_rv) {
   if (imageBitmap.IsWriteOnly()) {
@@ -55,31 +56,10 @@ Maybe<TexUnpackBlobDesc> FromImageBitmap(const GLenum target, Maybe<uvec3> size,
     return {};
   }
 
-  const auto cloneData = imageBitmap.ToCloneData();
-  if (!cloneData) {
-    return {};
-  }
-
-  const RefPtr<gfx::DataSourceSurface> surf = cloneData->mSurface;
-  const auto imageSize = *uvec2::FromSize(surf->GetSize());
-  if (!size) {
-    size.emplace(imageSize.x, imageSize.y, 1);
-  }
-
-  // WhatWG "HTML Living Standard" (30 October 2015):
-  // "The getImageData(sx, sy, sw, sh) method [...] Pixels must be returned as
-  // non-premultiplied alpha values."
-  return Some(TexUnpackBlobDesc{target,
-                                size.value(),
-                                cloneData->mAlphaType,
-                                {},
-                                {},
-                                Some(imageSize),
-                                nullptr,
-                                {},
-                                surf,
-                                {},
-                                false});
+  auto sfer = nsLayoutUtils::SurfaceFromImageBitmap(
+      const_cast<dom::ImageBitmap*>(&imageBitmap),
+      kDefaultSurfaceFromElementFlags);
+  return FromSurfaceFromElementResult(webgl, target, size, false, sfer, out_rv);
 }
 
 static layers::SurfaceDescriptor Flatten(const layers::SurfaceDescriptor& sd) {
@@ -132,7 +112,8 @@ Maybe<webgl::TexUnpackBlobDesc> FromOffscreenCanvas(
   auto sfer = nsLayoutUtils::SurfaceFromOffscreenCanvas(
       const_cast<dom::OffscreenCanvas*>(&canvas),
       kDefaultSurfaceFromElementFlags);
-  return FromSurfaceFromElementResult(webgl, target, size, sfer, out_error);
+  return FromSurfaceFromElementResult(webgl, target, size, true, sfer,
+                                      out_error);
 }
 
 Maybe<webgl::TexUnpackBlobDesc> FromVideoFrame(
@@ -141,7 +122,8 @@ Maybe<webgl::TexUnpackBlobDesc> FromVideoFrame(
   auto sfer = nsLayoutUtils::SurfaceFromVideoFrame(
       const_cast<dom::VideoFrame*>(&videoFrame),
       kDefaultSurfaceFromElementFlags);
-  return FromSurfaceFromElementResult(webgl, target, size, sfer, out_error);
+  return FromSurfaceFromElementResult(webgl, target, size, true, sfer,
+                                      out_error);
 }
 
 Maybe<webgl::TexUnpackBlobDesc> FromDomElem(const ClientWebGLContext& webgl,
@@ -167,12 +149,14 @@ Maybe<webgl::TexUnpackBlobDesc> FromDomElem(const ClientWebGLContext& webgl,
   RefPtr<gfx::DrawTarget> idealDrawTarget = nullptr;  // Don't care for now.
   auto sfer = nsLayoutUtils::SurfaceFromElement(
       const_cast<dom::Element*>(&elem), flags, idealDrawTarget);
-  return FromSurfaceFromElementResult(webgl, target, size, sfer, out_error);
+  return FromSurfaceFromElementResult(webgl, target, size, true, sfer,
+                                      out_error);
 }
 
 Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
     const ClientWebGLContext& webgl, const GLenum target, Maybe<uvec3> size,
-    SurfaceFromElementResult& sfer, ErrorResult* const out_error) {
+    bool applyUnpackTransforms, SurfaceFromElementResult& sfer,
+    ErrorResult* const out_error) {
   uvec2 elemSize;
 
   const auto& layersImage = sfer.mLayersImage;
@@ -251,7 +235,9 @@ Maybe<webgl::TexUnpackBlobDesc> FromSurfaceFromElementResult(
                                 Some(elemSize),
                                 layersImage,
                                 sd,
-                                dataSurf});
+                                dataSurf,
+                                {},
+                                applyUnpackTransforms});
 }
 
 }  // namespace webgl

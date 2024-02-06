@@ -18,7 +18,8 @@ class OffscreenCanvas;
 
 namespace webgl {
 
-Maybe<TexUnpackBlobDesc> FromImageBitmap(GLenum target, Maybe<uvec3> size,
+Maybe<TexUnpackBlobDesc> FromImageBitmap(const ClientWebGLContext& webgl,
+                                         GLenum target, Maybe<uvec3> size,
                                          const dom::ImageBitmap& imageBitmap,
                                          ErrorResult* const out_rv);
 
@@ -39,7 +40,8 @@ Maybe<TexUnpackBlobDesc> FromDomElem(const ClientWebGLContext& webgl,
 
 Maybe<TexUnpackBlobDesc> FromSurfaceFromElementResult(
     const ClientWebGLContext& webgl, GLenum target, Maybe<uvec3> size,
-    SurfaceFromElementResult& sfer, ErrorResult* const out_error);
+    bool applyUnpackTransforms, SurfaceFromElementResult& sfer,
+    ErrorResult* const out_error);
 
 }  // namespace webgl
 }  // namespace mozilla

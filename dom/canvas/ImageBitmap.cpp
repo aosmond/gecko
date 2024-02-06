@@ -29,6 +29,7 @@
 #include "mozilla/gfx/Swizzle.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/ScopeExit.h"
+#include "gfxUtils.h"
 #include "nsGlobalWindowInner.h"
 #include "nsIAsyncInputStream.h"
 #include "nsNetUtil.h"
@@ -704,10 +705,14 @@ SurfaceFromElementResult ImageBitmap::SurfaceFrom(uint32_t aSurfaceFlags) {
 
   IntSize imageSize(mData->GetSize());
   IntRect imageRect(IntPoint(0, 0), imageSize);
-  bool hasCropRect = mPictureRect.IsEqualEdges(imageRect);
 
-  bool wantExactSize =
-      bool(aSurfaceFlags & nsLayoutUtils::SFE_EXACT_SIZE_SURFACE);
+  IntRect imagePortion = imageRect.Intersect(mPictureRect);
+  if (imagePortion.IsEmpty()) {
+    // the crop lies entirely outside the surface area, nothing to draw
+    return sfer;
+  }
+
+  bool hasCropRect = !imagePortion.IsEqualEdges(imageRect);
   bool allowNonPremult =
       bool(aSurfaceFlags & nsLayoutUtils::SFE_ALLOW_NON_PREMULT);
   bool allowUncropped =
@@ -715,43 +720,53 @@ SurfaceFromElementResult ImageBitmap::SurfaceFrom(uint32_t aSurfaceFlags) {
   bool requiresPremult =
       !allowNonPremult && mAlphaType == gfxAlphaType::NonPremult;
   bool requiresCrop = !allowUncropped && hasCropRect;
-  if (wantExactSize || requiresPremult || requiresCrop || mSurface) {
-    RefPtr<DrawTarget> dt = Factory::CreateDrawTarget(
-        BackendType::SKIA, IntSize(1, 1), SurfaceFormat::B8G8R8A8);
-    sfer.mSourceSurface = PrepareForDrawTarget(dt);
 
-    if (!sfer.mSourceSurface) {
-      return sfer;
+  if (!requiresPremult && !requiresCrop) {
+    // We can just supply the image as is.
+    if (hasCropRect) {
+      sfer.mCropRect = Some(imagePortion);
     }
-
-    MOZ_ASSERT(mSurface);
-
-    sfer.mSize = sfer.mIntrinsicSize = sfer.mSourceSurface->GetSize();
+    sfer.mSize = imageSize;
+    sfer.mIntrinsicSize = imagePortion.Size();
     sfer.mHasSize = true;
-    sfer.mAlphaType = IsOpaque(sfer.mSourceSurface->GetFormat())
-                          ? gfxAlphaType::Opaque
-                          : gfxAlphaType::Premult;
+    sfer.mAlphaType = mAlphaType;
+    sfer.mLayersImage = mData;
     return sfer;
   }
 
-  if (hasCropRect) {
-    IntRect imagePortion = imageRect.Intersect(mPictureRect);
+  RefPtr<SourceSurface> srcSurface = mData->GetAsSourceSurface();
+  if (!srcSurface) {
+    return sfer;
+  }
 
-    // the crop lies entirely outside the surface area, nothing to draw
-    if (imagePortion.IsEmpty()) {
+  RefPtr<DataSourceSurface> srcDataSurface = srcSurface->GetDataSurface();
+  if (NS_WARN_IF(!srcDataSurface)) {
+    return sfer;
+  }
+
+  RefPtr<DataSourceSurface> dstSurface;
+  if (requiresCrop) {
+    dstSurface = CropAndCopyDataSourceSurface(srcDataSurface, imagePortion);
+    if (NS_WARN_IF(!dstSurface)) {
       return sfer;
     }
 
-    sfer.mCropRect = Some(imagePortion);
-    sfer.mIntrinsicSize = imagePortion.Size();
+    srcDataSurface = dstSurface;
   } else {
-    sfer.mIntrinsicSize = imageSize;
+    MOZ_ASSERT(requiresPremult);
+    dstSurface = Factory::CreateDataSourceSurface(srcDataSurface->GetSize(),
+                                                  srcDataSurface->GetFormat());
   }
 
-  sfer.mSize = imageSize;
+  if (requiresPremult && NS_WARN_IF(!gfxUtils::PremultiplyDataSurface(
+                             srcDataSurface, dstSurface))) {
+    return sfer;
+  }
+
+  sfer.mAlphaType = requiresPremult ? gfxAlphaType::Premult : mAlphaType;
+  sfer.mSize = sfer.mIntrinsicSize = dstSurface->GetSize();
   sfer.mHasSize = true;
-  sfer.mAlphaType = mAlphaType;
-  sfer.mLayersImage = mData;
+  sfer.mSourceSurface = std::move(dstSurface);
   return sfer;
 }
 
