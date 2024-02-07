@@ -1733,7 +1733,8 @@ bool CanvasRenderingContext2D::TrySharedTarget(
 
     aOutProvider = layers::PersistentBufferProviderShared::Create(
         GetSize(), GetSurfaceFormat(), imageBridge,
-        !mAllowAcceleration || GetEffectiveWillReadFrequently());
+        !mAllowAcceleration || GetEffectiveWillReadFrequently(),
+        mOffscreenCanvas->GetWindowID());
   }
 
   if (!aOutProvider) {
