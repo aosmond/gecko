@@ -43,6 +43,8 @@ child:
 parent:
   async Update(CompositableOperation[] ops, OpDestroy[] toDestroy, uint64_t fwdTransactionId);
 
+  sync SyncWithCompositor();
+
   // First step of the destruction sequence. This puts ImageBridge
   // in a state in which it can't send asynchronous messages
   // so as to not race with the channel getting closed.
