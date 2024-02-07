@@ -1725,6 +1725,10 @@ bool CanvasRenderingContext2D::TrySharedTarget(
         GetSize(), GetSurfaceFormat(),
         !mAllowAcceleration || GetEffectiveWillReadFrequently());
   } else if (mOffscreenCanvas) {
+    if (!StaticPrefs::gfx_offscreencanvas_shared_provider()) {
+      return false;
+    }
+
     RefPtr<layers::ImageBridgeChild> imageBridge =
         layers::ImageBridgeChild::GetSingleton();
     if (NS_WARN_IF(!imageBridge)) {

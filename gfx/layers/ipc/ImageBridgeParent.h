@@ -82,6 +82,8 @@ class ImageBridgeParent final : public PImageBridgeParent,
                                      OpDestroyArray&& aToDestroy,
                                      const uint64_t& aFwdTransactionId);
 
+  mozilla::ipc::IPCResult RecvSyncWithCompositor();
+
   PTextureParent* AllocPTextureParent(
       const SurfaceDescriptor& aSharedData, ReadLockDescriptor& aReadLock,
       const LayersBackend& aLayersBackend, const TextureFlags& aFlags,

@@ -227,6 +227,10 @@ mozilla::ipc::IPCResult ImageBridgeParent::RecvUpdate(
   return result;
 }
 
+mozilla::ipc::IPCResult ImageBridgeParent::RecvSyncWithCompositor() {
+  return IPC_OK();
+}
+
 /* static */
 bool ImageBridgeParent::CreateForContent(
     Endpoint<PImageBridgeParent>&& aEndpoint, dom::ContentParentId aContentId) {

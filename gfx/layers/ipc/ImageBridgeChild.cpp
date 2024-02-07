@@ -436,9 +436,13 @@ void ImageBridgeChild::SyncWithCompositor(const Maybe<uint64_t>& aWindowID) {
   // have released get released.
   SynchronousTask task("SyncWithCompositor Event Lock");
 
-  RefPtr<Runnable> runnable =
-      NS_NewRunnableFunction("ImageBridgeChild::SyncWithCompositor(Event)",
-                             [&]() { AutoCompleteTask complete(&task); });
+  RefPtr<Runnable> runnable = NS_NewRunnableFunction(
+      "ImageBridgeChild::SyncWithCompositor(Event)", [&]() {
+        AutoCompleteTask complete(&task);
+        if (CanSend()) {
+          SendSyncWithCompositor();
+        }
+      });
   GetThread()->Dispatch(runnable.forget());
 
   task.Wait();
