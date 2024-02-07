@@ -1492,8 +1492,7 @@ bool CanvasRenderingContext2D::BorrowTarget(const IntRect& aPersistedRect,
 bool CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
                                             bool aWillClear) {
   if (AlreadyShutDown()) {
-    gfxCriticalErrorOnce()
-        << "Attempt to render into a Canvas2d after shutdown.";
+    gfxCriticalNoteOnce << "Attempt to render into a Canvas2d after shutdown.";
     SetErrorState();
     return false;
   }

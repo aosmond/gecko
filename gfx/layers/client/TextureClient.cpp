@@ -839,12 +839,46 @@ void TextureClient::EnableReadLock() {
   }
 }
 
+void TextureClient::OnPrepareForwardToHost() {
+  if (!ShouldReadLock()) {
+    return;
+  }
+
+  MutexAutoLock lock(mMutex);
+  if (NS_WARN_IF(!mReadLock)) {
+    MOZ_ASSERT(!mAllocator->IPCOpen(), "Should have created readlock already!");
+    MOZ_ASSERT(!mIsPendingForwardReadLocked);
+    return;
+  }
+
+  if (mIsPendingForwardReadLocked) {
+    return;
+  }
+
+  mReadLock->ReadLock();
+  mIsPendingForwardReadLocked = true;
+}
+
+void TextureClient::OnAbandonForwardToHost() {
+  if (!ShouldReadLock()) {
+    return;
+  }
+
+  MutexAutoLock lock(mMutex);
+  if (!mReadLock || !mIsPendingForwardReadLocked) {
+    return;
+  }
+
+  mReadLock->ReadUnlock();
+  mIsPendingForwardReadLocked = false;
+}
+
 bool TextureClient::OnForwardedToHost() {
   if (mData) {
     mData->OnForwardedToHost();
   }
 
-  if (!ShouldReadLock() || !mUpdated) {
+  if (!ShouldReadLock()) {
     return false;
   }
 
@@ -857,9 +891,23 @@ bool TextureClient::OnForwardedToHost() {
       return false;
     }
 
-    // Take a read lock on behalf of the TextureHost. The latter will unlock
-    // after the shared data is available again for drawing.
-    mReadLock->ReadLock();
+    if (!mUpdated) {
+      if (mIsPendingForwardReadLocked) {
+        mIsPendingForwardReadLocked = false;
+        mReadLock->ReadUnlock();
+      }
+      return false;
+    }
+
+    if (mIsPendingForwardReadLocked) {
+      // We have successfully forwarded, just clear the flag and let the
+      // TextureHost be responsible for unlocking.
+      mIsPendingForwardReadLocked = false;
+    } else {
+      // Otherwise we did not need to readlock in advance, so do so now. We do
+      // this on behalf of the TextureHost.
+      mReadLock->ReadLock();
+    }
   }
 
   mUpdated = false;
