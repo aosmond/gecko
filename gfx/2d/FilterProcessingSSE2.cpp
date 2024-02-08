@@ -56,7 +56,7 @@ void FilterProcessing::ApplyMorphologyVertical_SSE2(
 
 already_AddRefed<DataSourceSurface> FilterProcessing::ApplyColorMatrix_SSE2(
     DataSourceSurface* aInput, const Matrix5x4& aMatrix) {
-  return ApplyColorMatrix_SIMD<__m128i, __m128i, __m128i>(aInput, aMatrix);
+  return ApplyColorMatrix_SIMD<__m128i, __m128i, __m128i, __m128i>(aInput, aMatrix);
 }
 
 void FilterProcessing::ApplyComposition_SSE2(DataSourceSurface* aSource,

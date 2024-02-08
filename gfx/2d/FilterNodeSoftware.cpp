@@ -1496,16 +1496,20 @@ already_AddRefed<DataSourceSurface> FilterNodeColorMatrixSoftware::Render(
     return nullptr;
   }
 
+#if 0
   if (mAlphaMode == ALPHA_MODE_PREMULTIPLIED) {
     input = Unpremultiply(input);
   }
+#endif
 
   RefPtr<DataSourceSurface> result =
       FilterProcessing::ApplyColorMatrix(input, mMatrix);
 
+#if 0
   if (mAlphaMode == ALPHA_MODE_PREMULTIPLIED) {
     result = Premultiply(result);
   }
+#endif
 
   return result.forget();
 }

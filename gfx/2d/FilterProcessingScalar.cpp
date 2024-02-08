@@ -136,7 +136,7 @@ void FilterProcessing::ApplyMorphologyVertical_Scalar(
 already_AddRefed<DataSourceSurface> FilterProcessing::ApplyColorMatrix_Scalar(
     DataSourceSurface* aInput, const Matrix5x4& aMatrix) {
   return ApplyColorMatrix_SIMD<simd::Scalari32x4_t, simd::Scalari16x8_t,
-                               simd::Scalaru8x16_t>(aInput, aMatrix);
+                               simd::Scalaru16x8_t, simd::Scalaru8x16_t>(aInput, aMatrix);
 }
 
 void FilterProcessing::ApplyComposition_Scalar(DataSourceSurface* aSource,
