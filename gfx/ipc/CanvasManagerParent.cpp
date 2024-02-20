@@ -180,52 +180,29 @@ CanvasManagerParent::AllocPCanvasParent() {
 mozilla::ipc::IPCResult CanvasManagerParent::RecvGetSnapshot(
     const Maybe<RemoteTextureOwnerId>& aOwnerId,
     layers::SurfaceDescriptorShared* aDesc) {
-
-  webgl::FrontBufferSnapshotIpc buffer;
-  switch (actor->GetProtocolId()) {
-    case ProtocolId::PWebGLMsgStart: {
-      RefPtr<dom::WebGLParent> webgl = static_cast<dom::WebGLParent*>(actor);
-      mozilla::ipc::IPCResult rv = webgl->GetFrontBufferSnapshot(&buffer, this);
-      if (!rv) {
-        return rv;
-      }
-      *aFormat = SurfaceFormat::R8G8B8A8;
-    } break;
-    case ProtocolId::PCanvasMsgStart: {
-      RefPtr<layers::CanvasTranslator> translator =
-          static_cast<layers::CanvasTranslator*>(actor);
-      IntSize size;
-      if (aOwnerId.isNothing()) {
-        return IPC_FAIL(this, "invalid OwnerId");
-      }
-      mozilla::ipc::IPCResult rv = translator->GetFrontBufferSnapshot(
-          *aOwnerId, *aFormat, size, buffer.shmem);
-      if (!rv) {
-        return rv;
-      }
-      buffer.surfSize.x = static_cast<uint32_t>(size.width);
-      buffer.surfSize.y = static_cast<uint32_t>(size.height);
-    } break;
-    case ProtocolId::PWebGPUMsgStart: {
-      RefPtr<webgpu::WebGPUParent> webgpu =
-          static_cast<webgpu::WebGPUParent*>(actor);
-      IntSize size;
-      if (aOwnerId.isNothing()) {
-        return IPC_FAIL(this, "invalid OwnerId");
-      }
-      mozilla::ipc::IPCResult rv = webgpu->GetFrontBufferSnapshot(
-          *aOwnerId, *aFormat, size, buffer.shmem);
-      if (!rv) {
-        return rv;
-      }
-      buffer.surfSize.x = static_cast<uint32_t>(size.width);
-      buffer.surfSize.y = static_cast<uint32_t>(size.height);
-    } break;
-    default:
-      return IPC_FAIL(this, "unsupported protocol");
+  nsresult rv = NS_ERROR_FAILURE;
+  if (!aOwnerId) {
+    *aDesc = layers::SurfaceDescriptorShared();
+    return IPC_OK();
   }
 
-  *aResult = std::move(buffer);
+  auto* instance = RemoteTextureMap::Get();
+  if (NS_WARN_IF(!instance)) {
+    *aDesc = layers::SurfaceDescriptorShared();
+    return IPC_OK();
+  }
+
+  IntSize size;
+  int32_t stride = 0;
+  SurfaceFormat format = SurfaceFormat::UNKNOWN;
+  auto shmem = RefPtr<mozilla::ipc::SharedMemoryBasic>();
+  nsresult rv = instance->GetFrontBufferSnapshot(aOwnerId.value(), OtherPid(), shmem, size, stride, format);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    *aDesc = layers::SurfaceDescriptorShared();
+    return IPC_OK();
+  }
+
+  *aDesc = layers::SurfaceDescriptorShared(size, stride, format, shmem->TakeHandle());
   return IPC_OK();
 }
 

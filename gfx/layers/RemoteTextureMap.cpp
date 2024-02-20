@@ -479,10 +479,12 @@ bool RemoteTextureMap::RemoveTexture(const RemoteTextureId aTextureId,
   return false;
 }
 
-nsresult RemoteTextureMap::GetLatestBufferSnapshot(
-    const RemoteTextureOwnerId aOwnerId, mozilla::ipc::IProtocol* aProtocol,
-    const base::ProcessId aForPid, gfx::SurfaceFormat& aOutFormat,
-    gfx::IntSize& aOutSize, mozilla::ipc::Shmem& aOutShmem) {
+nsresult RemoteTextureMap::GetLatestBufferSnapshot(const RemoteTextureOwnerId aOwnerId,
+                                   const base::ProcessId aForPid,
+                                   SharedMemoryBasic* aOutShmem,
+                                   gfx::IntSize& aOutSize,
+                                   int32_t& aOutStride,
+                                   gfx::SurfaceFormat& aOutFormat) {
   // The compositable ref of remote texture should be updated in mMonitor lock.
   CompositableTextureHostRef textureHostRef;
   RefPtr<TextureHost> releasingTexture;  // Release outside the monitor
@@ -539,10 +541,18 @@ nsresult RemoteTextureMap::GetLatestBufferSnapshot(
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  int32_t stride =
+  aOutStride =
       layers::ImageDataSerializer::ComputeRGBStride(aOutFormat, aOutSize.width);
-  int32_t len = aOutSize.height * stride;
-  if (NS_WARN_IF(!aProtocol->AllocShmem(len, &aOutShmem))) {
+  int32_t len = aOutSize.height * aOutStride;
+
+  size_t shmemSize = mozilla::ipc::SharedMemory::PageAlignedSize(len);
+  if (NS_WARN_IF(shmemSize > UINT32_MAX)) {
+    MOZ_ASSERT_UNREACHABLE("Buffer too big?");
+    return NS_ERROR_FAILURE;
+  }
+
+  if (NS_WARN_IF(!aOutShmem->Create(shmemSize)) || 
+      NS_WARN_IF(!aOutShmem->Map(shmemSize))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
