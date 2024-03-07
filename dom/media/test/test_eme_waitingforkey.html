@@ -25,11 +25,13 @@ function startTest(test, token)
 
   let waitForKey = new EMEPromise;
   v.addEventListener("waitingforkey", function() {
+    Log(token, "Got waitingforkey");
     gotWaitingForKey += 1;
     waitForKey.resolve();
   });
 
   v.onwaitingforkey = function() {
+    Log(token, "Got onwaitingforkey");
     gotOnwaitingforkey += 1;
   };
 
