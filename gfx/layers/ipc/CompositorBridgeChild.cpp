@@ -15,14 +15,12 @@
 #include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/APZCTreeManagerChild.h"
-#include "mozilla/layers/CanvasChild.h"
 #include "mozilla/layers/WebRenderLayerManager.h"
 #include "mozilla/layers/PTextureChild.h"
 #include "mozilla/layers/TextureClient.h"      // for TextureClient
 #include "mozilla/layers/TextureClientPool.h"  // for TextureClientPool
 #include "mozilla/layers/WebRenderBridgeChild.h"
 #include "mozilla/layers/SyncObject.h"  // for SyncObjectClient
-#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/gfx/Logging.h"
@@ -514,26 +512,6 @@ PTextureChild* CompositorBridgeChild::CreateTexture(
   return SendPTextureConstructor(
       textureChild, aSharedData, std::move(aReadLock), aLayersBackend, aFlags,
       LayersId{0} /* FIXME? */, aSerial, aExternalImageId);
-}
-
-already_AddRefed<CanvasChild> CompositorBridgeChild::GetCanvasChild() {
-  MOZ_ASSERT(gfxPlatform::UseRemoteCanvas());
-  if (auto* cm = gfx::CanvasManagerChild::Get()) {
-    return cm->GetCanvasChild().forget();
-  }
-  return nullptr;
-}
-
-void CompositorBridgeChild::EndCanvasTransaction() {
-  if (auto* cm = gfx::CanvasManagerChild::Get()) {
-    cm->EndCanvasTransaction();
-  }
-}
-
-void CompositorBridgeChild::ClearCachedResources() {
-  if (auto* cm = gfx::CanvasManagerChild::Get()) {
-    cm->ClearCachedResources();
-  }
 }
 
 bool CompositorBridgeChild::AllocUnsafeShmem(size_t aSize, ipc::Shmem* aShmem) {

@@ -22,6 +22,7 @@
 #include "mozilla/StaticPrefs_gfx.h"
 #include "mozilla/StaticPrefs_layers.h"
 #include "mozilla/gfx/2D.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DataSurfaceHelpers.h"  // for CreateDataSourceSurfaceByCloning
 #include "mozilla/gfx/Logging.h"             // for gfxDebug
 #include "mozilla/gfx/gfxVars.h"
@@ -373,11 +374,12 @@ TextureData* TextureData::Create(TextureForwarder* aAllocator,
                                               aSelector, aAllocFlags);
 
   if (aAllocFlags & ALLOC_FORCE_REMOTE) {
-    RefPtr<CanvasChild> canvasChild = aAllocator->GetCanvasChild();
-    if (canvasChild) {
-      return new RecordedTextureData(canvasChild.forget(), aSize, aFormat,
-                                     textureType,
-                                     layers::TexTypeForWebgl(aKnowsCompositor));
+    if (auto* canvasManager = CanvasManagerChild::Get()) {
+      if (RefPtr<CanvasChild> canvasChild = canvasManager->GetCanvasChild()) {
+        return new RecordedTextureData(
+            canvasChild.forget(), aSize, aFormat, textureType,
+            layers::TexTypeForWebgl(aKnowsCompositor));
+      }
     }
     // If we must be remote, but there is no canvas child, then falling back
     // is not possible.

@@ -10,6 +10,7 @@
 #include "mozilla/StaticPrefs_apz.h"
 #include "mozilla/StaticPrefs_layers.h"
 #include "mozilla/dom/BrowserChild.h"
+#include "mozilla/gfx/CanvasManagerChild.h"
 #include "mozilla/gfx/DrawEventRecorder.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/StackingContextHelper.h"
@@ -296,7 +297,9 @@ bool WebRenderLayerManager::EndEmptyTransaction(EndTransactionFlags aFlags) {
     }
   }
 
-  GetCompositorBridgeChild()->EndCanvasTransaction();
+  if (auto* canvasManager = CanvasManagerChild::MaybeGet()) {
+    canvasManager->EndCanvasTransaction();
+  }
 
   Maybe<TransactionData> transactionData;
   if (mStateManager.mAsyncResourceUpdates || !mPendingScrollUpdates.IsEmpty() ||
@@ -434,7 +437,9 @@ void WebRenderLayerManager::EndTransactionWithoutLayer(
     }
   }
 
-  GetCompositorBridgeChild()->EndCanvasTransaction();
+  if (auto* canvasManager = CanvasManagerChild::MaybeGet()) {
+    canvasManager->EndCanvasTransaction();
+  }
 
   {
     AUTO_PROFILER_TRACING_MARKER("Paint", "ForwardDPTransaction", GRAPHICS);
@@ -625,9 +630,8 @@ void WebRenderLayerManager::ClearCachedResources() {
   mWebRenderCommandBuilder.ClearCachedResources();
   DiscardImages();
   mStateManager.ClearCachedResources();
-  CompositorBridgeChild* compositorBridge = GetCompositorBridgeChild();
-  if (compositorBridge) {
-    compositorBridge->ClearCachedResources();
+  if (auto* canvasManager = CanvasManagerChild::MaybeGet()) {
+    canvasManager->ClearCachedResources();
   }
   WrBridge()->EndClearCachedResources();
 }
