@@ -147,12 +147,13 @@ CanvasRenderingContextHelper::CreateContextHelper(
 
     case CanvasContextType::Canvas2D:
       Telemetry::Accumulate(Telemetry::CANVAS_2D_USED, 1);
-      ret = new CanvasRenderingContext2D(aCompositorBackend);
+      ret = new CanvasRenderingContext2D(GetParentObject(), aCompositorBackend);
       break;
 
     case CanvasContextType::OffscreenCanvas2D:
       Telemetry::Accumulate(Telemetry::CANVAS_2D_USED, 1);
-      ret = new OffscreenCanvasRenderingContext2D(aCompositorBackend);
+      ret = new OffscreenCanvasRenderingContext2D(GetParentObject(),
+                                                  aCompositorBackend);
       break;
 
     case CanvasContextType::WebGL1:

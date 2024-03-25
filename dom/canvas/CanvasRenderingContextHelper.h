@@ -42,6 +42,8 @@ class CanvasRenderingContextHelper {
  public:
   CanvasRenderingContextHelper();
 
+  virtual nsIGlobalObject* GetParentObject() const = 0;
+
   virtual bool GetOpaqueAttr() = 0;
 
  protected:

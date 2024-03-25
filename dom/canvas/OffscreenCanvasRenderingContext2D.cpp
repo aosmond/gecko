@@ -45,8 +45,8 @@ NS_IMPL_RELEASE_INHERITED(OffscreenCanvasRenderingContext2D,
                           CanvasRenderingContext2D)
 
 OffscreenCanvasRenderingContext2D::OffscreenCanvasRenderingContext2D(
-    layers::LayersBackend aCompositorBackend)
-    : CanvasRenderingContext2D(aCompositorBackend) {}
+    nsIGlobalObject* aGlobal, layers::LayersBackend aCompositorBackend)
+    : CanvasRenderingContext2D(aGlobal, aCompositorBackend) {}
 
 OffscreenCanvasRenderingContext2D::~OffscreenCanvasRenderingContext2D() =
     default;
@@ -55,10 +55,6 @@ JSObject* OffscreenCanvasRenderingContext2D::WrapObject(
     JSContext* aCx, JS::Handle<JSObject*> aGivenProto) {
   return OffscreenCanvasRenderingContext2D_Binding::Wrap(aCx, this,
                                                          aGivenProto);
-}
-
-nsIGlobalObject* OffscreenCanvasRenderingContext2D::GetParentObject() const {
-  return mOffscreenCanvas->GetOwnerGlobal();
 }
 
 NS_IMETHODIMP OffscreenCanvasRenderingContext2D::InitializeWithDrawTarget(

@@ -13,6 +13,7 @@
 #include "mozilla/gfx/2D.h"
 #include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/EnumeratedArray.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/MruCache.h"
@@ -77,13 +78,14 @@ struct DOMMatrix2DInit;
 /**
  ** CanvasRenderingContext2D
  **/
-class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
-                                 public nsWrapperCache {
+class CanvasRenderingContext2D : public DOMEventTargetHelper,
+                                 public nsICanvasRenderingContextInternal {
  protected:
   virtual ~CanvasRenderingContext2D();
 
  public:
-  explicit CanvasRenderingContext2D(layers::LayersBackend aCompositorBackend);
+  explicit CanvasRenderingContext2D(nsIGlobalObject* aGlobal,
+                                    layers::LayersBackend aCompositorBackend);
 
   virtual JSObject* WrapObject(JSContext* aCx,
                                JS::Handle<JSObject*> aGivenProto) override;
@@ -118,6 +120,11 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
     // Userland polyfill is `c2d.width = c2d.width;`
     SetDimensions(GetWidth(), GetHeight());
   }
+
+  bool IsContextLost() { return false; }
+
+  IMPL_EVENT_HANDLER(contextlost);
+  IMPL_EVENT_HANDLER(contextrestored);
 
   void Scale(double aX, double aY, mozilla::ErrorResult& aError);
   void Rotate(double aAngle, mozilla::ErrorResult& aError);
@@ -521,10 +528,10 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   void RedrawUser(const gfxRect& aR);
 
   // nsISupports interface + CC
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
+  NS_DECL_ISUPPORTS_INHERITED
 
-  NS_DECL_CYCLE_COLLECTION_SKIPPABLE_WRAPPERCACHE_CLASS(
-      CanvasRenderingContext2D)
+  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(CanvasRenderingContext2D,
+                                           DOMEventTargetHelper)
 
   enum class CanvasMultiGetterType : uint8_t {
     STRING = 0,

@@ -872,12 +872,13 @@ NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(CanvasGradient, mContext)
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(CanvasPattern, mContext)
 
-NS_IMPL_CYCLE_COLLECTING_ADDREF(CanvasRenderingContext2D)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(CanvasRenderingContext2D)
+NS_IMPL_ADDREF_INHERITED(CanvasRenderingContext2D, DOMEventTargetHelper)
+NS_IMPL_RELEASE_INHERITED(CanvasRenderingContext2D, DOMEventTargetHelper)
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(CanvasRenderingContext2D)
+NS_IMPL_CYCLE_COLLECTION_CLASS(CanvasRenderingContext2D)
 
-NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CanvasRenderingContext2D)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(CanvasRenderingContext2D,
+                                                DOMEventTargetHelper)
   // Make sure we remove ourselves from the list of demotable contexts (raw
   // pointers), since we're logically destructed at this point.
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCanvasElement)
@@ -902,7 +903,8 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CanvasRenderingContext2D)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CanvasRenderingContext2D)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(CanvasRenderingContext2D,
+                                                  DOMEventTargetHelper)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCanvasElement)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOffscreenCanvas)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocShell)
@@ -924,7 +926,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CanvasRenderingContext2D)
   }
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
-NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(CanvasRenderingContext2D)
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN_INHERITED(CanvasRenderingContext2D,
+                                                  DOMEventTargetHelper)
   if (nsCCUncollectableMarker::sGeneration && tmp->HasKnownLiveWrapper()) {
     dom::Element* canvasElement = tmp->mCanvasElement;
     if (canvasElement) {
@@ -937,18 +940,19 @@ NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(CanvasRenderingContext2D)
   }
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
 
-NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(CanvasRenderingContext2D)
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN_INHERITED(
+    CanvasRenderingContext2D, DOMEventTargetHelper)
   return nsCCUncollectableMarker::sGeneration && tmp->HasKnownLiveWrapper();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
 
-NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(CanvasRenderingContext2D)
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN_INHERITED(CanvasRenderingContext2D,
+                                                       DOMEventTargetHelper)
   return nsCCUncollectableMarker::sGeneration && tmp->HasKnownLiveWrapper();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(CanvasRenderingContext2D)
-  NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(CanvasRenderingContext2D,
+                                                  DOMEventTargetHelper)
   NS_INTERFACE_MAP_ENTRY(nsICanvasRenderingContextInternal)
-  NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
 CanvasRenderingContext2D::ContextState::ContextState() = default;
@@ -1064,8 +1068,9 @@ static uint8_t CanvasToGfx(CanvasFontKerning aKerning) {
 }
 
 CanvasRenderingContext2D::CanvasRenderingContext2D(
-    layers::LayersBackend aCompositorBackend)
-    :  // these are the default values from the Canvas spec
+    nsIGlobalObject* aGlobal, layers::LayersBackend aCompositorBackend)
+    : DOMEventTargetHelper(aGlobal),
+      // these are the default values from the Canvas spec
       mWidth(0),
       mHeight(0),
       mZero(false),

@@ -212,6 +212,8 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
     return mCurrentContext;
   }
 
+  nsIGlobalObject* GetParentObject() const final { return GetOwnerGlobal(); }
+
   /*
    * Returns true if the canvas context content is guaranteed to be opaque
    * across its entire area.

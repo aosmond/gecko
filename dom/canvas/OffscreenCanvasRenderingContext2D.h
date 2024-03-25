@@ -24,10 +24,10 @@ class OffscreenCanvasRenderingContext2D final
   NS_DECL_CYCLE_COLLECTION_SKIPPABLE_SCRIPT_HOLDER_CLASS_INHERITED(
       OffscreenCanvasRenderingContext2D, CanvasRenderingContext2D)
 
-  explicit OffscreenCanvasRenderingContext2D(
-      layers::LayersBackend aCompositorBackend);
+  OffscreenCanvasRenderingContext2D(nsIGlobalObject* aGlobal,
+                                    layers::LayersBackend aCompositorBackend);
 
-  nsIGlobalObject* GetParentObject() const;
+  nsIGlobalObject* GetParentObject() const { return GetOwnerGlobal(); }
 
   JSObject* WrapObject(JSContext* aCx,
                        JS::Handle<JSObject*> aGivenProto) override;

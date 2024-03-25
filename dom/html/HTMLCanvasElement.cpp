@@ -985,7 +985,7 @@ void HTMLCanvasElement::ToBlob(JSContext* aCx, BlobCallback& aCallback,
     return;
   }
 
-  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  nsCOMPtr<nsIGlobalObject> global = GetOwnerGlobal();
   MOZ_ASSERT(global);
 
   nsIntSize elemSize = GetWidthHeight();
