@@ -225,6 +225,8 @@ class nsICanvasRenderingContextInternal : public nsISupports,
   // Checking if fingerprinting protection is enable for the given target.
   bool ShouldResistFingerprinting(mozilla::RFPTarget aTarget) const;
 
+  bool DispatchEvent(const nsAString& eventName) const;
+
  protected:
   RefPtr<mozilla::dom::HTMLCanvasElement> mCanvasElement;
   RefPtr<mozilla::dom::OffscreenCanvas> mOffscreenCanvas;
