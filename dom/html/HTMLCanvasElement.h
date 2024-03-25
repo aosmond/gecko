@@ -152,6 +152,12 @@ class HTMLCanvasElement final : public nsGenericHTMLElement,
               JS::Handle<JS::Value> aParams, nsIPrincipal& aSubjectPrincipal,
               ErrorResult& aRv);
 
+  EventHandlerNonNull* GetOncontextlost();
+  void SetOncontextlost(EventHandlerNonNull* aCallback);
+
+  EventHandlerNonNull* GetOncontextrestored();
+  void SetOncontextrestored(EventHandlerNonNull* aCallback);
+
   OffscreenCanvas* TransferControlToOffscreen(ErrorResult& aRv);
 
   bool MozOpaque() const { return GetBoolAttr(nsGkAtoms::moz_opaque); }

@@ -33,6 +33,9 @@ interface HTMLCanvasElement : HTMLElement {
   undefined toBlob(BlobCallback callback,
                    optional DOMString type = "",
                    optional any encoderOptions);
+
+  attribute EventHandler oncontextlost;
+  attribute EventHandler oncontextrestored;
 };
 
 // Mozilla specific bits

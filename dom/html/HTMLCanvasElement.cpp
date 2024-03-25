@@ -1009,6 +1009,22 @@ void HTMLCanvasElement::ToBlob(JSContext* aCx, BlobCallback& aCallback,
                                        usePlaceholder, aRv);
 }
 
+EventHandlerNonNull* HTMLCanvasElement::GetOncontextlost() {
+  return EventTarget::GetEventHandler(nsGkAtoms::oncontextlost);
+}
+
+void HTMLCanvasElement::SetOncontextlost(EventHandlerNonNull* aCallback) {
+  EventTarget::SetEventHandler(nsGkAtoms::oncontextlost, aCallback);
+}
+
+EventHandlerNonNull* HTMLCanvasElement::GetOncontextrestored() {
+  return EventTarget::GetEventHandler(nsGkAtoms::oncontextrestored);
+}
+
+void HTMLCanvasElement::SetOncontextrestored(EventHandlerNonNull* aCallback) {
+  EventTarget::SetEventHandler(nsGkAtoms::oncontextrestored, aCallback);
+}
+
 OffscreenCanvas* HTMLCanvasElement::TransferControlToOffscreen(
     ErrorResult& aRv) {
   if (mCurrentContext || mOffscreenCanvas) {
