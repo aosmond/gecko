@@ -1227,6 +1227,47 @@ void CanvasRenderingContext2D::RemoveShutdownObserver() {
   canvasManager->RemoveShutdownObserver(this);
 }
 
+void CanvasRenderingContext2D::OnRemoteCanvasLost() {
+  // We only lose context / data if we are using remote canvas, which is only
+  // for accelerated targets.
+  if (!mBufferProvider || !mBufferProvider->IsAccelerated() || mIsContextLost) {
+    return;
+  }
+
+  // 2. Set context's context lost to true.
+  mIsContextLost = true;
+
+  // 3. Reset the rendering context to its default state given context.
+  ResetBitmap();
+
+  NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
+      "CanvasRenderingContext2D::OnRemoteCanvasLost", [self = RefPtr{this}] {
+        // 4. Let shouldRestore be the result of firing an event named
+        // contextlost at canvas, with the cancelable attribute initialized to
+        // true.
+        self->mAllowContextRestore = self->DispatchEvent(u"contextlost"_ns);
+      }));
+}
+
+void CanvasRenderingContext2D::OnRemoteCanvasRestored() {
+  // We never lost our context if it was not a remote canvas.
+  if (!mIsContextLost) {
+    return;
+  }
+
+  NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
+      "CanvasRenderingContext2D::OnRemoteCanvasRestored",
+      [self = RefPtr{this}] {
+        if (self->mIsContextLost && self->mAllowContextRestore) {
+          // 7. Set context's context lost to false.
+          self->mIsContextLost = false;
+
+          // 8. Fire an event named contextrestored at canvas.
+          self->DispatchEvent(u"contextrestored"_ns);
+        }
+      }));
+}
+
 void CanvasRenderingContext2D::SetStyleFromString(const nsACString& aStr,
                                                   Style aWhichStyle) {
   MOZ_ASSERT(!aStr.IsVoid());
@@ -1451,6 +1492,12 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
     SetErrorState();
     aError.ThrowInvalidStateError(
         "Cannot use canvas after shutdown initiated.");
+    return false;
+  }
+
+  if (mIsContextLost) {
+    aError.ThrowInvalidStateError(
+        "Cannot use canvas unless lost context is restored.");
     return false;
   }
 
