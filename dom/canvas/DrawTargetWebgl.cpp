@@ -819,10 +819,12 @@ bool DrawTargetWebgl::IsValid() const {
 
 bool DrawTargetWebgl::CanCreate(const IntSize& aSize, SurfaceFormat aFormat) {
   if (!gfxVars::UseAcceleratedCanvas2D()) {
+    printf_stderr("DrawTargetWebgl::CanCreate -- not accelerated\n");
     return false;
   }
 
   if (!Factory::AllowedSurfaceSize(aSize)) {
+    printf_stderr("DrawTargetWebgl::CanCreate -- bad size\n");
     return false;
   }
 
@@ -831,11 +833,13 @@ bool DrawTargetWebgl::CanCreate(const IntSize& aSize, SurfaceFormat aFormat) {
   // small.
   static const int32_t kMinDimension = 16;
   if (std::min(aSize.width, aSize.height) < kMinDimension) {
+    printf_stderr("DrawTargetWebgl::CanCreate -- too small\n");
     return false;
   }
 
   int32_t minSize = StaticPrefs::gfx_canvas_accelerated_min_size();
   if (aSize.width * aSize.height < minSize * minSize) {
+    printf_stderr("DrawTargetWebgl::CanCreate -- too small 2\n");
     return false;
   }
 
@@ -846,6 +850,7 @@ bool DrawTargetWebgl::CanCreate(const IntSize& aSize, SurfaceFormat aFormat) {
   int32_t maxSize = StaticPrefs::gfx_canvas_accelerated_max_size();
   if (maxSize > 0) {
     if (std::max(aSize.width, aSize.height) > maxSize) {
+      printf_stderr("DrawTargetWebgl::CanCreate -- too large\n");
       return false;
     }
   } else if (maxSize < 0) {
@@ -859,6 +864,7 @@ bool DrawTargetWebgl::CanCreate(const IntSize& aSize, SurfaceFormat aFormat) {
       LayoutDeviceIntSize screenSize = screen->GetRect().Size();
       if (aSize.width * aSize.height >
           std::max(screenSize.width * screenSize.height, kScreenPixels)) {
+        printf_stderr("DrawTargetWebgl::CanCreate -- too large 2\n");
         return false;
       }
     }

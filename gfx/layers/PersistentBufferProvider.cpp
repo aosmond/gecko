@@ -128,6 +128,7 @@ PersistentBufferProviderAccelerated::Create(gfx::IntSize aSize,
                                             KnowsCompositor* aKnowsCompositor) {
   if (!aKnowsCompositor || !aKnowsCompositor->GetTextureForwarder() ||
       !aKnowsCompositor->GetTextureForwarder()->IPCOpen()) {
+    printf_stderr("PersistentBufferProviderAccelerated::Create -- no/bad compositor\n");
     return nullptr;
   }
 
@@ -140,6 +141,7 @@ PersistentBufferProviderAccelerated::Create(gfx::IntSize aSize,
       return nullptr;
     }
 #else
+    printf_stderr("PersistentBufferProviderAccelerated::Create -- cannot create\n");
     return nullptr;
 #endif
   }
@@ -149,6 +151,7 @@ PersistentBufferProviderAccelerated::Create(gfx::IntSize aSize,
   RefPtr<TextureClient> texture = CreateTexture(
       aKnowsCompositor, aFormat, aSize, false, Some(remoteTextureOwnerId));
   if (!texture) {
+    printf_stderr("PersistentBufferProviderAccelerated::Create -- no texture\n");
     return nullptr;
   }
 

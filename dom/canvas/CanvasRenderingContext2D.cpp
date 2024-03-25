@@ -1228,6 +1228,7 @@ void CanvasRenderingContext2D::RemoveShutdownObserver() {
 }
 
 void CanvasRenderingContext2D::OnRemoteCanvasLost() {
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::OnRemoteCanvasLost -- provider %p, accelerated %d, context lost %d\n", this, mBufferProvider.get(), mBufferProvider ? mBufferProvider->IsAccelerated() : false, mIsContextLost);
   // We only lose context / data if we are using remote canvas, which is only
   // for accelerated targets.
   if (!mBufferProvider || !mBufferProvider->IsAccelerated() || mIsContextLost) {
@@ -1250,6 +1251,7 @@ void CanvasRenderingContext2D::OnRemoteCanvasLost() {
 }
 
 void CanvasRenderingContext2D::OnRemoteCanvasRestored() {
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::OnRemoteCanvasRestored -- provider %p, accelerated %d, context lost %d\n", this, mBufferProvider.get(), mBufferProvider ? mBufferProvider->IsAccelerated() : false, mIsContextLost);
   // We never lost our context if it was not a remote canvas.
   if (!mIsContextLost) {
     return;
@@ -1684,6 +1686,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
     // Only allow accelerated contexts to be created in a content process to
     // ensure it is remoted appropriately and run on the correct parent or
     // GPU process threads.
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::TryAcceleratedTarget -- not content process\n", this);
     return false;
   }
   if (mBufferProvider && mBufferProvider->IsAccelerated() &&
@@ -1695,6 +1698,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
   // Don't try creating an accelerate DrawTarget if either acceleration failed
   // previously or if the application expects acceleration to be slow.
   if (!mAllowAcceleration || GetEffectiveWillReadFrequently()) {
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::TryAcceleratedTarget -- not allowed\n", this);
     return false;
   }
 
@@ -1712,6 +1716,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
              StaticPrefs::gfx_canvas_remote_allow_offscreen()) {
     RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton();
     if (NS_WARN_IF(!imageBridge)) {
+      printf_stderr("[AO] [%p] CanvasRenderingContext2D::TryAcceleratedTarget -- no image bridge\n", this);
       return false;
     }
 
@@ -1720,6 +1725,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
   }
 
   if (!aOutProvider) {
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::TryAcceleratedTarget -- create failed\n", this);
     return false;
   }
   aOutDT = aOutProvider->BorrowDrawTarget(IntRect());
