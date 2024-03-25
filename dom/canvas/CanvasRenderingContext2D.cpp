@@ -1084,11 +1084,13 @@ CanvasRenderingContext2D::CanvasRenderingContext2D(
   sNumLivingContexts.infallibleInit();
   sErrorTarget.infallibleInit();
   sNumLivingContexts.set(sNumLivingContexts.get() + 1);
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::CanvasRenderingContext2D\n", this);
 }
 
 CanvasRenderingContext2D::~CanvasRenderingContext2D() {
   RemovePostRefreshObserver();
   RemoveShutdownObserver();
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::~CanvasRenderingContext2D -- target %p provider %p\n", this, mTarget.get(), mBufferProvider.get());
   ResetBitmap();
 
   sNumLivingContexts.set(sNumLivingContexts.get() - 1);
@@ -1163,6 +1165,7 @@ Maybe<nscolor> CanvasRenderingContext2D::ParseColor(
 }
 
 void CanvasRenderingContext2D::ResetBitmap(bool aFreeBuffer) {
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::ResetBitmap -- freeBuffer %d target %p provider %p\n", this, aFreeBuffer, mTarget.get(), mBufferProvider.get());
   if (mCanvasElement) {
     mCanvasElement->InvalidateCanvas();
   }
@@ -1192,6 +1195,7 @@ void CanvasRenderingContext2D::ResetBitmap(bool aFreeBuffer) {
 }
 
 void CanvasRenderingContext2D::OnShutdown() {
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::OnShutdown -- target %p provider %p\n", this, mTarget.get(), mBufferProvider.get());
   RefPtr<PersistentBufferProvider> provider = mBufferProvider;
 
   ResetBitmap();
@@ -1410,10 +1414,12 @@ bool CanvasRenderingContext2D::BorrowTarget(const IntRect& aPersistedRect,
   // recreated by EnsureTarget later.
   if (!mBufferProvider || mBufferProvider->RequiresRefresh() ||
       (mBufferProvider->IsAccelerated() && GetEffectiveWillReadFrequently())) {
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::BorrowTarget -- bad provider\n", this);
     return false;
   }
   mTarget = mBufferProvider->BorrowDrawTarget(aPersistedRect);
   if (!mTarget || !mTarget->IsValid()) {
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::BorrowTarget -- invalid target %p\n", this, mTarget.get());
     if (mTarget) {
       mBufferProvider->ReturnDrawTarget(mTarget.forget());
     }
@@ -1424,6 +1430,7 @@ bool CanvasRenderingContext2D::BorrowTarget(const IntRect& aPersistedRect,
       // If the buffer provider preserves the clip and transform state, then
       // we must ensure it is cleared before reusing the target.
       if (!mTarget->RemoveAllClips()) {
+        printf_stderr("[AO] [%p] CanvasRenderingContext2D::BorrowTarget -- target %p needs clear\n", this, mTarget.get());
         mBufferProvider->ReturnDrawTarget(mTarget.forget());
         return false;
       }
@@ -1451,6 +1458,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
     SetErrorState();
     aError.ThrowInvalidStateError(
         "Cannot use canvas after shutdown initiated.");
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- shutdown\n", this);
     return false;
   }
 
@@ -1459,6 +1467,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
       aError.ThrowInvalidStateError("Canvas is already in error state.");
       return false;
     }
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- has target %p\n", this, mTarget.get());
     return true;
   }
 
@@ -1467,12 +1476,14 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
       mHeight > StaticPrefs::gfx_canvas_max_size()) {
     SetErrorState();
     aError.ThrowInvalidStateError("Canvas exceeds max size.");
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- max size\n", this);
     return false;
   }
 
   if (mWidth < 0 || mHeight < 0) {
     SetErrorState();
     aError.ThrowInvalidStateError("Canvas has invalid size.");
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- bad size\n", this);
     return false;
   }
 
@@ -1506,6 +1517,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
 
   // Attempt to reuse the existing buffer provider.
   if (BorrowTarget(persistedRect, !canDiscardContent)) {
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- borrowed target %p\n", this, mTarget.get());
     return true;
   }
 
@@ -1520,6 +1532,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
         << "Failed borrow shared and basic targets.";
 
     SetErrorState();
+    printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- no provider\n", this);
     return false;
   }
 
@@ -1568,6 +1581,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
   Redraw();
   mFrameCaptureState = captureState;
 
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::EnsureTarget -- created target %p\n", this, mTarget.get());
   return true;
 }
 
@@ -1589,6 +1603,7 @@ void CanvasRenderingContext2D::SetInitialState() {
 }
 
 void CanvasRenderingContext2D::SetErrorState() {
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::SetErrorState\n", this);
   EnsureErrorTarget();
 
   if (mTarget && mTarget != sErrorTarget.get()) {
@@ -1830,6 +1845,7 @@ void CanvasRenderingContext2D::RemoveAssociatedMemory() {
 void CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight) {
   // Only free the buffer provider if the size no longer matches.
   bool freeBuffer = aWidth != mWidth || aHeight != mHeight;
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::ClearTarget -- width %d height %d target %p provider %p\n", this, aWidth, aHeight, mTarget.get(), mBufferProvider.get());
   ResetBitmap(freeBuffer);
 
   mResetLayer = true;
@@ -1873,6 +1889,7 @@ void CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight) {
 }
 
 void CanvasRenderingContext2D::ReturnTarget(bool aForceReset) {
+  printf_stderr("[AO] [%p] CanvasRenderingContext2D::ReturnTarget -- target %p provider %p\n", this, mTarget.get(), mBufferProvider.get());
   if (mTarget && mBufferProvider && mTarget != sErrorTarget.get()) {
     CurrentState().transform = mTarget->GetTransform();
     if (aForceReset || !mBufferProvider->PreservesDrawingState()) {
