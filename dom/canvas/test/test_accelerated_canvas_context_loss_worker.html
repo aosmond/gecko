@@ -1,0 +1,186 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Check for contextlost/restored events after GPU process restart</title>
+  <script src="/tests/SimpleTest/SimpleTest.js"></script>
+  <link rel="stylesheet" href="/tests/SimpleTest/test.css">
+</head>
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+
+<script id="worker" type="javascript/worker">
+
+const canvas = new OffscreenCanvas(512, 512);
+const context = canvas.getContext("2d");
+
+let restartedPromiseResolve;
+let restartedPromiseReject;
+
+const restartedPromise = new Promise((resolve, reject) => {
+  restartedPromiseResolve = resolve;
+  restartedPromiseReject = reject;
+});
+
+let restoredPromiseResolve;
+let restoredPromiseReject;
+
+const restoredPromise = new Promise((resolve, reject) => {
+  restoredPromiseResolve = resolve;
+  restoredPromiseReject = reject;
+});
+
+let countLostEvents = 0;
+let countRestoredEvents = 0;
+
+function onContextLost() {
+  ok(context.isContextLost(), "Canvas context should be lost during contextlost event");
+  countLostEvents += 1;
+}
+
+function onContextRestored() {
+  ok(!context.isContextLost(), "Canvas context should not be lost during contextrestored event");
+  countRestoredEvents += 1;
+
+  restoredPromiseResolve(true);
+}
+
+function waitRAF() {
+  return new Promise((resolve, reject) => {
+    requestAnimationFrame(resolve);
+  });
+}
+
+function waitContextRestored() {
+  let timeoutId = setTimeout(restoredPromiseReject, 5000);
+  return restoredPromise.then(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
+function ok(cond, msg) {
+  postMessage({ name: "ok", cond, msg });
+}
+
+function is(got, expected, msg) {
+  postMessage({ name: "is", got, expected, msg });
+}
+
+function restartGPUProcess() {
+  postMessage({ name: "restartGpu" });
+  let timeoutId = setTimeout(restartedPromiseReject, 5000);
+  return restartedPromise.then((restarted) => {
+    clearTimeout(timeoutId);
+    return restarted;
+  });
+}
+
+async function start() {
+  try {
+    canvas.addEventListener("contextlost", onContextLost);
+    canvas.addEventListener("contextrestored", onContextRestored);
+
+    ok(!context.isContextLost(), "Canvas context should not be lost before initial fill");
+
+    context.fillStyle = 'red';
+    context.fill();
+    await waitRAF();
+
+    ok(!context.isContextLost(), "Canvas context should not be lost after initial fill");
+
+    const restarted = await restartGPUProcess();
+    const expectedEvents = restarted ? 1 : 0;
+
+    if (expectedEvents) {
+      await waitContextRestored();
+    }
+    await waitRAF();
+
+    is(countLostEvents, expectedEvents, "Should have fired " + expectedEvents + " contextlost events");
+    is(countRestoredEvents, expectedEvents, "Should have fired " + expectedEvents + " contextrestored events");
+    ok(!context.isContextLost(), "Canvas context should not be lost after restoration");
+
+    context.fillStyle = 'green';
+    context.fill();
+    await waitRAF();
+
+    ok(!context.isContextLost(), "Canvas context should not be lost at completion");
+  } catch (err) {
+    ok(false, "Caught exception " + err);
+  } finally {
+    postMessage({ name: "finish" });
+  }
+}
+
+self.onmessage = async function(evt) {
+  const name = evt.data.name;
+  if (name === "start") {
+    start();
+  } else if (name === "restartedGpu") {
+    restartedPromiseResolve(evt.data.value);
+  } else {
+    ok(false, "Unhandled event " + name);
+  }
+};
+
+</script>
+
+<script type="application/javascript">
+
+async function restartGPUProcess() {
+  return await SpecialPowers.spawnChrome([], async () => {
+    const gfxInfo = Cc["@mozilla.org/gfx/info;1"].getService(Ci.nsIGfxInfo);
+
+    if (gfxInfo.usingGPUProcess) {
+      const { TestUtils } = ChromeUtils.importESModule(
+        "resource://testing-common/TestUtils.sys.mjs"
+      );
+      let promise = TestUtils.topicObserved("compositor-reinitialized");
+
+      const remoteCanvas = gfxInfo.usingRemoteCanvas;
+      const acceleratedCanvas = gfxInfo.usingAcceleratedCanvas;
+      ok(true, "Restarting GPU process, remote canvas " + remoteCanvas + ", accelerated canvas " + acceleratedCanvas);
+
+      gfxInfo.killGPUProcessForTests();
+      await promise;
+
+      return remoteCanvas || acceleratedCanvas;
+    }
+
+    ok(true, "Not using GPU process");
+    return false;
+  });
+}
+
+function start() {
+  const blob = new Blob([document.querySelector('#worker').textContent], { type: "text/javascript" })
+  const worker = new Worker(window.URL.createObjectURL(blob));
+
+  worker.onmessage = async function(evt) {
+    const name = evt.data.name;
+    if (name === "ok") {
+      ok(evt.data.cond, evt.data.msg);
+    } else if (name === "is") {
+      is(evt.data.got, evt.data.expected, evt.data.msg);
+    } else if (name === "restartGpu") {
+      const value = await restartGPUProcess();
+      worker.postMessage({ name: "restartedGpu", value });
+    } else if (name === "finish") {
+      SimpleTest.finish();
+    } else {
+      ok(false, "Unhandled event " + name);
+    }
+  }
+
+  worker.postMessage({ name: "start" });
+}
+
+SimpleTest.waitForExplicitFinish();
+SimpleTest.requestFlakyTimeout("Wait for failure condition");
+window.addEventListener("load", start);
+
+</script>
+
+</script>
+</body>
+</html>
