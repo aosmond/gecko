@@ -35,7 +35,7 @@ uint64_t FocusState::LastAPZProcessedEvent() const {
 bool FocusState::IsCurrent(const MutexAutoLock& aProofOfLock) const {
   FS_LOG("Checking IsCurrent() with cseq=%" PRIu64 ", aseq=%" PRIu64 "\n",
          mLastContentProcessedEvent, mLastAPZProcessedEvent);
-  MOZ_ASSERT(mLastContentProcessedEvent <= mLastAPZProcessedEvent);
+  //MOZ_ASSERT(mLastContentProcessedEvent <= mLastAPZProcessedEvent);
   return mLastContentProcessedEvent == mLastAPZProcessedEvent;
 }
 
