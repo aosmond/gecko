@@ -62,6 +62,8 @@ NS_IMPL_NS_NEW_HTML_ELEMENT(Canvas)
 
 namespace mozilla::dom {
 
+static LazyLogModule sCanvasElmLog("HTMLCanvasElement");
+
 class RequestedFrameRefreshObserver : public nsARefreshObserver {
   NS_INLINE_DECL_REFCOUNTING(RequestedFrameRefreshObserver, override)
 
@@ -555,6 +557,7 @@ HTMLCanvasElement::CreateContext(CanvasContextType aContextType) {
 nsresult HTMLCanvasElement::UpdateContext(
     JSContext* aCx, JS::Handle<JS::Value> aNewContextOptions,
     ErrorResult& aRvForDictionaryInit) {
+  MOZ_LOG(sCanvasElmLog, LogLevel::Debug, ("[AO] [%p] UpdateContext\n", this));
   nsresult rv = CanvasRenderingContextHelper::UpdateContext(
       aCx, aNewContextOptions, aRvForDictionaryInit);
 
@@ -615,6 +618,7 @@ void HTMLCanvasElement::OnAttrSetButNotChanged(
 
 void HTMLCanvasElement::AfterMaybeChangeAttr(int32_t aNamespaceID,
                                              nsAtom* aName, bool aNotify) {
+  MOZ_LOG(sCanvasElmLog, LogLevel::Debug, ("[AO] [%p] AfterMaybeChangeAttr\n", this));
   if (mCurrentContext && aNamespaceID == kNameSpaceID_None &&
       (aName == nsGkAtoms::width || aName == nsGkAtoms::height ||
        aName == nsGkAtoms::moz_opaque)) {
@@ -1079,6 +1083,7 @@ nsresult HTMLCanvasElement::GetContext(const nsAString& aContextId,
 already_AddRefed<nsISupports> HTMLCanvasElement::GetContext(
     JSContext* aCx, const nsAString& aContextId,
     JS::Handle<JS::Value> aContextOptions, ErrorResult& aRv) {
+  MOZ_LOG(sCanvasElmLog, LogLevel::Debug, ("[AO] [%p] GetContext\n", this));
   if (mOffscreenCanvas) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
@@ -1169,6 +1174,7 @@ void HTMLCanvasElement::FlushOffscreenCanvas() {
 
 void HTMLCanvasElement::InvalidateCanvasPlaceholder(uint32_t aWidth,
                                                     uint32_t aHeight) {
+  MOZ_LOG(sCanvasElmLog, LogLevel::Debug, ("[AO] [%p] InvalidateCanvasPlaceholder -- %d x %d\n", this, aWidth, aHeight));
   ErrorResult rv;
   SetUnsignedIntAttr(nsGkAtoms::width, aWidth, DEFAULT_CANVAS_WIDTH, rv);
   MOZ_ASSERT(!rv.Failed());
@@ -1177,6 +1183,7 @@ void HTMLCanvasElement::InvalidateCanvasPlaceholder(uint32_t aWidth,
 }
 
 void HTMLCanvasElement::InvalidateCanvasContent(const gfx::Rect* damageRect) {
+
   // Cache the current ImageContainer to avoid contention on the mutex.
   if (mOffscreenDisplay) {
     mImageContainer = mOffscreenDisplay->GetImageContainer();
@@ -1185,7 +1192,10 @@ void HTMLCanvasElement::InvalidateCanvasContent(const gfx::Rect* damageRect) {
   // We don't need to flush anything here; if there's no frame or if
   // we plan to reframe we don't need to invalidate it anyway.
   nsIFrame* frame = GetPrimaryFrame();
-  if (!frame) return;
+  if (!frame) {
+    MOZ_LOG(sCanvasElmLog, LogLevel::Debug, ("[AO] [%p] InvalidateCanvasContent -- no frame\n", this));
+    return;
+  }
 
   // When using layers-free WebRender, we cannot invalidate the layer (because
   // there isn't one). Instead, we mark the CanvasRenderer dirty and scheduling
@@ -1197,6 +1207,8 @@ void HTMLCanvasElement::InvalidateCanvasContent(const gfx::Rect* damageRect) {
   if (data) {
     renderer = data->GetCanvasRenderer();
   }
+
+  MOZ_LOG(sCanvasElmLog, LogLevel::Debug, ("[AO] [%p] InvalidateCanvasContent -- schedule paint, renderer %p\n", this, renderer));
 
   if (renderer) {
     renderer->SetDirty();

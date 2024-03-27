@@ -308,6 +308,7 @@ class nsDisplayCanvas final : public nsPaintedDisplayItem {
     renderer->FirePreTransactionCallback();
     const auto snapshot = renderer->BorrowSnapshot();
     if (!snapshot) {
+      renderer->FireDidTransactionCallback();
       return;
     }
     const auto& surface = snapshot->mSurf;

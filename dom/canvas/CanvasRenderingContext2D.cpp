@@ -154,6 +154,8 @@ using namespace mozilla::layers;
 
 namespace mozilla::dom {
 
+static mozilla::LazyLogModule sCanvasLog("Canvas2D");
+
 // Cap sigma to avoid overly large temp surfaces.
 const Float SIGMA_MAX = 100;
 
@@ -1084,9 +1086,11 @@ CanvasRenderingContext2D::CanvasRenderingContext2D(
   sNumLivingContexts.infallibleInit();
   sErrorTarget.infallibleInit();
   sNumLivingContexts.set(sNumLivingContexts.get() + 1);
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] CanvasRenderingContext2D\n", this));
 }
 
 CanvasRenderingContext2D::~CanvasRenderingContext2D() {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] ~CanvasRenderingContext2D\n", this));
   RemovePostRefreshObserver();
   RemoveShutdownObserver();
   ResetBitmap();
@@ -1096,6 +1100,13 @@ CanvasRenderingContext2D::~CanvasRenderingContext2D() {
     RefPtr<DrawTarget> target = dont_AddRef(sErrorTarget.get());
     sErrorTarget.set(nullptr);
   }
+}
+
+void CanvasRenderingContext2D::Reset() {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Reset\n", this));
+  // reset the rendering context to its default state
+  // Userland polyfill is `c2d.width = c2d.width;`
+  SetDimensions(GetWidth(), GetHeight());
 }
 
 nsresult CanvasRenderingContext2D::Initialize() {
@@ -1163,6 +1174,7 @@ Maybe<nscolor> CanvasRenderingContext2D::ParseColor(
 }
 
 void CanvasRenderingContext2D::ResetBitmap(bool aFreeBuffer) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] ResetBitmap -- freeBuffer %d, elm %p, offscreen %p\n", this, aFreeBuffer, mCanvasElement.get(), mOffscreenCanvas.get()));
   if (mCanvasElement) {
     mCanvasElement->InvalidateCanvas();
   }
@@ -1230,7 +1242,11 @@ void CanvasRenderingContext2D::RemoveShutdownObserver() {
 void CanvasRenderingContext2D::OnRemoteCanvasLost() {
   // We only lose context / data if we are using remote canvas, which is only
   // for accelerated targets.
+#if 0
   if (!mBufferProvider || !mBufferProvider->IsAccelerated() || mIsContextLost) {
+#endif
+  if (mIsContextLost) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasLost -- dropped, provider %p, contextLost %d, accelerated %d\n", this, mBufferProvider.get(), mIsContextLost, mBufferProvider ? mBufferProvider->IsAccelerated() : false));
     return;
   }
 
@@ -1238,7 +1254,9 @@ void CanvasRenderingContext2D::OnRemoteCanvasLost() {
   mIsContextLost = true;
 
   // 3. Reset the rendering context to its default state given context.
-  ResetBitmap();
+  //ClearTarget();
+
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasLost -- dispatch\n", this));
 
   NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
       "CanvasRenderingContext2D::OnRemoteCanvasLost", [self = RefPtr{this}] {
@@ -1247,14 +1265,18 @@ void CanvasRenderingContext2D::OnRemoteCanvasLost() {
         // true.
         self->mAllowContextRestore = self->DispatchEvent(
             u"contextlost"_ns, CanBubble::eNo, Cancelable::eYes);
+        MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasLost -- event sent, allowRestore %d\n", self.get(), self->mAllowContextRestore));
       }));
 }
 
 void CanvasRenderingContext2D::OnRemoteCanvasRestored() {
   // We never lost our context if it was not a remote canvas.
   if (!mIsContextLost) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasRestored -- dropped, provider %p, contextLost %d, accelerated %d\n", this, mBufferProvider.get(), mIsContextLost, mBufferProvider ? mBufferProvider->IsAccelerated() : false));
     return;
   }
+
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasRestored -- dispatch\n", this));
 
   NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
       "CanvasRenderingContext2D::OnRemoteCanvasRestored",
@@ -1262,11 +1284,22 @@ void CanvasRenderingContext2D::OnRemoteCanvasRestored() {
         if (self->mIsContextLost && self->mAllowContextRestore) {
           // 7. Set context's context lost to false.
           self->mIsContextLost = false;
+          self->ClearTarget();
+          self->ResetBitmap(false);
 
           // 8. Fire an event named contextrestored at canvas.
           self->DispatchEvent(u"contextrestored"_ns, CanBubble::eNo,
                               Cancelable::eNo);
-        }
+          MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasRestored -- event sent\n", self.get()));
+        } else if (self->mIsContextLost) {
+          self->mIsContextLost = false;
+          self->ClearTarget();
+          self->SetErrorState();
+          MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasRestored -- event dropped, set error state\n", self.get()));
+
+        } else {
+          MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] OnRemoteCanvasRestored -- event dropped, contextLost %d, allowRestore %d\n", self.get(), self->mIsContextLost, self->mAllowContextRestore));
+	}
       }));
 }
 
@@ -1317,15 +1350,18 @@ nsresult CanvasRenderingContext2D::Redraw() {
   mFrameCaptureState = FrameCaptureState::DIRTY;
 
   if (mIsEntireFrameInvalid) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Redraw -- already invalid\n", this));
     return NS_OK;
   }
 
   mIsEntireFrameInvalid = true;
 
   if (mCanvasElement) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Redraw -- invalidate elm\n", this));
     SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
     mCanvasElement->InvalidateCanvasContent(nullptr);
   } else if (mOffscreenCanvas) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Redraw -- invalidate offscreen\n", this));
     mOffscreenCanvas->QueueCommitToCompositor();
   } else {
     NS_ASSERTION(mDocShell, "Redraw with no canvas element or docshell!");
@@ -1335,11 +1371,14 @@ nsresult CanvasRenderingContext2D::Redraw() {
 }
 
 void CanvasRenderingContext2D::Redraw(const gfx::Rect& aR) {
+  Redraw();
+#if 0
   mFrameCaptureState = FrameCaptureState::DIRTY;
 
   ++mInvalidateCount;
 
   if (mIsEntireFrameInvalid) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Redraw -- already invalid\n", this));
     return;
   }
 
@@ -1349,13 +1388,16 @@ void CanvasRenderingContext2D::Redraw(const gfx::Rect& aR) {
   }
 
   if (mCanvasElement) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Redraw -- invalidate elm\n", this));
     SVGObserverUtils::InvalidateDirectRenderingObservers(mCanvasElement);
     mCanvasElement->InvalidateCanvasContent(&aR);
   } else if (mOffscreenCanvas) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Redraw -- invalidate offscreen\n", this));
     mOffscreenCanvas->QueueCommitToCompositor();
   } else {
     NS_ASSERTION(mDocShell, "Redraw with no canvas element or docshell!");
   }
+#endif
 }
 
 void CanvasRenderingContext2D::DidRefresh() {}
@@ -1462,6 +1504,7 @@ bool CanvasRenderingContext2D::BorrowTarget(const IntRect& aPersistedRect,
     }
     return false;
   }
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] BorrowTarget -- buffer needs clear %d, needs clear %d\n", this, mBufferNeedsClear, aNeedsClear));
   if (mBufferNeedsClear) {
     if (mBufferProvider->PreservesDrawingState()) {
       // If the buffer provider preserves the clip and transform state, then
@@ -1490,24 +1533,27 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
                                             const gfx::Rect* aCoveredRect,
                                             bool aWillClear) {
   if (AlreadyShutDown()) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- shutdown\n", this));
     gfxCriticalNoteOnce << "Attempt to render into a Canvas2d after shutdown.";
     SetErrorState();
     aError.ThrowInvalidStateError(
         "Cannot use canvas after shutdown initiated.");
     return false;
   }
-
   if (mIsContextLost) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- lost context\n", this));
+#if 0
     aError.ThrowInvalidStateError(
         "Cannot use canvas unless lost context is restored.");
+#endif
     return false;
   }
-
   if (mTarget) {
     if (mTarget == sErrorTarget.get()) {
       aError.ThrowInvalidStateError("Canvas is already in error state.");
       return false;
     }
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- reuse\n", this));
     return true;
   }
 
@@ -1516,12 +1562,14 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
       mHeight > StaticPrefs::gfx_canvas_max_size()) {
     SetErrorState();
     aError.ThrowInvalidStateError("Canvas exceeds max size.");
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- max size\n", this));
     return false;
   }
 
   if (mWidth < 0 || mHeight < 0) {
     SetErrorState();
     aError.ThrowInvalidStateError("Canvas has invalid size.");
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- bad size\n", this));
     return false;
   }
 
@@ -1555,6 +1603,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
 
   // Attempt to reuse the existing buffer provider.
   if (BorrowTarget(persistedRect, !canDiscardContent)) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- borrowed\n", this));
     return true;
   }
 
@@ -1569,6 +1618,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
         << "Failed borrow shared and basic targets.";
 
     SetErrorState();
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- no provider\n", this));
     return false;
   }
 
@@ -1617,6 +1667,7 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
   Redraw();
   mFrameCaptureState = captureState;
 
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] EnsureTarget -- got new\n", this));
   return true;
 }
 
@@ -1686,6 +1737,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
     // Only allow accelerated contexts to be created in a content process to
     // ensure it is remoted appropriately and run on the correct parent or
     // GPU process threads.
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryAcceleratedTarget -- not content\n", this));
     return false;
   }
   if (mBufferProvider && mBufferProvider->IsAccelerated() &&
@@ -1697,6 +1749,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
   // Don't try creating an accelerate DrawTarget if either acceleration failed
   // previously or if the application expects acceleration to be slow.
   if (!mAllowAcceleration || GetEffectiveWillReadFrequently()) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryAcceleratedTarget -- not allowed %d\n", this, !mAllowAcceleration));
     return false;
   }
 
@@ -1705,6 +1758,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
 
     WindowRenderer* renderer = WindowRendererFromCanvasElement(mCanvasElement);
     if (NS_WARN_IF(!renderer)) {
+      MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryAcceleratedTarget -- no renderer\n", this));
       return false;
     }
 
@@ -1714,6 +1768,7 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
              StaticPrefs::gfx_canvas_remote_allow_offscreen()) {
     RefPtr<ImageBridgeChild> imageBridge = ImageBridgeChild::GetSingleton();
     if (NS_WARN_IF(!imageBridge)) {
+      MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryAcceleratedTarget -- no imageBridge\n", this));
       return false;
     }
 
@@ -1722,10 +1777,12 @@ bool CanvasRenderingContext2D::TryAcceleratedTarget(
   }
 
   if (!aOutProvider) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryAcceleratedTarget -- create failed\n", this));
     return false;
   }
   aOutDT = aOutProvider->BorrowDrawTarget(IntRect());
   MOZ_ASSERT(aOutDT);
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryAcceleratedTarget -- got dt %p\n", this, aOutDT.get()));
   return !!aOutDT;
 }
 
@@ -1740,28 +1797,34 @@ bool CanvasRenderingContext2D::TrySharedTarget(
     // one because the current one failed so let's just fall back to the basic
     // provider.
     mClipsNeedConverting = true;
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TrySharedTarget -- used shared before\n", this));
     return false;
   }
 
   if (mCanvasElement) {
     MOZ_ASSERT(NS_IsMainThread());
 
+#if 0
     WindowRenderer* renderer = WindowRendererFromCanvasElement(mCanvasElement);
     if (NS_WARN_IF(!renderer)) {
+      MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TrySharedTarget -- no renderer\n", this));
       return false;
     }
 
     aOutProvider = renderer->CreatePersistentBufferProvider(
         GetSize(), GetSurfaceFormat(),
         !mAllowAcceleration || GetEffectiveWillReadFrequently());
+#endif
   } else if (mOffscreenCanvas) {
     if (!StaticPrefs::gfx_offscreencanvas_shared_provider()) {
+      MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TrySharedTarget -- disabled\n", this));
       return false;
     }
 
     RefPtr<layers::ImageBridgeChild> imageBridge =
         layers::ImageBridgeChild::GetSingleton();
     if (NS_WARN_IF(!imageBridge)) {
+      MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TrySharedTarget -- no imageBridge\n", this));
       return false;
     }
 
@@ -1772,6 +1835,7 @@ bool CanvasRenderingContext2D::TrySharedTarget(
   }
 
   if (!aOutProvider) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TrySharedTarget -- create failed\n", this));
     return false;
   }
 
@@ -1780,6 +1844,7 @@ bool CanvasRenderingContext2D::TrySharedTarget(
   aOutDT = aOutProvider->BorrowDrawTarget(IntRect());
   MOZ_ASSERT(aOutDT);
 
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TrySharedTarget -- got dt %p\n", this, aOutDT.get()));
   return !!aOutDT;
 }
 
@@ -1791,6 +1856,7 @@ bool CanvasRenderingContext2D::TryBasicTarget(
       GetSize(), GetSurfaceFormat());
   if (!aOutDT) {
     aError.ThrowInvalidStateError("Canvas could not create basic draw target.");
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryBasicTarget -- create failed\n", this));
     return false;
   }
 
@@ -1800,26 +1866,36 @@ bool CanvasRenderingContext2D::TryBasicTarget(
   if (!aOutDT->IsValid()) {
     aOutDT = nullptr;
     aError.ThrowInvalidStateError("Canvas could not init basic draw target.");
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryBasicTarget -- invalid\n", this));
     return false;
   }
 
   aOutProvider = new PersistentBufferProviderBasic(aOutDT);
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] TryBasicTarget -- got dt %p\n", this, aOutDT.get()));
   return true;
 }
 
 PersistentBufferProvider* CanvasRenderingContext2D::GetBufferProvider() {
+  if (mIsContextLost) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetBufferProvider -- context lost\n", this));
+    return nullptr;
+  }
   if (mBufferProvider && mBufferNeedsClear) {
     // Force the buffer to clear before it is used.
     EnsureTarget();
   }
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetBufferProvider -- provider %p\n", this, mBufferProvider.get()));
   return mBufferProvider;
 }
 
 Maybe<SurfaceDescriptor> CanvasRenderingContext2D::GetFrontBuffer(
     WebGLFramebufferJS*, const bool webvr) {
   if (auto* provider = GetBufferProvider()) {
-    return provider->GetFrontBuffer();
+    Maybe<SurfaceDescriptor> desc = provider->GetFrontBuffer();
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetFrontBuffer -- desc %d\n", this, desc.isSome()));
+    return desc;
   }
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetFrontBuffer -- no provider\n", this));
   return Nothing();
 }
 
@@ -1844,6 +1920,7 @@ PresShell* CanvasRenderingContext2D::GetPresShell() {
 
 NS_IMETHODIMP
 CanvasRenderingContext2D::SetDimensions(int32_t aWidth, int32_t aHeight) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetDimensions -- %d x %d\n", this, aWidth, aHeight));
   // Zero sized surfaces can cause problems.
   mZero = false;
   if (aHeight == 0) {
@@ -1943,6 +2020,7 @@ void CanvasRenderingContext2D::ReturnTarget(bool aForceReset) {
       mTarget->SetTransform(Matrix());
     }
 
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] ReturnTarget -- returned\n", this));
     mBufferProvider->ReturnDrawTarget(mTarget.forget());
   }
 }
@@ -1978,7 +2056,9 @@ void CanvasRenderingContext2D::SetOpaqueValueFromOpaqueAttr(
 }
 
 void CanvasRenderingContext2D::UpdateIsOpaque() {
-  mOpaque = !mContextAttributesHasAlpha || mOpaqueAttrValue;
+  bool wasOpaque = mOpaque;
+  //mOpaque = !mContextAttributesHasAlpha || mOpaqueAttrValue;
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] UpdateIsOpaque -- opaque %d -> %d\n", this, wasOpaque, mOpaque));
   ClearTarget();
 }
 
@@ -1987,6 +2067,7 @@ CanvasRenderingContext2D::SetContextOptions(JSContext* aCx,
                                             JS::Handle<JS::Value> aOptions,
                                             ErrorResult& aRvForDictionaryInit) {
   if (aOptions.isNullOrUndefined()) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetContextOptions -- null\n", this));
     return NS_OK;
   }
 
@@ -2003,6 +2084,7 @@ CanvasRenderingContext2D::SetContextOptions(JSContext* aCx,
   mWillReadFrequently = attributes.mWillReadFrequently;
 
   mContextAttributesHasAlpha = attributes.mAlpha;
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetContextOptions -- read freq %d alpha %d\n", this, mWillReadFrequently, mContextAttributesHasAlpha));
   UpdateIsOpaque();
 
   return NS_OK;
@@ -2067,6 +2149,21 @@ CanvasRenderingContext2D::GetInputStream(const char* aMimeType,
 already_AddRefed<mozilla::gfx::SourceSurface>
 CanvasRenderingContext2D::GetOptimizedSnapshot(DrawTarget* aTarget,
                                                gfxAlphaType* aOutAlphaType) {
+  if (mIsContextLost) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetOptimizedSnapshot -- context lost\n", this));
+    return nullptr;
+  }
+
+  if (mTarget && mTarget == sErrorTarget.get()) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetOptimizedSnapshot -- error target\n", this));
+    return mTarget->Snapshot();
+  }
+
+  if (!mBufferProvider) {
+    MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetOptimizedSnapshot -- no buffer provider\n", this));
+    return nullptr;
+  }
+
   if (aOutAlphaType) {
     *aOutAlphaType = (mOpaque ? gfxAlphaType::Opaque : gfxAlphaType::Premult);
   }
@@ -2087,6 +2184,7 @@ CanvasRenderingContext2D::GetOptimizedSnapshot(DrawTarget* aTarget,
   RefPtr<SourceSurface> snapshot = mBufferProvider->BorrowSnapshot(aTarget);
   RefPtr<SourceSurface> retSurface = snapshot;
   mBufferProvider->ReturnSnapshot(snapshot.forget());
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetOptimizedSnapshot -- surface %p\n", this, snapshot.get()));
   return retSurface.forget();
 }
 
@@ -3039,6 +3137,7 @@ void CanvasRenderingContext2D::ClearRect(double aX, double aY, double aW,
 
 void CanvasRenderingContext2D::FillRect(double aX, double aY, double aW,
                                         double aH) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] FillRect -- draw\n", this));
   mFeatureUsage |= CanvasFeatureUsage::FillRect;
 
   if (!ValidateRect(aX, aY, aW, aH, true)) {
@@ -3125,6 +3224,7 @@ void CanvasRenderingContext2D::FillRect(double aX, double aY, double aW,
 
 void CanvasRenderingContext2D::StrokeRect(double aX, double aY, double aW,
                                           double aH) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] StrokeRect -- draw\n", this));
   if (!aW && !aH) {
     return;
   }
@@ -3256,6 +3356,7 @@ void CanvasRenderingContext2D::FillImpl(const gfx::Path& aPath) {
 }
 
 void CanvasRenderingContext2D::Fill(const CanvasWindingRule& aWinding) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Fill -- draw\n", this));
   EnsureUserSpacePath(aWinding);
   if (!IsTargetValid()) {
     return;
@@ -3268,6 +3369,7 @@ void CanvasRenderingContext2D::Fill(const CanvasWindingRule& aWinding) {
 
 void CanvasRenderingContext2D::Fill(const CanvasPath& aPath,
                                     const CanvasWindingRule& aWinding) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Fill -- draw\n", this));
   EnsureTarget();
   if (!IsTargetValid()) {
     return;
@@ -3317,6 +3419,7 @@ void CanvasRenderingContext2D::StrokeImpl(const gfx::Path& aPath) {
 }
 
 void CanvasRenderingContext2D::Stroke() {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Stroke -- draw\n", this));
   mFeatureUsage |= CanvasFeatureUsage::Stroke;
 
   EnsureUserSpacePath();
@@ -3330,6 +3433,7 @@ void CanvasRenderingContext2D::Stroke() {
 }
 
 void CanvasRenderingContext2D::Stroke(const CanvasPath& aPath) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Stroke -- draw\n", this));
   EnsureTarget();
   if (!IsTargetValid()) {
     return;
@@ -3409,6 +3513,7 @@ bool CanvasRenderingContext2D::DrawCustomFocusRing(Element& aElement) {
 }
 
 void CanvasRenderingContext2D::Clip(const CanvasWindingRule& aWinding) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Clip -- draw\n", this));
   EnsureUserSpacePath(aWinding);
 
   if (!mPath) {
@@ -3421,6 +3526,7 @@ void CanvasRenderingContext2D::Clip(const CanvasWindingRule& aWinding) {
 
 void CanvasRenderingContext2D::Clip(const CanvasPath& aPath,
                                     const CanvasWindingRule& aWinding) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Clip -- draw\n", this));
   EnsureTarget();
   if (!IsTargetValid()) {
     return;
@@ -3439,6 +3545,7 @@ void CanvasRenderingContext2D::Clip(const CanvasPath& aPath,
 void CanvasRenderingContext2D::ArcTo(double aX1, double aY1, double aX2,
                                      double aY2, double aRadius,
                                      ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] ArcTo -- draw\n", this));
   if (aRadius < 0) {
     return aError.ThrowIndexSizeError("Negative radius");
   }
@@ -3507,6 +3614,7 @@ void CanvasRenderingContext2D::ArcTo(double aX1, double aY1, double aX2,
 void CanvasRenderingContext2D::Arc(double aX, double aY, double aR,
                                    double aStartAngle, double aEndAngle,
                                    bool aAnticlockwise, ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Arc -- draw\n", this));
   if (aR < 0.0) {
     return aError.ThrowIndexSizeError("Negative radius");
   }
@@ -3721,6 +3829,7 @@ void CanvasRenderingContext2D::RoundRect(
     const UnrestrictedDoubleOrDOMPointInitOrUnrestrictedDoubleOrDOMPointInitSequence&
         aRadii,
     ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] RoundRect -- draw\n", this));
   EnsureWritablePath();
 
   PathBuilder* builder = mPathBuilder;
@@ -3735,6 +3844,7 @@ void CanvasRenderingContext2D::Ellipse(double aX, double aY, double aRadiusX,
                                        double aStartAngle, double aEndAngle,
                                        bool aAnticlockwise,
                                        ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] Ellipse -- draw\n", this));
   if (aRadiusX < 0.0 || aRadiusY < 0.0) {
     return aError.ThrowIndexSizeError("Negative radius");
   }
@@ -3838,6 +3948,7 @@ void CanvasRenderingContext2D::TransformCurrentPath(const Matrix& aTransform) {
 
 void CanvasRenderingContext2D::SetFont(const nsACString& aFont,
                                        ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetFont -- draw\n", this));
   mFeatureUsage |= CanvasFeatureUsage::SetFont;
 
   SetFontInternal(aFont, aError);
@@ -4243,6 +4354,7 @@ void CanvasRenderingContext2D::FillText(const nsAString& aText, double aX,
                                         double aY,
                                         const Optional<double>& aMaxWidth,
                                         ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] FillText -- draw\n", this));
   // We try to match the most commonly observed strings used by canvas
   // fingerprinting scripts. We do a prefix match, because that means having to
   // match fewer bytes and sometimes the strings is followed by a few random
@@ -4274,6 +4386,7 @@ void CanvasRenderingContext2D::StrokeText(const nsAString& aText, double aX,
                                           double aY,
                                           const Optional<double>& aMaxWidth,
                                           ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] StrokeText -- draw\n", this));
   DebugOnly<UniquePtr<TextMetrics>> metrics = DrawOrMeasureText(
       aText, aX, aY, aMaxWidth, TextDrawOperation::STROKE, aError);
   MOZ_ASSERT(
@@ -4282,6 +4395,7 @@ void CanvasRenderingContext2D::StrokeText(const nsAString& aText, double aX,
 
 UniquePtr<TextMetrics> CanvasRenderingContext2D::MeasureText(
     const nsAString& aRawText, ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] MeasureText -- draw\n", this));
   Optional<double> maxWidth;
   return DrawOrMeasureText(aRawText, 0, 0, maxWidth, TextDrawOperation::MEASURE,
                            aError);
@@ -5036,6 +5150,7 @@ gfxFontGroup* CanvasRenderingContext2D::GetCurrentFontStyle() {
 
 void CanvasRenderingContext2D::SetLineDash(const Sequence<double>& aSegments,
                                            ErrorResult& aRv) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetLineDash -- draw\n", this));
   nsTArray<mozilla::gfx::Float> dash;
 
   for (uint32_t x = 0; x < aSegments.Length(); x++) {
@@ -5073,6 +5188,7 @@ void CanvasRenderingContext2D::GetLineDash(nsTArray<double>& aSegments) const {
 }
 
 void CanvasRenderingContext2D::SetLineDashOffset(double aOffset) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetLineDashOffset -- draw\n", this));
   CurrentState().dashOffset = aOffset;
 }
 
@@ -5345,6 +5461,7 @@ void CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
                                          double aDw, double aDh,
                                          uint8_t aOptional_argc,
                                          ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] DrawImage -- draw\n", this));
   MOZ_ASSERT(aOptional_argc == 0 || aOptional_argc == 2 || aOptional_argc == 6);
 
   if (!ValidateRect(aDx, aDy, aDw, aDh, true)) {
@@ -5699,6 +5816,7 @@ void CanvasRenderingContext2D::DrawDirectlyToCanvas(
 
 void CanvasRenderingContext2D::SetGlobalCompositeOperation(
     const nsAString& aOp, ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] SetGlobalCompositeOperation -- draw\n", this));
   CompositionOp comp_op;
 
 #define CANVAS_OP_TO_GFX_OP(cvsop, op2d) \
@@ -5959,6 +6077,7 @@ void CanvasRenderingContext2D::DrawWindow(nsGlobalWindowInner& aWindow,
 already_AddRefed<ImageData> CanvasRenderingContext2D::GetImageData(
     JSContext* aCx, int32_t aSx, int32_t aSy, int32_t aSw, int32_t aSh,
     nsIPrincipal& aSubjectPrincipal, ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetImageData -- draw\n", this));
   if (!mCanvasElement && !mDocShell && !mOffscreenCanvas) {
     NS_ERROR("No canvas element and no docshell in GetImageData!!!");
     aError.Throw(NS_ERROR_DOM_SECURITY_ERR);
@@ -6027,6 +6146,7 @@ static IntRect ClipImageDataTransfer(IntRect& aSrc, const IntPoint& aDestOffset,
 nsresult CanvasRenderingContext2D::GetImageDataArray(
     JSContext* aCx, int32_t aX, int32_t aY, uint32_t aWidth, uint32_t aHeight,
     nsIPrincipal& aSubjectPrincipal, JSObject** aRetval) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] GetImageDataArray -- draw\n", this));
   MOZ_ASSERT(aWidth && aHeight);
 
   // Restrict the typed array length to INT32_MAX because that's all we support.
@@ -6189,6 +6309,7 @@ void CanvasRenderingContext2D::PutImageData_explicit(
     int32_t aX, int32_t aY, ImageData& aImageData, bool aHasDirtyRect,
     int32_t aDirtyX, int32_t aDirtyY, int32_t aDirtyWidth, int32_t aDirtyHeight,
     ErrorResult& aRv) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] PutImageData -- draw\n", this));
   RootedSpiderMonkeyInterface<Uint8ClampedArray> arr(RootingCx());
   if (!arr.Init(aImageData.GetDataObject())) {
     return aRv.ThrowInvalidStateError(
@@ -6360,6 +6481,7 @@ static already_AddRefed<ImageData> CreateImageData(
 
 already_AddRefed<ImageData> CanvasRenderingContext2D::CreateImageData(
     JSContext* aCx, int32_t aSw, int32_t aSh, ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] CreateImageData -- draw\n", this));
   if (!aSw || !aSh) {
     aError.ThrowIndexSizeError("Invalid width or height");
     return nullptr;
@@ -6372,6 +6494,7 @@ already_AddRefed<ImageData> CanvasRenderingContext2D::CreateImageData(
 
 already_AddRefed<ImageData> CanvasRenderingContext2D::CreateImageData(
     JSContext* aCx, ImageData& aImagedata, ErrorResult& aError) {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] CreateImageData -- draw\n", this));
   return dom::CreateImageData(aCx, this, aImagedata.Width(),
                               aImagedata.Height(), aError);
 }
@@ -6458,6 +6581,7 @@ bool CanvasRenderingContext2D::InitializeCanvasRenderer(
 }
 
 void CanvasRenderingContext2D::MarkContextClean() {
+  MOZ_LOG(sCanvasLog, LogLevel::Debug, ("[AO] [%p] MarkContextClean\n", this));
   if (mInvalidateCount > 0) {
     mPredictManyRedrawCalls = mInvalidateCount > kCanvasMaxInvalidateCount;
   }

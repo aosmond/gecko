@@ -199,6 +199,7 @@ void ShareableCanvasRenderer::UpdateCompositableClient() {
     auto tc = fnGetExistingTc(desc, lostFrontTexture);
     if (lostFrontTexture) {
       // Device reset could cause this.
+      FireDidTransactionCallback();
       return;
     }
     if (!tc) {
@@ -211,6 +212,7 @@ void ShareableCanvasRenderer::UpdateCompositableClient() {
 
     if (!tc) {
       NS_WARNING("Couldn't make TextureClient for CanvasRenderer.");
+      FireDidTransactionCallback();
       return;
     }
 

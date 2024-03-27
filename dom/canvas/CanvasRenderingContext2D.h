@@ -113,11 +113,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   void Save();
   void Restore();
 
-  void Reset() {
-    // reset the rendering context to its default state
-    // Userland polyfill is `c2d.width = c2d.width;`
-    SetDimensions(GetWidth(), GetHeight());
-  }
+  void Reset();
 
   void Scale(double aX, double aY, mozilla::ErrorResult& aError);
   void Rotate(double aAngle, mozilla::ErrorResult& aError);
@@ -766,7 +762,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
    * Check if the target is valid after calling EnsureTarget.
    */
   bool IsTargetValid() const {
-    return !!mTarget && mTarget != sErrorTarget.get();
+    return !!mTarget && mTarget != sErrorTarget.get() && !mIsContextLost;
   }
 
   /**
