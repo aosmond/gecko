@@ -1238,7 +1238,7 @@ void CanvasRenderingContext2D::OnRemoteCanvasLost() {
   mIsContextLost = true;
 
   // 3. Reset the rendering context to its default state given context.
-  ResetBitmap();
+  ClearTarget();
 
   NS_DispatchToCurrentThread(NS_NewCancelableRunnableFunction(
       "CanvasRenderingContext2D::OnRemoteCanvasLost", [self = RefPtr{this}] {
@@ -1497,9 +1497,9 @@ bool CanvasRenderingContext2D::EnsureTarget(ErrorResult& aError,
     return false;
   }
 
+  // The spec doesn't say what to do in this case, but Chrome silently fails
+  // without throwing an error.
   if (mIsContextLost) {
-    aError.ThrowInvalidStateError(
-        "Cannot use canvas unless lost context is restored.");
     return false;
   }
 
@@ -2075,7 +2075,7 @@ CanvasRenderingContext2D::GetOptimizedSnapshot(DrawTarget* aTarget,
   // already exists, otherwise we get performance issues. See bug 1567054.
   if (!EnsureTarget()) {
     MOZ_ASSERT(
-        mTarget == sErrorTarget.get(),
+        mTarget == sErrorTarget.get() || mIsContextLost,
         "On EnsureTarget failure mTarget should be set to sErrorTarget.");
     // In rare circumstances we may have failed to create an error target.
     return mTarget ? mTarget->Snapshot() : nullptr;

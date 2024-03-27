@@ -766,7 +766,7 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
    * Check if the target is valid after calling EnsureTarget.
    */
   bool IsTargetValid() const {
-    return !!mTarget && mTarget != sErrorTarget.get();
+    return !!mTarget && mTarget != sErrorTarget.get() && !mIsContextLost;
   }
 
   /**

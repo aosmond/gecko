@@ -2163,7 +2163,7 @@ GfxInfoBase::GetUsingGPUProcess(bool* aOutValue) {
 
 NS_IMETHODIMP
 GfxInfoBase::GetUsingRemoteCanvas(bool* aOutValue) {
-  *aOutValue = gfxPlatform::UseRemoteCanvas();
+  *aOutValue = gfx::gfxVars::RemoteCanvasEnabled();
   return NS_OK;
 }
 
