@@ -352,6 +352,21 @@ const GfxDeviceFamily* GfxDriverInfo::GetDeviceFamily(DeviceFamily id) {
       APPEND_DEVICE(0x591C);
       APPEND_DEVICE(0x87C0);
       break;
+    case DeviceFamily::IntelTigerLake:
+      // gt1
+      APPEND_DEVICE(0x9a60);
+      APPEND_DEVICE(0x9a68);
+      APPEND_DEVICE(0x9a70);
+      // gt2
+      APPEND_DEVICE(0x9a40);
+      APPEND_DEVICE(0x9a49);
+      APPEND_DEVICE(0x9a59);
+      APPEND_DEVICE(0x9a78);
+      APPEND_DEVICE(0x9ac0);
+      APPEND_DEVICE(0x9ac9);
+      APPEND_DEVICE(0x9ad9);
+      APPEND_DEVICE(0x9af8);
+      break;
     case DeviceFamily::IntelHD520:
       APPEND_DEVICE(0x1916);
       break;
@@ -649,6 +664,7 @@ const nsAString& GfxDriverInfo::GetDeviceVendor(DeviceFamily id) {
     case DeviceFamily::IntelGen7Baytrail:
     case DeviceFamily::IntelSkylake:
     case DeviceFamily::IntelKabyLake:
+    case DeviceFamily::IntelTigerLake:
     case DeviceFamily::IntelHD520:
     case DeviceFamily::IntelMobileHDGraphics:
     case DeviceFamily::IntelWebRenderBlocked:

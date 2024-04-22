@@ -179,6 +179,7 @@ enum class DeviceFamily : uint8_t {
   IntelGen7Baytrail,
   IntelSkylake,
   IntelKabyLake,
+  IntelTigerLake,
   IntelHD520,
   IntelMobileHDGraphics,
   NvidiaBlockD3D9Layers,
