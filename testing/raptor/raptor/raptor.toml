@@ -35,6 +35,8 @@
 
 ["include:tests/benchmarks/unity-webgl-mobile.toml"]
 
+["include:tests/benchmarks/video-playback-latency.toml"]
+
 ["include:tests/benchmarks/wasm-godot-baseline.toml"]
 
 ["include:tests/benchmarks/wasm-godot-optimizing.toml"]
