@@ -47,7 +47,7 @@ job-defaults:
                             - linux64-custom-car
                             - linux64-minidump-stackwalk
                             - linux64-fix-stacks
-                        windows10-64.*:
+                        windows.*-64.*:
                             - win64-custom-car
                             - win64-minidump-stackwalk
                             - win64-fix-stacks
@@ -65,12 +65,15 @@ job-defaults:
                         windows.*-32.*.:
                             - win32-minidump-stackwalk
                             - win32-fix-stacks
-                        windows10-64.*:
+                        windows.*-64.*:
                             - win64-minidump-stackwalk
                             - win64-fix-stacks
-                        macos.*:
+                        macosx1015.*:
                             - macosx64-minidump-stackwalk
                             - macosx64-fix-stacks
+                        macosx1400.*:
+                            - macosx64-aarch64-minidump-stackwalk
+                            - macosx64-aarch64-fix-stacks
                         default:
                             - linux64-minidump-stackwalk
                             - linux64-fix-stacks
@@ -863,6 +866,30 @@ browsertime-pageload-benchmark:
     run-on-projects: []
     tier: 2
     treeherder-symbol: Btime(tp6-bench)
+
+browsertime-video-playback-latency:
+    <<: *tp6-defaults
+    raptor:
+        apps: [firefox, chrome, safari]
+        test: video-playback-latency
+        run-visual-metrics: true
+        subtests:
+            by-app:
+                safari:
+                    - h264-1080p
+                default:
+                    - av1-1080p
+                    - h264-1080p
+                    - vp9-1080p
+    description: Raptor (browsertime) Video playback latency test
+    max-run-time: 4500
+    mozharness:
+        extra-options:
+            - --chimera
+            - --extra-profiler-run
+    run-on-projects: []
+    tier: 2
+    treeherder-symbol: Btime(vpl)
 
 browsertime-speculative:
     raptor:
