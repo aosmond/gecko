@@ -864,6 +864,25 @@ browsertime-pageload-benchmark:
     tier: 2
     treeherder-symbol: Btime(tp6-bench)
 
+browsertime-video-playback-latency:
+    <<: *tp6-defaults
+    raptor:
+        apps: [firefox, chrome, safari]
+        run-visual-metrics: true
+        subtests:
+            - [video-playback-latency-av1-1080p, vpl-av1]
+            - [video-playback-latency-h264-1080p, vpl-h264]
+            - [video-playback-latency-vp9-1080p, vpl-vp9]
+    description: Raptor (browsertime) Video playback latency test
+    max-run-time: 4500
+    mozharness:
+        extra-options:
+            - --browser-cycles=5
+            - --page-cycles=5
+    run-on-projects: []
+    tier: 2
+    treeherder-symbol: Btime(vpl)
+
 browsertime-speculative:
     raptor:
         apps: [firefox]

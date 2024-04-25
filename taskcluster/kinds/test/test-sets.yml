@@ -104,6 +104,7 @@ browsertime:
     - browsertime-throttled
     - browsertime-pageload-benchmark
     - browsertime-indexeddb
+    - browsertime-video-playback-latency
 
 browsertime-clang:
     - browsertime-tp6
