@@ -46,8 +46,8 @@ user_pref('datareporting.healthreport.uploadEnabled', false);
 user_pref('toolkit.telemetry.initDelay', 99999999);
 
 // disable autoplay for raptor tests
-user_pref('media.autoplay.default', 5);
-user_pref('media.autoplay.ask-permission', true);
-user_pref('media.autoplay.blocking_policy', 1);
-user_pref('media.allowed-to-play.enabled', false);
-user_pref('media.block-autoplay-until-in-foreground', true);
+user_pref('media.autoplay.default', 0);
+user_pref('media.autoplay.ask-permission', false);
+user_pref('media.autoplay.blocking_policy', 0);
+user_pref('media.allowed-to-play.enabled', true);
+user_pref('media.block-autoplay-until-in-foreground', false);
