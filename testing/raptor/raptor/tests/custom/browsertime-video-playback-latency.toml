@@ -23,11 +23,11 @@ preferences = [
   "media.block-autoplay-until-in-foreground=false",
 ]
 
-["video-playback-latency-h264-1080p"]
+["h264-1080p"]
 test_url = "http://<host>:<port>/video-playback-latency/h264_1080p.html"
 
-["video-playback-latency-vp9-1080p"]
+["vp9-1080p"]
 test_url = "http://<host>:<port>/video-playback-latency/vp9_1080p.html"
 
-["video-playback-latency-av1-1080p"]
+["av1-1080p"]
 test_url = "http://<host>:<port>/video-playback-latency/av1_1080p.html"
