@@ -82,6 +82,7 @@ talos-profiling:
 
 talos-ref-hw:
     - talos-webgl
+    - browsertime-video-playback-latency
 
 browsertime:
     - browsertime-tp6
