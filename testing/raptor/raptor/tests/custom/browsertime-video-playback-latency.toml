@@ -30,5 +30,4 @@ test_url = "http://<host>:<port>/video-playback-latency/h264_1080p.html"
 test_url = "http://<host>:<port>/video-playback-latency/vp9_1080p.html"
 
 ["video-playback-latency-av1-1080p"]
-apps = "firefox, chrome"
 test_url = "http://<host>:<port>/video-playback-latency/av1_1080p.html"
