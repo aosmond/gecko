@@ -882,8 +882,6 @@ browsertime-video-playback-latency:
     mozharness:
         extra-options:
             - --chimera
-            - --browser-cycles=5
-            - --page-cycles=5
     run-on-projects: []
     tier: 2
     treeherder-symbol: Btime(vpl)
