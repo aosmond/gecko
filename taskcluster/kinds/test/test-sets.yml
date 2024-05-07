@@ -82,7 +82,6 @@ talos-profiling:
 
 talos-ref-hw:
     - talos-webgl
-    - browsertime-video-playback-latency
 
 browsertime:
     - browsertime-tp6
@@ -349,6 +348,7 @@ windows-talos:
     # - talos-h1 Bug 1487031 - Disabled for not finding actionable regressions
 
 windows-ref-hw-tests:
+    - browsertime-video-playback-latency
     - mochitest-media
 
 talos-xperf:
@@ -430,6 +430,7 @@ macosx64-talos:
 
 macosx1400-64-qr-tests:
     - browsertime-benchmark
+    - browsertime-video-playback-latency
 
 # Android
 

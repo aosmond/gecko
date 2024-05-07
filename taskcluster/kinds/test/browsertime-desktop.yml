@@ -47,7 +47,7 @@ job-defaults:
                             - linux64-custom-car
                             - linux64-minidump-stackwalk
                             - linux64-fix-stacks
-                        windows10-64.*:
+                        windows.*-64.*:
                             - win64-custom-car
                             - win64-minidump-stackwalk
                             - win64-fix-stacks
@@ -65,7 +65,7 @@ job-defaults:
                         windows.*-32.*.:
                             - win32-minidump-stackwalk
                             - win32-fix-stacks
-                        windows10-64.*:
+                        windows.*-64.*:
                             - win64-minidump-stackwalk
                             - win64-fix-stacks
                         macos.*:
