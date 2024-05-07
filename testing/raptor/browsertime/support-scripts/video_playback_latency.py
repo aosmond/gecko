@@ -61,7 +61,6 @@ class VideoPlaybackLatency(BasePythonSupport):
         for measurement, values in measurements.items():
             bt_result["measurements"].setdefault(measurement, []).extend(values)
 
-
     def _build_subtest(self, measurement_name, replicates, test):
         unit = test.get("unit", "ms")
         if test.get("subtest_unit"):
@@ -75,7 +74,6 @@ class VideoPlaybackLatency(BasePythonSupport):
             "replicates": replicates,
             "value": round(filters.geometric_mean(replicates), 3),
         }
-
 
     def summarize_test(self, test, suite, **kwargs):
         suite["type"] = "pageload"

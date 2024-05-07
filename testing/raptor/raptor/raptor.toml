@@ -35,8 +35,6 @@
 
 ["include:tests/benchmarks/unity-webgl-mobile.toml"]
 
-["include:tests/benchmarks/video-playback-latency.toml"]
-
 ["include:tests/benchmarks/wasm-godot-baseline.toml"]
 
 ["include:tests/benchmarks/wasm-godot-optimizing.toml"]
@@ -86,6 +84,9 @@
 
 ["include:tests/custom/browsertime-welcome.toml"]
 # First-install pageload test
+
+["include:tests/custom/browsertime-video-playback-latency.toml"]
+# Video playback latency tests
 
 ["include:tests/interactive/browsertime-responsiveness.toml"]
 # Interactive raptor-browsertime tests
