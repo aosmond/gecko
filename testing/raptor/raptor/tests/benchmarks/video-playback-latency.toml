@@ -1,5 +1,6 @@
 [DEFAULT]
 alert_threshold = 2.0
+alert_on = "firstFrame, secondFrame, lastFrame"
 gecko_profile_interval = 1
 expose_browser_profiler = true
 lower_is_better = true
@@ -7,12 +8,12 @@ newtab_per_cycle = true
 owner = ":aosmond and the Media Team"
 page_cycles = 1
 browser_cycles = 1
-page_timeout = 60000
+page_timeout = 30000
 apps = "firefox, chrome, safari"
 type = "pageload"
-cold = true
-#measure = "LastVisualChange"
-#measure = "KeyColor-Poster KeyColor-FirstFrame KeyColor-SecondFrame"
+benchmark_webserver = true
+support_class = "video_playback_latency.py"
+measure = "firstFrame, secondFrame, lastFrame"
 unit = "ms"
 preferences = [
   "media.autoplay.default=0",
@@ -23,4 +24,10 @@ preferences = [
 ]
 
 ["video-playback-latency-h264-1080p"]
-test_url = "http://localhost:8080/video-playback-latency/h264_1080p.html"
+test_url = "http://<host>:<port>/video-playback-latency/h264_1080p.html"
+
+["video-playback-latency-vp9-1080p"]
+test_url = "http://<host>:<port>/video-playback-latency/vp9_1080p.html"
+
+["video-playback-latency-av1-1080p"]
+test_url = "http://<host>:<port>/video-playback-latency/av1_1080p.html"
