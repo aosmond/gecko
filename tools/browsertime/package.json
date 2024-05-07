@@ -7,7 +7,7 @@
     "package.json": "^2.0.1"
   },
   "devDependencies": {
-    "browsertime": "https://github.com/sitespeedio/browsertime/tarball/de9cbe379e64562cb5ccdcb4e4c5a9b6390547b6"
+    "browsertime": "http://github.com/aosmond/browsertime/tarball/36deb403a6fa3cda1c0637f61836266c9f81e3c7"
   },
   "notes(private)": "We don't want to publish to npm, so this is marked as private",
   "private": true
