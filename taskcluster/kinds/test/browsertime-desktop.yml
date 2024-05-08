@@ -886,6 +886,7 @@ browsertime-video-playback-latency:
     mozharness:
         extra-options:
             - --chimera
+            - --browsertime-no-ffwindowrecorder
             - --extra-profiler-run
     run-on-projects: []
     tier: 2
