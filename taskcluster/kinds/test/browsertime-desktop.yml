@@ -68,9 +68,12 @@ job-defaults:
                         windows.*-64.*:
                             - win64-minidump-stackwalk
                             - win64-fix-stacks
-                        macos.*:
+                        macosx1015.*:
                             - macosx64-minidump-stackwalk
                             - macosx64-fix-stacks
+                        macosx1400.*:
+                            - macosx64-aarch64-minidump-stackwalk
+                            - macosx64-aarch64-fix-stacks
                         default:
                             - linux64-minidump-stackwalk
                             - linux64-fix-stacks
@@ -868,6 +871,7 @@ browsertime-video-playback-latency:
     <<: *tp6-defaults
     raptor:
         apps: [firefox, chrome, safari]
+        test: video-playback-latency
         run-visual-metrics: true
         subtests:
             by-app:
@@ -882,6 +886,7 @@ browsertime-video-playback-latency:
     mozharness:
         extra-options:
             - --chimera
+            - --extra-profiler-run
     run-on-projects: []
     tier: 2
     treeherder-symbol: Btime(vpl)
