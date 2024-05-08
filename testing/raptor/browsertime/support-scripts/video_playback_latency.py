@@ -49,14 +49,45 @@ class VideoPlaybackLatency(BasePythonSupport):
             "firstFrame": [],
             "secondFrame": [],
             "lastFrame": [],
+            "estimatedFirstFrameLatency": [],
+            "estimatedAnyFrameLatency": [],
+        }
+
+        fps = 20
+        total_duration_ms = 1000
+        frame_duration_ms = total_duration_ms / fps
+
+        offsets = {
+            "firstFrame": 0,
+            "secondFrame": frame_duration_ms,
+            "lastFrame": total_duration_ms - frame_duration_ms,
         }
 
         # Gather the key frame start times of each page/cycle
         for cycle in raw_result["visualMetrics"]:
+            measurement = {}
             for key, frames in cycle["KeyColorFrames"].items():
                 if key not in measurements or not len(frames):
                     continue
-                measurements[key].append(frames[0]["startTimestamp"])
+                measurement[key] = frames[0]["startTimestamp"]
+
+            for key in ["firstFrame", "secondFrame", "lastFrame"]:
+                if key in measurement:
+                    normalized_value = measurement[key] - offsets[key]
+                    if normalized_value > 0:
+                        measurements["estimatedFirstFrameLatency"].append(
+                            normalized_value
+                        )
+                        break
+
+            for key, value in measurement.items():
+                measurements[key].append(value)
+                if key in offsets:
+                    normalized_value = value - offsets[key]
+                    if normalized_value > 0:
+                        measurements["estimatedAnyFrameLatency"].append(
+                            normalized_value
+                        )
 
         for measurement, values in measurements.items():
             bt_result["measurements"].setdefault(measurement, []).extend(values)

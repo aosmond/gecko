@@ -1,6 +1,6 @@
 [DEFAULT]
 alert_threshold = 2.0
-alert_on = "firstFrame, secondFrame, lastFrame"
+alert_on = "estimatedFirstFrameLatency, estimatedAnyFrameLatency"
 gecko_profile_interval = 1
 expose_browser_profiler = true
 lower_is_better = true
@@ -13,7 +13,7 @@ apps = "firefox, chrome, safari"
 type = "pageload"
 benchmark_webserver = true
 support_class = "video_playback_latency.py"
-measure = "firstFrame, secondFrame, lastFrame"
+measure = "firstFrame, secondFrame, lastFrame, estimatedFirstFrameLatency, estimatedAnyFrameLatency"
 unit = "ms"
 preferences = [
   "media.autoplay.default=0",
