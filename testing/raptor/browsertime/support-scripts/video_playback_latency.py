@@ -53,12 +53,12 @@ class VideoPlaybackLatency(BasePythonSupport):
             "estimatedAnyFrameLatency": [],
         }
 
-        fps = 20
-        total_duration_ms = 1000
+        fps = 30.0
+        total_duration_ms = 1000.0
         frame_duration_ms = total_duration_ms / fps
 
         offsets = {
-            "firstFrame": 0,
+            "firstFrame": 0.0,
             "secondFrame": frame_duration_ms,
             "lastFrame": total_duration_ms - frame_duration_ms,
         }
