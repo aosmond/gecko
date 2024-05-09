@@ -62,7 +62,7 @@ class VideoPlaybackLatency(BasePythonSupport):
             "estimatedAnyFrameLatency": [],
         }
 
-        fps = 20.0
+        fps = 30.0
         total_duration_ms = 1000.0
         frame_duration_ms = total_duration_ms / fps
 
