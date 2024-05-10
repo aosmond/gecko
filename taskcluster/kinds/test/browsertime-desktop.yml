@@ -876,11 +876,11 @@ browsertime-video-playback-latency:
         subtests:
             by-app:
                 safari:
-                    - h264-1080p
+                    - vpl-h264
                 default:
-                    - av1-1080p
-                    - h264-1080p
-                    - vp9-1080p
+                    - vpl-av1
+                    - vpl-h264
+                    - vpl-vp9
     description: Raptor (browsertime) Video playback latency test
     max-run-time: 4500
     mozharness:
