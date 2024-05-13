@@ -47,8 +47,6 @@ class VideoPlaybackLatency(BasePythonSupport):
             "0.8",
             "--chrome.enableVideoAutoplay",
             "true",
-            "--videoParams.framerate",
-            "60",
         ]
 
     def handle_result(self, bt_result, raw_result, last_result=False, **kwargs):
@@ -69,7 +67,7 @@ class VideoPlaybackLatency(BasePythonSupport):
         offsets = {
             "firstFrame": 0.0,
             "posterEnd": 0.0,
-            "secondFrame": frame_duration_ms,
+            "secondFrame": frame_duration_ms * 2.0,
             "lastFrame": total_duration_ms - frame_duration_ms,
         }
 
