@@ -7,7 +7,7 @@
     "package.json": "^2.0.1"
   },
   "devDependencies": {
-    "browsertime": "http://github.com/aosmond/browsertime/tarball/023dd0b6bc3e81b1b23cd87ac1399766a07f56b7"
+    "browsertime": "http://github.com/aosmond/browsertime/tarball/40709bd9ad92b979e431096c1333cf9a9d43f0a6"
   },
   "notes(private)": "We don't want to publish to npm, so this is marked as private",
   "private": true
