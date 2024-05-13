@@ -67,7 +67,7 @@ class VideoPlaybackLatency(BasePythonSupport):
         offsets = {
             "firstFrame": 0.0,
             "posterEnd": 0.0,
-            "secondFrame": frame_duration_ms * 2.0,
+            "secondFrame": frame_duration_ms * 3.0,
             "lastFrame": total_duration_ms - frame_duration_ms,
         }
 
