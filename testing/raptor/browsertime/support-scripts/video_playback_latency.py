@@ -3,11 +3,18 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import filters
+from cmdline import DESKTOP_APPS
 from base_python_support import BasePythonSupport
 
 
 class VideoPlaybackLatency(BasePythonSupport):
     def modify_command(self, cmd, test):
+        # Because of the aspect ratio of Android during recording,
+        # most pixels are white, so we need to use a lower fraction.
+        is_android = False
+        if "--android.enabled" in cmd:
+            is_android = cmd[cmd.index("--android.enabled") + 1] == "true"
+        fraction = "0.25" if is_android else "0.7"
         cmd += [
             "--visualMetricsKeyColor",
             "poster",
@@ -17,7 +24,7 @@ class VideoPlaybackLatency(BasePythonSupport):
             "255",
             "220",
             "255",
-            "0.7",
+            fraction,
             "--visualMetricsKeyColor",
             "firstFrame",
             "220",
@@ -26,7 +33,7 @@ class VideoPlaybackLatency(BasePythonSupport):
             "60",
             "0",
             "60",
-            "0.7",
+            fraction,
             "--visualMetricsKeyColor",
             "secondFrame",
             "0",
@@ -35,7 +42,7 @@ class VideoPlaybackLatency(BasePythonSupport):
             "60",
             "220",
             "255",
-            "0.7",
+            fraction,
             "--visualMetricsKeyColor",
             "lastFrame",
             "220",
@@ -44,7 +51,7 @@ class VideoPlaybackLatency(BasePythonSupport):
             "255",
             "0",
             "128",
-            "0.7",
+            fraction,
             "--chrome.enableVideoAutoplay",
             "true",
         ]
