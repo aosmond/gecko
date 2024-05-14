@@ -432,6 +432,7 @@ macosx64-talos:
 
 macosx1400-64-qr-tests:
     - browsertime-benchmark
+    - browsertime-video-playback-latency
 
 # Android
 
@@ -501,3 +502,6 @@ android-hw-browsertime-profiling:
 android-hw-speedometer-tests:
     - browsertime-benchmark-speedometer-mobile
     - browsertime-benchmark-speedometer3-mobile
+
+browsertime-video-playback-latency:
+    - browsertime-video-playback-latency

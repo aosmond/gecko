@@ -343,6 +343,7 @@ macosx1100-64-shippable-qr/opt:
     test-sets:
         - macosx1100-64-jittests
         - macosx1100-64-qr-tests
+        - browsertime-video-playback-latency
         # - macosx64-talos
         # - browsertime-high-priority
 

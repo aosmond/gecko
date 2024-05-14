@@ -362,7 +362,7 @@ def setup_browsertime(config, tasks):
                     "macosx64-geckodriver",
                     "macosx64-node",
                 ],
-                "macosx1400.*": [
+                "macosx(1100|1400).*": [
                     "browsertime",
                     "macosx64-aarch64-geckodriver",
                     "macosx64-aarch64-node",
@@ -386,7 +386,7 @@ def setup_browsertime(config, tasks):
                 "android.*": ["linux64-ffmpeg-4.4.1"],
                 "linux.*": ["linux64-ffmpeg-4.4.1"],
                 "macosx1015.*": ["mac64-ffmpeg-4.4.1"],
-                "macosx1400.*": ["mac64-ffmpeg-4.4.1"],
+                "macosx(1100|1400).*": ["mac64-ffmpeg-4.4.1"],
                 "windows.*aarch64.*": ["win64-ffmpeg-4.4.1"],
                 "windows.*-32.*": ["win64-ffmpeg-4.4.1"],
                 "windows.*-64.*": ["win64-ffmpeg-4.4.1"],
@@ -409,7 +409,7 @@ def setup_browsertime(config, tasks):
                 "mac64-chromedriver-123",
                 "mac64-chromedriver-124",
             ],
-            "macosx1400.*": [
+            "macosx(1100|1400).*": [
                 "mac-arm-chromedriver-122",
                 "mac-arm-chromedriver-123",
                 "mac-arm-chromedriver-124",
@@ -428,7 +428,7 @@ def setup_browsertime(config, tasks):
         chromium_fetches = {
             "linux.*": ["linux64-chromiumdriver"],
             "macosx1015.*": ["mac-chromiumdriver"],
-            "macosx1400.*": ["mac-chromiumdriver-arm"],
+            "macosx(1100|1400).*": ["mac-chromiumdriver-arm"],
             "windows.*aarch64.*": ["win32-chromiumdriver"],
             "windows.*-32.*": ["win32-chromiumdriver"],
             "windows.*-64.*": ["win64-chromiumdriver"],

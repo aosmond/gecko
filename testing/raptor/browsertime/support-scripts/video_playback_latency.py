@@ -3,7 +3,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import filters
-from cmdline import DESKTOP_APPS
 from base_python_support import BasePythonSupport
 
 
