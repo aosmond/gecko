@@ -175,7 +175,7 @@ host_fetches = {
     "darwin": {
         "ffmpeg": {
             "type": "static-url",
-            "url": "https://github.com/mozilla/perf-automation/releases/download/FFMPEG-v4.4.1/ffmpeg-macos.zip",  # noqa
+            "url": "https://gist.github.com/aosmond/ba8225db717973bb9b8d6a926dd1a37e/raw/9b2175fbafb0c2af165f398275cc48e608ce0f67/ffmpeg-macos.zip",  # noqa
             # An extension to `fetch` syntax.
             "path": "ffmpeg-macos",
         },

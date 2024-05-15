@@ -29,6 +29,15 @@ mac64-ffmpeg-4.4.1:
         sha256: 9d07411bce176f56314cc5624f5df51f9cffa76a59e3e81abe2175d4ebaf87ae
         size: 49100208
 
+mac64-ffmpeg-6.1.1:
+    description: 'Mac64 ffmpeg'
+    fetch:
+        type: static-url
+        # url: https://evermeet.cx/pub/ffmpeg/
+        url: https://gist.github.com/aosmond/ba8225db717973bb9b8d6a926dd1a37e/raw/9b2175fbafb0c2af165f398275cc48e608ce0f67/ffmpeg-macos.zip
+        sha256: f8985d43fe1aa8cdddfc3ab173a469263c10d1d87426ea8502a30c69e54f9b3a
+        size: 50759520
+
 linux64-chromedriver:
     description: 'Linux64 chromedriver'
     fetch:

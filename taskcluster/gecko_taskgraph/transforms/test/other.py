@@ -386,7 +386,7 @@ def setup_browsertime(config, tasks):
                 "android.*": ["linux64-ffmpeg-4.4.1"],
                 "linux.*": ["linux64-ffmpeg-4.4.1"],
                 "macosx1015.*": ["mac64-ffmpeg-4.4.1"],
-                "macosx(1100|1400).*": ["mac64-ffmpeg-4.4.1"],
+                "macosx(1100|1400).*": ["mac64-ffmpeg-6.1.1"],
                 "windows.*aarch64.*": ["win64-ffmpeg-4.4.1"],
                 "windows.*-32.*": ["win64-ffmpeg-4.4.1"],
                 "windows.*-64.*": ["win64-ffmpeg-4.4.1"],

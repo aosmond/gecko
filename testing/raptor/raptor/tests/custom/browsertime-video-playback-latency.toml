@@ -16,6 +16,7 @@ benchmark_webserver = true
 support_class = "video_playback_latency.py"
 measure = "firstFrame, secondFrame, lastFrame, estimatedFirstFrameLatency, estimatedAnyFrameLatency"
 unit = "ms"
+verbose = true
 preferences = [
   "media.autoplay.default=0",
   "media.autoplay.ask-permission=false",
