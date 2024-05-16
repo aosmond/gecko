@@ -888,6 +888,8 @@ browsertime-video-playback-latency:
             - --chimera
             - --browsertime-no-ffwindowrecorder
             - --extra-profiler-run
+    run:
+        run-as-root: true
     run-on-projects: []
     tier: 2
     treeherder-symbol: Btime(vpl)
