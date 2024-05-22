@@ -38,6 +38,11 @@ GMPVideoHostImpl& GMPVideoEncoderChild::Host() { return mVideoHost; }
 void GMPVideoEncoderChild::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
                                    const uint8_t* aCodecSpecificInfo,
                                    uint32_t aCodecSpecificInfoLength) {
+  if (NS_WARN_IF(!mPlugin)) {
+    aEncodedFrame->Destroy();
+    return;
+  }
+
   MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
 
   auto ef = static_cast<GMPVideoEncodedFrameImpl*>(aEncodedFrame);
@@ -53,6 +58,10 @@ void GMPVideoEncoderChild::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
 }
 
 void GMPVideoEncoderChild::Error(GMPErr aError) {
+  if (NS_WARN_IF(!mPlugin)) {
+    return;
+  }
+
   MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
 
   SendError(aError);
@@ -142,6 +151,7 @@ mozilla::ipc::IPCResult GMPVideoEncoderChild::RecvSetPeriodicKeyFrames(
 }
 
 mozilla::ipc::IPCResult GMPVideoEncoderChild::RecvEncodingComplete() {
+  MOZ_ASSERT(mPlugin);
   MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
 
   if (mNeedShmemIntrCount) {
@@ -159,20 +169,34 @@ mozilla::ipc::IPCResult GMPVideoEncoderChild::RecvEncodingComplete() {
     return IPC_OK();
   }
 
-  // Ignore any return code. It is OK for this to fail without killing the
-  // process.
-  mVideoEncoder->EncodingComplete();
-
-  mVideoHost.DoneWithAPI();
-
-  mPlugin = nullptr;
-
+  ReleasePlugin();
   Unused << Send__delete__(this);
 
   return IPC_OK();
 }
 
+void GMPVideoEncoderChild::ActorDestroy(ActorDestroyReason why) {
+  ReleasePlugin();
+}
+
+void GMPVideoEncoderChild::ReleasePlugin() {
+  if (mVideoEncoder) {
+    // Ignore any return code. It is OK for this to fail without killing the
+    // process.
+    mVideoEncoder->EncodingComplete();
+    mVideoEncoder = nullptr;
+  }
+
+  mVideoHost.DoneWithAPI();
+
+  mPlugin = nullptr;
+}
+
 bool GMPVideoEncoderChild::Alloc(size_t aSize, Shmem* aMem) {
+  if (NS_WARN_IF(!mPlugin)) {
+    return false;
+  }
+
   MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
 
   bool rv;

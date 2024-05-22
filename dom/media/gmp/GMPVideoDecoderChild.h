@@ -48,6 +48,8 @@ class GMPVideoDecoderChild : public PGMPVideoDecoderChild,
  private:
   virtual ~GMPVideoDecoderChild();
 
+  void ReleasePlugin();
+
   // PGMPVideoDecoderChild
   mozilla::ipc::IPCResult RecvInitDecode(const GMPVideoCodec& aCodecSettings,
                                          nsTArray<uint8_t>&& aCodecSpecific,
@@ -59,6 +61,7 @@ class GMPVideoDecoderChild : public PGMPVideoDecoderChild,
   mozilla::ipc::IPCResult RecvReset();
   mozilla::ipc::IPCResult RecvDrain();
   mozilla::ipc::IPCResult RecvDecodingComplete();
+  void ActorDestroy(ActorDestroyReason why) override;
 
   GMPContentChild* mPlugin;
   GMPVideoDecoder* mVideoDecoder;

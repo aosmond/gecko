@@ -43,6 +43,7 @@ class GMPVideoEncoderChild : public PGMPVideoEncoderChild,
 
  private:
   virtual ~GMPVideoEncoderChild();
+  void ReleasePlugin();
 
   // PGMPVideoEncoderChild
   mozilla::ipc::IPCResult RecvInitEncode(const GMPVideoCodec& aCodecSettings,
@@ -59,6 +60,7 @@ class GMPVideoEncoderChild : public PGMPVideoEncoderChild,
                                        const uint32_t& aFrameRate);
   mozilla::ipc::IPCResult RecvSetPeriodicKeyFrames(const bool& aEnable);
   mozilla::ipc::IPCResult RecvEncodingComplete();
+  void ActorDestroy(ActorDestroyReason why) override;
 
   GMPContentChild* mPlugin;
   GMPVideoEncoder* mVideoEncoder;
