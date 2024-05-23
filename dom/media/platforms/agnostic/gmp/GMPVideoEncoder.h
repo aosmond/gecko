@@ -16,11 +16,9 @@ namespace mozilla {
 class GMPVideoEncoder final : public MediaDataEncoder,
                               public GMPVideoEncoderCallbackProxy {
  public:
-  using Config = H264Config;
-
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(GMPVideoEncoder, final);
 
-  GMPVideoEncoder(const Config& aConfig, RefPtr<TaskQueue> aTaskQueue)
+  GMPVideoEncoder(const EncoderConfig& aConfig, RefPtr<TaskQueue> aTaskQueue)
       : mConfig(aConfig),
         mTaskQueue(aTaskQueue),
         mFramesCompleted(false),
@@ -77,7 +75,7 @@ class GMPVideoEncoder final : public MediaDataEncoder,
   MozPromiseHolder<EncodePromise> mEncodePromise;
   MozPromiseHolder<EncodePromise> mDrainPromise;
 
-  const Config mConfig;
+  const EncoderConfig mConfig;
   const RefPtr<TaskQueue> mTaskQueue;
   // Access only in mTaskQueue.
   EncodedData mEncodedData;

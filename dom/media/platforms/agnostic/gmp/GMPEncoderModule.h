@@ -12,13 +12,15 @@
 namespace mozilla {
 class GMPEncoderModule final : public PlatformEncoderModule {
  public:
-  GMPEncoderModule() {}
-  virtual ~GMPEncoderModule() {}
-
-  bool SupportsMimeType(const nsACString& aMimeType) const override;
+  GMPEncoderModule() = default;
 
   already_AddRefed<MediaDataEncoder> CreateVideoEncoder(
-      const CreateEncoderParams& aParams) const override;
+      const EncoderConfig& aConfig, const RefPtr<TaskQueue>& aTaskQueue) const;
+
+  bool Supports(const EncoderConfig& aConfig) const override;
+  bool SupportsCodec(CodecType aCodecType) const override;
+
+  const char* GetName() const override { return "GMP Encoder Module"; }
 };
 
 }  // namespace mozilla

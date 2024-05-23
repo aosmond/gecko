@@ -14,18 +14,10 @@
 
 namespace mozilla {
 
-bool GMPEncoderModule::SupportsMimeType(const nsACString& aMimeType) const {
-  if (!MP4Decoder::IsH264(aMimeType)) {
-    return false;
-  }
-
-  return HaveGMPFor("encode-video"_ns, {"h264"_ns});
-}
-
 already_AddRefed<MediaDataEncoder> GMPEncoderModule::CreateVideoEncoder(
-    const CreateEncoderParams& aParams) const {
-  if (!MP4Decoder::IsH264(aParams.mConfig.mMimeType)) {
-    return nullptr;
+    const EncoderConfig& aConfig, const RefPtr<TaskQueue>& aTaskQueue) const {
+  if (!Supports(aConfig)) {
+    return false;
   }
 
   RefPtr<gmp::GeckoMediaPluginService> s(
@@ -43,6 +35,19 @@ already_AddRefed<MediaDataEncoder> GMPEncoderModule::CreateVideoEncoder(
       new GMPVideoEncoder(aParams.ToH264Config(), aParams.mTaskQueue));
   return do_AddRef(
       new MediaDataEncoderProxy(encoder.forget(), thread.forget()));
+}
+
+bool GMPEncoderModule::Supports(const EncoderConfig& aConfig) const {
+  // TODO(aosmond): Check other encoder parameters.
+  return SupportsCodec(aConfig.mCodec);
+}
+
+bool GMPEncoderModule::SupportsCodec(CodecType aCodecType) const {
+  if (aCodecType != CodecType::H264) {
+    return false;
+  }
+
+  return HaveGMPFor("encode-video"_ns, {"h264"_ns});
 }
 
 }  // namespace mozilla
