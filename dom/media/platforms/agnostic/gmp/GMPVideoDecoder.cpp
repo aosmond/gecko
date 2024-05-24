@@ -8,6 +8,7 @@
 #include "GMPDecoderModule.h"
 #include "GMPVideoHost.h"
 #include "GMPLog.h"
+#include "GMPUtils.h"
 #include "MediaData.h"
 #include "mozilla/EndianUtils.h"
 #include "mozilla/StaticPrefs_media.h"
@@ -20,19 +21,6 @@
 #include "VideoUtils.h"
 
 namespace mozilla {
-
-#if defined(DEBUG)
-static bool IsOnGMPThread() {
-  nsCOMPtr<mozIGeckoMediaPluginService> mps =
-      do_GetService("@mozilla.org/gecko-media-plugin-service;1");
-  MOZ_ASSERT(mps);
-
-  nsCOMPtr<nsIThread> gmpThread;
-  nsresult rv = mps->GetThread(getter_AddRefs(gmpThread));
-  MOZ_ASSERT(NS_SUCCEEDED(rv) && gmpThread);
-  return gmpThread->IsOnCurrentThread();
-}
-#endif
 
 GMPVideoDecoderParams::GMPVideoDecoderParams(const CreateDecoderParams& aParams)
     : mConfig(aParams.VideoConfig()),
