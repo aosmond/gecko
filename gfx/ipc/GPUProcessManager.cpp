@@ -228,7 +228,7 @@ bool GPUProcessManager::LaunchGPUProcess() {
     return true;
   }
 
-  if (AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdown)) {
+  if (AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed)) {
     return false;
   }
 
@@ -355,7 +355,7 @@ bool GPUProcessManager::MaybeDisableGPUProcess(const char* aMessage,
   // know that it is disabled in the config above.
   DebugOnly<bool> ready = EnsureProtocolsReady();
   MOZ_ASSERT_IF(!ready,
-                AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdown));
+                AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed));
 
   // If we disable the GPU process during reinitialization after a previous
   // crash, then we need to tell the content processes again, because they
@@ -371,7 +371,8 @@ nsresult GPUProcessManager::EnsureGPUReady(
   // We only wait to fail with NS_ERROR_ILLEGAL_DURING_SHUTDOWN if we would
   // cause a state change or if we are in the middle of relaunching the GPU
   // process.
-  bool inShutdown = AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdown);
+  bool inShutdown =
+      AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdownConfirmed);
 
   while (true) {
     // Launch the GPU process if it is enabled but hasn't been (re-)launched
@@ -388,6 +389,7 @@ nsresult GPUProcessManager::EnsureGPUReady(
 
     if (mProcess && !mProcess->IsConnected()) {
       if (NS_WARN_IF(inShutdown)) {
+        mProcess->KillProcess(/* aGenerateMinidump */ false);
         return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
       }
 
@@ -405,6 +407,18 @@ nsresult GPUProcessManager::EnsureGPUReady(
     if (!mGPUChild) {
       MOZ_DIAGNOSTIC_ASSERT(!gfxConfig::IsEnabled(Feature::GPU_PROCESS));
       break;
+    }
+
+    // Typically the GPU process is already setup, in which case, just return.
+    if (mGPUChild->IsGPUReady()) {
+      return NS_OK;
+    }
+
+    // If we are in shutdown, we don't want to block the main thread waiting for
+    // the GPU process to finish setting up.
+    if (NS_WARN_IF(inShutdown)) {
+      KillProcess(/* aGenerateMinidump */ false);
+      return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
     }
 
     if (mGPUChild->EnsureGPUReady()) {

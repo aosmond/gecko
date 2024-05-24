@@ -88,9 +88,7 @@ bool GPUChild::EnsureGPUReady() {
   // message. Additionally, we may have updated our compositor configuration
   // through the gfxVars after fallback, in which case we want to ensure the
   // GPU process has handled any updates before creating compositor sessions.
-  if (mGPUReady && !mWaitForVarUpdate) {
-    return true;
-  }
+  MOZ_ASSERT(!IsGPUReady());
 
   GPUDeviceData data;
   if (!SendGetDeviceStatus(&data)) {

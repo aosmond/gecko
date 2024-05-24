@@ -33,6 +33,7 @@ class GPUChild final : public ipc::CrashReporterHelper<GeckoProcessType_GPU>,
 
   void Init();
 
+  bool IsGPUReady() const { return mGPUReady && !mWaitForVarUpdate; }
   bool EnsureGPUReady();
   void MarkWaitForVarUpdate() { mWaitForVarUpdate = true; }
 
