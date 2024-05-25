@@ -121,7 +121,8 @@ void GMPVideoEncoder::InitComplete(GMPVideoEncoderProxy* aGMP,
   codec.mMode = ToGMPVideoCodecMode(mConfig.mUsage);
   codec.mWidth = mConfig.mSize.width;
   codec.mHeight = mConfig.mSize.height;
-  codec.mStartBitrate = mConfig.mBitrate;
+  codec.mStartBitrate = mConfig.mBitrate / 1000;
+  codec.mMaxBitrate = codec.mStartBitrate * 2;
   codec.mMaxFramerate = mConfig.mFramerate;
   codec.mUseThreadedEncode = StaticPrefs::media_gmp_encoder_multithreaded();
   codec.mLogLevel = GetGMPLibraryLogLevel();
@@ -198,8 +199,9 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Encode(
                                           __func__);
   }
 
-  mSamples.Insert(timestamp);
-  return mEncodePromise.Ensure(__func__);
+  RefPtr<EncodePromise::Private> promise = new EncodePromise::Private(__func__);
+  mPendingEncodes.InsertOrUpdate(timestamp, promise);
+  return promise.forget();
 }
 
 RefPtr<MediaDataEncoder::ReconfigurationPromise> GMPVideoEncoder::Reconfigure(
@@ -218,8 +220,8 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Drain() {
                                           __func__);
   }
 
-  if (mSamples.IsEmpty()) {
-    return EncodePromise::CreateAndResolve(std::move(mEncodedData), __func__);
+  if (mPendingEncodes.IsEmpty()) {
+    return EncodePromise::CreateAndResolve(EncodedData(), __func__);
   }
 
   return mDrainPromise.Ensure(__func__);
@@ -229,17 +231,12 @@ RefPtr<ShutdownPromise> GMPVideoEncoder::Shutdown() {
   GMP_LOG_DEBUG("GMPVideoEncoder::Shutdown");
   MOZ_ASSERT(IsOnGMPThread());
 
-  if (mGMP) {
-    mGMP->Close();
-    mGMP = nullptr;
-    mHost = nullptr;
-  }
-
+  Teardown(NS_ERROR_ABORT);
   return ShutdownPromise::CreateAndResolve(true, __func__);
 }
 
 RefPtr<GenericPromise> GMPVideoEncoder::SetBitrate(uint32_t aBitsPerSec) {
-  GMP_LOG_DEBUG("GMPVideoEncoder::SetBitrate");
+  GMP_LOG_DEBUG("GMPVideoEncoder::SetBitrate -- %u", aBitsPerSec);
   MOZ_ASSERT(IsOnGMPThread());
 
   if (NS_WARN_IF(!IsInitialized())) {
@@ -247,7 +244,7 @@ RefPtr<GenericPromise> GMPVideoEncoder::SetBitrate(uint32_t aBitsPerSec) {
                                            __func__);
   }
 
-  GMPErr err = mGMP->SetRates(aBitsPerSec, mConfig.mFramerate);
+  GMPErr err = mGMP->SetRates(aBitsPerSec / 1000, mConfig.mFramerate);
   if (NS_WARN_IF(err != GMPNoErr)) {
     return GenericPromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                                            __func__);
@@ -263,16 +260,18 @@ void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
   MOZ_ASSERT(aEncodedFrame);
 
   uint64_t timestamp = aEncodedFrame->TimeStamp();
-  mSamples.Remove(timestamp);
+
+  RefPtr<EncodePromise::Private> promise;
+  if (!mPendingEncodes.Remove(timestamp, getter_AddRefs(promise))) {
+    return;
+  }
 
   uint8_t* encodedData = aEncodedFrame->Buffer();
   uint32_t encodedSize = aEncodedFrame->Size();
 
   if (NS_WARN_IF(encodedSize == 0) || NS_WARN_IF(!encodedData)) {
-    mEncodedData.Clear();
-    mSamples.Clear();
-    mEncodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
-    mDrainPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+    promise->Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+    Teardown(NS_ERROR_DOM_MEDIA_FATAL_ERR);
     return;
   }
 
@@ -280,41 +279,52 @@ void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
 
   UniquePtr<MediaRawDataWriter> writer(output->CreateWriter());
   if (NS_WARN_IF(!writer->SetSize(encodedSize))) {
-    mEncodedData.Clear();
-    mSamples.Clear();
-    mEncodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
-    mDrainPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+    promise->Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+    Teardown(NS_ERROR_DOM_MEDIA_FATAL_ERR);
     return;
   }
 
   memcpy(writer->Data(), encodedData, encodedSize);
   output->mKeyframe = aEncodedFrame->FrameType() == kGMPKeyFrame;
-  mEncodedData.AppendElement(std::move(output));
 
-  if (!mSamples.IsEmpty()) {
-    return;
-  }
+  EncodedData encodedDataSet(1);
+  encodedDataSet.AppendElement(std::move(output));
+  promise->Resolve(std::move(encodedDataSet), __func__);
 
-  if (mEncodePromise.IsEmpty()) {
-    mEncodePromise.Resolve(std::move(mEncodedData), __func__);
-  }
-  if (mDrainPromise.IsEmpty()) {
-    mDrainPromise.Resolve(std::move(mEncodedData), __func__);
+  if (mPendingEncodes.IsEmpty()) {
+    mDrainPromise.ResolveIfExists(EncodedData(), __func__);
   }
 }
 
-void GMPVideoEncoder::Error(GMPErr aError) {
-  GMP_LOG_DEBUG("GMPVideoEncoder::Error");
+void GMPVideoEncoder::Teardown(nsresult aRejectReason) {
+  GMP_LOG_DEBUG("GMPVideoEncoder::Teardown");
   MOZ_ASSERT(IsOnGMPThread());
-  mEncodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
-  mDrainPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+
+  PendingEncodePromises pendingEncodes = std::move(mPendingEncodes);
+  for (auto i = pendingEncodes.Iter(); !i.Done(); i.Next()) {
+    i.Data()->Reject(aRejectReason, __func__);
+  }
+
+  mDrainPromise.RejectIfExists(aRejectReason, __func__);
+
+  if (mGMP) {
+    mGMP->Close();
+    mGMP = nullptr;
+  }
+
+  mHost = nullptr;
+}
+
+void GMPVideoEncoder::Error(GMPErr aError) {
+  GMP_LOG_DEBUG("GMPVideoEncoder::Error -- GMPErr(%u)", uint32_t(aError));
+  MOZ_ASSERT(IsOnGMPThread());
+  Teardown(NS_ERROR_DOM_MEDIA_FATAL_ERR);
 }
 
 void GMPVideoEncoder::Terminated() {
   GMP_LOG_DEBUG("GMPVideoEncoder::Terminated");
   MOZ_ASSERT(IsOnGMPThread());
-  mEncodePromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
-  mDrainPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+  Teardown(NS_ERROR_DOM_MEDIA_FATAL_ERR);
 }
 
 }  // namespace mozilla

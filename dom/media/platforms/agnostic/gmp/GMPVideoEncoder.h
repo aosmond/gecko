@@ -8,7 +8,7 @@
 #define mozilla_GMPVideoEncoder_h_
 
 #include "GMPVideoEncoderProxy.h"
-#include "nsHashtablesFwd.h"
+#include "nsRefPtrHashtable.h"
 #include "PlatformEncoderModule.h"
 #include "TimeUnits.h"
 
@@ -59,15 +59,18 @@ class GMPVideoEncoder final : public MediaDataEncoder,
 
   bool IsInitialized() const { return mGMP && mHost; }
 
+  void Teardown(nsresult aRejectReason);
+
   const EncoderConfig mConfig;
-  EncodedData mEncodedData;
   nsCOMPtr<mozIGeckoMediaPluginService> mMPS;
   GMPVideoEncoderProxy* mGMP = nullptr;
   GMPVideoHost* mHost = nullptr;
   MozPromiseHolder<InitPromise> mInitPromise;
-  MozPromiseHolder<EncodePromise> mEncodePromise;
   MozPromiseHolder<EncodePromise> mDrainPromise;
-  nsTHashSet<uint64_t> mSamples;
+
+  using PendingEncodePromises =
+      nsRefPtrHashtable<nsUint64HashKey, EncodePromise::Private>;
+  PendingEncodePromises mPendingEncodes;
 };
 
 }  // namespace mozilla
