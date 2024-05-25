@@ -44,6 +44,7 @@ LazyLogModule sPEMLog("PlatformEncoderModule");
 
 PEMFactory::PEMFactory() {
   gfx::gfxVars::Initialize();
+#if 0
 #ifdef MOZ_APPLEMEDIA
   RefPtr<PlatformEncoderModule> m(new AppleEncoderModule());
   mCurrentPEMs.AppendElement(m);
@@ -72,6 +73,7 @@ PEMFactory::PEMFactory() {
       mCurrentPEMs.AppendElement(pem);
     }
   }
+#endif
 #endif
 
   if (StaticPrefs::media_gmp_encoder_enabled()) {

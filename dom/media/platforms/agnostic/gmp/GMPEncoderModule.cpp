@@ -40,9 +40,11 @@ bool GMPEncoderModule::Supports(const EncoderConfig& aConfig) const {
   if (!CanLikelyEncode(aConfig)) {
     return false;
   }
+#if 0
   if (aConfig.mScalabilityMode != ScalabilityMode::None) {
     return false;
   }
+#endif
   return SupportsCodec(aConfig.mCodec);
 }
 
