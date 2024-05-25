@@ -162,6 +162,7 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Encode(
   GMPVideoFrame* ftmp = nullptr;
   GMPErr err = mHost->CreateFrame(kGMPI420VideoFrame, &ftmp);
   if (NS_WARN_IF(err != GMPNoErr)) {
+    GMP_LOG_DEBUG("GMPVideoEncoder::Encode -- failed to create frame");
     return EncodePromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                                           __func__);
   }
@@ -186,6 +187,7 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Encode(
                            cbCrBufSize.value(), yuv->mCrChannel, ySize.width,
                            ySize.height, yStride, cbCrStride, cbCrStride);
   if (NS_WARN_IF(err != GMPNoErr)) {
+    GMP_LOG_DEBUG("GMPVideoEncoder::Encode -- failed to allocate frame data");
     return EncodePromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                                           __func__);
   }
@@ -199,9 +201,15 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Encode(
   nsTArray<uint8_t> codecSpecific;
   err = mGMP->Encode(std::move(frame), codecSpecific, frameType);
   if (NS_WARN_IF(err != GMPNoErr)) {
+    GMP_LOG_DEBUG("GMPVideoEncoder::Encode -- failed to queue frame");
     return EncodePromise::CreateAndReject(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                                           __func__);
   }
+
+  GMP_LOG_DEBUG("GMPVideoEncoder::Encode -- request encode of frame @ %" PRIu64
+                " y %dx%d stride=%u cbCr %dx%d stride=%u",
+                timestamp, ySize.width, ySize.height, yStride, cbCrSize.width,
+                cbCrSize.height, cbCrStride);
 
   RefPtr<EncodePromise::Private> promise = new EncodePromise::Private(__func__);
   mPendingEncodes.InsertOrUpdate(timestamp, promise);
@@ -216,7 +224,6 @@ RefPtr<MediaDataEncoder::ReconfigurationPromise> GMPVideoEncoder::Reconfigure(
 }
 
 RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Drain() {
-  GMP_LOG_DEBUG("GMPVideoEncoder::Shutdown");
   MOZ_ASSERT(IsOnGMPThread());
 
   if (NS_WARN_IF(!IsInitialized())) {
@@ -228,6 +235,7 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Drain() {
     return EncodePromise::CreateAndResolve(EncodedData(), __func__);
   }
 
+  GMP_LOG_DEBUG("GMPVideoEncoder::Drain -- waiting for queue to clear");
   return mDrainPromise.Ensure(__func__);
 }
 
@@ -259,7 +267,6 @@ RefPtr<GenericPromise> GMPVideoEncoder::SetBitrate(uint32_t aBitsPerSec) {
 
 void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
                               const nsTArray<uint8_t>& aCodecSpecificInfo) {
-  GMP_LOG_DEBUG("GMPVideoEncoder::Encoded");
   MOZ_ASSERT(IsOnGMPThread());
   MOZ_ASSERT(aEncodedFrame);
 
@@ -267,13 +274,18 @@ void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
 
   RefPtr<EncodePromise::Private> promise;
   if (!mPendingEncodes.Remove(timestamp, getter_AddRefs(promise))) {
+    GMP_LOG_DEBUG(
+        "GMPVideoEncoder::Encoded -- no frame matching timestamp %" PRIu64,
+        timestamp);
     return;
   }
 
   uint8_t* encodedData = aEncodedFrame->Buffer();
   uint32_t encodedSize = aEncodedFrame->Size();
 
-  if (NS_WARN_IF(encodedSize == 0) || NS_WARN_IF(!encodedData)) {
+  if (NS_WARN_IF(encodedSize == 0) || NS_WARN_IF(!encodedData) ||
+      NS_WARN_IF(aEncodedFrame->BufferType() != GMP_BufferLength32)) {
+    GMP_LOG_DEBUG("GMPVideoEncoder::Encoded -- bad/empty frame");
     promise->Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
     Teardown(NS_ERROR_DOM_MEDIA_FATAL_ERR);
     return;
@@ -283,13 +295,20 @@ void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
 
   UniquePtr<MediaRawDataWriter> writer(output->CreateWriter());
   if (NS_WARN_IF(!writer->SetSize(encodedSize))) {
+    GMP_LOG_DEBUG("GMPVideoEncoder::Encoded -- failed to allocate %u buffer",
+                  encodedSize);
     promise->Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
     Teardown(NS_ERROR_DOM_MEDIA_FATAL_ERR);
     return;
   }
 
   memcpy(writer->Data(), encodedData, encodedSize);
+
+  output->mTime = media::TimeUnit::FromMicroseconds(timestamp);
   output->mKeyframe = aEncodedFrame->FrameType() == kGMPKeyFrame;
+
+  GMP_LOG_DEBUG("GMPVideoEncoder::Encoded -- %sframe @ timestamp %" PRIu64,
+                output->mKeyframe ? "key" : "", timestamp);
 
   EncodedData encodedDataSet(1);
   encodedDataSet.AppendElement(std::move(output));
