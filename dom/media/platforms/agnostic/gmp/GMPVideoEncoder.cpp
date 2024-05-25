@@ -116,6 +116,7 @@ void GMPVideoEncoder::InitComplete(GMPVideoEncoderProxy* aGMP,
   GMPVideoCodec codec;
   memset(&codec, 0, sizeof(codec));
 
+  codec.mGMPApiVersion = kGMPVersion35;
   codec.mCodecType = kGMPVideoCodecH264;
   codec.mMode = ToGMPVideoCodecMode(mConfig.mUsage);
   codec.mWidth = mConfig.mSize.width;
