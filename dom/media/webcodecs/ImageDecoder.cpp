@@ -33,6 +33,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ImageDecoder)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mOutstandingDecodes)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDecodedFrames)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
+  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ImageDecoder)
@@ -287,11 +288,15 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
 
   mDecoder->Initialize()->Then(
       GetCurrentSerialEventTarget(), __func__,
-      [self = RefPtr{this}](const image::DecodeMetadataResult& aMetadata) {
-        self->OnMetadataSuccess(aMetadata);
+      [self = WeakPtr{this}](const image::DecodeMetadataResult& aMetadata) {
+        if (self) {
+          self->OnMetadataSuccess(aMetadata);
+        }
       },
-      [self = RefPtr{this}](const nsresult& aErr) {
-        self->OnMetadataFailed(aErr);
+      [self = WeakPtr{this}](const nsresult& aErr) {
+        if (self) {
+          self->OnMetadataFailed(aErr);
+        }
       });
 }
 
@@ -372,11 +377,15 @@ void ImageDecoder::RequestFrameCount(uint32_t aKnownFrameCount) {
   mDecoder->DecodeFrameCount(aKnownFrameCount)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
-          [self = RefPtr{this}](const image::DecodeFrameCountResult& aResult) {
-            self->OnFrameCountSuccess(aResult);
+          [self = WeakPtr{this}](const image::DecodeFrameCountResult& aResult) {
+            if (self) {
+              self->OnFrameCountSuccess(aResult);
+            }
           },
-          [self = RefPtr{this}](const nsresult& aErr) {
-            self->OnFrameCountFailed(aErr);
+          [self = WeakPtr{this}](const nsresult& aErr) {
+            if (self) {
+              self->OnFrameCountFailed(aErr);
+            }
           });
 }
 
@@ -400,11 +409,15 @@ void ImageDecoder::RequestDecodeFrames(uint32_t aFrameIndex) {
   mDecoder->DecodeFrames(framesToDecode)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
-          [self = RefPtr{this}](const image::DecodeFramesResult& aResult) {
-            self->OnDecodeFramesSuccess(aResult);
+          [self = WeakPtr{this}](const image::DecodeFramesResult& aResult) {
+            if (self) {
+              self->OnDecodeFramesSuccess(aResult);
+            }
           },
-          [self = RefPtr{this}](const nsresult& aErr) {
-            self->OnDecodeFramesFailed(aErr);
+          [self = WeakPtr{this}](const nsresult& aErr) {
+            if (self) {
+              self->OnDecodeFramesFailed(aErr);
+            }
           });
 }
 

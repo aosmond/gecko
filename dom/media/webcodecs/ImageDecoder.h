@@ -11,6 +11,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/NotNull.h"
+#include "mozilla/WeakPtr.h"
 #include "mozilla/dom/ImageDecoderBinding.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsWrapperCache.h"
@@ -33,7 +34,9 @@ class Promise;
 class VideoFrame;
 struct ImageDecoderReadRequest;
 
-class ImageDecoder final : public nsISupports, public nsWrapperCache {
+class ImageDecoder final : public nsISupports,
+                           public nsWrapperCache,
+                           public SupportsWeakPtr {
  public:
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageDecoder)
