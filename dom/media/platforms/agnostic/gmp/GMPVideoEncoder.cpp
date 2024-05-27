@@ -12,7 +12,6 @@
 #include "GMPService.h"
 #include "GMPVideoHost.h"
 #include "ImageContainer.h"
-#include "mozilla/EndianUtils.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "nsServiceManagerUtils.h"
 #include "prsystem.h"
@@ -313,47 +312,11 @@ void GMPVideoEncoder::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
   // massage/correct issues with OpenH264 and WebRTC. This allows us to use the
   // PlatformEncoderModule framework with WebRTC, fallback to this encoder and
   // actually render the video.
-
-  // Libwebrtc's RtpPacketizerH264 expects a 3- or 4-byte NALU start sequence
-  // before the start of the NALU payload. {0,0,1} or {0,0,0,1}. We set this
-  // in-place. Any other length of the length field we reject.
-
-  const int sizeNumBytes = 4;
-  uint32_t unitOffset = 0;
-  uint32_t unitSize = 0;
-  // Make sure we don't read past the end of the buffer getting the size
-  while (unitOffset + sizeNumBytes < encodedSize) {
-    uint8_t* unitBuffer = encodedData + unitOffset;
-#if MOZ_LITTLE_ENDIAN()
-    unitSize = LittleEndian::readUint32(unitBuffer);
-#else
-    unitSize = BigEndian::readUint32(unitBuffer);
-#endif
-    const uint8_t startSequence[] = {0, 0, 0, 1};
-    if (memcmp(unitBuffer, startSequence, 4) == 0) {
-      // This is a bug in OpenH264 where it misses to convert the NALU start
-      // sequence to the NALU size per the GMP protocol. We mitigate this by
-      // letting it through as this is what libwebrtc already expects and
-      // scans for.
-      unitSize = encodedSize - 4;
-    } else {
-      memcpy(unitBuffer, startSequence, 4);
-    }
-
-    MOZ_ASSERT(unitSize != 0);
-    MOZ_ASSERT(unitOffset + sizeNumBytes + unitSize <= encodedSize);
-    if (unitSize == 0 || unitOffset + sizeNumBytes + unitSize > encodedSize) {
-      GMP_LOG_ERROR(
-          "[%p] GMPVideoEncoder::Encoded -- bad frame data; unitOffset=%u, "
-          "unitSize=%u, size=%u",
-          this, unitOffset, unitSize, encodedSize);
-      promise->Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
-      Teardown(MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR, "Bad frame data"_ns),
-               __func__);
-      return;
-    }
-
-    unitOffset += sizeNumBytes + unitSize;
+  if (NS_WARN_IF(!AdjustOpenH264NALUSequence(aEncodedFrame))) {
+    promise->Reject(NS_ERROR_DOM_MEDIA_FATAL_ERR, __func__);
+    Teardown(MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR, "Bad frame data"_ns),
+             __func__);
+    return;
   }
 
   auto output = MakeRefPtr<MediaRawData>();
