@@ -79,13 +79,14 @@ void ImageDecoder::Destroy() {
     mReadRequest = nullptr;
   }
 
-  mSourceBuffer = nullptr;
-  mDecoder = nullptr;
-
   if (mTracks) {
     mTracks->Destroy();
     mTracks = nullptr;
   }
+
+  mSourceBuffer = nullptr;
+  mDecoder = nullptr;
+  mParent = nullptr;
 }
 
 /* static */ already_AddRefed<ImageDecoder> ImageDecoder::Constructor(

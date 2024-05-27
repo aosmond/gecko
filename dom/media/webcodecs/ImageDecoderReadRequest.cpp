@@ -41,15 +41,36 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
 }
 
 void ImageDecoderReadRequest::Destroy() {
-  mDecoder = nullptr;
-  mReader = nullptr;
-
   if (mSourceBuffer) {
     if (!mSourceBuffer->IsComplete()) {
       mSourceBuffer->Complete(NS_ERROR_ABORT);
     }
     mSourceBuffer = nullptr;
   }
+
+  if (mReader) {
+    if (CycleCollectedJSContext* ccjscx = CycleCollectedJSContext::Get()) {
+      ErrorResult rv;
+      rv.ThrowAbortError("ImageDecoderReadRequest destroyed");
+
+      JSContext* cx = ccjscx->Context();
+      JS::Rooted<JS::Value> errorValue(cx);
+      if (ToJSValue(cx, std::move(rv), &errorValue)) {
+        IgnoredErrorResult ignoredRv;
+        if (RefPtr<Promise> p =
+                MOZ_KnownLive(mReader)->Cancel(cx, errorValue, ignoredRv)) {
+          bool setHandled = NS_WARN_IF(p->SetAnyPromiseIsHandled());
+          (void)setHandled;
+        }
+      }
+
+      JS_ClearPendingException(cx);
+    }
+
+    mReader = nullptr;
+  }
+
+  mDecoder = nullptr;
 }
 
 void ImageDecoderReadRequest::QueueRead() {
@@ -86,8 +107,7 @@ void ImageDecoderReadRequest::QueueRead() {
     return;
   }
 
-  CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
-  if (NS_WARN_IF(!context)) {
+  if (NS_WARN_IF(!CycleCollectedJSContext::Get())) {
     Complete(NS_ERROR_FAILURE);
     return;
   }
@@ -101,8 +121,8 @@ void ImageDecoderReadRequest::Read() {
     return;
   }
 
-  CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
-  if (NS_WARN_IF(!context)) {
+  CycleCollectedJSContext* ccjscx = CycleCollectedJSContext::Get();
+  if (NS_WARN_IF(!ccjscx)) {
     Complete(NS_ERROR_FAILURE);
     return;
   }
@@ -111,8 +131,7 @@ void ImageDecoderReadRequest::Read() {
   RefPtr<ReadableStreamDefaultReader> reader(mReader);
 
   IgnoredErrorResult err;
-  JSContext* cx = context->Context();
-  reader->ReadChunk(cx, *self, err);
+  reader->ReadChunk(ccjscx->Context(), *self, err);
   if (NS_WARN_IF(err.Failed())) {
     Complete(NS_ERROR_FAILURE);
   }
@@ -144,8 +163,6 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
       Complete(NS_ERROR_FAILURE);
       return;
     }
-
-    QueueRead();
   });
 }
 
