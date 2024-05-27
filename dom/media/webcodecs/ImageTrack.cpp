@@ -31,6 +31,8 @@ ImageTrack::ImageTrack(ImageTrackList* aTrackList, int32_t aIndex,
 
 ImageTrack::~ImageTrack() = default;
 
+void ImageTrack::Destroy() { mTrackList = nullptr; }
+
 JSObject* ImageTrack::WrapObject(JSContext* aCx,
                                  JS::Handle<JSObject*> aGivenProto) {
   AssertIsOnOwningThread();
@@ -38,6 +40,8 @@ JSObject* ImageTrack::WrapObject(JSContext* aCx,
 }
 
 void ImageTrack::SetSelected(bool aSelected) {
+  // 10.7.2.2. Let newValue be the given value.
+  // 10.7.2.3. If newValue equals [[selected]], abort these steps.
   if (mSelected == aSelected) {
     return;
   }

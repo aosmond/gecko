@@ -39,6 +39,8 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
  public:
   nsIGlobalObject* GetParentObject() const { return mParent; }
 
+  void Destroy();
+
   JSObject* WrapObject(JSContext* aCx,
                        JS::Handle<JSObject*> aGivenProto) override;
 

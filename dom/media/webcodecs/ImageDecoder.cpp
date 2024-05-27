@@ -208,7 +208,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
-  mTracks = MakeAndAddRef<ImageTrackList>(mParent);
+  mTracks = MakeAndAddRef<ImageTrackList>(mParent, this);
   mTracks->Initialize(aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     return;

@@ -31,7 +31,7 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   NS_DECL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageTrackList)
 
  public:
-  explicit ImageTrackList(nsIGlobalObject* aParent);
+  ImageTrackList(nsIGlobalObject* aParent, ImageDecoder* aDecoder);
 
   void Initialize(ErrorResult& aRv);
   void Destroy();
@@ -85,6 +85,7 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   void MaybeRejectReady(const nsACString& aReason);
 
   nsCOMPtr<nsIGlobalObject> mParent;
+  RefPtr<ImageDecoder> mDecoder;
   AutoTArray<RefPtr<ImageTrack>, 1> mTracks;
   RefPtr<Promise> mReadyPromise;
   int32_t mSelectedIndex = -1;

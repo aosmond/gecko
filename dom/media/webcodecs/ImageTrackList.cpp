@@ -10,8 +10,8 @@
 
 namespace mozilla::dom {
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrackList, mParent, mReadyPromise,
-                                      mTracks)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrackList, mParent, mDecoder,
+                                      mReadyPromise, mTracks)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ImageTrackList)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ImageTrackList)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageTrackList)
@@ -19,7 +19,8 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageTrackList)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-ImageTrackList::ImageTrackList(nsIGlobalObject* aParent) : mParent(aParent) {}
+ImageTrackList::ImageTrackList(nsIGlobalObject* aParent, ImageDecoder* aDecoder)
+    : mParent(aParent), mDecoder(aDecoder) {}
 
 ImageTrackList::~ImageTrackList() = default;
 
@@ -37,8 +38,18 @@ void ImageTrackList::Initialize(ErrorResult& aRv) {
 }
 
 void ImageTrackList::Destroy() {
-  mSelectedIndex = -1;
+  if (mReadyPromise &&
+      mReadyPromise->State() != Promise::PromiseState::Pending) {
+    mReadyPromise->MaybeRejectWithAbortError("ImageDecoder destroyed");
+  }
+
+  for (auto& track : mTracks) {
+    track->Destroy();
+  }
   mTracks.Clear();
+
+  mDecoder = nullptr;
+  mSelectedIndex = -1;
 }
 
 void ImageTrackList::MaybeResolveReady() {
@@ -91,6 +102,23 @@ void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {
   MOZ_ASSERT(aIndex >= 0);
   MOZ_ASSERT(uint32_t(aIndex) < mTracks.Length());
 
+  // 10.7.2.1. If [[ImageDecoder]]'s [[closed]] slot is true, abort these steps.
+  if (!mDecoder) {
+    return;
+  }
+
+  // 10.7.2.2. and 10.7.2.3. handled in ImageTrack::SetSelected.
+
+  // 10.7.2.4. Assign newValue to [[selected]].
+  // 10.7.2.5. Let parentTrackList be [[ImageTrackList]]
+  // 10.7.2.6. Let oldSelectedIndex be the value of parentTrackList [[selected
+  // index]]. 10.7.2.7. If oldSelectedIndex is not -1: 10.7.2.7.1. Let
+  // oldSelectedTrack be the ImageTrack in parentTrackList [[track list]] at the
+  // position of oldSelectedIndex. 10.7.2.7.2. Assign false to oldSelectedTrack
+  // [[selected]] 10.7.2.8. If newValue is true, let selectedIndex be the index
+  // of this ImageTrack within parentTrackList’s [[track list]]. Otherwise, let
+  // selectedIndex be -1. 10.7.2.9. Assign selectedIndex to parentTrackList
+  // [[selected index]].
   if (aSelected) {
     if (mSelectedIndex == -1) {
       mTracks[aIndex]->MarkSelected();
@@ -105,8 +133,14 @@ void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {
   } else if (mSelectedIndex == aIndex) {
     mTracks[mSelectedIndex]->ClearSelected();
     mSelectedIndex = -1;
-    MaybeRejectReady("No track selected"_ns);
   }
+
+  // 10.7.2.10. Run the Reset ImageDecoder algorithm on [[ImageDecoder]].
+  mDecoder->Reset();
+
+  // FIXME
+  // 10.7.2.11. Queue a control message to [[ImageDecoder]]'s control message
+  // queue to update the internal selected track index with selectedIndex.
 }
 
 }  // namespace mozilla::dom
