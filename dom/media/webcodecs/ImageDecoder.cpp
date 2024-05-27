@@ -59,9 +59,13 @@ ImageDecoder::ImageDecoder(nsCOMPtr<nsIGlobalObject>&& aParent,
     : mParent(std::move(aParent)),
       mType(aType),
       mFramesTimestamp(image::FrameTimeout::Zero()) {
+  printf_stderr("[AO] [%p] ImageDecoder::ImageDecoder\n", this);
 }
 
-ImageDecoder::~ImageDecoder() { Destroy(); }
+ImageDecoder::~ImageDecoder() {
+  printf_stderr("[AO] [%p] ImageDecoder::~ImageDecoder\n", this);
+  Destroy();
+}
 
 JSObject* ImageDecoder::WrapObject(JSContext* aCx,
                                    JS::Handle<JSObject*> aGivenProto) {
@@ -70,6 +74,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 }
 
 void ImageDecoder::Destroy() {
+  printf_stderr("[AO] [%p] ImageDecoder::Destroy\n", this);
   if (mDecoder) {
     mDecoder->Destroy();
   }

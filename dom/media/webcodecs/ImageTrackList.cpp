@@ -36,9 +36,13 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ImageTrackList)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 ImageTrackList::ImageTrackList(nsIGlobalObject* aParent, ImageDecoder* aDecoder)
-    : mParent(aParent), mDecoder(aDecoder) {}
+    : mParent(aParent), mDecoder(aDecoder) {
+  printf_stderr("[AO] [%p] ImageTrackList::ImageTrackList\n", this);
+}
 
-ImageTrackList::~ImageTrackList() = default;
+ImageTrackList::~ImageTrackList() {
+  printf_stderr("[AO] [%p] ImageTrackList::~ImageTrackList\n", this);
+}
 
 JSObject* ImageTrackList::WrapObject(JSContext* aCx,
                                      JS::Handle<JSObject*> aGivenProto) {
@@ -54,6 +58,7 @@ void ImageTrackList::Initialize(ErrorResult& aRv) {
 }
 
 void ImageTrackList::Destroy() {
+  printf_stderr("[AO] [%p] ImageTrackList::Destroy\n", this);
   if (mReadyPromise &&
       mReadyPromise->State() != Promise::PromiseState::Pending) {
     mReadyPromise->MaybeRejectWithAbortError("ImageDecoder destroyed");

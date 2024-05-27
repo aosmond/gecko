@@ -40,11 +40,17 @@ ImageTrack::ImageTrack(ImageTrackList* aTrackList, int32_t aIndex,
       mFrameCount(aFrameCount),
       mAnimated(aAnimated),
       mSelected(aSelected) {
+  printf_stderr("[AO] [%p] ImageTrack::ImageTrack\n", this);
 }
 
-ImageTrack::~ImageTrack() = default;
+ImageTrack::~ImageTrack() {
+  printf_stderr("[AO] [%p] ImageTrack::~ImageTrack\n", this);
+}
 
-void ImageTrack::Destroy() { mTrackList = nullptr; }
+void ImageTrack::Destroy() {
+  printf_stderr("[AO] [%p] ImageTrack::Destroy\n", this);
+  mTrackList = nullptr;
+}
 
 JSObject* ImageTrack::WrapObject(JSContext* aCx,
                                  JS::Handle<JSObject*> aGivenProto) {

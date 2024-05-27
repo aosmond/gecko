@@ -28,6 +28,7 @@ ImageDecoderReadRequest::~ImageDecoderReadRequest() = default;
 bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
                                          ImageDecoder* aDecoder,
                                          ReadableStream& aStream) {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::Initialize\n", this);
   IgnoredErrorResult rv;
   mReader = ReadableStreamDefaultReader::Constructor(aGlobal, aStream, rv);
   if (NS_WARN_IF(rv.Failed())) {
@@ -41,6 +42,7 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
 }
 
 void ImageDecoderReadRequest::Destroy() {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::Destroy\n", this);
   if (mSourceBuffer) {
     if (!mSourceBuffer->IsComplete()) {
       mSourceBuffer->Complete(NS_ERROR_ABORT);
@@ -74,6 +76,7 @@ void ImageDecoderReadRequest::Destroy() {
 }
 
 void ImageDecoderReadRequest::QueueRead() {
+  printf_stderr("[AO] [%p] QueueRead\n", this);
   class ReadRunnable final : public CancelableRunnable {
    public:
     explicit ReadRunnable(ImageDecoderReadRequest* aOwner)
@@ -117,6 +120,7 @@ void ImageDecoderReadRequest::QueueRead() {
 }
 
 void ImageDecoderReadRequest::Read() {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::Read\n", this);
   if (!mReader) {
     return;
   }
@@ -138,6 +142,7 @@ void ImageDecoderReadRequest::Read() {
 }
 
 void ImageDecoderReadRequest::Complete(nsresult aErr) {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::Complete\n", this);
   if (mSourceBuffer && !mSourceBuffer->IsComplete()) {
     mSourceBuffer->Complete(aErr);
   }
@@ -151,6 +156,7 @@ void ImageDecoderReadRequest::Complete(nsresult aErr) {
 void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aChunk,
                                          ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::ImageDecoderReadRequest::ChunkSteps\n", this);
   RootedSpiderMonkeyInterface<Uint8Array> chunk(aCx);
   if (!aChunk.isObject() || !chunk.Init(&aChunk.toObject())) {
     Complete(NS_ERROR_FAILURE);
@@ -167,12 +173,14 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::CloseSteps\n", this);
   Complete(NS_OK);
 }
 
 void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aError,
                                          ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] ImageDecoderReadRequest::ErrorSteps\n", this);
   Complete(NS_ERROR_FAILURE);
 }
 
