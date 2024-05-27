@@ -111,7 +111,7 @@ nsresult nsGIFDecoder2::FinishInternal() {
     if (mCurrentFrameIndex == mGIFStruct.images_decoded) {
       EndImageFrame();
     }
-    PostDecodeDone(mGIFStruct.loop_count);
+    PostDecodeDone();
     mGIFOpen = false;
   }
 
@@ -727,6 +727,7 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadNetscapeExtensionData(
         mGIFStruct.loop_count = -1;
       }
 
+      PostLoopCount(mGIFStruct.loop_count);
       return Transition::To(State::NETSCAPE_EXTENSION_SUB_BLOCK,
                             SUB_BLOCK_HEADER_LEN);
 

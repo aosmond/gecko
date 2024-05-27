@@ -400,6 +400,13 @@ LexerResult nsWebPDecoder::ReadHeader(WebPDemuxer* aDemuxer, bool aIsComplete) {
 
     PostIsAnimated(FrameTimeout::FromRawMilliseconds(iter.duration));
     WebPDemuxReleaseIterator(&iter);
+
+    uint32_t loopCount = WebPDemuxGetI(aDemuxer, WEBP_FF_LOOP_COUNT);
+
+    MOZ_LOG(sWebPLog, LogLevel::Debug,
+            ("[this=%p] nsWebPDecoder::ReadHeader -- loop count %u\n", this,
+             loopCount));
+    PostLoopCount(loopCount - 1);
   } else {
     // Single frames don't need a demuxer to be created.
     mNeedDemuxer = false;
@@ -591,12 +598,7 @@ LexerResult nsWebPDecoder::ReadMultiple(WebPDemuxer* aDemuxer,
     if (!complete && !IsFirstFrameDecode()) {
       rv = LexerResult(Yield::OUTPUT_AVAILABLE);
     } else {
-      uint32_t loopCount = WebPDemuxGetI(aDemuxer, WEBP_FF_LOOP_COUNT);
-
-      MOZ_LOG(sWebPLog, LogLevel::Debug,
-              ("[this=%p] nsWebPDecoder::ReadMultiple -- loop count %u\n", this,
-               loopCount));
-      PostDecodeDone(loopCount - 1);
+      PostDecodeDone();
     }
   }
 
