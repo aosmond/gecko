@@ -17,6 +17,7 @@ class SourceBuffer;
 namespace dom {
 class ImageDecoder;
 class ReadableStreamDefaultReader;
+class WeakWorkerRef;
 
 struct ImageDecoderReadRequest final : public ReadRequest {
  public:
@@ -48,6 +49,7 @@ struct ImageDecoderReadRequest final : public ReadRequest {
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void Read();
   void Complete(nsresult aErr);
 
+  RefPtr<WeakWorkerRef> mWorkerRef;
   RefPtr<ImageDecoder> mDecoder;
   RefPtr<ReadableStreamDefaultReader> mReader;
   RefPtr<image::SourceBuffer> mSourceBuffer;

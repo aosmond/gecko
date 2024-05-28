@@ -8,6 +8,8 @@
 #include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/dom/ImageDecoder.h"
 #include "mozilla/dom/ReadableStreamDefaultReader.h"
+#include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerRef.h"
 #include "mozilla/image/SourceBuffer.h"
 
 namespace mozilla::dom {
@@ -28,10 +30,21 @@ ImageDecoderReadRequest::~ImageDecoderReadRequest() = default;
 bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
                                          ImageDecoder* aDecoder,
                                          ReadableStream& aStream) {
+  if (WorkerPrivate* wp = GetCurrentThreadWorkerPrivate()) {
+    mWorkerRef =
+        WeakWorkerRef::Create(wp, [self = RefPtr{this}]() { self->Destroy(); });
+    if (NS_WARN_IF(!mWorkerRef)) {
+      mSourceBuffer->Complete(NS_ERROR_FAILURE);
+      Destroy();
+      return false;
+    }
+  }
+
   IgnoredErrorResult rv;
   mReader = ReadableStreamDefaultReader::Constructor(aGlobal, aStream, rv);
   if (NS_WARN_IF(rv.Failed())) {
     mSourceBuffer->Complete(NS_ERROR_FAILURE);
+    Destroy();
     return false;
   }
 
@@ -59,8 +72,7 @@ void ImageDecoderReadRequest::Destroy() {
         IgnoredErrorResult ignoredRv;
         if (RefPtr<Promise> p =
                 MOZ_KnownLive(mReader)->Cancel(cx, errorValue, ignoredRv)) {
-          bool setHandled = NS_WARN_IF(p->SetAnyPromiseIsHandled());
-          (void)setHandled;
+          MOZ_ALWAYS_TRUE(p->SetAnyPromiseIsHandled());
         }
       }
 
