@@ -38,7 +38,7 @@ void ImageTrackList::Initialize(ErrorResult& aRv) {
 }
 
 void ImageTrackList::Destroy() {
-  if (!mIsReady && mReadyPromise->PromiseObj()) {
+  if (!mIsReady && mReadyPromise && mReadyPromise->PromiseObj()) {
     mReadyPromise->MaybeRejectWithAbortError("ImageTrackList destroyed");
     mIsReady = true;
   }

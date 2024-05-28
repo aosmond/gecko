@@ -172,6 +172,8 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
       Complete(NS_ERROR_FAILURE);
       return;
     }
+
+    QueueRead();
   });
 }
 
