@@ -53,7 +53,7 @@ void ImageTrackList::Destroy() {
 }
 
 void ImageTrackList::MaybeResolveReady() {
-  if (!mIsReady) {
+  if (mIsReady) {
     return;
   }
 
