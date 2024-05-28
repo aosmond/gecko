@@ -15,7 +15,7 @@
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ImageDecoderReadRequest, ReadRequest,
-                                   mDecoder, mReader)
+                                   mDecoder, mStream, mReader)
 NS_IMPL_ADDREF_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_IMPL_RELEASE_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoderReadRequest)
@@ -49,19 +49,14 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
   }
 
   mDecoder = aDecoder;
+  mStream = &aStream;
   QueueRead();
   return true;
 }
 
 void ImageDecoderReadRequest::Destroy() {
-  if (mSourceBuffer) {
-    if (!mSourceBuffer->IsComplete()) {
-      mSourceBuffer->Complete(NS_ERROR_ABORT);
-    }
-    mSourceBuffer = nullptr;
-  }
-
-  if (mReader) {
+  if (mReader && mStream &&
+      mStream->State() == ReadableStream::ReaderState::Readable) {
     AutoJSAPI jsapi;
     MOZ_ALWAYS_TRUE(jsapi.Init(mDecoder->GetParentObject()));
 
@@ -78,10 +73,18 @@ void ImageDecoderReadRequest::Destroy() {
     }
 
     jsapi.ClearException();
-    mReader = nullptr;
+  }
+
+  if (mSourceBuffer) {
+    if (!mSourceBuffer->IsComplete()) {
+      mSourceBuffer->Complete(NS_ERROR_ABORT);
+    }
+    mSourceBuffer = nullptr;
   }
 
   mDecoder = nullptr;
+  mReader = nullptr;
+  mStream = nullptr;
 }
 
 void ImageDecoderReadRequest::QueueRead() {
@@ -149,6 +152,9 @@ void ImageDecoderReadRequest::Complete(nsresult aErr) {
     mDecoder->OnSourceBufferComplete(aErr);
     mDecoder = nullptr;
   }
+
+  mReader = nullptr;
+  mStream = nullptr;
 }
 
 void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,

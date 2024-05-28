@@ -51,6 +51,7 @@ struct ImageDecoderReadRequest final : public ReadRequest {
 
   RefPtr<WeakWorkerRef> mWorkerRef;
   RefPtr<ImageDecoder> mDecoder;
+  RefPtr<ReadableStream> mStream;
   RefPtr<ReadableStreamDefaultReader> mReader;
   RefPtr<image::SourceBuffer> mSourceBuffer;
 };
