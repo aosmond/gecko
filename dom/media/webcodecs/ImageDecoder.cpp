@@ -104,8 +104,8 @@ void ImageDecoder::Destroy() {
 /* static */ already_AddRefed<ImageDecoder> ImageDecoder::Constructor(
     const GlobalObject& aGlobal, const ImageDecoderInit& aInit,
     ErrorResult& aRv) {
-  // 10.2.2.1 If init is not valid ImageDecoderInit, throw a TypeError.
-  // 10.3.1 If type is not a valid image MIME type, return false.
+  // 10.2.2.1. If init is not valid ImageDecoderInit, throw a TypeError.
+  // 10.3.1. If type is not a valid image MIME type, return false.
   const auto mimeType = Substring(aInit.mType, 0, 6);
   if (!mimeType.Equals(u"image/"_ns)) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -118,7 +118,7 @@ void ImageDecoder::Destroy() {
 
   if (aInit.mData.IsReadableStream()) {
     const auto& stream = aInit.mData.GetAsReadableStream();
-    // 10.3.2 If data is of type ReadableStream and the ReadableStream is
+    // 10.3.2. If data is of type ReadableStream and the ReadableStream is
     // disturbed or locked, return false.
     if (stream->Disturbed() || stream->Locked()) {
       MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -127,6 +127,7 @@ void ImageDecoder::Destroy() {
       return nullptr;
     }
   } else {
+    // 10.3.3. If data is of type BufferSource:
     bool empty;
     if (aInit.mData.IsArrayBufferView()) {
       const auto& view = aInit.mData.GetAsArrayBufferView();
@@ -146,9 +147,8 @@ void ImageDecoder::Destroy() {
       return nullptr;
     }
 
-    // 10.3.3.1 If the result of running IsDetachedBuffer (described in
-    // [ECMASCRIPT]) on data is false, return false.
-    // 10.3.3.2 If data is empty, return false.
+    // 10.3.3.1. If data is [detached], return false.
+    // 10.3.3.2. If data is empty, return false.
     if (empty) {
       MOZ_LOG(gWebCodecsLog, LogLevel::Error,
               ("ImageDecoder Constructor -- detached/empty BufferSource"));
@@ -157,9 +157,10 @@ void ImageDecoder::Destroy() {
     }
   }
 
-  // 10.3.4 If desiredWidth exists and desiredHeight does not exist, return
-  // false. 10.3.5 If desiredHeight exists and desiredWidth does not exist,
-  // return false.
+  // 10.3.4. If desiredWidth exists and desiredHeight does not exist, return
+  // false.
+  // 10.3.5. If desiredHeight exists and desiredWidth does not exist, return
+  // false.
   if (aInit.mDesiredHeight.WasPassed() != aInit.mDesiredWidth.WasPassed()) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoder Constructor -- both/neither desiredHeight/width "
@@ -171,7 +172,7 @@ void ImageDecoder::Destroy() {
 
   nsTHashSet<const ArrayBuffer*> transferSet;
   for (const auto& buffer : aInit.mTransfer) {
-    // 10.2.2.2 If init.transfer contains more than one reference to the same
+    // 10.2.2.2. If init.transfer contains more than one reference to the same
     // ArrayBuffer, then throw a DataCloneError DOMException.
     if (transferSet.Contains(&buffer)) {
       MOZ_LOG(
@@ -182,7 +183,7 @@ void ImageDecoder::Destroy() {
       return nullptr;
     }
     transferSet.Insert(&buffer);
-    // 10.2.2.3.1 If [[Detached]] internal slot is true, then throw a
+    // 10.2.2.3.1. If [[Detached]] internal slot is true, then throw a
     // DataCloneError DOMException.
     bool empty = buffer.ProcessData(
         [&](const Span<uint8_t>& aData, JS::AutoCheckCannotGC&&) {
