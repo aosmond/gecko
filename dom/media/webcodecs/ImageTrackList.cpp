@@ -38,9 +38,9 @@ void ImageTrackList::Initialize(ErrorResult& aRv) {
 }
 
 void ImageTrackList::Destroy() {
-  if (mReadyPromise &&
-      mReadyPromise->State() != Promise::PromiseState::Pending) {
-    mReadyPromise->MaybeRejectWithAbortError("ImageDecoder destroyed");
+  if (!mIsReady && mReadyPromise->PromiseObj()) {
+    mReadyPromise->MaybeRejectWithAbortError("ImageTrackList destroyed");
+    mIsReady = true;
   }
 
   for (auto& track : mTracks) {
@@ -53,20 +53,22 @@ void ImageTrackList::Destroy() {
 }
 
 void ImageTrackList::MaybeResolveReady() {
+  if (!mIsReady) {
+    return;
+  }
+
   ImageTrack* track = GetSelectedTrack();
   if (!track || (track->FrameCount() == 0 && !track->FrameCountComplete())) {
     return;
   }
-  if (mReadyPromise->State() != Promise::PromiseState::Pending) {
-    mReadyPromise = Promise::CreateInfallible(mParent);
-  }
+
   mReadyPromise->MaybeResolveWithUndefined();
   mIsReady = true;
 }
 
 void ImageTrackList::MaybeRejectReady(const nsACString& aReason) {
-  if (mReadyPromise->State() != Promise::PromiseState::Pending) {
-    mReadyPromise = Promise::CreateInfallible(mParent);
+  if (mIsReady) {
+    return;
   }
   mReadyPromise->MaybeRejectWithInvalidStateError(aReason);
   mIsReady = true;
@@ -92,10 +94,7 @@ void ImageTrackList::OnFrameCountSuccess(
   }
 
   mTracks.LastElement()->OnFrameCountSuccess(aResult);
-
-  if (!mIsReady) {
-    MaybeResolveReady();
-  }
+  MaybeResolveReady();
 }
 
 void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {
@@ -112,23 +111,23 @@ void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {
   // 10.7.2.4. Assign newValue to [[selected]].
   // 10.7.2.5. Let parentTrackList be [[ImageTrackList]]
   // 10.7.2.6. Let oldSelectedIndex be the value of parentTrackList [[selected
-  // index]]. 10.7.2.7. If oldSelectedIndex is not -1: 10.7.2.7.1. Let
-  // oldSelectedTrack be the ImageTrack in parentTrackList [[track list]] at the
-  // position of oldSelectedIndex. 10.7.2.7.2. Assign false to oldSelectedTrack
-  // [[selected]] 10.7.2.8. If newValue is true, let selectedIndex be the index
-  // of this ImageTrack within parentTrackList’s [[track list]]. Otherwise, let
-  // selectedIndex be -1. 10.7.2.9. Assign selectedIndex to parentTrackList
-  // [[selected index]].
+  // index]].
+  // 10.7.2.7. If oldSelectedIndex is not -1:
+  // 10.7.2.7.1. Let oldSelectedTrack be the ImageTrack in parentTrackList
+  // [[track list]] at the position of oldSelectedIndex.
+  // 10.7.2.7.2. Assign false to oldSelectedTrack [[selected]]
+  // 10.7.2.8. If newValue is true, let selectedIndex be the index of this
+  // ImageTrack within parentTrackList's [[track list]]. Otherwise, let
+  // selectedIndex be -1.
+  // 10.7.2.9. Assign selectedIndex to parentTrackList [[selected index]].
   if (aSelected) {
     if (mSelectedIndex == -1) {
       mTracks[aIndex]->MarkSelected();
       mSelectedIndex = aIndex;
-      MaybeResolveReady();
     } else if (mSelectedIndex != aIndex) {
       mTracks[mSelectedIndex]->ClearSelected();
       mTracks[aIndex]->MarkSelected();
       mSelectedIndex = aIndex;
-      MaybeResolveReady();
     }
   } else if (mSelectedIndex == aIndex) {
     mTracks[mSelectedIndex]->ClearSelected();

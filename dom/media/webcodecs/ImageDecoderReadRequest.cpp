@@ -41,7 +41,7 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
   }
 
   IgnoredErrorResult rv;
-  mReader = ReadableStreamDefaultReader::Constructor(aGlobal, aStream, rv);
+  mReader = aStream.GetReader(rv);
   if (NS_WARN_IF(rv.Failed())) {
     mSourceBuffer->Complete(NS_ERROR_FAILURE);
     Destroy();
@@ -63,7 +63,7 @@ void ImageDecoderReadRequest::Destroy() {
 
   if (mReader) {
     AutoJSAPI jsapi;
-    jsapi.Init();
+    MOZ_ALWAYS_TRUE(jsapi.Init(mDecoder->GetParentObject()));
 
     ErrorResult rv;
     rv.ThrowAbortError("ImageDecoderReadRequest destroyed");
