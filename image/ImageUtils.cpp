@@ -282,9 +282,10 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     }
 
     if (mFramesTask && mFramesToDecode > 0) {
-      MOZ_LOG(
-          sLog, LogLevel::Debug,
-          ("[%p] AnonymousDecoderImpl::OnMetadata -- start frames task", this));
+      MOZ_LOG(sLog, LogLevel::Debug,
+              ("[%p] AnonymousDecoderImpl::OnMetadata -- start frames task, "
+               "want %zu",
+               this, mFramesToDecode));
       DecodePool::Singleton()->AsyncRun(mFramesTask);
     }
   }
