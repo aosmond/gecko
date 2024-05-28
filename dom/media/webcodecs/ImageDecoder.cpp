@@ -566,7 +566,9 @@ void ImageDecoder::OnFrameCountSuccess(
     }
   }
 
-  RequestDecodeFrames(minFrameIndex);
+  if (!mOutstandingDecodes.IsEmpty()) {
+    RequestDecodeFrames(minFrameIndex);
+  }
 
   for (const auto& i : rejected) {
     i.mPromise->MaybeRejectWithRangeError("Index beyond frame count bounds"_ns);
