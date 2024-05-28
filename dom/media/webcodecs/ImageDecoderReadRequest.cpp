@@ -11,6 +11,9 @@
 #include "mozilla/dom/WorkerCommon.h"
 #include "mozilla/dom/WorkerRef.h"
 #include "mozilla/image/SourceBuffer.h"
+#include "mozilla/Logging.h"
+
+extern mozilla::LazyLogModule gWebCodecsLog;
 
 namespace mozilla::dom {
 
@@ -23,9 +26,15 @@ NS_INTERFACE_MAP_END_INHERITING(ReadRequest)
 
 ImageDecoderReadRequest::ImageDecoderReadRequest(
     image::SourceBuffer* aSourceBuffer)
-    : mSourceBuffer(std::move(aSourceBuffer)) {}
+    : mSourceBuffer(std::move(aSourceBuffer)) {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::ImageDecoderReadRequest", this));
+}
 
-ImageDecoderReadRequest::~ImageDecoderReadRequest() = default;
+ImageDecoderReadRequest::~ImageDecoderReadRequest() {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::~ImageDecoderReadRequest", this));
+}
 
 bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
                                          ImageDecoder* aDecoder,
@@ -34,6 +43,10 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
     mWorkerRef =
         WeakWorkerRef::Create(wp, [self = RefPtr{this}]() { self->Destroy(); });
     if (NS_WARN_IF(!mWorkerRef)) {
+      MOZ_LOG(
+          gWebCodecsLog, LogLevel::Error,
+          ("[%p] ImageDecoderReadRequest::Initialize -- cannot get worker ref",
+           this));
       mSourceBuffer->Complete(NS_ERROR_FAILURE);
       Destroy();
       return false;
@@ -43,6 +56,10 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
   IgnoredErrorResult rv;
   mReader = aStream.GetReader(rv);
   if (NS_WARN_IF(rv.Failed())) {
+    MOZ_LOG(
+        gWebCodecsLog, LogLevel::Error,
+        ("[%p] ImageDecoderReadRequest::Initialize -- cannot get stream reader",
+         this));
     mSourceBuffer->Complete(NS_ERROR_FAILURE);
     Destroy();
     return false;
@@ -55,6 +72,9 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
 }
 
 void ImageDecoderReadRequest::Destroy() {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::Destroy", this));
+
   if (mReader && mStream &&
       mStream->State() == ReadableStream::ReaderState::Readable) {
     AutoJSAPI jsapi;
@@ -118,32 +138,50 @@ void ImageDecoderReadRequest::QueueRead() {
   };
 
   if (!mReader) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+            ("[%p] ImageDecoderReadRequest::QueueRead -- destroyed", this));
     return;
   }
 
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::QueueRead -- queue", this));
   auto task = MakeRefPtr<ReadRunnable>(this);
   NS_DispatchToCurrentThread(task.forget());
 }
 
 void ImageDecoderReadRequest::Read() {
-  if (!mReader) {
+  if (!mReader || !mDecoder) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+            ("[%p] ImageDecoderReadRequest::Read -- destroyed", this));
     return;
   }
 
   AutoJSAPI jsapi;
-  jsapi.Init();
+  MOZ_ALWAYS_TRUE(jsapi.Init(mDecoder->GetParentObject()));
 
   RefPtr<ImageDecoderReadRequest> self(this);
   RefPtr<ReadableStreamDefaultReader> reader(mReader);
 
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::Read -- begin read chunk", this));
+
   IgnoredErrorResult err;
   reader->ReadChunk(jsapi.cx(), *self, err);
   if (NS_WARN_IF(err.Failed())) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
+            ("[%p] ImageDecoderReadRequest::Read -- read chunk failed", this));
     Complete(NS_ERROR_FAILURE);
   }
+
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::Read -- end read chunk", this));
 }
 
 void ImageDecoderReadRequest::Complete(nsresult aErr) {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::Read -- complete, success %d", this,
+           NS_SUCCEEDED(aErr)));
+
   if (mSourceBuffer && !mSourceBuffer->IsComplete()) {
     mSourceBuffer->Complete(aErr);
   }
@@ -162,13 +200,22 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
                                          ErrorResult& aRv) {
   RootedSpiderMonkeyInterface<Uint8Array> chunk(aCx);
   if (!aChunk.isObject() || !chunk.Init(&aChunk.toObject())) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
+            ("[%p] ImageDecoderReadRequest::ChunkSteps -- bad chunk", this));
     Complete(NS_ERROR_FAILURE);
     return;
   }
   chunk.ProcessData([&](const Span<uint8_t>& aData, JS::AutoCheckCannotGC&&) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+            ("[%p] ImageDecoderReadRequest::ChunkSteps -- write %zu bytes",
+             this, aData.Length()));
+
     nsresult rv = mSourceBuffer->Append(
         reinterpret_cast<const char*>(aData.Elements()), aData.Length());
     if (NS_WARN_IF(NS_FAILED(rv))) {
+      MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+              ("[%p] ImageDecoderReadRequest::ChunkSteps -- failed to append",
+               this));
       Complete(NS_ERROR_FAILURE);
       return;
     }
@@ -178,12 +225,16 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::CloseSteps", this));
   Complete(NS_OK);
 }
 
 void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aError,
                                          ErrorResult& aRv) {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("[%p] ImageDecoderReadRequest::ErrorSteps", this));
   Complete(NS_ERROR_FAILURE);
 }
 
