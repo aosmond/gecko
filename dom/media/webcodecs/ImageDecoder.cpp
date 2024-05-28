@@ -286,7 +286,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
-  mDecoder->Initialize()->Then(
+  mDecoder->DecodeMetadata()->Then(
       GetCurrentSerialEventTarget(), __func__,
       [self = WeakPtr{this}](const image::DecodeMetadataResult& aMetadata) {
         if (self) {

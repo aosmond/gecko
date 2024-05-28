@@ -11,6 +11,7 @@
 #include "mozilla/Assertions.h"
 #include "mozilla/MozPromise.h"
 #include "mozilla/RefPtr.h"
+#include "mozilla/ThreadSafeWeakPtr.h"
 #include "nsString.h"
 #include "nsTArray.h"
 
@@ -22,6 +23,9 @@ class SourceSurface;
 }
 
 namespace image {
+class Decoder;
+class imgFrame;
+class ImageMetadata;
 class SourceBuffer;
 
 /**
@@ -69,11 +73,9 @@ using DecodeFrameCountPromise =
     MozPromise<DecodeFrameCountResult, nsresult, true>;
 using DecodeFramesPromise = MozPromise<DecodeFramesResult, nsresult, true>;
 
-class AnonymousDecoder {
+class AnonymousDecoder : public SupportsThreadSafeWeakPtr<AnonymousDecoder> {
  public:
-  NS_INLINE_DECL_PURE_VIRTUAL_REFCOUNTING
-
-  virtual RefPtr<DecodeMetadataPromise> Initialize() = 0;
+  virtual RefPtr<DecodeMetadataPromise> DecodeMetadata() = 0;
 
   virtual void Destroy() = 0;
 
@@ -84,9 +86,26 @@ class AnonymousDecoder {
 
   virtual void CancelDecodeFrames() = 0;
 
+  virtual bool Initialize(RefPtr<Decoder>&& aDecoder) = 0;
+
+  virtual void OnMetadata(const ImageMetadata* aMetadata) = 0;
+
+  virtual void OnFrameCount(uint32_t aFrameCount, bool aComplete) = 0;
+
+  virtual bool OnFrameAvailable(imgFrame* aFrame,
+                                RefPtr<gfx::SourceSurface>&& aSurface) = 0;
+
+  virtual void OnFrameComplete() = 0;
+
+#ifdef MOZ_REFCOUNTED_LEAK_CHECKING
+  virtual const char* typeName() const = 0;
+  virtual size_t typeSize() const = 0;
+#endif
+
+  virtual ~AnonymousDecoder();
+
  protected:
   AnonymousDecoder();
-  virtual ~AnonymousDecoder();
 };
 
 using CreateBufferPromise = MozPromise<RefPtr<SourceBuffer>, nsresult, true>;
