@@ -18,7 +18,7 @@ extern mozilla::LazyLogModule gWebCodecsLog;
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ImageDecoderReadRequest, ReadRequest,
-                                   mDecoder, mStream, mReader)
+                                   mDecoder, mReader)
 NS_IMPL_ADDREF_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_IMPL_RELEASE_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoderReadRequest)
@@ -40,15 +40,16 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
                                          ImageDecoder* aDecoder,
                                          ReadableStream& aStream) {
   if (WorkerPrivate* wp = GetCurrentThreadWorkerPrivate()) {
-    mWorkerRef =
-        WeakWorkerRef::Create(wp, [self = RefPtr{this}]() { self->Destroy(); });
+    mWorkerRef = WeakWorkerRef::Create(wp, [self = RefPtr{this}]() {
+      self->Destroy(/* aCycleCollect */ false);
+    });
     if (NS_WARN_IF(!mWorkerRef)) {
       MOZ_LOG(
           gWebCodecsLog, LogLevel::Error,
           ("[%p] ImageDecoderReadRequest::Initialize -- cannot get worker ref",
            this));
       mSourceBuffer->Complete(NS_ERROR_FAILURE);
-      Destroy();
+      Destroy(/* aCycleCollect */ false);
       return false;
     }
   }
@@ -61,22 +62,19 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
         ("[%p] ImageDecoderReadRequest::Initialize -- cannot get stream reader",
          this));
     mSourceBuffer->Complete(NS_ERROR_FAILURE);
-    Destroy();
+    Destroy(/* aCycleCollect */ false);
     return false;
   }
 
   mDecoder = aDecoder;
-  mStream = &aStream;
   QueueRead();
   return true;
 }
 
-void ImageDecoderReadRequest::Destroy() {
+void ImageDecoderReadRequest::Destroy(bool aCycleCollect /* = true */) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("[%p] ImageDecoderReadRequest::Destroy", this));
-
-  if (mReader && mStream &&
-      mStream->State() == ReadableStream::ReaderState::Readable) {
+  if (mReader && mDecoder && !aCycleCollect) {
     AutoJSAPI jsapi;
     MOZ_ALWAYS_TRUE(jsapi.Init(mDecoder->GetParentObject()));
 
@@ -104,7 +102,6 @@ void ImageDecoderReadRequest::Destroy() {
 
   mDecoder = nullptr;
   mReader = nullptr;
-  mStream = nullptr;
 }
 
 void ImageDecoderReadRequest::QueueRead() {
@@ -188,16 +185,18 @@ void ImageDecoderReadRequest::Complete(nsresult aErr) {
 
   if (mDecoder) {
     mDecoder->OnSourceBufferComplete(aErr);
-    mDecoder = nullptr;
   }
 
-  mReader = nullptr;
-  mStream = nullptr;
+  Destroy(/* aCycleComplete */ false);
 }
 
 void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aChunk,
                                          ErrorResult& aRv) {
+  if (!mSourceBuffer) {
+    return;
+  }
+
   RootedSpiderMonkeyInterface<Uint8Array> chunk(aCx);
   if (!aChunk.isObject() || !chunk.Init(&aChunk.toObject())) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -205,6 +204,7 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
     Complete(NS_ERROR_FAILURE);
     return;
   }
+
   chunk.ProcessData([&](const Span<uint8_t>& aData, JS::AutoCheckCannotGC&&) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
             ("[%p] ImageDecoderReadRequest::ChunkSteps -- write %zu bytes",
@@ -217,11 +217,10 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
               ("[%p] ImageDecoderReadRequest::ChunkSteps -- failed to append",
                this));
       Complete(NS_ERROR_FAILURE);
-      return;
     }
-
-    QueueRead();
   });
+
+  QueueRead();
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {

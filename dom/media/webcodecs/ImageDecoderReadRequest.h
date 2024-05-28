@@ -29,7 +29,7 @@ struct ImageDecoderReadRequest final : public ReadRequest {
 
   bool Initialize(const GlobalObject& aGlobal, ImageDecoder* aDecoder,
                   ReadableStream& aStream);
-  void Destroy();
+  void Destroy(bool aCycleCollect = true);
 
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void ChunkSteps(JSContext* aCx,
                                               JS::Handle<JS::Value> aChunk,
@@ -51,7 +51,6 @@ struct ImageDecoderReadRequest final : public ReadRequest {
 
   RefPtr<WeakWorkerRef> mWorkerRef;
   RefPtr<ImageDecoder> mDecoder;
-  RefPtr<ReadableStream> mStream;
   RefPtr<ReadableStreamDefaultReader> mReader;
   RefPtr<image::SourceBuffer> mSourceBuffer;
 };
