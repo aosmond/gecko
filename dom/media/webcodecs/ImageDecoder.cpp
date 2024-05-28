@@ -241,6 +241,9 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
+  // 10.2.2.8. Assign [[ImageTrackList]] a new ImageTrackList initialized as
+  // follows:
+  // 10.2.2.8.1. Assign a new list to [[track list]].
   mTracks = MakeAndAddRef<ImageTrackList>(mParent, this);
   mTracks->Initialize(aRv);
   if (NS_WARN_IF(aRv.Failed())) {
@@ -336,6 +339,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
+  // 10.2.2.18.7. Queue a control message to decode track metadata.
   mDecoder->DecodeMetadata()->Then(
       GetCurrentSerialEventTarget(), __func__,
       [self = WeakPtr{this}](const image::DecodeMetadataResult& aMetadata) {
@@ -593,22 +597,17 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return nullptr;
   }
 
-  if (aOptions.mFrameIndex > INT32_MAX) {
+  // 10.2.4.1. If [[closed]] is true, return a Promise rejected with an
+  // InvalidStateError DOMException.
+  if (!mTracks || !mDecoder) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p Decode -- invalid index", this));
-    promise->MaybeRejectWithRangeError("Index outside valid range"_ns);
+            ("ImageDecoder %p Decode -- closed", this));
+    promise->MaybeRejectWithInvalidStateError("Closed decoder"_ns);
     return promise.forget();
   }
 
-  if (!mComplete) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-            ("ImageDecoder %p Decode -- queue index %u but incomplete", this,
-             aOptions.mFrameIndex));
-    mOutstandingDecodes.AppendElement(
-        OutstandingDecode{promise, aOptions.mFrameIndex});
-    return promise.forget();
-  }
-
+  // 10.2.4.2. If [[ImageTrackList]]'s [[selected index]] is '-1', return a
+  // Promise rejected with an InvalidStateError DOMException.
   ImageTrack* track = mTracks->GetSelectedTrack();
   if (!track) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -617,14 +616,14 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return promise.forget();
   }
 
-  if (NS_WARN_IF(!mDecoder)) {
+  if (NS_WARN_IF(aOptions.mFrameIndex > INT32_MAX)) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p Decode -- no decoder", this));
-    promise->MaybeRejectWithInvalidStateError("No decoder available"_ns);
+            ("ImageDecoder %p Decode -- invalid index", this));
+    promise->MaybeRejectWithRangeError("Index outside valid range"_ns);
     return promise.forget();
   }
 
-  if (aOptions.mFrameIndex >= track->FrameCount()) {
+  if (mComplete && aOptions.mFrameIndex >= track->FrameCount()) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoder %p Decode -- index %u out-of-bounds %u", this,
              aOptions.mFrameIndex, track->FrameCount()));
