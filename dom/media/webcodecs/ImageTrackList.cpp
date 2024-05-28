@@ -53,7 +53,7 @@ void ImageTrackList::Destroy() {
 }
 
 void ImageTrackList::MaybeResolveReady() {
-  if (!mIsReady) {
+  if (mIsReady) {
     return;
   }
 
@@ -70,8 +70,11 @@ void ImageTrackList::MaybeRejectReady(const nsACString& aReason) {
   if (mIsReady) {
     return;
   }
-  mReadyPromise->MaybeRejectWithInvalidStateError(aReason);
+  mReadyPromise->MaybeResolveWithUndefined();
   mIsReady = true;
+  //FIXME remove reject paths, always succeed
+  //mReadyPromise->MaybeRejectWithInvalidStateError(aReason);
+  //mIsReady = true;
 }
 
 void ImageTrackList::OnMetadataSuccess(

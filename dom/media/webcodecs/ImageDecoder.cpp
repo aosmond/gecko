@@ -490,12 +490,16 @@ void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
 
 already_AddRefed<Promise> ImageDecoder::Decode(
     const ImageDecodeOptions& aOptions, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] ImageDecoder::Decode\n", this);
   RefPtr<Promise> promise = Promise::Create(mParent, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- no promise\n", this);
     return nullptr;
   }
 
+  // FIXME(mComplete) state not right...
   if (!mComplete) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- incomplete\n", this);
     mOutstandingDecodes.AppendElement(
         OutstandingDecode{promise, aOptions.mFrameIndex});
     return promise.forget();
@@ -503,21 +507,25 @@ already_AddRefed<Promise> ImageDecoder::Decode(
 
   ImageTrack* track = mTracks->GetSelectedTrack();
   if (!track) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- no track\n", this);
     promise->MaybeRejectWithInvalidStateError("No track selected"_ns);
     return promise.forget();
   }
 
   if (NS_WARN_IF(!mDecoder)) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- no decoder\n", this);
     promise->MaybeRejectWithInvalidStateError("No decoder available"_ns);
     return promise.forget();
   }
 
   if (aOptions.mFrameIndex > INT32_MAX) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- invalid index\n", this);
     promise->MaybeRejectWithRangeError("Index outside valid range"_ns);
     return promise.forget();
   }
 
   if (aOptions.mFrameIndex >= track->FrameCount()) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- outside bounds\n", this);
     promise->MaybeRejectWithRangeError("Index beyond frame count bounds"_ns);
     return promise.forget();
   }
@@ -535,7 +543,10 @@ already_AddRefed<Promise> ImageDecoder::Decode(
       OutstandingDecode{promise, aOptions.mFrameIndex});
 
   if (wasEmpty) {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- request decode\n", this);
     RequestDecodeFrames(aOptions.mFrameIndex);
+  } else {
+    printf_stderr("[AO] [%p] ImageDecoder::Decode -- queue decode\n", this);
   }
 
   return promise.forget();
@@ -543,6 +554,7 @@ already_AddRefed<Promise> ImageDecoder::Decode(
 
 void ImageDecoder::OnDecodeFramesSuccess(
     const image::DecodeFramesResult& aResult) {
+  printf_stderr("[AO] [%p] ImageDecoder::OnDecodeFramesSuccess\n", this);
   if (!mTracks) {
     return;
   }
@@ -619,6 +631,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
 }
 
 void ImageDecoder::OnDecodeFramesFailed(const nsresult& aErr) {
+  printf_stderr("[AO] [%p] ImageDecoder::OnDecodeFramesFailed\n", this);
   AutoTArray<OutstandingDecode, 1> rejected = std::move(mOutstandingDecodes);
   for (const auto& i : rejected) {
     i.mPromise->MaybeRejectWithRangeError("No more frames available"_ns);

@@ -165,6 +165,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     MutexAutoLock lock(mMutex);
 
     if (result == LexerResult(TerminalState::FAILURE)) {
+      printf_stderr("[AO] [%p] ImagelibDecoder::DoMetadataDecode -- rejected\n", this);
       mMetadataPromise.Reject(NS_ERROR_FAILURE, __func__);
       mFrameCountPromise.RejectIfExists(NS_ERROR_FAILURE, __func__);
       mFramesPromise.RejectIfExists(NS_ERROR_FAILURE, __func__);
@@ -178,6 +179,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     const auto size = mdIn.GetSize();
     DecodeMetadataResult mdOut{size.width, size.height, mdIn.GetLoopCount(),
                                mdIn.HasAnimation()};
+    printf_stderr("[AO] [%p] ImagelibDecoder::DoMetadataDecode -- resolved\n", this);
     mMetadataPromise.Resolve(mdOut, __func__);
     mMetadataDecoder = nullptr;
     return true;
@@ -203,6 +205,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
     }
 
     if (resolve) {
+      printf_stderr("[AO] [%p] ImagelibDecoder::DoFrameCountDecode -- resolved, %u (%u)\n", this, uint32_t(frameCount), uint32_t(mFrameCount));
       mFrameCountPromise.ResolveIfExists(
           DecodeFrameCountResult{frameCount, finished}, __func__);
     } else {
@@ -249,6 +252,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
 
         MutexAutoLock lock(mMutex);
         mFramesToDecode = 0;
+        printf_stderr("[AO] [%p] ImagelibDecoder::DoFrameDecode -- resolved, finished\n", this);
         mFramesPromise.Resolve(std::move(aResult), __func__);
         break;
       }
@@ -259,6 +263,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder,
       MutexAutoLock lock(mMutex);
       if (mFramesToDecode >= aResult.mFrames.Length()) {
         mFramesToDecode = 0;
+        printf_stderr("[AO] [%p] ImagelibDecoder::DoFrameDecode -- resolved\n", this);
         mFramesPromise.Resolve(std::move(aResult), __func__);
         break;
       }
