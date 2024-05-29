@@ -9,8 +9,7 @@
 #include <cstdint>
 #include "ImageContainer.h"
 #include "ImageDecoderReadRequest.h"
-#include "nsComponentManagerUtils.h"
-#include "nsTHashSet.h"
+#include "MediaResult.h"
 #include "mozilla/dom/ImageTrack.h"
 #include "mozilla/dom/ImageTrackList.h"
 #include "mozilla/dom/ReadableStream.h"
@@ -20,6 +19,8 @@
 #include "mozilla/image/ImageUtils.h"
 #include "mozilla/image/SourceBuffer.h"
 #include "mozilla/Logging.h"
+#include "nsComponentManagerUtils.h"
+#include "nsTHashSet.h"
 
 extern mozilla::LazyLogModule gWebCodecsLog;
 
@@ -354,15 +355,15 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
       });
 }
 
-void ImageDecoder::OnSourceBufferComplete(nsresult aErr) {
+void ImageDecoder::OnSourceBufferComplete(const MediaResult& aResult) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoder %p OnSourceBufferComplete -- success %d", this,
-           NS_SUCCEEDED(aErr)));
+           NS_SUCCEEDED(aResult.Code())));
 
   MOZ_ASSERT(mSourceBuffer->IsComplete());
 
-  if (NS_WARN_IF(NS_FAILED(aErr))) {
-    OnCompleteFailed(aErr);
+  if (NS_WARN_IF(NS_FAILED(aResult.Code()))) {
+    OnCompleteFailed(aResult);
     return;
   }
 
@@ -396,7 +397,7 @@ void ImageDecoder::OnCompleteSuccess() {
   mCompletePromise->MaybeResolveWithUndefined();
 }
 
-void ImageDecoder::OnCompleteFailed(nsresult aErr) {
+void ImageDecoder::OnCompleteFailed(const MediaResult& aResult) {
   if (mComplete) {
     return;
   }
@@ -404,7 +405,7 @@ void ImageDecoder::OnCompleteFailed(nsresult aErr) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Error,
           ("ImageDecoder %p OnCompleteFailed -- complete", this));
   mComplete = true;
-  mCompletePromise->MaybeRejectWithInvalidStateError(""_ns);
+  aResult.RejectTo(mCompletePromise);
 }
 
 void ImageDecoder::OnMetadataSuccess(
@@ -431,14 +432,16 @@ void ImageDecoder::OnMetadataSuccess(
 
 void ImageDecoder::OnMetadataFailed(const nsresult& aErr) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-          ("ImageDecoder %p OnMetadataFailed", this));
+          ("ImageDecoder %p OnMetadataFailed 0x%08x", this, aErr));
+
+  MediaResult result(NS_ERROR_DOM_ENCODING_NOT_SUPPORTED_ERR,
+                     "Metadata decoding failed"_ns);
 
   if (mTracks) {
     mTracks->OnMetadataFailed(aErr);
   }
 
-  OnCompleteFailed(aErr);
-  OnDecodeFramesFailed(aErr);
+  Close(result);
 }
 
 void ImageDecoder::RequestFrameCount(uint32_t aKnownFrameCount) {
@@ -583,7 +586,8 @@ void ImageDecoder::OnFrameCountSuccess(
 void ImageDecoder::OnFrameCountFailed(const nsresult& aErr) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Error,
           ("ImageDecoder %p OnFrameCountFailed", this));
-  OnCompleteFailed(aErr);
+  Close(MediaResult(NS_ERROR_DOM_ENCODING_NOT_SUPPORTED_ERR,
+                    "Frame count decoding failed"_ns));
 }
 
 void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
@@ -763,7 +767,7 @@ void ImageDecoder::OnDecodeFramesFailed(const nsresult& aErr) {
   }
 }
 
-void ImageDecoder::Reset() {
+void ImageDecoder::Reset(const MediaResult& aResult) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug, ("ImageDecoder %p Reset", this));
   // 10.2.5. Reset ImageDecoder (with exception)
 
@@ -779,25 +783,20 @@ void ImageDecoder::Reset() {
   for (const auto& i : rejected) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
             ("ImageDecoder %p Reset -- reject index %u", this, i.mFrameIndex));
-    i.mPromise->MaybeRejectWithAbortError("Reset decoder"_ns);
+    aResult.RejectTo(i.mPromise);
   }
 }
 
-void ImageDecoder::Close() {
+void ImageDecoder::Close(const MediaResult& aResult) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug, ("ImageDecoder %p Close", this));
 
   // 10.2.5. Algorithms - Close ImageDecoder (with exception)
 
   // 1. Run the Reset ImageDecoder algorithm with exception.
+  Reset(aResult);
+
   if (mDecoder) {
     mDecoder->Destroy();
-  }
-
-  AutoTArray<OutstandingDecode, 1> rejected = std::move(mOutstandingDecodes);
-  for (const auto& i : rejected) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-            ("ImageDecoder %p Close -- reject index %u", this, i.mFrameIndex));
-    i.mPromise->MaybeRejectWithAbortError("Closed decoder"_ns);
   }
 
   // 3. Clear [[codec implementation]] and release associated system resources.
@@ -819,9 +818,17 @@ void ImageDecoder::Close() {
   }
 
   if (!mComplete) {
-    mCompletePromise->MaybeRejectWithAbortError("Closed decoder"_ns);
+    aResult.RejectTo(mCompletePromise);
     mComplete = true;
   }
+}
+
+void ImageDecoder::Reset() {
+  Reset(MediaResult(NS_ERROR_DOM_ABORT_ERR, "Reset decoder"_ns));
+}
+
+void ImageDecoder::Close() {
+  Close(MediaResult(NS_ERROR_DOM_ABORT_ERR, "Closed decoder"_ns));
 }
 
 }  // namespace mozilla::dom

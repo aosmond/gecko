@@ -19,6 +19,8 @@
 class nsIGlobalObject;
 
 namespace mozilla {
+class MediaResult;
+
 namespace image {
 class AnonymousDecoder;
 class SourceBuffer;
@@ -73,7 +75,7 @@ class ImageDecoder final : public nsISupports,
 
   void Close();
 
-  void OnSourceBufferComplete(nsresult aErr);
+  void OnSourceBufferComplete(const MediaResult& aResult);
 
  private:
   ~ImageDecoder();
@@ -89,9 +91,11 @@ class ImageDecoder final : public nsISupports,
   void Initialize(const GlobalObject& aGLobal, const ImageDecoderInit& aInit,
                   ErrorResult& aRv);
   void Destroy();
+  void Reset(const MediaResult& aResult);
+  void Close(const MediaResult& aResult);
 
   void OnCompleteSuccess();
-  void OnCompleteFailed(nsresult aErr);
+  void OnCompleteFailed(const MediaResult& aResult);
 
   void OnMetadataSuccess(const image::DecodeMetadataResult& aMetadata);
   void OnMetadataFailed(const nsresult& aErr);

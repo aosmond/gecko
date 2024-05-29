@@ -10,6 +10,8 @@
 #include "mozilla/dom/ReadRequest.h"
 
 namespace mozilla {
+class MediaResult;
+
 namespace image {
 class SourceBuffer;
 }
@@ -47,7 +49,7 @@ struct ImageDecoderReadRequest final : public ReadRequest {
 
   void QueueRead();
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void Read();
-  void Complete(nsresult aErr);
+  void Complete(const MediaResult& aResult);
 
   RefPtr<WeakWorkerRef> mWorkerRef;
   RefPtr<ImageDecoder> mDecoder;

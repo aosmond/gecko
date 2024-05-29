@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "ImageDecoderReadRequest.h"
+#include "MediaResult.h"
 #include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/dom/ImageDecoder.h"
 #include "mozilla/dom/ReadableStreamDefaultReader.h"
@@ -118,7 +119,8 @@ void ImageDecoderReadRequest::QueueRead() {
     }
 
     nsresult Cancel() override {
-      mOwner->Complete(NS_ERROR_ABORT);
+      mOwner->Complete(
+          MediaResult(NS_ERROR_DOM_MEDIA_ABORT_ERR, "Read cancelled"_ns));
       mOwner = nullptr;
       return NS_OK;
     }
@@ -166,24 +168,25 @@ void ImageDecoderReadRequest::Read() {
   if (NS_WARN_IF(err.Failed())) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoderReadRequest %p Read -- read chunk failed", this));
-    Complete(NS_ERROR_FAILURE);
+    Complete(MediaResult(NS_ERROR_DOM_FILE_NOT_READABLE_ERR,
+                         "Reader cannot read chunk from stream"_ns));
   }
 
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p Read -- end read chunk", this));
 }
 
-void ImageDecoderReadRequest::Complete(nsresult aErr) {
+void ImageDecoderReadRequest::Complete(const MediaResult& aResult) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p Read -- complete, success %d", this,
-           NS_SUCCEEDED(aErr)));
+           NS_SUCCEEDED(aResult.Code())));
 
   if (mSourceBuffer && !mSourceBuffer->IsComplete()) {
-    mSourceBuffer->Complete(aErr);
+    mSourceBuffer->Complete(aResult.Code());
   }
 
   if (mDecoder) {
-    mDecoder->OnSourceBufferComplete(aErr);
+    mDecoder->OnSourceBufferComplete(aResult);
   }
 
   Destroy(/* aCycleComplete */ false);
@@ -200,7 +203,8 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
   if (!aChunk.isObject() || !chunk.Init(&aChunk.toObject())) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoderReadRequest %p ChunkSteps -- bad chunk", this));
-    Complete(NS_ERROR_FAILURE);
+    Complete(MediaResult(NS_ERROR_DOM_DATA_ERR,
+                         "Reader cannot read chunk from stream"_ns));
     return;
   }
 
@@ -215,7 +219,8 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
       MOZ_LOG(
           gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p ChunkSteps -- failed to append", this));
-      Complete(NS_ERROR_FAILURE);
+      Complete(MediaResult(NS_ERROR_DOM_UNKNOWN_ERR,
+                           "Reader cannot allocate storage for chunk"_ns));
     }
   });
 
@@ -225,7 +230,7 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p CloseSteps", this));
-  Complete(NS_OK);
+  Complete(MediaResult(NS_OK));
 }
 
 void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
@@ -233,7 +238,8 @@ void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          ErrorResult& aRv) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p ErrorSteps", this));
-  Complete(NS_ERROR_FAILURE);
+  Complete(MediaResult(NS_ERROR_DOM_FILE_NOT_READABLE_ERR,
+                       "Reader failed while waiting for chunk from stream"_ns));
 }
 
 }  // namespace mozilla::dom
