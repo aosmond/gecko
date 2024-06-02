@@ -120,6 +120,7 @@ class ImageDecoder final : public nsISupports,
   image::FrameTimeout mFramesTimestamp;
   bool mComplete = false;
   bool mHasFrameCount = false;
+  bool mHasFramePending = false;
 };
 
 }  // namespace dom

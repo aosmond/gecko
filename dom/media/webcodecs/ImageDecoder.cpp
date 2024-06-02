@@ -490,6 +490,12 @@ void ImageDecoder::RequestDecodeFrames(uint32_t aFrameIndex) {
     return;
   }
 
+  if (mHasFramePending) {
+    return;
+  }
+
+  mHasFramePending = true;
+
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoder %p RequestDecodeFrames -- frameIndex %u "
            "(framesToDecode %u)",
@@ -662,6 +668,9 @@ already_AddRefed<Promise> ImageDecoder::Decode(
 
 void ImageDecoder::OnDecodeFramesSuccess(
     const image::DecodeFramesResult& aResult) {
+  MOZ_ASSERT(mHasFramePending);
+  mHasFramePending = false;
+
   if (!mTracks) {
     return;
   }
@@ -755,6 +764,9 @@ void ImageDecoder::OnDecodeFramesSuccess(
 }
 
 void ImageDecoder::OnDecodeFramesFailed(const nsresult& aErr) {
+  MOZ_ASSERT(mHasFramePending);
+  mHasFramePending = false;
+
   MOZ_LOG(gWebCodecsLog, LogLevel::Error,
           ("ImageDecoder %p OnDecodeFramesFailed", this));
 
@@ -775,6 +787,9 @@ void ImageDecoder::Reset(const MediaResult& aResult) {
   if (mDecoder) {
     mDecoder->CancelDecodeFrames();
   }
+
+  // FIXME could this be racy where a pending decode fullfillment is on the thread queue?
+  mHasFramePending = false;
 
   // 2. For each decodePromise in [[pending decode promises]]:
   // 2.1. Reject decodePromise with exception.
