@@ -22,6 +22,7 @@ ImageTrack::ImageTrack(ImageTrackList* aTrackList, int32_t aIndex,
                        float aRepetitionCount)
     : mParent(aTrackList->GetParentObject()),
       mTrackList(aTrackList),
+      mFramesTimestamp(image::FrameTimeout::Zero()),
       mIndex(aIndex),
       mRepetitionCount(aRepetitionCount),
       mFrameCount(aFrameCount),
@@ -64,6 +65,44 @@ void ImageTrack::OnFrameCountSuccess(
   MOZ_ASSERT(aResult.mFrameCount >= mFrameCount);
   mFrameCount = aResult.mFrameCount;
   mFrameCountComplete = aResult.mFinished;
+}
+
+void ImageTrack::OnDecodeFramesSuccess(
+    const image::DecodeFramesResult& aResult) {
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("ImageTrack %p OnDecodeFramesSuccess -- decoded %zu frames, %zu "
+           "total, finished %d",
+           this, aResult.mFrames.Length(), mDecodedFrames.Length(),
+           aResult.mFinished));
+
+  for (const auto& f : aResult.mFrames) {
+    VideoColorSpaceInit colorSpace;
+    gfx::IntSize size = f.mSurface->GetSize();
+    gfx::IntRect rect(gfx::IntPoint(0, 0), size);
+
+    Maybe<VideoPixelFormat> format =
+        SurfaceFormatToVideoPixelFormat(f.mSurface->GetFormat());
+    MOZ_ASSERT(format, "Unexpected format for image!");
+
+    Maybe<uint64_t> duration;
+    if (f.mTimeout != image::FrameTimeout::Forever()) {
+      duration =
+          Some(static_cast<uint64_t>(f.mTimeout.AsMilliseconds()) * 1000);
+    }
+
+    uint64_t timestamp = UINT64_MAX;
+    if (mFramesTimestamp != image::FrameTimeout::Forever()) {
+      timestamp =
+          static_cast<uint64_t>(mFramesTimestamp.AsMilliseconds()) * 1000;
+    }
+
+    mFramesTimestamp += f.mTimeout;
+
+    auto image = MakeRefPtr<layers::SourceSurfaceImage>(size, f.mSurface);
+    auto frame = MakeRefPtr<VideoFrame>(mParent, image, format, size, rect,
+                                        size, duration, timestamp, colorSpace);
+    mDecodedFrames.AppendElement(std::move(frame));
+  }
 }
 
 }  // namespace mozilla::dom

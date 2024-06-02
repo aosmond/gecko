@@ -26,6 +26,52 @@ extern mozilla::LazyLogModule gWebCodecsLog;
 
 namespace mozilla::dom {
 
+class ImageDecoder::ControlMessage {
+ public:
+  ControlMessage() = default;
+  virtual ~ControlMessage() = default;
+
+  virtual ConfigureMessage* AsConfigureMessage() { return nullptr; }
+  virtual DecodeMetadataMessage* AsDecodeMetadataMessage() { return nullptr; }
+  virtual DecodeFrameMessage* AsDecodeFrameMessage() { return nullptr; }
+  virtual SelectTrackMessage* AsSelectTrackMessage() { return nullptr; }
+};
+
+class ImageDecoder::ConfigureMessage final
+    : public ImageDecoder::ControlMessage {
+ public:
+  explicit ConfigureMessage(ColorSpaceConversion aColorSpaceConversion)
+      : mColorSpaceConversion(aColorSpaceConversion) {}
+
+  ConfigureMessage* AsConfigureMessage() override { return this; }
+
+  const ColorSpaceConversion mColorSpaceConversion;
+};
+
+class ImageDecoder::DecodeMetadataMessage final
+    : public ImageDecoder::ControlMessage {
+ public:
+  DecodeMetadataMessage* AsDecodeMetadataMessage() override { return this; }
+};
+
+class ImageDecoder::DecodeFrameMessage final
+    : public ImageDecoder::ControlMessage {
+ public:
+  DecodeFrameMessage(uint32_t aFrameIndex, bool aCompleteFramesOnly)
+      : mFrameIndex(aFrameIndex), mCompleteFramesOnly(aCompleteFramesOnly) {}
+
+  DecodeFrameMessage* AsDecodeFrameMessage() override { return this; }
+
+  const uint32_t mFrameIndex;
+  const bool mCompleteFramesOnly;
+};
+
+class ImageDecoder::SelectTrackMessage final
+    : public ImageDecoder::ControlMessage {
+ public:
+  SelectTrackMessage* AsSelectTrackMessage() override { return this; }
+};
+
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageDecoder)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ImageDecoder)
@@ -100,6 +146,159 @@ void ImageDecoder::Destroy() {
   mSourceBuffer = nullptr;
   mDecoder = nullptr;
   mParent = nullptr;
+}
+
+void ImageDecoder::ResumeControlMessageQueue() {
+  MOZ_ASSERT(mMessageQueueBlocked);
+  mMessageQueueBlocked = false;
+  ProcessControlMessageQueue();
+}
+
+void ImageDecoder::ProcessControlMessageQueue() {
+  while (!mMessageQueueBlocked && !mControlMessageQueue.empty()) {
+    auto& msg = mControlMessageQueue.front();
+    auto result = MessageProcessedResult::Processed;
+    if (auto* submsg = msg->AsConfigureMessage()) {
+      result = ProcessConfigureMessage(submsg);
+    } else if (auto* submsg = msg->AsDecodeMetadataMessage()) {
+      result = ProcessDecodeMetadataMessage(submsg);
+    } else if (auto* submsg = msg->AsDecodeFrameMessage()) {
+      result = ProcessDecodeFrameMessage(submsg);
+    } else if (auto* submsg = msg->AsSelectTrackMessage()) {
+      result = ProcessSelectTrackMessage(submsg);
+    } else {
+      MOZ_ASSERT_UNREACHABLE("Unhandled control message type!");
+    }
+
+    if (result == MessageProcessedResult::NotProcessed) {
+      break;
+    }
+
+    mControlMessageQueue.pop();
+  }
+}
+
+MessageProcessedResult ImageDecoder::ProcessConfigureMessage(
+    ConfigureMessage* aMsg) {
+  // 10.2.2. Running a control message to configure the image decoder means
+  // running these steps:
+
+  // 1. Let supported be the result of running the Check Type Support algorithm
+  // with init.type.
+  //
+  // 2. If supported is false, run the Close ImageDecoder algorithm with a
+  // NotSupportedError DOMException and return "processed".
+  NS_ConvertUTF16toUTF8 mimeType(mType);
+  image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
+  if (NS_WARN_IF(type == image::DecoderType::UNKNOWN)) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
+            ("ImageDecoder %p Initialize -- unsupported mime type '%s'", this,
+             mimeType.get()));
+    Close(MediaResult(NS_ERROR_DOM_NOT_SUPPORTED_ERR,
+                      "Unsupported mime type"_ns));
+    return MessageProcessedResult::Processed;
+  }
+
+  image::SurfaceFlags surfaceFlags = image::DefaultSurfaceFlags();
+  switch (aMsg->mColorSpaceConversion) {
+    case ColorSpaceConversion::None:
+      surfaceFlags |= image::SurfaceFlags::NO_COLORSPACE_CONVERSION;
+      break;
+    case ColorSpaceConversion::Default:
+      break;
+    default:
+      MOZ_LOG(
+          gWebCodecsLog, LogLevel::Error,
+          ("ImageDecoder %p Initialize -- unsupported colorspace conversion",
+           this));
+      Close(MediaResult(NS_ERROR_DOM_NOT_SUPPORTED_ERR,
+                        "Unsupported colorspace conversion"_ns));
+      return MessageProcessedResult::Processed;
+  }
+
+  // 3. Otherwise, assign the [[codec implementation]] internal slot with an
+  // implementation supporting init.type
+  mDecoder =
+      image::ImageUtils::CreateDecoder(mSourceBuffer, type, surfaceFlags);
+  if (NS_WARN_IF(!mDecoder)) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
+            ("ImageDecoder %p Initialize -- failed to create platform decoder",
+             this));
+    Close(MediaResult(NS_ERROR_DOM_NOT_SUPPORTED_ERR,
+                      "Failed to create platform decoder"_ns));
+    return MessageProcessedResult::Processed;
+  }
+
+  // 4. Assign true to [[message queue blocked]].
+  mMessageQueueBlocked = true;
+
+  NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+      "ImageDecoder::ProcessConfigureMessage", [self = RefPtr{this}] {
+        // 5. Enqueue the following steps to the [[codec work queue]]:
+        // 5.1. Configure [[codec implementation]] in accordance with the values
+        //      given for colorSpaceConversion, desiredWidth, and desiredHeight.
+        // 5.2. Assign false to [[message queue blocked]].
+        // 5.3. Queue a task to Process the control message queue.
+        self->ResumeControlMessageQueue();
+      }));
+
+  // 6. Return "processed".
+  return MessageProcessedResult::Processed;
+}
+
+MessageProcessedResult ImageDecoder::ProcessDecodeMetadataMessage(
+    DecodeMetadataMessage* aMsg) {
+  // 10.2.2. Running a control message to decode track metadata means running
+  // these steps:
+
+  if (!mDecoder) {
+    return MessageProcessedResult::Processed;
+  }
+
+  // 1. Enqueue the following steps to the [[codec work queue]]:
+  // 1.1. Run the Establish Tracks algorithm.
+  mDecoder->DecodeMetadata()->Then(
+      GetCurrentSerialEventTarget(), __func__,
+      [self = WeakPtr{this}](const image::DecodeMetadataResult& aMetadata) {
+        if (self) {
+          self->OnMetadataSuccess(aMetadata);
+        }
+      },
+      [self = WeakPtr{this}](const nsresult& aErr) {
+        if (self) {
+          self->OnMetadataFailed(aErr);
+        }
+      });
+  return MessageProcessedResult::Processed;
+}
+
+MessageProcessedResult ImageDecoder::ProcessDecodeFrameMessage(
+    DecodeFrameMessage* aMsg) {
+  // 10.4.2. Running a control message to decode the image means running these
+  // steps:
+  //
+  // 1. Enqueue the following steps to the [[codec work queue]]:
+  // 1.1. Wait for [[tracks established]] to become true.
+  //
+  // 1.2. If options.completeFramesOnly is false and the image is a
+  //      Progressive Image for which the User Agent supports progressive
+  //      decoding, run the Decode Progressive Frame algorithm with
+  //      options.frameIndex and promise.
+  //
+  // 1.3. Otherwise, run the Decode Complete Frame algorithm with
+  //      options.frameIndex and promise.
+  return MessageProcessedResult::Processed;
+}
+
+MessageProcessedResult ImageDecoder::ProcessSelectTrackMessage(
+    SelectTrackMessage* aMsg) {
+  // 10.7.2. Running a control message to update the internal selected track
+  // index means running these steps:
+  //
+  // 1. Enqueue the following steps to [[ImageDecoder]]'s [[codec work queue]]:
+  // 1.1. Assign selectedIndex to [[internal selected track index]].
+  // 1.2. Remove all entries from [[progressive frame generations]].
+  return MessageProcessedResult::Processed;
 }
 
 /* static */ already_AddRefed<ImageDecoder> ImageDecoder::Constructor(
@@ -668,12 +867,20 @@ already_AddRefed<Promise> ImageDecoder::Decode(
 
 void ImageDecoder::OnDecodeFramesSuccess(
     const image::DecodeFramesResult& aResult) {
+  // 10.2.5. Decode Complete Frame (with frameIndex and promise)
   MOZ_ASSERT(mHasFramePending);
-  mHasFramePending = false;
 
+  // 1. Assert that [[tracks established]] is true.
+  MOZ_ASSERT(mTracksEstablished);
+
+  // Assert that [[internal selected track index]] is not -1.
   if (!mTracks) {
     return;
   }
+
+  ImageTrack* track = mTracks->GetDefaultTrack();
+
+  mHasFramePending = false;
 
   mDecodedFrames.SetCapacity(mDecodedFrames.Length() +
                              aResult.mFrames.Length());

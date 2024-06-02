@@ -7,11 +7,13 @@
 #ifndef mozilla_dom_ImageTrack_h
 #define mozilla_dom_ImageTrack_h
 
+#include "FrameTimeout.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/NotNull.h"
 #include "mozilla/dom/ImageDecoderBinding.h"
 #include "nsCycleCollectionParticipant.h"
+#include "nsTArray.h"
 #include "nsWrapperCache.h"
 
 class nsIGlobalObject;
@@ -19,10 +21,12 @@ class nsIGlobalObject;
 namespace mozilla {
 namespace image {
 struct DecodeFrameCountResult;
+struct DecodeFramesResult;
 }
 
 namespace dom {
 class ImageTrackList;
+class VideoFrame;
 
 class ImageTrack final : public nsISupports, public nsWrapperCache {
  public:
@@ -61,7 +65,15 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
   void ClearSelected() { mSelected = false; }
   void MarkSelected() { mSelected = true; }
 
+  VideoFrame* GetDecodedFrame(uint32_t aIndex) const {
+    if (mDecodedFrames.Length() <= aIndex) {
+      return nullptr;
+    }
+    return mDecodedFrames[aIndex];
+  }
+
   void OnFrameCountSuccess(const image::DecodeFrameCountResult& aResult);
+  void OnDecodeFramesSuccess(const image::DecodeFramesResult& aResult);
 
  private:
   // ImageTrack can run on either main thread or worker thread.
@@ -69,6 +81,8 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
 
   nsCOMPtr<nsIGlobalObject> mParent;
   RefPtr<ImageTrackList> mTrackList;
+  AutoTArray<RefPtr<VideoFrame>, 1> mDecodedFrames;
+  image::FrameTimeout mFramesTimestamp;
   int32_t mIndex = 0;
   float mRepetitionCount = 0.0f;
   uint32_t mFrameCount = 0;

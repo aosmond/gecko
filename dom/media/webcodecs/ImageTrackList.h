@@ -64,6 +64,13 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
     return mTracks[mSelectedIndex];
   }
 
+  ImageTrack* GetDefaultTrack() const {
+    if (mTracks.IsEmpty()) {
+      return nullptr;
+    }
+    return mTracks[0];
+  }
+
   ImageTrack* IndexedGetter(uint32_t aIndex, bool& aFound) const {
     if (aIndex >= mTracks.Length()) {
       aFound = false;

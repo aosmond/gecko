@@ -13,6 +13,7 @@
 #include "mozilla/NotNull.h"
 #include "mozilla/WeakPtr.h"
 #include "mozilla/dom/ImageDecoderBinding.h"
+#include "mozilla/dom/WebCodecsUtils.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsWrapperCache.h"
 
@@ -80,6 +81,16 @@ class ImageDecoder final : public nsISupports,
  private:
   ~ImageDecoder();
 
+  class ControlMessage;
+  class ConfigureMessage;
+  class DecodeMetadataMessage;
+  class DecodeFrameMessage;
+  class SelectTrackMessage;
+
+  std::queue<UniquePtr<ControlMessage>> mControlMessageQueue;
+  bool mMessageQueueBlocked = false;
+  bool mTracksEstablished = false;
+
   struct OutstandingDecode {
     RefPtr<Promise> mPromise;
     uint32_t mFrameIndex;
@@ -93,6 +104,14 @@ class ImageDecoder final : public nsISupports,
   void Destroy();
   void Reset(const MediaResult& aResult);
   void Close(const MediaResult& aResult);
+
+  void ResumeControlMessageQueue();
+  void ProcessControlMessageQueue();
+  MessageProcessedResult ProcessConfigureMessage(ConfigureMessage* aMsg);
+  MessageProcessedResult ProcessDecodeMetadataMessage(
+      DecodeMetadataMessage* aMsg);
+  MessageProcessedResult ProcessDecodeFrameMessage(DecodeFrameMessage* aMsg);
+  MessageProcessedResult ProcessSelectTrackMessage(SelectTrackMessage* aMsg);
 
   void OnCompleteSuccess();
   void OnCompleteFailed(const MediaResult& aResult);
