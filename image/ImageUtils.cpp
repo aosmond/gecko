@@ -56,7 +56,7 @@ class AnonymousDecoderTask : public IDecodingTask {
           MOZ_LOG(sLog, LogLevel::Debug,
                   ("[%p] AnonymousDecoderTask::Run -- new frame %p", this,
                    frame.get()));
-          resume = OnFrameAvailable(frame, std::move(surface));
+          resume = OnFrameAvailable(std::move(frame), std::move(surface));
         } else {
           MOZ_ASSERT_UNREACHABLE("No surface from frame?");
         }
@@ -78,7 +78,7 @@ class AnonymousDecoderTask : public IDecodingTask {
 
   virtual void OnNeedMoreData() {}
 
-  virtual bool OnFrameAvailable(imgFrame* aFrame,
+  virtual bool OnFrameAvailable(RefPtr<imgFrame>&& aFrame,
                                 RefPtr<gfx::SourceSurface>&& aSurface) {
     return true;
   }
@@ -144,14 +144,14 @@ class AnonymousFramesDecoderTask final : public AnonymousDecoderTask {
       : AnonymousDecoderTask(std::move(aDecoder), std::move(aOwner)) {}
 
  protected:
-  bool OnFrameAvailable(imgFrame* aFrame,
+  bool OnFrameAvailable(RefPtr<imgFrame>&& aFrame,
                         RefPtr<gfx::SourceSurface>&& aSurface) override {
     RefPtr<AnonymousDecoder> owner(mOwner);
     if (!owner) {
       return false;
     }
 
-    return owner->OnFrameAvailable(aFrame, std::move(aSurface));
+    return owner->OnFrameAvailable(std::move(aFrame), std::move(aSurface));
   }
 
   void OnComplete(bool aSuccess) override {
@@ -342,7 +342,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     }
   }
 
-  bool OnFrameAvailable(imgFrame* aFrame,
+  bool OnFrameAvailable(RefPtr<imgFrame>&& aFrame,
                         RefPtr<gfx::SourceSurface>&& aSurface) override {
     MutexAutoLock lock(mMutex);
 
@@ -351,14 +351,13 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
       return false;
     }
 
-    // Check for duplicate frames.
-    if (!mPendingFramesResult.mFrames.IsEmpty() &&
-        mPendingFramesResult.mFrames.LastElement().mSurface == aSurface) {
+    // Filter duplicate frames.
+    if (mLastFrame == aFrame) {
       return true;
     }
-
     mPendingFramesResult.mFrames.AppendElement(
         DecodedFrame{std::move(aSurface), aFrame->GetTimeout()});
+    mLastFrame = std::move(aFrame);
 
     MOZ_LOG(sLog, LogLevel::Debug,
             ("[%p] AnonymousDecoderImpl::OnFrameAvailable -- want %zu, got %zu",
@@ -394,6 +393,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     if (!mFramesPromise.IsEmpty()) {
       mFramesPromise.Resolve(std::move(mPendingFramesResult), __func__);
     }
+    mLastFrame = nullptr;
     mFramesTask = nullptr;
   }
 
@@ -488,6 +488,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
   RefPtr<AnonymousFramesDecoderTask> mFramesTask MOZ_GUARDED_BY(mMutex);
   RefPtr<AnonymousMetadataDecoderTask> mMetadataTask MOZ_GUARDED_BY(mMutex);
   RefPtr<AnonymousFrameCountDecoderTask> mFrameCountTask MOZ_GUARDED_BY(mMutex);
+  RefPtr<imgFrame> mLastFrame MOZ_GUARDED_BY(mMutex);
   DecodeMetadataResult mMetadataResult MOZ_GUARDED_BY(mMutex);
   DecodeFramesResult mPendingFramesResult MOZ_GUARDED_BY(mMutex);
   size_t mFramesToDecode MOZ_GUARDED_BY(mMutex) = 1;

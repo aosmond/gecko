@@ -95,7 +95,7 @@ class AnonymousDecoder : public SupportsThreadSafeWeakPtr<AnonymousDecoder> {
 
   virtual void OnFrameCount(uint32_t aFrameCount, bool aComplete) = 0;
 
-  virtual bool OnFrameAvailable(imgFrame* aFrame,
+  virtual bool OnFrameAvailable(RefPtr<imgFrame>&& aFrame,
                                 RefPtr<gfx::SourceSurface>&& aSurface) = 0;
 
   virtual void OnFrameComplete() = 0;
