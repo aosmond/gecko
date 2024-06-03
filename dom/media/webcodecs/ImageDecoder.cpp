@@ -352,7 +352,7 @@ void ImageDecoder::CheckOutstandingDecodes() {
                this, frameIndex));
       resolved.AppendElement(std::move(decode));
       mOutstandingDecodes.RemoveElementAt(i);
-    } else if (frameCountComplete && frameCount < frameIndex) {
+    } else if (frameCountComplete && frameCount <= frameIndex) {
       // We have gotten the last frame from the decoder, so we must reject any
       // unfulfilled requests.
       MOZ_LOG(gWebCodecsLog, LogLevel::Warning,
@@ -364,17 +364,16 @@ void ImageDecoder::CheckOutstandingDecodes() {
     } else {
       // We haven't gotten the last frame yet, so we can advance to the next
       // one.
+      MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+              ("ImageDecoder %p CheckOutstandingDecodes -- pending index %u",
+               this, frameIndex));
       minFrameIndex = std::min(minFrameIndex, frameIndex);
       ++i;
     }
   }
 
-  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-          ("ImageDecoder %p CheckOutstandingDecodes -- outstanding decodes %zu",
-           this, mOutstandingDecodes.Length()));
-
   if (minFrameIndex < UINT32_MAX) {
-    RequestDecodeFrames(minFrameIndex - decodedFrameCount + 1);
+    RequestDecodeFrames(minFrameIndex + 1 - decodedFrameCount);
   } else if (NS_WARN_IF(!mOutstandingDecodes.IsEmpty())) {
     // The caller requested a frame with an index of UINT32_MAX.
     rejected.AppendElements(std::move(mOutstandingDecodes));
@@ -902,8 +901,11 @@ already_AddRefed<Promise> ImageDecoder::Decode(
 
   // 2. If [[ImageTrackList]]'s [[selected index]] is '-1', return a Promise
   //    rejected with an InvalidStateError DOMException.
+  //
+  // This must be balanced with the fact that we might get a decode call before
+  // the tracks are established and we are supposed to wait.
   ImageTrack* track = mTracks->GetSelectedTrack();
-  if (!track) {
+  if (mTracksEstablished && !track) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoder %p Decode -- no track selected", this));
     promise->MaybeRejectWithInvalidStateError("No track selected"_ns);
