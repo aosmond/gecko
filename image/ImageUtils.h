@@ -50,11 +50,13 @@ struct DecodeMetadataResult {
   int32_t mWidth = 0;
   int32_t mHeight = 0;
   int32_t mRepetitions = -1;
+  uint32_t mTrackCount = 1;
   bool mAnimated = false;
 };
 
 struct DecodeFrameCountResult {
   uint32_t mFrameCount = 0;
+  int32_t mTrack = 0;
   bool mFinished = false;
 };
 
@@ -65,6 +67,7 @@ struct DecodedFrame {
 
 struct DecodeFramesResult {
   nsTArray<DecodedFrame> mFrames;
+  int32_t mTrack = 0;
   bool mFinished = false;
 };
 
