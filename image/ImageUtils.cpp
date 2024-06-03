@@ -263,6 +263,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     mMetadataResult.mHeight = size.height;
     mMetadataResult.mRepetitions = aMetadata->GetLoopCount();
     mMetadataResult.mAnimated = aMetadata->HasAnimation();
+    mMetadataTask = nullptr;
 
     MOZ_LOG(sLog, LogLevel::Debug,
             ("[%p] AnonymousDecoderImpl::OnMetadata -- %dx%d, repetitions %d, "
@@ -270,16 +271,20 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
              this, size.width, size.height, mMetadataResult.mRepetitions,
              mMetadataResult.mAnimated));
 
-    mMetadataPromise.Resolve(mMetadataResult, __func__);
-    mMetadataTask = nullptr;
-
-    if (mFrameCountTask) {
+    if (!mMetadataResult.mAnimated) {
+      mMetadataResult.mFrameCount = 1;
+      mMetadataResult.mFrameCountComplete = true;
+      mFrameCountTask = nullptr;
+    } else if (mFrameCountTask) {
       MOZ_LOG(
           sLog, LogLevel::Debug,
           ("[%p] AnonymousDecoderImpl::OnMetadata -- start frame count task",
            this));
       DecodePool::Singleton()->AsyncRun(mFrameCountTask);
+      return;
     }
+
+    mMetadataPromise.Resolve(mMetadataResult, __func__);
 
     if (mFramesTask && mFramesToDecode > 0) {
       MOZ_LOG(sLog, LogLevel::Debug,
@@ -310,9 +315,15 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
       resolve = true;
     }
 
+    // If metadata completing is waiting on an updated frame count, resolve it.
+    mMetadataResult.mFrameCount = mFrameCount;
+    mMetadataResult.mFrameCountComplete = aComplete;
+    mMetadataPromise.ResolveIfExists(mMetadataResult, __func__);
+
     if (resolve) {
       mFrameCountPromise.ResolveIfExists(
-          DecodeFrameCountResult{aFrameCount, aComplete}, __func__);
+          DecodeFrameCountResult{/* aTrack */ 0, aFrameCount, aComplete},
+          __func__);
     }
 
     if (aComplete) {
@@ -413,7 +424,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
                "detected %u, complete %d",
                this, aKnownFrameCount, mFrameCount, !mFrameCountTask));
       return DecodeFrameCountPromise::CreateAndResolve(
-          DecodeFrameCountResult{mFrameCount,
+          DecodeFrameCountResult{/* aTrack */ 0, mFrameCount,
                                  /* mFinished */ !mFrameCountTask},
           __func__);
     }

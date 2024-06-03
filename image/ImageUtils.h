@@ -9,6 +9,7 @@
 #include "FrameTimeout.h"
 #include "mozilla/image/SurfaceFlags.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/MozPromise.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/ThreadSafeWeakPtr.h"
@@ -51,12 +52,14 @@ struct DecodeMetadataResult {
   int32_t mHeight = 0;
   int32_t mRepetitions = -1;
   uint32_t mTrackCount = 1;
+  uint32_t mFrameCount = 0;
   bool mAnimated = false;
+  bool mFrameCountComplete = true;
 };
 
 struct DecodeFrameCountResult {
-  uint32_t mFrameCount = 0;
   int32_t mTrack = 0;
+  uint32_t mFrameCount = 0;
   bool mFinished = false;
 };
 
