@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/ImageTrackList.h"
+#include "MediaResult.h"
 #include "mozilla/dom/ImageTrack.h"
 #include "mozilla/image/ImageUtils.h"
 
@@ -52,52 +53,95 @@ void ImageTrackList::Destroy() {
   mSelectedIndex = -1;
 }
 
-void ImageTrackList::MaybeResolveReady() {
-  if (mIsReady) {
+void ImageTrackList::MaybeRejectReady(const MediaResult& aResult) {
+  if (mIsReady || !mReadyPromise || !mReadyPromise->PromiseObj()) {
     return;
   }
-
-  ImageTrack* track = GetSelectedTrack();
-  if (!track || (track->FrameCount() == 0 && !track->FrameCountComplete())) {
-    return;
-  }
-
-  mReadyPromise->MaybeResolveWithUndefined();
-  mIsReady = true;
-}
-
-void ImageTrackList::MaybeRejectReady(const nsACString& aReason) {
-  if (mIsReady) {
-    return;
-  }
-  mReadyPromise->MaybeRejectWithInvalidStateError(aReason);
+  aResult.RejectTo(mReadyPromise);
   mIsReady = true;
 }
 
 void ImageTrackList::OnMetadataSuccess(
     const image::DecodeMetadataResult& aMetadata) {
+  // 10.2.5. Establish Tracks
+  //
+  // Note that our implementation only supports one track, so many of these
+  // steps are simplified.
   MOZ_ASSERT(aMetadata.mTrackCount == 1);
 
+  // 4. Let newTrackList be a new list.
+  MOZ_ASSERT(mTracks.IsEmpty());
+
+  // 5. For each image track found in [[encoded data]]:
+  // 5.1. Let newTrack be a new ImageTrack, initialized as follows:
+  // 5.1.1. Assign this to [[ImageDecoder]].
+  // 5.1.2. Assign tracks to [[ImageTrackList]].
+  // 5.1.3. If image track is found to be animated, assign true to newTrack's
+  //        [[animated]] internal slot. Otherwise, assign false.
+  // 5.1.4. If image track is found to describe a frame count, assign that
+  //        count to newTrack's [[frame count]] internal slot. Otherwise, assign
+  //        0.
+  // 5.1.5. If image track is found to describe a repetition count, assign that
+  //        count to [[repetition count]] internal slot. Otherwise, assign 0.
+  // 5.1.6. Assign false to newTrack’s [[selected]] internal slot.
+  // 5.2. Append newTrack to newTrackList.
+  // 6. Let selectedTrackIndex be the result of running the Get Default Selected
+  //    Track Index algorithm with newTrackList.
+  // 7. Let selectedTrack be the track at position selectedTrackIndex within
+  //    newTrackList.
+  // 8. Assign true to selectedTrack’s [[selected]] internal slot.
+  // 9. Assign selectedTrackIndex to [[internal selected track index]].
+  const float repetitions = aMetadata.mRepetitions < 0
+                                ? std::numeric_limits<float>::infinity()
+                                : static_cast<float>(aMetadata.mRepetitions);
   auto track = MakeRefPtr<ImageTrack>(
       this, /* aIndex */ 0, /* aSelected */ true, aMetadata.mAnimated,
-      /* aFrameCount */ 0, aMetadata.mRepetitions);
-  mTracks.AppendElement(std::move(track));
-  mSelectedIndex = 0;
-}
+      aMetadata.mFrameCount, aMetadata.mFrameCountComplete, repetitions);
 
-void ImageTrackList::OnMetadataFailed(nsresult aErr) {
-  MaybeRejectReady("Metadata decoding failed"_ns);
+  // 11. Queue a task to perform the following steps:
+  //
+  // Note that we were already dispatched by the image decoder.
+
+  // 11.1. Assign newTrackList to the tracks [[track list]] internal slot.
+  mTracks.AppendElement(std::move(track));
+
+  // 11.2. Assign selectedTrackIndex to tracks [[selected index]].
+  mSelectedIndex = 0;
+
+  // 11.3. Resolve [[ready promise]].
+  MOZ_ASSERT(!mIsReady);
+  mReadyPromise->MaybeResolveWithUndefined();
+  mIsReady = true;
 }
 
 void ImageTrackList::OnFrameCountSuccess(
     const image::DecodeFrameCountResult& aResult) {
-  MOZ_ASSERT(aResult.mTrack >= 0);
-  if (mTracks.Length() <= static_cast<uint32_t>(aResult.mTrack)) {
+  if (mTracks.IsEmpty()) {
     return;
   }
 
-  mTracks[aResult.mTrack]->OnFrameCountSuccess(aResult);
-  MaybeResolveReady();
+  // 10.2.5. Update Tracks
+  //
+  // Note that we were already dispatched from the decoding threads.
+
+  // 3. Let trackList be a copy of tracks' [[track list]].
+  // 4. For each track in trackList:
+  // 4.1. Let trackIndex be the position of track in trackList.
+  // 4.2. Let latestFrameCount be the frame count as indicated by
+  //      [[encoded data]] for the track corresponding to track.
+  // 4.3. Assert that latestFrameCount is greater than or equal to
+  //      track.frameCount.
+  // 4.4. If latestFrameCount is greater than track.frameCount:
+  // 4.4.1. Let change be a track update struct whose track index is trackIndex
+  //        and frame count is latestFrameCount.
+  // 4.4.2. Append change to tracksChanges.
+  // 5. If tracksChanges is empty, abort these steps.
+  // 6. Queue a task to perform the following steps:
+  // 6.1. For each update in trackChanges:
+  // 6.1.1. Let updateTrack be the ImageTrack at position update.trackIndex
+  //        within tracks' [[track list]].
+  // 6.1.2. Assign update.frameCount to updateTrack’s [[frame count]].
+  mTracks.LastElement()->OnFrameCountSuccess(aResult);
 }
 
 void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {

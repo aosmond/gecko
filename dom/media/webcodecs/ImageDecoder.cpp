@@ -86,7 +86,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ImageDecoder)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mReadRequest)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCompletePromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mOutstandingDecodes)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mDecodedFrames)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
   NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
@@ -99,7 +98,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ImageDecoder)
   for (uint32_t i = 0; i < tmp->mOutstandingDecodes.Length(); ++i) {
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mOutstandingDecodes[i].mPromise);
   }
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDecodedFrames)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoder)
@@ -426,6 +424,9 @@ MessageProcessedResult ImageDecoder::ProcessSelectTrackMessage(
     }
   }
 
+  // 10.2.2.4. Let d be a new ImageDecoder object. In the steps below, all
+  //           mentions of ImageDecoder members apply to d unless stated
+  //           otherwise.
   nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
   auto imageDecoder = MakeRefPtr<ImageDecoder>(std::move(global), aInit.mType);
   imageDecoder->Initialize(aGlobal, aInit, aRv);
@@ -435,6 +436,12 @@ MessageProcessedResult ImageDecoder::ProcessSelectTrackMessage(
     return nullptr;
   }
 
+  // 10.2.2.19. For each transferable in init.transfer:
+  // 10.2.2.19.1. Perform DetachArrayBuffer on transferable
+  //
+  // Nothing to do, we already copied the data into SourceBuffer.
+
+  // 10.2.2.20. return d.
   return imageDecoder.forget();
 }
 
@@ -520,6 +527,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
       return;
     }
 
+    // 10.2.2.18.3.2. Assign a copy of init.data to [[encoded data]].
     rv = mSourceBuffer->Append(reinterpret_cast<const char*>(aData.Elements()),
                                aData.Length());
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -531,10 +539,36 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     }
 
     mSourceBuffer->Complete(NS_OK);
+
+    // 10.2.1.
+    //   [[complete]]
+    //     A boolean indicating whether [[encoded data]] is completely buffered.
+    //   [[completed promise]]
+    //     The promise used to signal when [[complete]] becomes true.
+    // 10.2.2.18.4. Assign true to [[complete]].
+    mComplete = true;
+
+    // 10.2.2.18.5. Resolve [[completed promise]].
+    mCompletePromise->MaybeResolveWithUndefined();
+
+    // FIXME
+    // 10.6.1. NOTE: ImageTrack frameCount can receive subsequent updates until
+    //         complete is true.
+    //
+    // Note that these sets of directives conflict with one another. We don't
+    // have the frame count yet.
   };
 
   if (aInit.mData.IsReadableStream()) {
+    // 10.2.2.17. If init’s data member is of type ReadableStream:
     const auto& stream = aInit.mData.GetAsReadableStream();
+
+    // 10.2.2.17.2. Assign false to [[complete]]
+    MOZ_ASSERT(!mComplete);
+
+    // 10.2.2.17.5. Let reader be the result of getting a reader for data.
+    // 10.2.2.17.6. In parallel, perform the Fetch Stream Data Loop on d with
+    //              reader.
     mReadRequest = MakeAndAddRef<ImageDecoderReadRequest>(mSourceBuffer);
     if (NS_WARN_IF(!mReadRequest->Initialize(aGlobal, this, stream))) {
       MOZ_LOG(
@@ -544,6 +578,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
       return;
     }
   } else if (aInit.mData.IsArrayBufferView()) {
+    // 10.2.2.18.3.1. Assert that init.data is of type BufferSource.
     const auto& view = aInit.mData.GetAsArrayBufferView();
     view.ProcessData([&](const Span<uint8_t>& aData, JS::AutoCheckCannotGC&&) {
       return fnSourceBufferFromSpan(aData);
@@ -552,6 +587,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
       return;
     }
   } else if (aInit.mData.IsArrayBuffer()) {
+    // 10.2.2.18.3.1. Assert that init.data is of type BufferSource.
     const auto& buffer = aInit.mData.GetAsArrayBuffer();
     buffer.ProcessData(
         [&](const Span<uint8_t>& aData, JS::AutoCheckCannotGC&&) {
@@ -566,19 +602,19 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
-  // 10.2.2.18.7. Queue a control message to decode track metadata.
-  mDecoder->DecodeMetadata()->Then(
-      GetCurrentSerialEventTarget(), __func__,
-      [self = WeakPtr{this}](const image::DecodeMetadataResult& aMetadata) {
-        if (self) {
-          self->OnMetadataSuccess(aMetadata);
-        }
-      },
-      [self = WeakPtr{this}](const nsresult& aErr) {
-        if (self) {
-          self->OnMetadataFailed(aErr);
-        }
-      });
+  // 10.2.2.17.3 / 10.2.2.18.6.
+  //   Queue a control message to configure the image decoder with init.
+  QueueConfigureMessage(aInit.mColorSpaceConversion);
+
+  // 10.2.10.2.2.18.7. Queue a control message to decode track metadata.
+  //
+  // Note that for readable streams it doesn't ever say to decode the metadata,
+  // but we can reasonably assume it means to decode the metadata in parallel
+  // with the reading of the stream.
+  QueueDecodeMetadataMessage();
+
+  // 10.2.2.18.8. Process the control message queue.
+  ProcessControlMessageQueue();
 }
 
 void ImageDecoder::OnSourceBufferComplete(const MediaResult& aResult) {
@@ -640,34 +676,51 @@ void ImageDecoder::OnMetadataSuccess(
     return;
   }
 
+  // 10.2.5. Establish Tracks
+
+  // 1. Assert [[tracks established]] is false.
+  MOZ_ASSERT(!mTracksEstablished);
+
+  // 2. and 3. See ImageDecoder::OnMetadataFailed.
+  MOZ_ASSERT(aMetadata.mTrackCount == 1);
+
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoder %p OnMetadataSuccess -- %dx%d, repetitions %d, "
-           "animated %d",
+           "animated %d, frameCount %u, frameCountComplete %d",
            this, aMetadata.mWidth, aMetadata.mHeight, aMetadata.mRepetitions,
-           aMetadata.mAnimated));
+           aMetadata.mAnimated, aMetadata.mFrameCount,
+           aMetadata.mFrameCountComplete));
 
+  // 4. - 9., 11. See ImageTrackList::OnMetadataSuccess
   mTracks->OnMetadataSuccess(aMetadata);
 
-  if (aMetadata.mAnimated) {
-    RequestFrameCount(/* aKnownFrameCount */ 0);
-  } else {
-    OnFrameCountSuccess(image::DecodeFrameCountResult{/* aFrameCount */ 1,
-                                                      /* mFinished */ true});
-  }
+  // 10. Assign true to [[tracks established]].
+  mTracksEstablished = true;
+
+  // If our encoded data comes from a ReadableStream, we may not have reached
+  // the end of the stream yet. As such, our frame count may be incomplete.
+  OnFrameCountSuccess(image::DecodeFrameCountResult{
+      /* aTrack */ 0, aMetadata.mFrameCount, aMetadata.mFrameCountComplete});
 }
 
 void ImageDecoder::OnMetadataFailed(const nsresult& aErr) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Error,
           ("ImageDecoder %p OnMetadataFailed 0x%08x", this, aErr));
 
-  MediaResult result(NS_ERROR_DOM_ENCODING_NOT_SUPPORTED_ERR,
-                     "Metadata decoding failed"_ns);
+  // 10.2.5. Establish Tracks
 
-  if (mTracks) {
-    mTracks->OnMetadataFailed(aErr);
-  }
+  // 1. Assert [[tracks established]] is false.
+  MOZ_ASSERT(!mTracksEstablished);
 
-  Close(result);
+  // 2. If [[encoded data]] does not contain enough data to determine the
+  //    number of tracks:
+  // 2.1. If complete is true, queue a task to run the Close ImageDecoder
+  //      algorithm.
+  // 2.2. Abort these steps.
+  // 3. If the number of tracks is found to be 0, queue a task to run the Close
+  //    ImageDecoder algorithm and abort these steps.
+  Close(MediaResult(NS_ERROR_DOM_ENCODING_NOT_SUPPORTED_ERR,
+                    "Metadata decoding failed"_ns));
 }
 
 void ImageDecoder::RequestFrameCount(uint32_t aKnownFrameCount) {
@@ -751,6 +804,12 @@ void ImageDecoder::OnFrameCountSuccess(
           ("ImageDecoder %p OnFrameCountSuccess -- frameCount %u, finished %d",
            this, aResult.mFrameCount, aResult.mFinished));
 
+  // 10.2.5. Update Tracks.
+
+  // 1. Assert [[tracks established]] is true.
+  MOZ_ASSERT(!mTracksEstablished);
+
+  // 2. - 6. See ImageTrackList::OnFrameCountSuccess.
   mTracks->OnFrameCountSuccess(aResult);
 
   if (aResult.mFinished) {
@@ -896,56 +955,23 @@ void ImageDecoder::OnDecodeFramesSuccess(
     const image::DecodeFramesResult& aResult) {
   // 10.2.5. Decode Complete Frame (with frameIndex and promise)
   MOZ_ASSERT(mHasFramePending);
+  mHasFramePending = false;
 
   // 1. Assert that [[tracks established]] is true.
   MOZ_ASSERT(mTracksEstablished);
 
-  // Assert that [[internal selected track index]] is not -1.
   if (!mTracks) {
     return;
   }
 
   ImageTrack* track = mTracks->GetDefaultTrack();
-
-  mHasFramePending = false;
-
-  mDecodedFrames.SetCapacity(mDecodedFrames.Length() +
-                             aResult.mFrames.Length());
-
-  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-          ("ImageDecoder %p OnDecodeFramesSuccess -- decoded %zu frames, %zu "
-           "total, finished %d",
-           this, aResult.mFrames.Length(), mDecodedFrames.Length(),
-           aResult.mFinished));
-
-  for (const auto& f : aResult.mFrames) {
-    VideoColorSpaceInit colorSpace;
-    gfx::IntSize size = f.mSurface->GetSize();
-    gfx::IntRect rect(gfx::IntPoint(0, 0), size);
-
-    Maybe<VideoPixelFormat> format =
-        SurfaceFormatToVideoPixelFormat(f.mSurface->GetFormat());
-    MOZ_ASSERT(format, "Unexpected format for image!");
-
-    Maybe<uint64_t> duration;
-    if (f.mTimeout != image::FrameTimeout::Forever()) {
-      duration =
-          Some(static_cast<uint64_t>(f.mTimeout.AsMilliseconds()) * 1000);
-    }
-
-    uint64_t timestamp = UINT64_MAX;
-    if (mFramesTimestamp != image::FrameTimeout::Forever()) {
-      timestamp =
-          static_cast<uint64_t>(mFramesTimestamp.AsMilliseconds()) * 1000;
-    }
-
-    mFramesTimestamp += f.mTimeout;
-
-    auto image = MakeRefPtr<layers::SourceSurfaceImage>(size, f.mSurface);
-    auto frame = MakeRefPtr<VideoFrame>(mParent, image, format, size, rect,
-                                        size, duration, timestamp, colorSpace);
-    mDecodedFrames.AppendElement(std::move(frame));
+  if (NS_WARN_IF(!track)) {
+    MOZ_ASSERT_UNREACHABLE("Must have default track!");
+    return;
   }
+
+  track->OnDecodeFramesSuccess(aResult);
+  size_t decodedFrameCount = track->DecodedFrameCount();
 
   AutoTArray<OutstandingDecode, 4> resolved;
   AutoTArray<OutstandingDecode, 4> rejected;
@@ -954,7 +980,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
   for (uint32_t i = 0; i < mOutstandingDecodes.Length();) {
     auto& decode = mOutstandingDecodes[i];
     const auto frameIndex = decode.mFrameIndex;
-    if (frameIndex < mDecodedFrames.Length()) {
+    if (frameIndex < decodedFrameCount) {
       MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
               ("ImageDecoder %p OnDecodeFramesSuccess -- resolved index %u",
                this, frameIndex));
@@ -987,7 +1013,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
 
   for (const auto& i : resolved) {
     ImageDecodeResult result;
-    result.mImage = mDecodedFrames[i.mFrameIndex];
+    result.mImage = track->GetDecodedFrame(i.mFrameIndex);
     result.mComplete = aResult.mFinished;
     i.mPromise->MaybeResolve(result);
   }
@@ -1044,12 +1070,10 @@ void ImageDecoder::Close(const MediaResult& aResult) {
   // 1. Run the Reset ImageDecoder algorithm with exception.
   Reset(aResult);
 
+  // 3. Clear [[codec implementation]] and release associated system resources.
   if (mDecoder) {
     mDecoder->Destroy();
   }
-
-  // 3. Clear [[codec implementation]] and release associated system resources.
-  mDecodedFrames.Clear();
 
   if (mReadRequest) {
     mReadRequest->Destroy();
@@ -1062,6 +1086,7 @@ void ImageDecoder::Close(const MediaResult& aResult) {
   // 4. Remove all entries from [[ImageTrackList]].
   // 5. Assign -1 to [[ImageTrackList]]'s [[selected index]].
   if (mTracks) {
+    mTracks->MaybeRejectReady(aResult);
     mTracks->Destroy();
     mTracks = nullptr;
   }

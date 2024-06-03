@@ -9,7 +9,8 @@
 
 namespace mozilla::dom {
 
-NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrack, mParent, mTrackList)
+NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrack, mParent, mTrackList,
+                                      mDecodedFrames)
 NS_IMPL_CYCLE_COLLECTING_ADDREF(ImageTrack)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(ImageTrack)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageTrack)
@@ -19,16 +20,16 @@ NS_INTERFACE_MAP_END
 
 ImageTrack::ImageTrack(ImageTrackList* aTrackList, int32_t aIndex,
                        bool aSelected, bool aAnimated, uint32_t aFrameCount,
-                       float aRepetitionCount)
+                       bool aFrameCountComplete, float aRepetitionCount)
     : mParent(aTrackList->GetParentObject()),
       mTrackList(aTrackList),
       mFramesTimestamp(image::FrameTimeout::Zero()),
       mIndex(aIndex),
       mRepetitionCount(aRepetitionCount),
       mFrameCount(aFrameCount),
+      mFrameCountComplete(aFrameCountComplete),
       mAnimated(aAnimated),
-      mSelected(aSelected) {
-}
+      mSelected(aSelected) {}
 
 ImageTrack::~ImageTrack() = default;
 
@@ -49,15 +50,9 @@ void ImageTrack::SetSelected(bool aSelected) {
 void ImageTrack::OnFrameCountSuccess(
     const image::DecodeFrameCountResult& aResult) {
   MOZ_ASSERT(aResult.mTrack == mIndex);
-
-  if (NS_WARN_IF(!mAnimated && aResult.mFrameCount > 1)) {
-    // The metadata decode may have indicated it was not animated, but we found
-    // multiple frames.
-    mFrameCount = 1;
-    mFrameCountComplete = true;
-    return;
-  }
-
+  MOZ_ASSERT_IF(mFrameCountComplete, mFrameCount == aResult.mFrameCount);
+  MOZ_ASSERT_IF(!aResult.mFinished, !mFrameCountComplete);
+  MOZ_ASSERT_IF(!mAnimated, aResult.mFrameCount <= 1);
   MOZ_ASSERT(aResult.mFrameCount >= mFrameCount);
   mFrameCount = aResult.mFrameCount;
   mFrameCountComplete = aResult.mFinished;
@@ -71,7 +66,8 @@ void ImageTrack::OnDecodeFramesSuccess(
            this, aResult.mFrames.Length(), mDecodedFrames.Length(),
            aResult.mFinished));
 
-  MOZ_ASSERT(aResult.mTrack == mIndex);
+  mDecodedFrames.SetCapacity(mDecodedFrames.Length() +
+                             aResult.mFrames.Length());
 
   for (const auto& f : aResult.mFrames) {
     VideoColorSpaceInit colorSpace;

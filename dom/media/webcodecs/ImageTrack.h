@@ -35,7 +35,8 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
 
  public:
   ImageTrack(ImageTrackList* aTrackList, int32_t aIndex, bool aSelected,
-             bool aAnimated, uint32_t aFrameCount, float aRepetitionCount);
+             bool aAnimated, uint32_t aFrameCount, bool aFrameCountComplete,
+             float aRepetitionCount);
 
  protected:
   ~ImageTrack();
@@ -65,6 +66,8 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
   void ClearSelected() { mSelected = false; }
   void MarkSelected() { mSelected = true; }
 
+  size_t DecodedFrameCount() const { return mDecodedFrames.Length(); }
+
   VideoFrame* GetDecodedFrame(uint32_t aIndex) const {
     if (mDecodedFrames.Length() <= aIndex) {
       return nullptr;
@@ -86,9 +89,9 @@ class ImageTrack final : public nsISupports, public nsWrapperCache {
   int32_t mIndex = 0;
   float mRepetitionCount = 0.0f;
   uint32_t mFrameCount = 0;
+  bool mFrameCountComplete = false;
   bool mAnimated = false;
   bool mSelected = false;
-  bool mFrameCountComplete = false;
 };
 
 }  // namespace dom

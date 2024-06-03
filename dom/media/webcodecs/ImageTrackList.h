@@ -15,6 +15,8 @@
 class nsIGlobalObject;
 
 namespace mozilla {
+class MediaResult;
+
 namespace image {
 struct DecodeFrameCountResult;
 struct DecodeMetadataResult;
@@ -34,9 +36,9 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   ImageTrackList(nsIGlobalObject* aParent, ImageDecoder* aDecoder);
 
   void Initialize(ErrorResult& aRv);
+  void MaybeRejectReady(const MediaResult& aResult);
   void Destroy();
   void OnMetadataSuccess(const image::DecodeMetadataResult& aMetadata);
-  void OnMetadataFailed(nsresult aErr);
   void OnFrameCountSuccess(const image::DecodeFrameCountResult& aResult);
   void SetSelectedIndex(int32_t aIndex, bool aSelected);
 
@@ -87,9 +89,6 @@ class ImageTrackList final : public nsISupports, public nsWrapperCache {
   void AssertIsOnOwningThread() const {
     NS_ASSERT_OWNINGTHREAD(ImageTrackList);
   }
-
-  void MaybeResolveReady();
-  void MaybeRejectReady(const nsACString& aReason);
 
   nsCOMPtr<nsIGlobalObject> mParent;
   RefPtr<ImageDecoder> mDecoder;

@@ -195,10 +195,15 @@ void ImageDecoderReadRequest::Complete(const MediaResult& aResult) {
 void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
                                          JS::Handle<JS::Value> aChunk,
                                          ErrorResult& aRv) {
+  // 10.2.5. Fetch Stream Data Loop (with reader) - chunk steps
+
+  // 1. If [[closed]] is true, abort these steps.
   if (!mSourceBuffer) {
     return;
   }
 
+  // 2. If chunk is not a Uint8Array object, queue a task to run the Close
+  // ImageDecoder algorithm with a DataError DOMException and abort these steps.
   RootedSpiderMonkeyInterface<Uint8Array> chunk(aCx);
   if (!aChunk.isObject() || !chunk.Init(&aChunk.toObject())) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -213,6 +218,8 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
             ("ImageDecoderReadRequest %p ChunkSteps -- write %zu bytes", this,
              aData.Length()));
 
+    // 3. Let bytes be the byte sequence represented by the Uint8Array object.
+    // 4. Append bytes to the [[encoded data]] internal slot.
     nsresult rv = mSourceBuffer->Append(
         reinterpret_cast<const char*>(aData.Elements()), aData.Length());
     if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -222,14 +229,25 @@ void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
       Complete(MediaResult(NS_ERROR_DOM_UNKNOWN_ERR,
                            "Reader cannot allocate storage for chunk"_ns));
     }
+
+    // 5. If [[tracks established]] is false, run the Establish Tracks
+    //    algorithm.
+    // 6. Otherwise, run the Update Tracks algorithm.
+    //
+    // Note that these steps will be triggered by the decoder promise callbacks.
   });
 
+  // 7. Run the Fetch Stream Data Loop algorithm with reader.
   QueueRead();
 }
 
 void ImageDecoderReadRequest::CloseSteps(JSContext* aCx, ErrorResult& aRv) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p CloseSteps", this));
+
+  // 10.2.5. Fetch Stream Data Loop (with reader) - close steps
+  // 1. Assign true to [[complete]]
+  // 2. Resolve [[completed promise]].
   Complete(MediaResult(NS_OK));
 }
 
@@ -238,6 +256,10 @@ void ImageDecoderReadRequest::ErrorSteps(JSContext* aCx,
                                          ErrorResult& aRv) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p ErrorSteps", this));
+
+  // 10.2.5. Fetch Stream Data Loop (with reader) - error steps
+  // 1. Queue a task to run the Close ImageDecoder algorithm with a
+  //    NotReadableError DOMException
   Complete(MediaResult(NS_ERROR_DOM_FILE_NOT_READABLE_ERR,
                        "Reader failed while waiting for chunk from stream"_ns));
 }
