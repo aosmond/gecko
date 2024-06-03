@@ -69,7 +69,12 @@ class ImageDecoder::DecodeFrameMessage final
 class ImageDecoder::SelectTrackMessage final
     : public ImageDecoder::ControlMessage {
  public:
+  SelectTrackMessage(uint32_t aSelectedTrack)
+      : mSelectedTrack(aSelectedTrack) {}
+
   SelectTrackMessage* AsSelectTrackMessage() override { return this; }
+
+  const uint32_t mSelectedTrack;
 };
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE_CLASS(ImageDecoder)
@@ -146,6 +151,26 @@ void ImageDecoder::Destroy() {
   mSourceBuffer = nullptr;
   mDecoder = nullptr;
   mParent = nullptr;
+}
+
+void ImageDecoder::QueueConfigureMessage(
+    ColorSpaceConversion aColorSpaceConversion) {
+  mControlMessageQueue.push(
+      MakeUnique<ConfigureMessage>(aColorSpaceConversion));
+}
+
+void ImageDecoder::QueueDecodeMetadataMessage() {
+  mControlMessageQueue.push(MakeUnique<DecodeMetadataMessage>());
+}
+
+void ImageDecoder::QueueDecodeFrameMessage(uint32_t aFrameIndex,
+                                           bool aCompleteFramesOnly) {
+  mControlMessageQueue.push(
+      MakeUnique<DecodeFrameMessage>(aFrameIndex, aCompleteFramesOnly));
+}
+
+void ImageDecoder::QueueSelectTrackMessage(uint32_t aSelectedIndex) {
+  mControlMessageQueue.push(MakeUnique<SelectTrackMessage>(aSelectedIndex));
 }
 
 void ImageDecoder::ResumeControlMessageQueue() {
@@ -298,6 +323,8 @@ MessageProcessedResult ImageDecoder::ProcessSelectTrackMessage(
   // 1. Enqueue the following steps to [[ImageDecoder]]'s [[codec work queue]]:
   // 1.1. Assign selectedIndex to [[internal selected track index]].
   // 1.2. Remove all entries from [[progressive frame generations]].
+  //
+  // At this time, progressive images and multi-track images are not supported.
   return MessageProcessedResult::Processed;
 }
 

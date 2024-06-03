@@ -78,6 +78,9 @@ class ImageDecoder final : public nsISupports,
 
   void OnSourceBufferComplete(const MediaResult& aResult);
 
+  void QueueSelectTrackMessage(uint32_t aSelectedTrack);
+  void ProcessControlMessageQueue();
+
  private:
   ~ImageDecoder();
 
@@ -105,8 +108,11 @@ class ImageDecoder final : public nsISupports,
   void Reset(const MediaResult& aResult);
   void Close(const MediaResult& aResult);
 
+  void QueueConfigureMessage(ColorSpaceConversion aColorSpaceConversion);
+  void QueueDecodeMetadataMessage();
+  void QueueDecodeFrameMessage(uint32_t aFrameIndex, bool aCompleteFramesOnly);
+
   void ResumeControlMessageQueue();
-  void ProcessControlMessageQueue();
   MessageProcessedResult ProcessConfigureMessage(ConfigureMessage* aMsg);
   MessageProcessedResult ProcessDecodeMetadataMessage(
       DecodeMetadataMessage* aMsg);
@@ -140,6 +146,7 @@ class ImageDecoder final : public nsISupports,
   bool mComplete = false;
   bool mHasFrameCount = false;
   bool mHasFramePending = false;
+  int32_t mSelectedTrack = -1;
 };
 
 }  // namespace dom

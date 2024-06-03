@@ -76,6 +76,8 @@ void ImageTrackList::MaybeRejectReady(const nsACString& aReason) {
 
 void ImageTrackList::OnMetadataSuccess(
     const image::DecodeMetadataResult& aMetadata) {
+  MOZ_ASSERT(aMetadata.mTrackCount == 1);
+
   auto track = MakeRefPtr<ImageTrack>(
       this, /* aIndex */ 0, /* aSelected */ true, aMetadata.mAnimated,
       /* aFrameCount */ 0, aMetadata.mRepetitions);
@@ -89,11 +91,12 @@ void ImageTrackList::OnMetadataFailed(nsresult aErr) {
 
 void ImageTrackList::OnFrameCountSuccess(
     const image::DecodeFrameCountResult& aResult) {
-  if (mTracks.IsEmpty()) {
+  MOZ_ASSERT(aResult.mTrack >= 0);
+  if (mTracks.Length() <= static_cast<uint32_t>(aResult.mTrack)) {
     return;
   }
 
-  mTracks.LastElement()->OnFrameCountSuccess(aResult);
+  mTracks[aResult.mTrack]->OnFrameCountSuccess(aResult);
   MaybeResolveReady();
 }
 
@@ -101,45 +104,58 @@ void ImageTrackList::SetSelectedIndex(int32_t aIndex, bool aSelected) {
   MOZ_ASSERT(aIndex >= 0);
   MOZ_ASSERT(uint32_t(aIndex) < mTracks.Length());
 
-  // 10.7.2.1. If [[ImageDecoder]]'s [[closed]] slot is true, abort these steps.
+  // 10.7.2. Attributes - selected, of type boolean
+
+  // 1. If [[ImageDecoder]]'s [[closed]] slot is true, abort these steps.
   if (!mDecoder) {
     return;
   }
 
-  // 10.7.2.2. and 10.7.2.3. handled in ImageTrack::SetSelected.
-
-  // 10.7.2.4. Assign newValue to [[selected]].
-  // 10.7.2.5. Let parentTrackList be [[ImageTrackList]]
-  // 10.7.2.6. Let oldSelectedIndex be the value of parentTrackList [[selected
-  // index]].
-  // 10.7.2.7. If oldSelectedIndex is not -1:
-  // 10.7.2.7.1. Let oldSelectedTrack be the ImageTrack in parentTrackList
-  // [[track list]] at the position of oldSelectedIndex.
-  // 10.7.2.7.2. Assign false to oldSelectedTrack [[selected]]
-  // 10.7.2.8. If newValue is true, let selectedIndex be the index of this
-  // ImageTrack within parentTrackList's [[track list]]. Otherwise, let
-  // selectedIndex be -1.
-  // 10.7.2.9. Assign selectedIndex to parentTrackList [[selected index]].
+  // 2. Let newValue be the given value.
+  // 3. If newValue equals [[selected]], abort these steps.
+  // 4. Assign newValue to [[selected]].
+  // 5. Let parentTrackList be [[ImageTrackList]]
+  // 6. Let oldSelectedIndex be the value of parentTrackList [[selected index]].
+  // 7. If oldSelectedIndex is not -1:
+  // 7.1. Let oldSelectedTrack be the ImageTrack in parentTrackList
+  //      [[track list]] at the position of oldSelectedIndex.
+  // 7.2. Assign false to oldSelectedTrack [[selected]]
+  // 8. If newValue is true, let selectedIndex be the index of this ImageTrack
+  //    within parentTrackList's [[track list]]. Otherwise, let selectedIndex be
+  //    -1.
+  // 9. Assign selectedIndex to parentTrackList [[selected index]].
   if (aSelected) {
     if (mSelectedIndex == -1) {
+      MOZ_ASSERT(!mTracks[aIndex]->Selected());
       mTracks[aIndex]->MarkSelected();
       mSelectedIndex = aIndex;
     } else if (mSelectedIndex != aIndex) {
+      MOZ_ASSERT(mTracks[mSelectedIndex]->Selected());
+      MOZ_ASSERT(!mTracks[aIndex]->Selected());
       mTracks[mSelectedIndex]->ClearSelected();
       mTracks[aIndex]->MarkSelected();
       mSelectedIndex = aIndex;
+    } else {
+      MOZ_ASSERT(mTracks[mSelectedIndex]->Selected());
+      return;
     }
   } else if (mSelectedIndex == aIndex) {
     mTracks[mSelectedIndex]->ClearSelected();
     mSelectedIndex = -1;
+  } else {
+    MOZ_ASSERT(!mTracks[aIndex]->Selected());
+    return;
   }
 
-  // 10.7.2.10. Run the Reset ImageDecoder algorithm on [[ImageDecoder]].
+  // 10. Run the Reset ImageDecoder algorithm on [[ImageDecoder]].
   mDecoder->Reset();
 
-  // FIXME
-  // 10.7.2.11. Queue a control message to [[ImageDecoder]]'s control message
-  // queue to update the internal selected track index with selectedIndex.
+  // 11. Queue a control message to [[ImageDecoder]]'s control message queue to
+  //     update the internal selected track index with selectedIndex.
+  mDecoder->QueueSelectTrackMessage(mSelectedIndex);
+
+  // 12. Process the control message queue belonging to [[ImageDecoder]].
+  mDecoder->ProcessControlMessageQueue();
 }
 
 }  // namespace mozilla::dom

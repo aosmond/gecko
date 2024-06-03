@@ -41,12 +41,6 @@ JSObject* ImageTrack::WrapObject(JSContext* aCx,
 }
 
 void ImageTrack::SetSelected(bool aSelected) {
-  // 10.7.2.2. Let newValue be the given value.
-  // 10.7.2.3. If newValue equals [[selected]], abort these steps.
-  if (mSelected == aSelected) {
-    return;
-  }
-
   if (mTrackList) {
     mTrackList->SetSelectedIndex(mIndex, aSelected);
   }
@@ -54,6 +48,8 @@ void ImageTrack::SetSelected(bool aSelected) {
 
 void ImageTrack::OnFrameCountSuccess(
     const image::DecodeFrameCountResult& aResult) {
+  MOZ_ASSERT(aResult.mTrack == mIndex);
+
   if (NS_WARN_IF(!mAnimated && aResult.mFrameCount > 1)) {
     // The metadata decode may have indicated it was not animated, but we found
     // multiple frames.
@@ -74,6 +70,8 @@ void ImageTrack::OnDecodeFramesSuccess(
            "total, finished %d",
            this, aResult.mFrames.Length(), mDecodedFrames.Length(),
            aResult.mFinished));
+
+  MOZ_ASSERT(aResult.mTrack == mIndex);
 
   for (const auto& f : aResult.mFrames) {
     VideoColorSpaceInit colorSpace;
