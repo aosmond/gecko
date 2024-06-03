@@ -367,7 +367,9 @@ void ImageDecoder::CheckOutstandingDecodes() {
       MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
               ("ImageDecoder %p CheckOutstandingDecodes -- pending index %u",
                this, frameIndex));
-      minFrameIndex = std::min(minFrameIndex, frameIndex);
+      if (frameCount > frameIndex) {
+        minFrameIndex = std::min(minFrameIndex, frameIndex);
+      }
       ++i;
     }
   }
