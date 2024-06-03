@@ -263,7 +263,6 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     mMetadataResult.mHeight = size.height;
     mMetadataResult.mRepetitions = aMetadata->GetLoopCount();
     mMetadataResult.mAnimated = aMetadata->HasAnimation();
-    mMetadataTask = nullptr;
 
     MOZ_LOG(sLog, LogLevel::Debug,
             ("[%p] AnonymousDecoderImpl::OnMetadata -- %dx%d, repetitions %d, "
@@ -274,6 +273,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     if (!mMetadataResult.mAnimated) {
       mMetadataResult.mFrameCount = 1;
       mMetadataResult.mFrameCountComplete = true;
+      mMetadataTask = nullptr;
       mFrameCountTask = nullptr;
     } else if (mFrameCountTask) {
       MOZ_LOG(
@@ -319,6 +319,18 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     mMetadataResult.mFrameCount = mFrameCount;
     mMetadataResult.mFrameCountComplete = aComplete;
     mMetadataPromise.ResolveIfExists(mMetadataResult, __func__);
+
+    if (mMetadataTask) {
+      mMetadataTask = nullptr;
+      if (mFramesTask && mFramesToDecode > 0) {
+        MOZ_LOG(
+            sLog, LogLevel::Debug,
+            ("[%p] AnonymousDecoderImpl::OnFrameCount -- start frames task, "
+             "want %zu",
+             this, mFramesToDecode));
+        DecodePool::Singleton()->AsyncRun(mFramesTask);
+      }
+    }
 
     if (resolve) {
       mFrameCountPromise.ResolveIfExists(
