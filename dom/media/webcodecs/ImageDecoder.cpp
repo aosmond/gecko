@@ -57,13 +57,7 @@ class ImageDecoder::DecodeMetadataMessage final
 class ImageDecoder::DecodeFrameMessage final
     : public ImageDecoder::ControlMessage {
  public:
-  DecodeFrameMessage(uint32_t aFrameIndex, bool aCompleteFramesOnly)
-      : mFrameIndex(aFrameIndex), mCompleteFramesOnly(aCompleteFramesOnly) {}
-
   DecodeFrameMessage* AsDecodeFrameMessage() override { return this; }
-
-  const uint32_t mFrameIndex;
-  const bool mCompleteFramesOnly;
 };
 
 class ImageDecoder::SelectTrackMessage final
@@ -161,10 +155,8 @@ void ImageDecoder::QueueDecodeMetadataMessage() {
   mControlMessageQueue.push(MakeUnique<DecodeMetadataMessage>());
 }
 
-void ImageDecoder::QueueDecodeFrameMessage(uint32_t aFrameIndex,
-                                           bool aCompleteFramesOnly) {
-  mControlMessageQueue.push(
-      MakeUnique<DecodeFrameMessage>(aFrameIndex, aCompleteFramesOnly));
+void ImageDecoder::QueueDecodeFrameMessage() {
+  mControlMessageQueue.push(MakeUnique<DecodeFrameMessage>());
 }
 
 void ImageDecoder::QueueSelectTrackMessage(uint32_t aSelectedIndex) {
@@ -310,6 +302,9 @@ MessageProcessedResult ImageDecoder::ProcessDecodeFrameMessage(
   //
   // 1.3. Otherwise, run the Decode Complete Frame algorithm with
   //      options.frameIndex and promise.
+  NS_DispatchToCurrentThread(NS_NewRunnableFunction(
+      "ImageDecoder::ProcessDecodeFrameMessage",
+      [self = RefPtr{this}] { self->CheckOutstandingDecodes(); }));
   return MessageProcessedResult::Processed;
 }
 
@@ -324,6 +319,79 @@ MessageProcessedResult ImageDecoder::ProcessSelectTrackMessage(
   //
   // At this time, progressive images and multi-track images are not supported.
   return MessageProcessedResult::Processed;
+}
+
+void ImageDecoder::CheckOutstandingDecodes() {
+  // 10.2.5. Resolve Decode (with promise and result)
+
+  // 1. If [[closed]], abort these steps.
+  if (!mTracks) {
+    return;
+  }
+
+  ImageTrack* track = mTracks->GetDefaultTrack();
+  if (!track) {
+    return;
+  }
+
+  const uint32_t decodedFrameCount = track->DecodedFrameCount();
+  const uint32_t frameCount = track->FrameCount();
+  const bool frameCountComplete = track->FrameCountComplete();
+
+  AutoTArray<OutstandingDecode, 4> resolved;
+  AutoTArray<OutstandingDecode, 4> rejected;
+  uint32_t minFrameIndex = UINT32_MAX;
+
+  // 3. Remove promise from [[pending decode promises]].
+  for (uint32_t i = 0; i < mOutstandingDecodes.Length();) {
+    auto& decode = mOutstandingDecodes[i];
+    const auto frameIndex = decode.mFrameIndex;
+    if (frameIndex < decodedFrameCount) {
+      MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+              ("ImageDecoder %p CheckOutstandingDecodes -- resolved index %u",
+               this, frameIndex));
+      resolved.AppendElement(std::move(decode));
+      mOutstandingDecodes.RemoveElementAt(i);
+    } else if (frameCountComplete && frameCount < frameIndex) {
+      // We have gotten the last frame from the decoder, so we must reject any
+      // unfulfilled requests.
+      MOZ_LOG(gWebCodecsLog, LogLevel::Warning,
+              ("ImageDecoder %p CheckOutstandingDecodes -- rejected index %u "
+               "out-of-bounds",
+               this, frameIndex));
+      rejected.AppendElement(std::move(decode));
+      mOutstandingDecodes.RemoveElementAt(i);
+    } else {
+      // We haven't gotten the last frame yet, so we can advance to the next
+      // one.
+      minFrameIndex = std::min(minFrameIndex, frameIndex);
+      ++i;
+    }
+  }
+
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("ImageDecoder %p CheckOutstandingDecodes -- outstanding decodes %zu",
+           this, mOutstandingDecodes.Length()));
+
+  if (minFrameIndex < UINT32_MAX) {
+    RequestDecodeFrames(minFrameIndex - decodedFrameCount + 1);
+  } else if (NS_WARN_IF(!mOutstandingDecodes.IsEmpty())) {
+    // The caller requested a frame with an index of UINT32_MAX.
+    rejected.AppendElements(std::move(mOutstandingDecodes));
+  }
+
+  // 4. Resolve promise with result.
+  for (const auto& i : resolved) {
+    ImageDecodeResult result;
+    result.mImage = track->GetDecodedFrame(i.mFrameIndex);
+    // TODO(aosmond): progressive images
+    result.mComplete = true;
+    i.mPromise->MaybeResolve(result);
+  }
+
+  for (const auto& i : rejected) {
+    i.mPromise->MaybeRejectWithRangeError("No more frames available"_ns);
+  }
 }
 
 /* static */ already_AddRefed<ImageDecoder> ImageDecoder::Constructor(
@@ -705,7 +773,8 @@ void ImageDecoder::OnMetadataSuccess(
 
 void ImageDecoder::OnMetadataFailed(const nsresult& aErr) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-          ("ImageDecoder %p OnMetadataFailed 0x%08x", this, aErr));
+          ("ImageDecoder %p OnMetadataFailed 0x%08x", this,
+           static_cast<uint32_t>(aErr)));
 
   // 10.2.5. Establish Tracks
 
@@ -748,38 +817,18 @@ void ImageDecoder::RequestFrameCount(uint32_t aKnownFrameCount) {
           });
 }
 
-void ImageDecoder::RequestDecodeFrames(uint32_t aFrameIndex) {
-  if (NS_WARN_IF(aFrameIndex < mDecodedFrames.Length())) {
-    MOZ_ASSERT_UNREACHABLE("Already decoded requested frame!");
-    return;
-  }
-
-  if (NS_WARN_IF(!mDecoder)) {
-    return;
-  }
-
-  MOZ_ASSERT(!mOutstandingDecodes.IsEmpty());
-
-  CheckedInt<uint32_t> framesToDecode =
-      CheckedInt<uint32_t>(aFrameIndex) + 1 - mDecodedFrames.Length();
-  if (NS_WARN_IF(!framesToDecode.isValid())) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p RequestDecodeFrames -- frameIndex %u overflow",
-             this, aFrameIndex));
-    return;
-  }
-
-  if (mHasFramePending) {
+void ImageDecoder::RequestDecodeFrames(uint32_t aFramesToDecode) {
+  if (!mDecoder || mHasFramePending) {
     return;
   }
 
   mHasFramePending = true;
 
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-          ("ImageDecoder %p RequestDecodeFrames -- frameIndex %u "
-           "(framesToDecode %u)",
-           this, aFrameIndex, framesToDecode.value()));
-  mDecoder->DecodeFrames(framesToDecode.value())
+          ("ImageDecoder %p RequestDecodeFrames -- framesToDecode %u", this,
+           aFramesToDecode));
+
+  mDecoder->DecodeFrames(aFramesToDecode)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
           [self = WeakPtr{this}](const image::DecodeFramesResult& aResult) {
@@ -819,59 +868,7 @@ void ImageDecoder::OnFrameCountSuccess(
     RequestFrameCount(aResult.mFrameCount);
   }
 
-  if (mOutstandingDecodes.IsEmpty()) {
-    return;
-  }
-
-  AutoTArray<OutstandingDecode, 1> rejected;
-
-  ImageTrack* track = mTracks->GetSelectedTrack();
-  if (NS_WARN_IF(!track)) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p OnFrameCountSuccess -- no selected track", this));
-    rejected = std::move(mOutstandingDecodes);
-    for (const auto& i : rejected) {
-      i.mPromise->MaybeRejectWithInvalidStateError("No track selected"_ns);
-    }
-    return;
-  }
-
-  if (NS_WARN_IF(!mDecoder)) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p OnFrameCountSuccess -- no decoder", this));
-    rejected = std::move(mOutstandingDecodes);
-    for (const auto& i : rejected) {
-      i.mPromise->MaybeRejectWithInvalidStateError("No decoder available"_ns);
-    }
-    return;
-  }
-
-  uint32_t minFrameIndex = UINT32_MAX;
-
-  for (uint32_t i = 0; i < mOutstandingDecodes.Length();) {
-    auto& decode = mOutstandingDecodes[i];
-    const auto frameIndex = decode.mFrameIndex;
-    if (frameIndex < track->FrameCount()) {
-      minFrameIndex = std::min(minFrameIndex, frameIndex);
-      ++i;
-    } else if (track->FrameCountComplete()) {
-      MOZ_LOG(gWebCodecsLog, LogLevel::Warning,
-              ("ImageDecoder %p OnFrameCountSuccess -- reject %u out-of-bounds",
-               this, frameIndex));
-      rejected.AppendElement(std::move(decode));
-      mOutstandingDecodes.RemoveElementAt(i);
-    } else {
-      ++i;
-    }
-  }
-
-  if (!mOutstandingDecodes.IsEmpty()) {
-    RequestDecodeFrames(minFrameIndex);
-  }
-
-  for (const auto& i : rejected) {
-    i.mPromise->MaybeRejectWithRangeError("Index beyond frame count bounds"_ns);
-  }
+  CheckOutstandingDecodes();
 }
 
 void ImageDecoder::OnFrameCountFailed(const nsresult& aErr) {
@@ -885,6 +882,9 @@ void ImageDecoder::GetType(nsAString& aType) const { aType.Assign(mType); }
 
 already_AddRefed<Promise> ImageDecoder::Decode(
     const ImageDecodeOptions& aOptions, ErrorResult& aRv) {
+  // 10.2.4. decode(options)
+
+  // 4. Let promise be a new Promise.
   RefPtr<Promise> promise = Promise::Create(mParent, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -892,8 +892,8 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return nullptr;
   }
 
-  // 10.2.4.1. If [[closed]] is true, return a Promise rejected with an
-  // InvalidStateError DOMException.
+  // 1. If [[closed]] is true, return a Promise rejected with an
+  //    InvalidStateError DOMException.
   if (!mTracks || !mDecoder) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoder %p Decode -- closed", this));
@@ -901,8 +901,8 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return promise.forget();
   }
 
-  // 10.2.4.2. If [[ImageTrackList]]'s [[selected index]] is '-1', return a
-  // Promise rejected with an InvalidStateError DOMException.
+  // 2. If [[ImageTrackList]]'s [[selected index]] is '-1', return a Promise
+  //    rejected with an InvalidStateError DOMException.
   ImageTrack* track = mTracks->GetSelectedTrack();
   if (!track) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
@@ -911,43 +911,18 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return promise.forget();
   }
 
-  if (NS_WARN_IF(aOptions.mFrameIndex > INT32_MAX)) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p Decode -- invalid index", this));
-    promise->MaybeRejectWithRangeError("Index outside valid range"_ns);
-    return promise.forget();
-  }
+  // 3. If options is undefined, assign a new ImageDecodeOptions to options.
+  // 5. Append promise to [[pending decode promises]].
+  mOutstandingDecodes.AppendElement(OutstandingDecode{
+      promise, aOptions.mFrameIndex, aOptions.mCompleteFramesOnly});
 
-  if (mComplete && aOptions.mFrameIndex >= track->FrameCount()) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p Decode -- index %u out-of-bounds %u", this,
-             aOptions.mFrameIndex, track->FrameCount()));
-    promise->MaybeRejectWithRangeError("Index beyond frame count bounds"_ns);
-    return promise.forget();
-  }
+  // 6. Queue a control message to decode the image with options, and promise.
+  QueueDecodeFrameMessage();
 
-  if (aOptions.mFrameIndex < mDecodedFrames.Length()) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-            ("ImageDecoder %p Decode -- index %u already decoded", this,
-             aOptions.mFrameIndex));
-    ImageDecodeResult result;
-    result.mImage = mDecodedFrames[aOptions.mFrameIndex];
-    result.mComplete = true;
-    promise->MaybeResolve(result);
-    return promise.forget();
-  }
+  // 7. Process the control message queue.
+  ProcessControlMessageQueue();
 
-  MOZ_LOG(
-      gWebCodecsLog, LogLevel::Debug,
-      ("ImageDecoder %p Decode -- queue index %u", this, aOptions.mFrameIndex));
-  bool wasEmpty = mOutstandingDecodes.IsEmpty();
-  mOutstandingDecodes.AppendElement(
-      OutstandingDecode{promise, aOptions.mFrameIndex});
-
-  if (wasEmpty) {
-    RequestDecodeFrames(aOptions.mFrameIndex);
-  }
-
+  // 8. Return promise.
   return promise.forget();
 }
 
@@ -971,56 +946,8 @@ void ImageDecoder::OnDecodeFramesSuccess(
   }
 
   track->OnDecodeFramesSuccess(aResult);
-  size_t decodedFrameCount = track->DecodedFrameCount();
 
-  AutoTArray<OutstandingDecode, 4> resolved;
-  AutoTArray<OutstandingDecode, 4> rejected;
-  uint32_t minFrameIndex = UINT32_MAX;
-
-  for (uint32_t i = 0; i < mOutstandingDecodes.Length();) {
-    auto& decode = mOutstandingDecodes[i];
-    const auto frameIndex = decode.mFrameIndex;
-    if (frameIndex < decodedFrameCount) {
-      MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-              ("ImageDecoder %p OnDecodeFramesSuccess -- resolved index %u",
-               this, frameIndex));
-      resolved.AppendElement(std::move(decode));
-      mOutstandingDecodes.RemoveElementAt(i);
-    } else if (aResult.mFinished) {
-      // We have gotten the last frame from the decoder, so we must reject any
-      // unfulfilled requests.
-      MOZ_LOG(gWebCodecsLog, LogLevel::Warning,
-              ("ImageDecoder %p OnDecodeFramesSuccess -- rejected index %u "
-               "out-of-bounds",
-               this, frameIndex));
-      rejected.AppendElement(std::move(decode));
-      mOutstandingDecodes.RemoveElementAt(i);
-    } else {
-      // We haven't gotten the last frame yet, so we can advance to the next
-      // one.
-      minFrameIndex = std::min(minFrameIndex, frameIndex);
-      ++i;
-    }
-  }
-
-  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
-          ("ImageDecoder %p OnDecodeFramesSuccess -- outstanding decodes %zu",
-           this, mOutstandingDecodes.Length()));
-
-  if (!mOutstandingDecodes.IsEmpty()) {
-    RequestDecodeFrames(minFrameIndex);
-  }
-
-  for (const auto& i : resolved) {
-    ImageDecodeResult result;
-    result.mImage = track->GetDecodedFrame(i.mFrameIndex);
-    result.mComplete = aResult.mFinished;
-    i.mPromise->MaybeResolve(result);
-  }
-
-  for (const auto& i : rejected) {
-    i.mPromise->MaybeRejectWithRangeError("No more frames available"_ns);
-  }
+  CheckOutstandingDecodes();
 }
 
 void ImageDecoder::OnDecodeFramesFailed(const nsresult& aErr) {

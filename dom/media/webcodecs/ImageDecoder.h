@@ -34,7 +34,6 @@ struct DecodeMetadataResult;
 
 namespace dom {
 class Promise;
-class VideoFrame;
 struct ImageDecoderReadRequest;
 
 class ImageDecoder final : public nsISupports,
@@ -96,7 +95,8 @@ class ImageDecoder final : public nsISupports,
 
   struct OutstandingDecode {
     RefPtr<Promise> mPromise;
-    uint32_t mFrameIndex;
+    uint32_t mFrameIndex = 0;
+    bool mCompleteFramesOnly = true;
   };
 
   // VideoFrame can run on either main thread or worker thread.
@@ -110,7 +110,7 @@ class ImageDecoder final : public nsISupports,
 
   void QueueConfigureMessage(ColorSpaceConversion aColorSpaceConversion);
   void QueueDecodeMetadataMessage();
-  void QueueDecodeFrameMessage(uint32_t aFrameIndex, bool aCompleteFramesOnly);
+  void QueueDecodeFrameMessage();
 
   void ResumeControlMessageQueue();
   MessageProcessedResult ProcessConfigureMessage(ConfigureMessage* aMsg);
@@ -118,6 +118,8 @@ class ImageDecoder final : public nsISupports,
       DecodeMetadataMessage* aMsg);
   MessageProcessedResult ProcessDecodeFrameMessage(DecodeFrameMessage* aMsg);
   MessageProcessedResult ProcessSelectTrackMessage(SelectTrackMessage* aMsg);
+
+  void CheckOutstandingDecodes();
 
   void OnCompleteSuccess();
   void OnCompleteFailed(const MediaResult& aResult);
@@ -129,7 +131,7 @@ class ImageDecoder final : public nsISupports,
   void OnFrameCountSuccess(const image::DecodeFrameCountResult& aResult);
   void OnFrameCountFailed(const nsresult& aErr);
 
-  void RequestDecodeFrames(uint32_t aFrameIndex);
+  void RequestDecodeFrames(uint32_t aFramesToDecode);
   void OnDecodeFramesSuccess(const image::DecodeFramesResult& aResult);
   void OnDecodeFramesFailed(const nsresult& aErr);
 
@@ -140,7 +142,6 @@ class ImageDecoder final : public nsISupports,
   RefPtr<image::SourceBuffer> mSourceBuffer;
   RefPtr<image::AnonymousDecoder> mDecoder;
   AutoTArray<OutstandingDecode, 1> mOutstandingDecodes;
-  AutoTArray<RefPtr<VideoFrame>, 1> mDecodedFrames;
   nsAutoString mType;
   image::FrameTimeout mFramesTimestamp;
   bool mComplete = false;
