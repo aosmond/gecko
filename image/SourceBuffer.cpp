@@ -311,6 +311,11 @@ void SourceBuffer::ResumeWaitingConsumers(
     nsTArray<RefPtr<IResumable>>& aWaitingConsumers) {
   mMutex.AssertNotCurrentThreadOwns();
 
+  if (AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdownFinal)) {
+    // The DecodePool has already gone away.
+    return;
+  }
+
   for (uint32_t i = 0; i < aWaitingConsumers.Length(); ++i) {
     aWaitingConsumers[i]->Resume();
   }
