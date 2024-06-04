@@ -451,7 +451,9 @@ std::tuple<int32_t, Maybe<WriteState>> nsGIFDecoder2::YieldPixels(
 /// Expand the colormap from RGB to Packed ARGB as needed by Cairo.
 /// And apply any LCMS transformation.
 void nsGIFDecoder2::ConvertColormap(uint32_t* aColormap, uint32_t aColors) {
-  if (!aColors) {
+  // If we are just counting frames for a metadata decode, there is no need to
+  // prep the colormap.
+  if (!aColors || WantsFrameCount()) {
     return;
   }
 
@@ -947,9 +949,13 @@ LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::FinishImageDescriptor(
 
 LexerTransition<nsGIFDecoder2::State> nsGIFDecoder2::ReadLocalColorTable(
     const char* aData, size_t aLength) {
-  uint8_t* dest = reinterpret_cast<uint8_t*>(mColormap) + mColorTablePos;
-  memcpy(dest, aData, aLength);
-  mColorTablePos += aLength;
+  // If we are just counting frames for a metadata decode, there is no need to
+  // prep the colormap.
+  if (!WantsFrameCount()) {
+    uint8_t* dest = reinterpret_cast<uint8_t*>(mColormap) + mColorTablePos;
+    memcpy(dest, aData, aLength);
+    mColorTablePos += aLength;
+  }
   return Transition::ContinueUnbuffered(State::LOCAL_COLOR_TABLE);
 }
 
