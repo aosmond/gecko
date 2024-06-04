@@ -29,7 +29,8 @@ void MediaResult::ThrowTo(ErrorResult& aRv) const {
     EXTENDED_EXCEPTIONS
     default:
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
-      MOZ_CRASH_UNSAFE_PRINTF("Unhandled result 0x%08x", mCode);
+      MOZ_CRASH_UNSAFE_PRINTF("Unhandled result 0x%08x",
+                              static_cast<uint32_t>(mCode));
 #endif
       aRv.ThrowUnknownError(mMessage);
       break;
@@ -48,7 +49,8 @@ void MediaResult::RejectTo(dom::Promise* aPromise) const {
     EXTENDED_EXCEPTIONS
     default:
 #ifdef MOZ_DIAGNOSTIC_ASSERT_ENABLED
-      MOZ_CRASH_UNSAFE_PRINTF("Unhandled result 0x%08x", mCode);
+      MOZ_CRASH_UNSAFE_PRINTF("Unhandled result 0x%08x",
+                              static_cast<uint32_t>(mCode));
 #endif
       aPromise->MaybeRejectWithUnknownError(mMessage);
       break;
