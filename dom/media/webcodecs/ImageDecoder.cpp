@@ -1012,6 +1012,7 @@ void ImageDecoder::Close(const MediaResult& aResult) {
 
   mSourceBuffer = nullptr;
   mDecoder = nullptr;
+  mType = u""_ns;
 
   // 4. Remove all entries from [[ImageTrackList]].
   // 5. Assign -1 to [[ImageTrackList]]'s [[selected index]].
