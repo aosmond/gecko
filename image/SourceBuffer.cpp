@@ -313,6 +313,7 @@ void SourceBuffer::ResumeWaitingConsumers(
 
   if (AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdownFinal)) {
     // The DecodePool has already gone away.
+    aWaitingConsumers.Clear();
     return;
   }
 
