@@ -324,7 +324,7 @@ void ImageDecoder::CheckOutstandingDecodes() {
   // 10.2.5. Resolve Decode (with promise and result)
 
   // 1. If [[closed]], abort these steps.
-  if (!mTracks) {
+  if (mClosed || !mTracks) {
     return;
   }
 
@@ -375,9 +375,6 @@ void ImageDecoder::CheckOutstandingDecodes() {
 
   if (minFrameIndex < UINT32_MAX) {
     RequestDecodeFrames(minFrameIndex + 1 - decodedFrameCount);
-  } else if (NS_WARN_IF(!mOutstandingDecodes.IsEmpty())) {
-    // The caller requested a frame with an index of UINT32_MAX.
-    rejected.AppendElements(std::move(mOutstandingDecodes));
   }
 
   // 4. Resolve promise with result.
@@ -554,35 +551,7 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
     return;
   }
 
-  NS_ConvertUTF16toUTF8 mimeType(mType);
-  image::DecoderType type = image::ImageUtils::GetDecoderType(mimeType);
-
-  image::SurfaceFlags surfaceFlags = image::DefaultSurfaceFlags();
-  switch (aInit.mColorSpaceConversion) {
-    case ColorSpaceConversion::None:
-      surfaceFlags |= image::SurfaceFlags::NO_COLORSPACE_CONVERSION;
-      break;
-    case ColorSpaceConversion::Default:
-      break;
-    default:
-      MOZ_LOG(
-          gWebCodecsLog, LogLevel::Error,
-          ("ImageDecoder %p Initialize -- unsupported colorspace conversion",
-           this));
-      aRv.ThrowNotSupportedError("Unsupported colorspace conversion");
-      return;
-  }
-
   mSourceBuffer = MakeRefPtr<image::SourceBuffer>();
-  mDecoder =
-      image::ImageUtils::CreateDecoder(mSourceBuffer, type, surfaceFlags);
-  if (NS_WARN_IF(!mDecoder)) {
-    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
-            ("ImageDecoder %p Initialize -- failed to create platform decoder",
-             this));
-    OnMetadataFailed(NS_ERROR_FAILURE);
-    return;
-  }
 
   const auto fnSourceBufferFromSpan = [&](const Span<uint8_t>& aData) {
     nsresult rv = mSourceBuffer->ExpectLength(aData.Length());
@@ -740,7 +709,7 @@ void ImageDecoder::OnCompleteFailed(const MediaResult& aResult) {
 
 void ImageDecoder::OnMetadataSuccess(
     const image::DecodeMetadataResult& aMetadata) {
-  if (!mTracks) {
+  if (mClosed || !mTracks) {
     return;
   }
 
@@ -844,7 +813,7 @@ void ImageDecoder::RequestDecodeFrames(uint32_t aFramesToDecode) {
 
 void ImageDecoder::OnFrameCountSuccess(
     const image::DecodeFrameCountResult& aResult) {
-  if (!mTracks) {
+  if (mClosed || !mTracks) {
     return;
   }
 
@@ -891,9 +860,19 @@ already_AddRefed<Promise> ImageDecoder::Decode(
     return nullptr;
   }
 
+  // 10.2.2. NOTE: Calling decode() on the constructed ImageDecoder will
+  //         trigger a NotSupportedError if the User Agent does not support
+  //         type.
+  if (mTypeNotSupported) {
+    MOZ_LOG(gWebCodecsLog, LogLevel::Error,
+            ("ImageDecoder %p Decode -- not supported", this));
+    promise->MaybeRejectWithNotSupportedError("Unsupported MIME type"_ns);
+    return promise.forget();
+  }
+
   // 1. If [[closed]] is true, return a Promise rejected with an
   //    InvalidStateError DOMException.
-  if (!mTracks || !mDecoder) {
+  if (mClosed || !mTracks || !mDecoder) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
             ("ImageDecoder %p Decode -- closed", this));
     promise->MaybeRejectWithInvalidStateError("Closed decoder"_ns);
@@ -937,7 +916,7 @@ void ImageDecoder::OnDecodeFramesSuccess(
   // 1. Assert that [[tracks established]] is true.
   MOZ_ASSERT(mTracksEstablished);
 
-  if (!mTracks) {
+  if (mClosed || !mTracks) {
     return;
   }
 
@@ -977,9 +956,6 @@ void ImageDecoder::Reset(const MediaResult& aResult) {
     mDecoder->CancelDecodeFrames();
   }
 
-  // FIXME could this be racy where a pending decode fullfillment is on the thread queue?
-  mHasFramePending = false;
-
   // 2. For each decodePromise in [[pending decode promises]]:
   // 2.1. Reject decodePromise with exception.
   // 2.3. Remove decodePromise from [[pending decode promises]].
@@ -995,6 +971,8 @@ void ImageDecoder::Close(const MediaResult& aResult) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug, ("ImageDecoder %p Close", this));
 
   // 10.2.5. Algorithms - Close ImageDecoder (with exception)
+  mClosed = true;
+  mTypeNotSupported = aResult.Code() == NS_ERROR_DOM_NOT_SUPPORTED_ERR;
 
   // 1. Run the Reset ImageDecoder algorithm with exception.
   Reset(aResult);

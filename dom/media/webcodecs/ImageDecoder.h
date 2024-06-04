@@ -147,6 +147,8 @@ class ImageDecoder final : public nsISupports,
   bool mComplete = false;
   bool mHasFrameCount = false;
   bool mHasFramePending = false;
+  bool mTypeNotSupported = false;
+  bool mClosed = false;
   int32_t mSelectedTrack = -1;
 };
 
