@@ -137,7 +137,6 @@ void ImageDecoder::Destroy() {
 
   if (mTracks) {
     mTracks->Destroy();
-    mTracks = nullptr;
   }
 
   mSourceBuffer = nullptr;
@@ -1019,7 +1018,6 @@ void ImageDecoder::Close(const MediaResult& aResult) {
   if (mTracks) {
     mTracks->MaybeRejectReady(aResult);
     mTracks->Destroy();
-    mTracks = nullptr;
   }
 
   if (!mComplete) {
