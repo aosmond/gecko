@@ -160,15 +160,22 @@ promise_test(t => {
 
 promise_test(t => {
   return fetch('four-colors.png').then(response => {
-    let decoder = new ImageDecoder({data: response.body, type: 'junk/type'});
-    return promise_rejects_dom(t, 'NotSupportedError', decoder.decode());
+    let decoder = new ImageDecoder({data: response.body, type: 'image/junk'});
+    return Promise.all([
+      promise_rejects_dom(t, 'NotSupportedError', decoder.decode()),
+      promise_rejects_dom(t, 'NotSupportedError', decoder.tracks.ready),
+      promise_rejects_dom(t, 'NotSupportedError', decoder.completed)
+    ]);
   });
 }, 'Test invalid mime type rejects decode() requests');
 
 promise_test(t => {
   return fetch('four-colors.png').then(response => {
-    let decoder = new ImageDecoder({data: response.body, type: 'junk/type'});
-    return promise_rejects_dom(t, 'NotSupportedError', decoder.tracks.ready);
+    let decoder = new ImageDecoder({data: response.body, type: 'image/junk'});
+    return Promise.all([
+      promise_rejects_dom(t, 'NotSupportedError', decoder.tracks.ready),
+      promise_rejects_dom(t, 'NotSupportedError', decoder.completed)
+    ]);
   });
 }, 'Test invalid mime type rejects decodeMetadata() requests');
 
@@ -406,7 +413,8 @@ promise_test(async t => {
         assert_equals(result.image.duration, 40000, "duration frame 3");
 
         // Decode frame not yet available then close before it comes in.
-        let p = decoder.decode({frameIndex: 5});
+        let p1 = decoder.completed;
+        let p2 = decoder.decode({frameIndex: 5});
         let tracks = decoder.tracks;
         let track = decoder.tracks.selectedTrack;
         decoder.close();
@@ -417,7 +425,10 @@ promise_test(async t => {
         track.selected = true;  // Should do nothing.
 
         // Previous decode should be aborted.
-        return promise_rejects_dom(t, 'AbortError', p);
+        return Promise.all([
+          promise_rejects_dom(t, 'AbortError', p1),
+          promise_rejects_dom(t, 'AbortError', p2)
+        ]);
       })
       .then(_ => {
         // Ensure feeding the source after closing doesn't crash.
