@@ -1005,7 +1005,7 @@ void ImageDecoder::Close(const MediaResult& aResult) {
   }
 
   if (mReadRequest) {
-    mReadRequest->Destroy();
+    mReadRequest->Destroy(/* aCycleCollect */ false);
     mReadRequest = nullptr;
   }
 
