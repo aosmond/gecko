@@ -63,7 +63,7 @@ class ImageDecoder::DecodeFrameMessage final
 class ImageDecoder::SelectTrackMessage final
     : public ImageDecoder::ControlMessage {
  public:
-  SelectTrackMessage(uint32_t aSelectedTrack)
+  explicit SelectTrackMessage(uint32_t aSelectedTrack)
       : mSelectedTrack(aSelectedTrack) {}
 
   SelectTrackMessage* AsSelectTrackMessage() override { return this; }

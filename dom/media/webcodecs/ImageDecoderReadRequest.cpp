@@ -74,7 +74,9 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
 void ImageDecoderReadRequest::Destroy(bool aCycleCollect /* = true */) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p Destroy", this));
-  if (mReader && mDecoder && !aCycleCollect) {
+
+  RefPtr<ReadableStreamDefaultReader> reader = std::move(mReader);
+  if (reader && mDecoder && !aCycleCollect) {
     AutoJSAPI jsapi;
     MOZ_ALWAYS_TRUE(jsapi.Init(mDecoder->GetParentObject()));
 
@@ -85,7 +87,7 @@ void ImageDecoderReadRequest::Destroy(bool aCycleCollect /* = true */) {
     if (ToJSValue(jsapi.cx(), std::move(rv), &errorValue)) {
       IgnoredErrorResult ignoredRv;
       if (RefPtr<Promise> p =
-              mReader->Cancel(jsapi.cx(), errorValue, ignoredRv)) {
+              reader->Cancel(jsapi.cx(), errorValue, ignoredRv)) {
         MOZ_ALWAYS_TRUE(p->SetAnyPromiseIsHandled());
       }
     }

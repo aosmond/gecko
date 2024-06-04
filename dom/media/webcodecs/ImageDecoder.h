@@ -149,7 +149,6 @@ class ImageDecoder final : public nsISupports,
   bool mHasFramePending = false;
   bool mTypeNotSupported = false;
   bool mClosed = false;
-  int32_t mSelectedTrack = -1;
 };
 
 }  // namespace dom
