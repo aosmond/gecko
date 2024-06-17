@@ -79,6 +79,7 @@ NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED_0(HTMLVideoElement,
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLVideoElement)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(HTMLVideoElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneSource)
@@ -87,6 +88,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(HTMLMediaElement)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLVideoElement,
                                                   HTMLMediaElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneSource)
@@ -151,6 +153,21 @@ void HTMLVideoElement::Invalidate(ImageSizeChanged aImageSizeChanged,
         mVisualCloneTarget->GetVideoFrameContainer();
     if (container) {
       container->Invalidate();
+    }
+  }
+
+  if (mVideoFrameRequestManager.IsEmpty()) {
+    return;
+  }
+
+  if (RefPtr<ImageContainer> imageContainer = GetImageContainer()) {
+    layers::AutoLockImage lockImage(imageContainer);
+    bool composited;
+    auto frameID = lockImage.GetFrameID(TimeStamp::Now(), composited);
+    if (frameID != mLastPresentedFrameID) {
+      if (Document* doc = OwnerDoc()) {
+        doc->ScheduleVideoFrameCallbacks(this);
+      }
     }
   }
 }
@@ -675,6 +692,75 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
     mCanAutoplayFlag = true;
     return;
   }
+}
+
+void HTMLVideoElement::ResetState() {
+  HTMLMediaElement::ResetState();
+  mLastPresentedFrameID = layers::kContainerFrameID_Invalid;
+}
+
+void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd,
+    nsTArray<VideoFrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+
+  // Ensure we did not race with shutting down the video.
+  if (!mHasPlayedOrSeeked || !mMediaInfo.mVideo.IsValid()) {
+    return;
+  }
+
+  // Attempt to find the next image to be presented on this tick. Note that
+  // composited will be accurate only if the element is visible.
+  layers::ImageContainer::FrameID frameID = layers::kContainerFrameID_Invalid;
+  bool composited = false;
+  if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
+    layers::AutoLockImage lockImage(container);
+    frameID = lockImage.GetFrameID(aNowTime, composited);
+  }
+
+  // If we did not find any current image, we must have fired too early. Wait
+  // for the next invalidation.
+  if (frameID == layers::kContainerFrameID_Invalid) {
+    return;
+  }
+
+  // If we have already displayed the expected frame, we need to make the
+  // display time match the presentation time to indicate it is already
+  // complete.
+  if (frameID == mLastPresentedFrameID || composited) {
+    aMd.mExpectedDisplayTime = aMd.mPresentationTime;
+  }
+
+  aMd.mWidth = mMediaInfo.mVideo.mDisplay.Width();
+  aMd.mHeight = mMediaInfo.mVideo.mDisplay.Height();
+  aMd.mMediaTime = CurrentTime();
+
+  // Presented frames is a bit of a misnomer from a rendering perspective,
+  // because we still need to advance regardless of composition. Video elements
+  // that are outside of the DOM, or are not visible, still advance the video in
+  // the background, and presumably the caller still needs some way to know how
+  // many frames we have advanced.
+  aMd.mPresentedFrames = frameID;
+
+  // TODO: We should set captureTime, receiveTime and rtpTimestamp for WebRTC.
+
+  mLastPresentedFrameID = frameID;
+  mVideoFrameRequestManager.Take(aCallbacks);
+}
+
+uint32_t HTMLVideoElement::RequestVideoFrameCallback(
+    VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
+  uint32_t handle = 0;
+  aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+  return handle;
+}
+
+bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
+  return mVideoFrameRequestManager.IsCanceled(aHandle);
+}
+
+void HTMLVideoElement::CancelVideoFrameCallback(uint32_t aHandle) {
+  mVideoFrameRequestManager.Cancel(aHandle);
 }
 
 }  // namespace mozilla::dom
