@@ -8,6 +8,7 @@
 
 #include "mozilla/AppShutdown.h"
 #include "mozilla/AsyncEventDispatcher.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/dom/HTMLVideoElementBinding.h"
 #include "nsGenericHTMLElement.h"
 #include "nsGkAtoms.h"
@@ -15,6 +16,7 @@
 #include "nsError.h"
 #include "nsIHttpChannel.h"
 #include "nsNodeInfoManager.h"
+#include "nsRefreshDriver.h"
 #include "plbase64.h"
 #include "prlock.h"
 #include "nsRFPService.h"
@@ -28,6 +30,7 @@
 #include "MediaDecoder.h"
 #include "MediaDecoderStateMachine.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/PresShell.h"
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/Performance.h"
@@ -79,6 +82,7 @@ NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED_0(HTMLVideoElement,
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLVideoElement)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(HTMLVideoElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneSource)
@@ -87,6 +91,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(HTMLMediaElement)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLVideoElement,
                                                   HTMLMediaElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneSource)
@@ -292,6 +297,22 @@ uint32_t HTMLVideoElement::MozPresentedFrames() {
   }
 
   return mDecoder ? mDecoder->GetFrameStatistics().GetPresentedFrames() : 0;
+}
+
+uint32_t HTMLVideoElement::GetMaybeCompositedFrames() {
+  MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
+  if (!IsVideoStatsEnabled()) {
+    return 0;
+  }
+
+  if (OwnerDoc()->ShouldResistFingerprinting(
+          RFPTarget::VideoElementMozFrames)) {
+    return nsRFPService::GetSpoofedPresentedFrames(TotalPlayTime(),
+                                                   VideoWidth(), VideoHeight());
+  }
+
+  return mDecoder ? mDecoder->GetFrameStatistics().GetMaybeCompositedFrames()
+                  : 0;
 }
 
 uint32_t HTMLVideoElement::MozPaintedFrames() {
@@ -674,6 +695,152 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
     PauseInternal();
     mCanAutoplayFlag = true;
     return;
+  }
+}
+
+class HTMLVideoElement::VideoFrameRequestCallbackListener final
+    : public FrameStatisticsPresentListener {
+ public:
+  explicit VideoFrameRequestCallbackListener(HTMLVideoElement* aOwner)
+      : mOwner(aOwner) {}
+
+  void Destroy() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mOwner = nullptr;
+  }
+
+  void OnPresent() override {
+    if (mCallbackPending.exchange(true)) {
+      return;
+    }
+
+    NS_DispatchToMainThread(
+        NS_NewRunnableFunction(__func__, [self = RefPtr{this}] {
+          if (self->mOwner) {
+            self->mOwner->OnFrameStatisticsPresented(self);
+          }
+        }));
+  }
+
+  void ClearCallbackPending() { mCallbackPending = false; }
+
+ private:
+  ~VideoFrameRequestCallbackListener() override { MOZ_ASSERT(!mOwner); }
+
+  WeakPtr<HTMLVideoElement> mOwner;
+  Atomic<bool> mCallbackPending{false};
+};
+
+void HTMLVideoElement::OnFrameStatisticsPresented(
+    VideoFrameRequestCallbackListener* aPresentListener) {
+  // We may have raced with a change in the decoder, and/or with our pending
+  // requests getting cancelled.
+  if (mFrameStatisticsPresentListener != aPresentListener ||
+      mVideoFrameRequestManager.IsEmpty()) {
+    return;
+  }
+
+  if (Document* doc = OwnerDoc()) {
+    doc->ScheduleVideoFrameCallbacks(this);
+  }
+}
+
+void HTMLVideoElement::MaybeAddFrameStatisticsPresentListener() {
+  if (!mDecoder || mVideoFrameRequestManager.IsEmpty() ||
+      mFrameStatisticsPresentListener) {
+    return;
+  }
+
+  mFrameStatisticsPresentListener = new VideoFrameRequestCallbackListener(this);
+  mDecoder->GetFrameStatistics().AddPresentListener(
+      mFrameStatisticsPresentListener);
+}
+
+void HTMLVideoElement::MaybeRemoveFrameStatisticsPresentListener() {
+  if (!mFrameStatisticsPresentListener) {
+    return;
+  }
+
+  if (mDecoder) {
+    mDecoder->GetFrameStatistics().RemovePresentListener(
+        mFrameStatisticsPresentListener);
+  } else {
+    MOZ_ASSERT_UNREACHABLE(
+        "Has mFrameStatisticsPresentListener without mDecoder");
+  }
+
+  mFrameStatisticsPresentListener->Destroy();
+  mFrameStatisticsPresentListener = nullptr;
+}
+
+void HTMLVideoElement::SetDecoder(MediaDecoder* aDecoder) {
+  HTMLMediaElement::SetDecoder(aDecoder);
+  MaybeAddFrameStatisticsPresentListener();
+}
+
+void HTMLVideoElement::ShutdownDecoder() {
+  MaybeRemoveFrameStatisticsPresentListener();
+  HTMLMediaElement::ShutdownDecoder();
+}
+
+void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd,
+    nsTArray<VideoFrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+
+  // Ensure we did not race with shutting down the video.
+  if (!mHasPlayedOrSeeked || !mMediaInfo.mVideo.IsValid()) {
+    return;
+  }
+  uint32_t maybeCompositedFrames = GetMaybeCompositedFrames();
+  if (maybeCompositedFrames == 0) {
+    return;
+  }
+
+  // Attempt to find the next image to be presented on this tick.
+  layers::Image* img = nullptr;
+  if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
+    layers::AutoLockImage lockImage(container);
+    img = lockImage.GetImage(aNowTime);
+    if (!img) {
+      img = lockImage.GetImage();
+    }
+  }
+
+  // If we don't have an image that would be displayed now, we were called too
+  // late. In that case, we are expected to make the display time match the
+  // presentation time to indicate it is already complete.
+  if (!img) {
+    aMd.mExpectedDisplayTime = aMd.mPresentationTime;
+  }
+
+  aMd.mWidth = mMediaInfo.mVideo.mDisplay.Width();
+  aMd.mHeight = mMediaInfo.mVideo.mDisplay.Height();
+  aMd.mMediaTime = CurrentTime();
+  aMd.mPresentedFrames = maybeCompositedFrames;
+
+  mVideoFrameRequestManager.Take(aCallbacks);
+  MaybeRemoveFrameStatisticsPresentListener();
+}
+
+uint32_t HTMLVideoElement::RequestVideoFrameCallback(
+    VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
+  uint32_t handle = 0;
+  aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+  if (!mVideoFrameRequestManager.IsEmpty()) {
+    MaybeAddFrameStatisticsPresentListener();
+  }
+  return handle;
+}
+
+bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
+  return mVideoFrameRequestManager.IsCanceled(aHandle);
+}
+
+void HTMLVideoElement::CancelVideoFrameCallback(uint32_t aHandle) {
+  mVideoFrameRequestManager.Cancel(aHandle);
+  if (mVideoFrameRequestManager.IsEmpty()) {
+    MaybeRemoveFrameStatisticsPresentListener();
   }
 }
 

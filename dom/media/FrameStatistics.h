@@ -11,6 +11,17 @@
 
 namespace mozilla {
 
+class FrameStatisticsPresentListener {
+ public:
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(FrameStatisticsPresentListener)
+
+  // Called when FrameStatisticsData::mPresentedFrames is incremented.
+  virtual void OnPresent() = 0;
+
+ protected:
+  virtual ~FrameStatisticsPresentListener() = default;
+};
+
 struct FrameStatisticsData {
   // Number of frames parsed and demuxed from media.
   // Access protected by mReentrantMonitor.
@@ -111,6 +122,15 @@ class FrameStatistics {
     return mFrameStatisticsData.mPresentedFrames;
   }
 
+  // Returns the number of decoded frames which have been sent to the compositor
+  // process for compositing.
+  // Can be called on any thread.
+  uint64_t GetMaybeCompositedFrames() const {
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    return mFrameStatisticsData.mPresentedFrames +
+           mFrameStatisticsData.mDroppedCompositorFrames;
+  }
+
   // Returns the number of presented and dropped frames
   // Can be called on any thread.
   uint64_t GetTotalFrames() const {
@@ -154,6 +174,9 @@ class FrameStatistics {
   void Accumulate(const FrameStatisticsData& aStats) {
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mFrameStatisticsData.Accumulate(aStats);
+    if (aStats.mPresentedFrames > 0 && mPresentListener) {
+      mPresentListener->OnPresent();
+    }
   }
 
   // Increments the presented frame counters.
@@ -161,6 +184,25 @@ class FrameStatistics {
   void NotifyPresentedFrame() {
     ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     ++mFrameStatisticsData.mPresentedFrames;
+    if (mPresentListener) {
+      mPresentListener->OnPresent();
+    }
+  }
+
+  // Add a listener for present updates.
+  void AddPresentListener(FrameStatisticsPresentListener* aPresentListener) {
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    MOZ_DIAGNOSTIC_ASSERT(!mPresentListener ||
+                          mPresentListener == aPresentListener);
+    mPresentListener = aPresentListener;
+  }
+
+  // Remove a listener for present updates.
+  void RemovePresentListener(FrameStatisticsPresentListener* aPresentListener) {
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    if (mPresentListener == aPresentListener) {
+      mPresentListener = nullptr;
+    }
   }
 
   // Stack based class to assist in notifying the frame statistics of
@@ -186,9 +228,12 @@ class FrameStatistics {
   ~FrameStatistics() = default;
 
   // ReentrantMonitor to protect access of playback statistics.
-  mutable ReentrantMonitor mReentrantMonitor MOZ_UNANNOTATED;
+  mutable ReentrantMonitor mReentrantMonitor;
 
-  FrameStatisticsData mFrameStatisticsData;
+  FrameStatisticsData mFrameStatisticsData MOZ_GUARDED_BY(mReentrantMonitor);
+
+  RefPtr<FrameStatisticsPresentListener> mPresentListener
+      MOZ_GUARDED_BY(mReentrantMonitor);
 };
 
 }  // namespace mozilla

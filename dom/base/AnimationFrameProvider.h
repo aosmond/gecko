@@ -14,6 +14,8 @@
 
 namespace mozilla::dom {
 
+class HTMLVideoElement;
+
 struct FrameRequest {
   FrameRequest(FrameRequestCallback& aCallback, int32_t aHandle);
   ~FrameRequest();
@@ -29,22 +31,26 @@ struct FrameRequest {
 
 class FrameRequestManager {
  public:
-  FrameRequestManager() = default;
-  ~FrameRequestManager() = default;
+  FrameRequestManager();
+  ~FrameRequestManager();
 
   nsresult Schedule(FrameRequestCallback& aCallback, int32_t* aHandle);
   bool Cancel(int32_t aHandle);
 
-  bool IsEmpty() const { return mCallbacks.IsEmpty(); }
+  void Schedule(HTMLVideoElement* aElement);
+  bool Cancel(HTMLVideoElement* aElement);
+
+  bool IsEmpty() const {
+    return mCallbacks.IsEmpty() && mVideoCallbacks.IsEmpty();
+  }
 
   bool IsCanceled(int32_t aHandle) const {
     return !mCanceledCallbacks.empty() && mCanceledCallbacks.has(aHandle);
   }
 
-  void Take(nsTArray<FrameRequest>& aCallbacks) {
-    aCallbacks = std::move(mCallbacks);
-    mCanceledCallbacks.clear();
-  }
+  void Take(nsTArray<FrameRequest>& aCallbacks,
+            nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks);
+  void Take(nsTArray<FrameRequest>& aCallbacks);
 
   void Unlink();
 
@@ -52,6 +58,7 @@ class FrameRequestManager {
 
  private:
   nsTArray<FrameRequest> mCallbacks;
+  nsTArray<RefPtr<HTMLVideoElement>> mVideoCallbacks;
 
   // The set of frame request callbacks that were canceled but which we failed
   // to find in mFrameRequestCallbacks.

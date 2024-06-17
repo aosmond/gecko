@@ -52,6 +52,7 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentTimeline.h"
 #include "mozilla/dom/DocumentInlines.h"
+#include "mozilla/dom/HTMLVideoElement.h"
 #include "nsIXULRuntime.h"
 #include "jsapi.h"
 #include "nsContentUtils.h"
@@ -2166,12 +2167,14 @@ struct DocumentFrameCallbacks {
 
   RefPtr<Document> mDocument;
   nsTArray<FrameRequest> mCallbacks;
+  nsTArray<RefPtr<HTMLVideoElement>> mVideoCallbacks;
 };
 
 static void TakeFrameRequestCallbacksFrom(
     Document* aDocument, nsTArray<DocumentFrameCallbacks>& aTarget) {
   aTarget.AppendElement(aDocument);
-  aDocument->TakeFrameRequestCallbacks(aTarget.LastElement().mCallbacks);
+  aDocument->TakeFrameRequestCallbacks(aTarget.LastElement().mCallbacks,
+                                       aTarget.LastElement().mVideoCallbacks);
 }
 
 void nsRefreshDriver::ScheduleAutoFocusFlush(Document* aDocument) {
@@ -2442,6 +2445,9 @@ void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
     AUTO_PROFILER_TRACING_MARKER_DOCSHELL("Paint",
                                           "requestAnimationFrame callbacks",
                                           GRAPHICS, GetDocShell(mPresContext));
+
+    Maybe<TimeStamp> nextTickHint = GetNextTickHint();
+
     for (const DocumentFrameCallbacks& docCallbacks : frameRequestCallbacks) {
       TimeStamp startTime = TimeStamp::Now();
 
@@ -2450,11 +2456,37 @@ void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
       nsPIDOMWindowInner* innerWindow =
           docCallbacks.mDocument->GetInnerWindow();
       DOMHighResTimeStamp timeStamp = 0;
+      DOMHighResTimeStamp nextTickTimeStamp = 0;
       if (innerWindow) {
         if (Performance* perf = innerWindow->GetPerformance()) {
           timeStamp = perf->TimeStampToDOMHighResForRendering(aNowTime);
+          nextTickTimeStamp =
+              nextTickHint
+                  ? perf->TimeStampToDOMHighResForRendering(*nextTickHint)
+                  : timeStamp;
         }
         // else window is partially torn down already
+      }
+      for (auto& videoElm : docCallbacks.mVideoCallbacks) {
+        nsCOMPtr<nsIGlobalObject> global(innerWindow ? innerWindow->AsGlobal()
+                                                     : nullptr);
+
+        nsTArray<VideoFrameRequest> callbacks;
+        VideoFrameCallbackMetadata metadata;
+        metadata.mPresentationTime = timeStamp;
+        metadata.mExpectedDisplayTime = nextTickTimeStamp;
+        videoElm->TakeVideoFrameRequestCallbacks(aNowTime, metadata, callbacks);
+
+        for (auto& callback : callbacks) {
+          CallbackDebuggerNotificationGuard guard(
+              global, DebuggerNotificationType::RequestVideoFrameCallback);
+
+          // MOZ_KnownLive is OK, because the stack array frameRequestCallbacks
+          // keeps callback alive and the mCallback strong reference can't be
+          // mutated by the call.
+          LogVideoFrameRequestCallback::Run run(callback.mCallback);
+          MOZ_KnownLive(callback.mCallback)->Call(timeStamp, metadata);
+        }
       }
       for (auto& callback : docCallbacks.mCallbacks) {
         if (docCallbacks.mDocument->IsCanceledFrameRequestCallback(
@@ -2703,7 +2735,8 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime,
   // Step 12. For each doc of docs, run the fullscreen steps for doc.
   RunFullscreenSteps();
 
-  // Step 14. For each doc of docs, run the animation frame callbacks for doc.
+  // Step 14. For each doc of docs, run the video frame callbacks and animation
+  // frame callbacks for doc.
   RunFrameRequestCallbacks(aNowTime);
   MaybeIncreaseMeasuredTicksSinceLoading();
 
