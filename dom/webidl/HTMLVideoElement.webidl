@@ -11,6 +11,25 @@
  * and create derivative works of this document.
  */
 
+dictionary VideoFrameCallbackMetadata {
+  required DOMHighResTimeStamp presentationTime;
+  required DOMHighResTimeStamp expectedDisplayTime;
+
+  required unsigned long width;
+  required unsigned long height;
+  required double mediaTime;
+
+  required unsigned long presentedFrames;
+  double processingDuration;
+
+  DOMHighResTimeStamp captureTime;
+  DOMHighResTimeStamp receiveTime;
+  unsigned long rtpTimestamp;
+};
+
+callback VideoFrameRequestCallback =
+    undefined(DOMHighResTimeStamp now, VideoFrameCallbackMetadata metadata);
+
 [Exposed=Window,
  InstrumentedProps=(cancelVideoFrameCallback,
                     onenterpictureinpicture,
@@ -84,4 +103,9 @@ partial interface HTMLVideoElement {
 // https://w3c.github.io/picture-in-picture/#htmlvideoelement-extensions
 partial interface HTMLVideoElement {
   [CEReactions, SetterThrows] attribute boolean disablePictureInPicture;
+};
+
+partial interface HTMLVideoElement {
+  unsigned long requestVideoFrameCallback(VideoFrameRequestCallback callback);
+  undefined cancelVideoFrameCallback(unsigned long handle);
 };
