@@ -695,6 +695,26 @@ class AutoLockImage {
     return mImages[chosenIndex].mImage.get();
   }
 
+  ImageContainer::FrameID GetFrameID() const {
+    return mImages.IsEmpty() ? kContainerFrameID_Invalid : mImages[0].mFrameID;
+  }
+
+  ImageContainer::FrameID GetFrameID(TimeStamp aTimeStamp) const {
+    if (mImages.IsEmpty()) {
+      return kContainerFrameID_Invalid;
+    }
+
+    MOZ_ASSERT(!aTimeStamp.IsNull());
+    uint32_t chosenIndex = 0;
+
+    while (chosenIndex + 1 < mImages.Length() &&
+           mImages[chosenIndex + 1].mTimeStamp <= aTimeStamp) {
+      ++chosenIndex;
+    }
+
+    return mImages[chosenIndex].mFrameID;
+  }
+
  private:
   AutoTArray<ImageContainer::OwningImage, 4> mImages;
 };
