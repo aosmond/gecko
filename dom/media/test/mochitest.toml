@@ -850,6 +850,8 @@ tags = "capturestream"
 ["test_resume.html"]
 skip-if = ["true"] # bug 1021673
 
+["test_requestVideoFrameCallback.html"]
+
 ["test_seamless_looping.html"]
 skip-if = [
   "apple_catalina && debug", # Bug 1796318

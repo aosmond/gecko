@@ -15,6 +15,7 @@
 #include "nsError.h"
 #include "nsIHttpChannel.h"
 #include "nsNodeInfoManager.h"
+#include "nsRefreshDriver.h"
 #include "plbase64.h"
 #include "prlock.h"
 #include "nsRFPService.h"
@@ -28,6 +29,7 @@
 #include "MediaDecoder.h"
 #include "MediaDecoderStateMachine.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/PresShell.h"
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/Performance.h"
@@ -79,6 +81,7 @@ NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED_0(HTMLVideoElement,
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLVideoElement)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(HTMLVideoElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneSource)
@@ -87,6 +90,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(HTMLMediaElement)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLVideoElement,
                                                   HTMLMediaElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneSource)
@@ -292,6 +296,22 @@ uint32_t HTMLVideoElement::MozPresentedFrames() {
   }
 
   return mDecoder ? mDecoder->GetFrameStatistics().GetPresentedFrames() : 0;
+}
+
+uint32_t HTMLVideoElement::GetMaybeCompositedFrames() {
+  MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
+  if (!IsVideoStatsEnabled()) {
+    return 0;
+  }
+
+  if (OwnerDoc()->ShouldResistFingerprinting(
+          RFPTarget::VideoElementMozFrames)) {
+    return nsRFPService::GetSpoofedPresentedFrames(TotalPlayTime(),
+                                                   VideoWidth(), VideoHeight());
+  }
+
+  return mDecoder ? mDecoder->GetFrameStatistics().GetMaybeCompositedFrames()
+                  : 0;
 }
 
 uint32_t HTMLVideoElement::MozPaintedFrames() {
@@ -648,6 +668,8 @@ void HTMLVideoElement::OnSecondaryVideoOutputFirstFrameRendered() {
 
 void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
   HTMLMediaElement::OnVisibilityChange(aNewVisibility);
+  printf_stderr("AZ: %s:%s:%d VisibilityChange\n", __FILE__, __func__,
+                __LINE__);
 
   // See the alternative part after step 4, but we only pause/resume invisible
   // autoplay for non-audible video, which is different from the spec. This
@@ -675,6 +697,227 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
     mCanAutoplayFlag = true;
     return;
   }
+}
+
+void HTMLVideoElement::GetVideoFrameCallbackMetadata(
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd) {
+  /*
+      VideoFrameCallbackMetadata(HTMLMediaElement* aElement,
+          DOMHighResTimeStamp aPresentationTime,
+          DOMHighResTimeStamp aExpectedDisplayTime,
+
+          uint32_t aWidth,
+          uint32_t aHeight,
+          double aMediaTime,
+
+          uint32_t aPresentedFrames,
+          double aProcessingDuration,
+
+          DOMHighResTimeStamp aCaptureTime,
+          DOMHighResTimeStamp aReceiveTime,
+          uint32_t aRtpTimestamp
+  */
+  DOMHighResTimeStamp ts = 0;
+  MediaInfo mediaInfo = GetMediaInfo();
+  const VideoInfo& videoInfo = mediaInfo.mVideo;
+  VideoFrameContainer* videoFrameContainer = GetVideoFrameContainer();
+  FrameStatistics* frameStats = GetFrameStatistics();
+
+  Maybe<int32_t> vfr = videoInfo.GetFrameRate();
+  double frameDelay = videoFrameContainer->GetFrameDelay();
+  double paintDelay = 0.12345;
+  // if (imageContainer)
+  //   paintDelay = imageContainer->GetPaintDelay().ToMilliseconds();
+  float videoFrameRate = 1;
+
+  if (vfr && vfr.isSome()) {
+    printf_stderr("AZ: found framerate! \n");
+    videoFrameRate = static_cast<float>(vfr.ref());
+  }
+
+  // Maybe<int32_t> videoFrameRate = videoInfo.GetFrameRate();
+
+  gfx::IntSize intSize;  // = imageContainer->GetCurrentSize();
+  // VideoTracks?
+  // frameStats->GetPresentedFrames();
+
+  /**
+   * Returns the delay between the last composited image's presentation
+   * timestamp and when it was first composited. It's possible for the delay
+   * to be negative if the first image in the list passed to SetCurrentImages
+   * has a presentation timestamp greater than "now".
+   * Returns 0 if the composited image had a null timestamp, or if no
+   * image has been composited yet.
+   */
+
+  printf_stderr(
+      "%s:%s:%d AZ - "
+      "VideoInfo: %s \n"
+      "VI Width: %d \n"
+      "VI Height: %d \n"
+      "El VideoWidth: %d \n"
+      "El VideoHeight: %d \n"
+      "IntSize VideoWidth: %d \n"
+      "IntSize VideoHeight: %d \n"
+      "GetPlayedOrSeeked: %d \n"
+      "MozParsedFrames(): %d \n"
+      "MozDecodedFrames(): %d \n"
+      "MozPresentedFrames(): %d \n"
+      "MozPaintedFrames(): %d \n"
+      "TotalVideoPlayTime(): %f \n"
+      "frameDelay: %f \n"
+      "frameRate: %f \n"
+      "paint delay: %f \n",
+      __FILE__, __func__, __LINE__,
+      NS_ConvertUTF16toUTF8(videoInfo.ToString()).get(),
+      videoInfo.mDisplay.Width(), videoInfo.mDisplay.Height(),
+
+      Width(), Height(),
+
+      intSize.width, intSize.height,
+
+      GetPlayedOrSeeked(), MozParsedFrames(), MozDecodedFrames(),
+      MozPresentedFrames(), MozPaintedFrames(), TotalVideoPlayTime(),
+      frameDelay, videoFrameRate, paintDelay);
+
+  // current time + 1 frame?
+
+  unsigned long mdWidth = videoInfo.mDisplay.Width();
+  unsigned long mdHeight = videoInfo.mDisplay.Height();
+
+  double mdMediaTime = CurrentTime();
+  unsigned long mdPresentedFrames = GetMaybeCompositedFrames();
+  double mdProcessingDuration = 0.1;                   // FIX ME
+  DOMHighResTimeStamp mdCaptureTime = CurrentTime();   // FIX ME
+  DOMHighResTimeStamp mdReceiveTime = CurrentTime();   // FIX ME
+  DOMHighResTimeStamp mdRtpTimestamp = CurrentTime();  // FIX ME
+
+  layers::Image* img = nullptr;
+  if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
+    layers::AutoLockImage lockImage(container);
+    img = lockImage.GetImage(aNowTime);
+    if (!img) {
+      img = lockImage.GetImage();
+    }
+  }
+
+  // If we don't have an image that would be displayed now, we were called too
+  // late. In that case, we are expected to make the display time match the
+  // presentation time to indicate it is already complete.
+  if (!img) {
+    aMd.mExpectedDisplayTime = aMd.mPresentationTime;
+  }
+
+  aMd.mWidth = mdWidth;
+  aMd.mHeight = mdHeight;
+  aMd.mMediaTime = mdMediaTime;
+  aMd.mPresentedFrames = mdPresentedFrames;
+  /*md.mProcessingDuration = mdProcessingDuration;
+  md.mCaptureTime = mdCaptureTime;
+  md.mReceiveTime = mdReceiveTime;
+  md.mRtpTimestamp = mdRtpTimestamp;*/
+
+  printf_stderr(
+      "\n%s:%s:%d AZ - HTMLVideoElement generated VideoFrameCallbackMetadata "
+      "with:\n"
+      "width: %lu \n"
+      "height: %lu \n"
+      "mediaTime: %f \n"
+      "presentedFrames: %lu \n"
+      "processingDuration: %f \n"
+      "captureTime: %f \n"
+      "receiveTime: %f \n"
+      "rtpTimestamp: %f \n\n",
+      __FILE__, __func__, __LINE__, mdWidth, mdHeight, mdMediaTime,
+      mdPresentedFrames, mdProcessingDuration, mdCaptureTime, mdReceiveTime,
+      mdRtpTimestamp);
+
+  /*
+  VideoFrameCallbackMetadata* md = new VideoFrameCallbackMetadata(
+                                 this,
+                                 CurrentTime(), // presentation time (when
+  submitted) expectedDisplayTime, // expected display time
+
+                                 //345,
+                                 //el->Height(), // media pixels
+                                 videoInfo.mDisplay.Width(), // media pixels
+                                 videoInfo.mDisplay.Height(), // media pixels
+                                 CurrentTime(), // "mediaTime" - presentation
+  timestamp of frame to
+                                    // be presented
+
+                                 MozPresentedFrames() + 1, // presented frames
+                                 0.1, // processing duration
+
+                                 ts, // capture time. SHOULD be present for
+  WebRTC or getUserMedia applications, and absent otherwise ts, // receive time
+  " " " 0); // rtpTimestamp " " "
+                                 */
+  /*
+   printf_stderr("%s:%s:%d AZ - HTMLVideoElement generated
+   VideoFrameCallbackMetadata with:\n" "presentationTime: %f \n"
+                 "expectedDisplayTime: %f \n"
+                 "width: %d \n"
+                 "height: %d \n"
+                 "mediaTime: %f \n"
+                 "presentedFrames: %d \n"
+                 "processingDuration: %f \n"
+                 "captureTime: %f \n"
+                 "rtpTimestamp: %d \n",
+                 __FILE__, __func__, __LINE__,
+                 PresentationTime,
+                 mExpectedDisplayTime,
+                 mWidth,
+                 mHeight,
+                 mMediaTime,
+                 mPresentedFrames,
+                 mProcessingDuration,
+                 mCaptureTime,
+                 mRtpTimestamp
+                );
+   */
+}
+
+void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
+    nsTArray<VideoFrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+  mVideoFrameRequestManager.Take(aCallbacks);
+  printf_stderr("AZ: %s:%s:%d Taking video frame callbacks...\n", __FILE__,
+                __func__, __LINE__);
+}
+
+unsigned long HTMLVideoElement::RequestVideoFrameCallback(
+    VideoFrameRequestCallback& aCallback) {
+  printf_stderr("\n");
+  printf_stderr("\n");
+  printf_stderr("\n");
+  printf_stderr(
+      "\nAZ: %s:%s:%d ***!!!**** REQUESTED VIDEO FRAME CALLBACK ***!!!***\n\n",
+      __FILE__, __func__, __LINE__);
+  printf_stderr("\n");
+  printf_stderr("\n");
+  printf_stderr("\n");
+
+  int32_t handle;
+  auto rv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+
+  Document* doc = OwnerDoc();
+  MOZ_RELEASE_ASSERT(doc);
+  doc->NotifyVideoFrameCallbacks(this);
+  return handle;
+}
+
+bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
+  return mVideoFrameRequestManager.IsCanceled(aHandle);
+}
+
+void HTMLVideoElement::CancelVideoFrameCallback(unsigned long aHandle) {
+  printf_stderr(
+      "\nAZ: %s:%s:%d ***!!!**** CANCELLED VIDEO FRAME CALLBACK ***!!!***\n\n",
+      __FILE__, __func__, __LINE__);
+  int rv = mVideoFrameRequestManager.Cancel(aHandle);
+  printf_stderr("AZ says: RV for cancelling callback = %d\n", rv);
+  return;
 }
 
 }  // namespace mozilla::dom

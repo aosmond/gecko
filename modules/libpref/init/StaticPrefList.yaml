@@ -10104,6 +10104,12 @@
   value: false
   mirror: always
 
+# Whether to enable experimental requestVideoFrameCallback support
+- name: media.rvfc.enabled
+  type: RelaxedAtomicBool
+  value: true
+  mirror: always
+
 # VideoSink
 - name: media.ruin-av-sync.enabled
   type: RelaxedAtomicBool

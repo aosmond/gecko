@@ -1,0 +1,116 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <title>Media test: Request video frame callback</title>
+        <script type="text/javascript" src="/MochiKit/MochiKit.js"></script>
+        <script src="/tests/SimpleTest/SimpleTest.js"></script>
+        <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
+        <script type="text/javascript" src="manifest.js"></script>
+    </head>
+
+    <body>
+        <pre id="test">
+  <video controls></video>
+  <canvas width="640" height="360"></canvas>
+  <span id="fps_text"/>
+
+<script>
+    SimpleTest.waitForExplicitFinish();
+    info("AZ says: Starting test_requestVideoFrameCallback.html");
+    let manager = new MediaTestManager;
+    var video1 = document.querySelector('video');
+    var vidFrameCallbackCount = 0;
+    var animCount = 0;
+
+    var vidFrameCallback = function(now, metadata) {
+        vidFrameCallbackCount += 1;
+        info("AZ: vFC exec, current time = " + now);
+        info("AZ: vFC# executions: " + vidFrameCallbackCount);
+        var props = ["presentationTime", "expectedDisplayTime", "width", "height", "mediaTime"];
+        for (const prop of props) {
+            info("Property: " + prop + " = " + metadata[prop]);
+        }
+
+        // for (let prop in metadata) {
+            // info(prop);
+            // info("Property: " + prop + " = " + metadata[prop]);
+        // }
+
+        // var video1 = document.querySelector('video');
+        // video1.requestVideoFrameCallback(vidFrameCallback);
+        video1.requestVideoFrameCallback(vidFrameCallback);
+        // for (const el of metadata) {
+            // info(el);
+        // }
+    }
+
+    var rAF = function(now) {
+         for (let x = 0; x < 10; x++) {
+             info("AZ: *** IN CHAINED rAF!!!");
+         }
+        // video1.requestVideoFrameCallback(rVFC);
+    }
+
+    var rAF2 = function(now) {
+         for (let x = 0; x < 1; x++) {
+             info("AZ: in normal animation frame callback");
+         }
+    }
+
+    var rVFC = function(now, metadata) {
+         for (let x = 0; x < 10; x++) {
+             info("AZ: in base rVFC, adding animation frame request");
+         }
+        info("AZ: vFC exec, current time = " + now);
+        info("AZ: vFC# executions: " + vidFrameCallbackCount);
+        var props = ["presentationTime", "expectedDisplayTime", "width", "height", "mediaTime"];
+        for (const prop of props) {
+            info("Property: " + prop + " = " + metadata[prop]);
+        }
+        window.requestAnimationFrame(rAF);
+    }
+
+
+    var animFrameCallback = function(timeStamp) {
+        animCount += 1;
+        info("AZ rAC# = " + animCount);
+        // window.requestAnimationFrame(animFrameCallback);
+    }
+
+    // window.requestAnimationFrame(animFrameCallback);
+
+    // video1.requestVideoFrameCallback(vidFrameCallback);
+    // video1.cancelVideoFrameCallback(1);
+
+    window.requestAnimationFrame(rAF2);
+    video1.requestVideoFrameCallback(rVFC);
+    video1.src = "http://localhost:8099/gamecube.mp4"
+
+    /*
+    video1.requestVideoFrameCallback(
+     (video_now => {
+        // Queue a call to window.rAF, and make sure it is executed within the
+        // same turn of the event loop (with the same 'time' parameter).
+         for (let x = 0; x < 10000; x++) {
+             info("AZ: in rVFC");
+         }
+        window.requestAnimationFrame( window_now => {
+         for (let x = 0; x < 10000; x++) {
+            info("AZ: in rAF");
+         }
+          assert_equals(video_now, window_now);
+          done();
+        })}));
+   */
+
+
+    video1.addEventListener("ended", ()=>{
+        SimpleTest.finish();
+        mediaTestCleanup();
+      });
+
+    video1.play()
+</script>
+        </pre>
+    </body>
+</html>
