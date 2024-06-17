@@ -10,6 +10,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/dom/HTMLMediaElement.h"
+#include "mozilla/dom/VideoFrameProvider.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "Units.h"
 
@@ -187,6 +188,27 @@ class HTMLVideoElement final : public HTMLMediaElement {
   // Please don't set this to non-nullptr values directly - use
   // SetVisualCloneTarget() instead.
   RefPtr<HTMLVideoElement> mVisualCloneSource;
+
+  // TODO: AZ NEW
+ private:
+  uint32_t GetMaybeCompositedFrames();
+
+  VideoFrameRequestManager mVideoFrameRequestManager;
+
+ public:
+  unsigned long RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback);
+  void CancelVideoFrameCallback(unsigned long aHandle);
+  void TakeVideoFrameRequestCallbacks(nsTArray<VideoFrameRequest>& aCallbacks);
+  void GetVideoFrameCallbackMetadata(const TimeStamp& aNowTime,
+                                     VideoFrameCallbackMetadata& aMd);
+  bool IsVideoFrameCallbackCancelled(uint32_t aHandle);
+
+  bool CanTakeVideoFrameRequestCallbacks() const {
+    return mHasPlayedOrSeeked && mMediaInfo.mVideo.IsValid();
+  }
+
+ private:
+  // TODO: END NEW
 
   static void MapAttributesIntoRule(MappedDeclarationsBuilder&);
 
