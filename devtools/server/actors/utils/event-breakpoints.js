@@ -314,6 +314,26 @@ const AVAILABLE_BREAKPOINTS = [
     ],
   },
   {
+    name: "Video",
+    items: [
+      animationEvent(
+        "request",
+        "Request Video Frame Callback",
+        "requestVideoFrameCallback"
+      ),
+      animationEvent(
+        "cancel",
+        "Cancel Video Frame Callback",
+        "cancelVideoFrameCallback"
+      ),
+      animationEvent(
+        "fire",
+        "Video Frame fired",
+        "requestVideoFrameCallbackFire"
+      ),
+    ],
+  },
+  {
     name: "WebSocket",
     items: [
       webSocketEvent("websocket", "open"),
