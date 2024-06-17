@@ -73,7 +73,7 @@
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/Performance.h"
 #include "mozilla/dom/Selection.h"
-#include "mozilla/dom/VideoFrameCallbackMetadata.h"
+#include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/VsyncMainChild.h"
 #include "mozilla/dom/WindowBinding.h"
 #include "mozilla/dom/LargestContentfulPaint.h"
@@ -2774,7 +2774,7 @@ void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
 
         LogVideoFrameRequestCallback::Run run(callback.mCallback);
         MOZ_KnownLive(callback.mCallback)
-            ->Call(timeStamp, *(el->GetVideoFrameCallbackMetadata()));
+            ->Call(timeStamp, el->GetVideoFrameCallbackMetadata());
       }
     }
   }

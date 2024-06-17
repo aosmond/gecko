@@ -9,9 +9,8 @@
 
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
-#include "mozilla/dom/VideoFrameCallbackMetadata.h"
-#include "mozilla/dom/VideoFrameProvider.h"
 #include "mozilla/dom/HTMLMediaElement.h"
+#include "mozilla/dom/VideoFrameProvider.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "Units.h"
 
@@ -23,8 +22,6 @@ namespace dom {
 
 class WakeLock;
 class VideoPlaybackQuality;
-class VideoFrameCallbackMetadata;
-class VideoFrameRequestCallback;
 
 class HTMLVideoElement final : public HTMLMediaElement {
   class SecondaryVideoOutput;
@@ -200,7 +197,7 @@ class HTMLVideoElement final : public HTMLMediaElement {
   unsigned long RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback);
   void CancelVideoFrameCallback(unsigned long aHandle);
   void TakeVideoFrameRequestCallbacks(nsTArray<VideoFrameRequest>& aCallbacks);
-  VideoFrameCallbackMetadata* GetVideoFrameCallbackMetadata();
+  VideoFrameCallbackMetadata GetVideoFrameCallbackMetadata();
   bool IsVideoFrameCallbackCancelled(uint32_t aHandle);
 
  private:

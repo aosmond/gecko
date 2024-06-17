@@ -683,7 +683,7 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
   }
 }
 
-VideoFrameCallbackMetadata* HTMLVideoElement::GetVideoFrameCallbackMetadata() {
+VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
   /*
       VideoFrameCallbackMetadata(HTMLMediaElement* aElement,
           DOMHighResTimeStamp aPresentationTime,
@@ -778,10 +778,17 @@ VideoFrameCallbackMetadata* HTMLVideoElement::GetVideoFrameCallbackMetadata() {
   DOMHighResTimeStamp mdReceiveTime = CurrentTime();   // FIX ME
   DOMHighResTimeStamp mdRtpTimestamp = CurrentTime();  // FIX ME
 
-  VideoFrameCallbackMetadata* md = new VideoFrameCallbackMetadata(
-      this, mdPresentationTime, mdExpectedDisplayTime, mdWidth, mdHeight,
-      mdMediaTime, mdPresentedFrames, mdProcessingDuration, mdCaptureTime,
-      mdReceiveTime, mdRtpTimestamp);
+  VideoFrameCallbackMetadata md;
+  md.mPresentationTime = mdPresentationTime;
+  md.mExpectedDisplayTime = mdExpectedDisplayTime;
+  md.mWidth = mdWidth;
+  md.mHeight = mdHeight;
+  md.mMediaTime = mdMediaTime;
+  md.mPresentedFrames = mdPresentedFrames;
+  /*md.mProcessingDuration = mdProcessingDuration;
+  md.mCaptureTime = mdCaptureTime;
+  md.mReceiveTime = mdReceiveTime;
+  md.mRtpTimestamp = mdRtpTimestamp;*/
 
   printf_stderr(
       "\n%s:%s:%d AZ - HTMLVideoElement generated VideoFrameCallbackMetadata "

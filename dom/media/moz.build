@@ -313,7 +313,6 @@ UNIFIED_SOURCES += [
     "SeekJob.cpp",
     "TimeUnits.cpp",
     "Tracing.cpp",
-    "VideoFrameCallbackMetadata.cpp",
     "VideoFrameContainer.cpp",
     "VideoPlaybackQuality.cpp",
     "VideoSegment.cpp",

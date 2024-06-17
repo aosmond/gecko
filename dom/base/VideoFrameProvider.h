@@ -6,11 +6,7 @@
 #include "nsTArray.h"
 
 #include "mozilla/dom/VideoFrameBinding.h"
-
-#include "mozilla/dom/VideoFrameCallbackMetadataBinding.h"
-#include "mozilla/dom/VideoFrameProviderBinding.h"
-#include "mozilla/dom/VideoFrameProvider.h"
-
+#include "mozilla/dom/HTMLVideoElementBinding.h"
 
 namespace mozilla::dom {
 
