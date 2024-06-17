@@ -85,3 +85,8 @@ partial interface HTMLVideoElement {
 partial interface HTMLVideoElement {
   [CEReactions, SetterThrows] attribute boolean disablePictureInPicture;
 };
+
+partial interface HTMLVideoElement {
+  unsigned long requestVideoFrameCallback(VideoFrameRequestCallback callback);
+  undefined cancelVideoFrameCallback(unsigned long handle);
+};

@@ -39,6 +39,10 @@ class nsIRunnable;
 
 namespace mozilla {
 class AnimationEventDispatcher;
+// TODO: Fix this nested namespace
+namespace dom {
+class HTMLVideoElement;
+}
 class PendingFullscreenEvent;
 class PresShell;
 class RefreshDriverTimer;
@@ -490,6 +494,23 @@ class nsRefreshDriver final : public mozilla::layers::TransactionIdAllocator,
   void UpdateAnimationsAndSendEvents();
   MOZ_CAN_RUN_SCRIPT
   void RunFrameRequestCallbacks(mozilla::TimeStamp aNowTime);
+
+  // TODO AZ new WIP
+
+ public:
+  void ScheduleVideoFrameRequestCallbacks(mozilla::dom::HTMLVideoElement* aElement);
+  void RevokeVideoFrameRequestCallbacks(mozilla::dom::HTMLVideoElement* aElement);
+
+ private:
+  MOZ_CAN_RUN_SCRIPT
+  void RunVideoFrameRequestCallbacks(mozilla::TimeStamp aNowTime);
+ public:
+  nsTArray<mozilla::dom::HTMLVideoElement*> mVideoFrameRequestCallbackElems;
+  nsTArray<mozilla::dom::HTMLVideoElement*> mThrottledVideoFrameRequestCallbackElems;
+ private:
+
+  // TODO AZ end new WIP
+
   void UpdateIntersectionObservations(mozilla::TimeStamp aNowTime);
   void UpdateRelevancyOfContentVisibilityAutoFrames();
   MOZ_CAN_RUN_SCRIPT void

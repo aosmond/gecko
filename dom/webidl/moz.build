@@ -1004,6 +1004,8 @@ WEBIDL_FILES = [
     "VideoDecoder.webidl",
     "VideoEncoder.webidl",
     "VideoFrame.webidl",
+    "VideoFrameCallbackMetadata.webidl",
+    "VideoFrameProvider.webidl",
     "VideoPlaybackQuality.webidl",
     "VideoTrack.webidl",
     "VideoTrackList.webidl",

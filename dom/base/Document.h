@@ -254,6 +254,7 @@ class HTMLInputElement;
 class HTMLMetaElement;
 class HTMLDialogElement;
 class HTMLSharedElement;
+class HTMLVideoElement;
 class HTMLImageElement;
 struct LifecycleCallbackArgs;
 class Link;
@@ -4707,6 +4708,7 @@ class Document : public nsINode,
   // This should generally be updated only via
   // UpdateFrameRequestCallbackSchedulingState.
   bool mFrameRequestCallbacksScheduled : 1;
+  bool mVideoFrameCallbacksScheduled : 1;
 
   bool mIsTopLevelContentDocument : 1;
 
@@ -5053,6 +5055,13 @@ class Document : public nsINode,
   nsPIDOMWindowInner* mWindow;
 
   nsCOMPtr<nsIDocumentEncoder> mCachedEncoder;
+
+ public:
+  nsTArray<HTMLVideoElement*> mPendingVFCs;
+  nsTArray<HTMLVideoElement*> mRescheduledVFCs;
+  void NotifyVideoFrameCallbacks(HTMLVideoElement* aElement);
+  void DelayVideoFrameCallbacks(HTMLVideoElement* aElement);
+ protected:
 
   FrameRequestManager mFrameRequestManager;
 

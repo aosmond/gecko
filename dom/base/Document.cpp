@@ -1344,6 +1344,7 @@ Document::Document(const char* aContentType)
       mFontFaceSetDirty(true),
       mDidFireDOMContentLoaded(true),
       mFrameRequestCallbacksScheduled(false),
+      mVideoFrameCallbacksScheduled(false),
       mIsTopLevelContentDocument(false),
       mIsContentDocument(false),
       mDidCallBeginLoad(false),
@@ -6990,24 +6991,71 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   // that variable can change. Also consider if you should change
   // WouldScheduleFrameRequestCallbacks() instead of adding more stuff to this
   // condition.
-  bool shouldBeScheduled =
+  bool scheduleAFs =
       WouldScheduleFrameRequestCallbacks() && !mFrameRequestManager.IsEmpty();
-  if (shouldBeScheduled == mFrameRequestCallbacksScheduled) {
-    // nothing to do
+  bool scheduleVFCs =
+      WouldScheduleFrameRequestCallbacks() && !mPendingVFCs.IsEmpty();
+
+  printf_stderr("\nAZ: %s:%s:%d wouldSched = %d, schedAFs = %d, schedVFCs = %d\n\n",
+                __FILE__, __func__, __LINE__,
+                WouldScheduleFrameRequestCallbacks(), scheduleAFs, scheduleVFCs
+                );
+
+  if ((scheduleAFs == mFrameRequestCallbacksScheduled) &&
+      (scheduleVFCs == mVideoFrameCallbacksScheduled)) {
     return;
+  }
+
+  if (!mRescheduledVFCs.IsEmpty()) {
+    printf_stderr("\nAZ: %s:%s:%d rescheduling %zu delayed frame callbacks\n\n",
+                  __FILE__, __func__, __LINE__,
+                  mRescheduledVFCs.Length());
+    mPendingVFCs.AppendElements(mRescheduledVFCs);
+    mRescheduledVFCs.Clear();
+  } else {
+    printf_stderr("AZ: %s:%s:%d No rescheduled callbacks!\n",
+                  __FILE__, __func__, __LINE__);
   }
 
   PresShell* presShell = aOldPresShell ? aOldPresShell : mPresShell;
   MOZ_RELEASE_ASSERT(presShell);
-
   nsRefreshDriver* rd = presShell->GetPresContext()->RefreshDriver();
-  if (shouldBeScheduled) {
-    rd->ScheduleFrameRequestCallbacks(this);
-  } else {
-    rd->RevokeFrameRequestCallbacks(this);
+  printf_stderr("AZ: %s:%s:%d (throttled) VideoFrameRequests before:: (%zu) %zu\n",
+                __FILE__, __func__, __LINE__,
+                rd->mThrottledVideoFrameRequestCallbackElems.Length(),
+                rd->mVideoFrameRequestCallbackElems.Length());
+
+  if (scheduleAFs != mFrameRequestCallbacksScheduled) {
+    printf_stderr("\nAZ: %s:%s:%d %s regular animation frame callback\n\n",
+                  __FILE__, __func__, __LINE__,
+                  scheduleAFs ? "sched" : "revoke");
+    scheduleAFs ?
+      rd->ScheduleFrameRequestCallbacks(this)
+      : rd->RevokeFrameRequestCallbacks(this);
+    mFrameRequestCallbacksScheduled = scheduleAFs;
   }
 
-  mFrameRequestCallbacksScheduled = shouldBeScheduled;
+  if (scheduleVFCs != mVideoFrameCallbacksScheduled) {
+    printf_stderr("\nAZ: %s:%s:%d %s video frame callback\n\n",
+                  __FILE__, __func__, __LINE__,
+                  scheduleVFCs ? "sched" : "revoke");
+    for (auto& el : mPendingVFCs) {
+      scheduleVFCs ?
+        rd->ScheduleVideoFrameRequestCallbacks(el)
+        : rd->RevokeVideoFrameRequestCallbacks(el);
+    }
+    mPendingVFCs.Clear();
+    mVideoFrameCallbacksScheduled = scheduleVFCs;
+
+  }
+
+  if (!mRescheduledVFCs.IsEmpty()) {
+    mVideoFrameCallbacksScheduled = false;
+  }
+
+  printf_stderr("AZ: %s:%s:%d pending VFCs after updating scheduling state: %zu\n",
+                __FILE__, __func__, __LINE__,
+                mPendingVFCs.Length());
 }
 
 void Document::TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks) {
@@ -7016,6 +7064,46 @@ void Document::TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks) {
   // No need to manually remove ourselves from the refresh driver; it will
   // handle that part.  But we do have to update our state.
   mFrameRequestCallbacksScheduled = false;
+}
+
+void Document::NotifyVideoFrameCallbacks(HTMLVideoElement* aElement) {
+  if (mPendingVFCs.IndexOf(aElement) !=
+      mPendingVFCs.NoIndex) {
+        printf_stderr("AZ: %s:%s:%d NOT Double adding HTMLVideoElement to pending callbacks!\n",
+                      __FILE__, __func__, __LINE__);
+        return;
+  }
+  printf_stderr("AZ: %s:%s:%d Adding HTMLVideoElement to notify list!\n",
+                __FILE__, __func__, __LINE__);
+  mPendingVFCs.AppendElement(aElement);
+
+  mVideoFrameCallbacksScheduled = false;
+  UpdateFrameRequestCallbackSchedulingState();
+}
+
+void Document::DelayVideoFrameCallbacks(HTMLVideoElement* aElement) {
+  /*
+  if (mRescheduledVFCs.IndexOf(aElement) !=
+      mRescheduledVFCs.NoIndex) {
+        printf_stderr("AZ: %s:%s:%d NOT Double adding HTMLVideoElement to delayed callbacks!\n",
+                      __FILE__, __func__, __LINE__);
+        return;
+  }
+  mRescheduledVFCs.AppendElement(aElement);
+  */
+  if (mRescheduledVFCs.IndexOf(aElement) !=
+      mRescheduledVFCs.NoIndex) {
+        printf_stderr("AZ: %s:%s:%d NOT Double adding HTMLVideoElement to RESCHEDULED callbacks!\n",
+                      __FILE__, __func__, __LINE__);
+        return;
+  }
+  mRescheduledVFCs.AppendElement(aElement);
+  printf_stderr("AZ: %s:%s:%d tracking new delayed callback, we have %zu...\n",
+                __FILE__, __func__, __LINE__,
+                mRescheduledVFCs.Length());
+
+  mVideoFrameCallbacksScheduled = false;
+  //UpdateFrameRequestCallbackSchedulingState();
 }
 
 bool Document::ShouldThrottleFrameRequests() const {
