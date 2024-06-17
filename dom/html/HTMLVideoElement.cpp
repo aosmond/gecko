@@ -15,6 +15,7 @@
 #include "nsError.h"
 #include "nsIHttpChannel.h"
 #include "nsNodeInfoManager.h"
+#include "nsRefreshDriver.h"
 #include "plbase64.h"
 #include "prlock.h"
 #include "nsRFPService.h"
@@ -28,6 +29,7 @@
 #include "MediaDecoder.h"
 #include "MediaDecoderStateMachine.h"
 #include "mozilla/Preferences.h"
+#include "mozilla/PresShell.h"
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/Performance.h"
@@ -79,6 +81,7 @@ NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED_0(HTMLVideoElement,
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLVideoElement)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(HTMLVideoElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneSource)
@@ -87,6 +90,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(HTMLMediaElement)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLVideoElement,
                                                   HTMLMediaElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneSource)
@@ -292,6 +296,22 @@ uint32_t HTMLVideoElement::MozPresentedFrames() {
   }
 
   return mDecoder ? mDecoder->GetFrameStatistics().GetPresentedFrames() : 0;
+}
+
+uint32_t HTMLVideoElement::GetMaybeCompositedFrames() {
+  MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
+  if (!IsVideoStatsEnabled()) {
+    return 0;
+  }
+
+  if (OwnerDoc()->ShouldResistFingerprinting(
+          RFPTarget::VideoElementMozFrames)) {
+    return nsRFPService::GetSpoofedPresentedFrames(TotalPlayTime(),
+                                                   VideoWidth(), VideoHeight());
+  }
+
+  return mDecoder ? mDecoder->GetFrameStatistics().GetMaybeCompositedFrames()
+                  : 0;
 }
 
 uint32_t HTMLVideoElement::MozPaintedFrames() {
@@ -675,6 +695,56 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
     mCanAutoplayFlag = true;
     return;
   }
+}
+
+void HTMLVideoElement::GetVideoFrameCallbackMetadata(
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd) {
+  // Attempt to find the next image to be presented on this tick.
+  layers::Image* img = nullptr;
+  if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
+    layers::AutoLockImage lockImage(container);
+    img = lockImage.GetImage(aNowTime);
+    if (!img) {
+      img = lockImage.GetImage();
+    }
+  }
+
+  // If we don't have an image that would be displayed now, we were called too
+  // late. In that case, we are expected to make the display time match the
+  // presentation time to indicate it is already complete.
+  if (!img) {
+    aMd.mExpectedDisplayTime = aMd.mPresentationTime;
+  }
+
+  aMd.mWidth = mMediaInfo.mVideo.mDisplay.Width();
+  aMd.mHeight = mMediaInfo.mVideo.mDisplay.Height();
+  aMd.mMediaTime = CurrentTime();
+  aMd.mPresentedFrames = GetMaybeCompositedFrames();
+}
+
+void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
+    nsTArray<VideoFrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+  mVideoFrameRequestManager.Take(aCallbacks);
+}
+
+unsigned long HTMLVideoElement::RequestVideoFrameCallback(
+    VideoFrameRequestCallback& aCallback) {
+  int32_t handle;
+  auto rv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+
+  Document* doc = OwnerDoc();
+  MOZ_RELEASE_ASSERT(doc);
+  doc->NotifyVideoFrameCallbacks(this);
+  return handle;
+}
+
+bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
+  return mVideoFrameRequestManager.IsCanceled(aHandle);
+}
+
+void HTMLVideoElement::CancelVideoFrameCallback(unsigned long aHandle) {
+  mVideoFrameRequestManager.Cancel(aHandle);
 }
 
 }  // namespace mozilla::dom

@@ -52,6 +52,7 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentTimeline.h"
 #include "mozilla/dom/DocumentInlines.h"
+#include "mozilla/dom/HTMLVideoElement.h"
 #include "nsIXULRuntime.h"
 #include "jsapi.h"
 #include "nsContentUtils.h"
@@ -72,6 +73,7 @@
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/Performance.h"
 #include "mozilla/dom/Selection.h"
+#include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/VsyncMainChild.h"
 #include "mozilla/dom/WindowBinding.h"
 #include "mozilla/dom/LargestContentfulPaint.h"
@@ -2486,6 +2488,226 @@ void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
   }
 }
 
+struct HTMLVideoElementCallbacks {
+  explicit HTMLVideoElementCallbacks(HTMLVideoElement* aHTMLVideoElement)
+      : mHTMLVideoElement(aHTMLVideoElement) {}
+
+  RefPtr<HTMLVideoElement> mHTMLVideoElement;
+  nsTArray<VideoFrameRequest> mCallbacks;
+};
+
+static void TakeVideoFrameRequestCallbacksFrom(
+    HTMLVideoElement* aElement, nsTArray<HTMLVideoElementCallbacks>& aTarget) {
+  aTarget.AppendElement(aElement);
+  aElement->TakeVideoFrameRequestCallbacks(aTarget.LastElement().mCallbacks);
+}
+
+void nsRefreshDriver::RevokeVideoFrameRequestCallbacks(
+    mozilla::dom::HTMLVideoElement* aElement) {
+  // TODO: IF YOU REVOKE CALLBACKS HERE, THEY GET EATEN FOREVER
+  printf_stderr("AZ: %s:%s:%d revoking video frame callback\n", __FILE__,
+                __func__, __LINE__);
+
+  mVideoFrameRequestCallbackElems.RemoveElement(aElement);
+  mThrottledVideoFrameRequestCallbackElems.RemoveElement(aElement);
+}
+
+void nsRefreshDriver::ScheduleVideoFrameRequestCallbacks(
+    mozilla::dom::HTMLVideoElement* aElement) {
+  // TODO: CHECK FOR THROTTLING?
+  MOZ_ASSERT(aElement);
+  Document* doc = aElement->OwnerDoc();
+  MOZ_ASSERT(doc);
+  bool shouldThrottle = (doc->ShouldThrottleFrameRequests()) ||
+                        (aElement->MozPaintedFrames() == 0);
+  bool regSched = mVideoFrameRequestCallbackElems.IndexOf(aElement) !=
+                  mVideoFrameRequestCallbackElems.NoIndex;
+  bool thrSched = mThrottledVideoFrameRequestCallbackElems.IndexOf(aElement) !=
+                  mThrottledVideoFrameRequestCallbackElems.NoIndex;
+
+  MOZ_RELEASE_ASSERT(!(regSched && thrSched));
+
+  if (regSched || thrSched) {
+    if (!regSched && thrSched && !shouldThrottle) {
+      auto idx = mThrottledVideoFrameRequestCallbackElems.IndexOf(aElement);
+      mThrottledVideoFrameRequestCallbackElems.RemoveElementsAt(idx, 1);
+    } else {
+      return;
+    }
+  }
+
+  if (aElement->MozPaintedFrames() == 0 || shouldThrottle) {
+    mThrottledVideoFrameRequestCallbackElems.AppendElement(aElement);
+  } else {
+    mVideoFrameRequestCallbackElems.AppendElement(aElement);
+  }
+
+  // make sure that the timer is running
+  EnsureTimerStarted();
+}
+
+void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
+  /*
+  To run the video frame request callbacks for a HTMLVideoElement video with a
+  timestamp now, run the following steps:
+
+    1. If video’s list of video frame request callbacks is empty, abort these
+  steps.
+
+    2. Let metadata be the VideoFrameCallbackMetadata dictionary built from
+  video’s latest presented frame.
+
+    3. Let presentedFrames be the value of metadata’s presentedFrames field.
+
+    4. If the last presented frame indentifier is equal to presentedFrames,
+  abort these steps.
+
+    5. Set the last presented frame indentifier to presentedFrames.
+
+    6. Let callbacks be the list of video frame request callbacks.
+
+    7. Set video’s list of video frame request callbacks to be empty.
+
+    8. For each entry in callbacks
+
+        i.   If the entry’s canceled boolean is true, continue to the next
+  entry.
+
+        ii.  Invoke the callback, passing now and metadata as arguments
+
+        iii. an exception is thrown, report the exception.
+  */
+
+  // Grab all of our frame request callbacks up front.
+  nsTArray<HTMLVideoElementCallbacks> videoFrameRequestCallbacks(
+      mVideoFrameRequestCallbackElems.Length() +
+      mThrottledVideoFrameRequestCallbackElems.Length());
+
+  nsTArray<HTMLVideoElement*> dupeCheck(
+      mVideoFrameRequestCallbackElems.Length() +
+      mThrottledVideoFrameRequestCallbackElems.Length());
+
+  for (auto e : mVideoFrameRequestCallbackElems) {
+    MOZ_RELEASE_ASSERT(dupeCheck.IndexOf(e) == dupeCheck.NoIndex);
+    dupeCheck.AppendElement(e);
+  }
+
+  for (auto e : mThrottledVideoFrameRequestCallbackElems) {
+    MOZ_RELEASE_ASSERT(dupeCheck.IndexOf(e) == dupeCheck.NoIndex);
+    dupeCheck.AppendElement(e);
+  }
+
+  nsTArray<HTMLVideoElement*> elemsToRemove;
+
+  //// We always tick throttled frame requests if the entire refresh driver is
+  //// throttled, because in that situation throttled frame requests tick at the
+  //// same frequency as non-throttled frame requests.
+  bool tickThrottledFrameRequests = mThrottled;
+
+  if (!tickThrottledFrameRequests &&
+      aNowTime >= mNextThrottledFrameRequestTick) {
+    mNextThrottledFrameRequestTick = aNowTime + mThrottledFrameRequestInterval;
+    tickThrottledFrameRequests = true;
+  }
+
+  for (HTMLVideoElement* el : mThrottledVideoFrameRequestCallbackElems) {
+    MOZ_RELEASE_ASSERT(el);
+    Document* doc = el->OwnerDoc();
+    MOZ_RELEASE_ASSERT(doc);
+    if (!el->CanTakeVideoFrameRequestCallbacks()) {
+      doc->DelayVideoFrameCallbacks(el);
+      continue;
+    }
+
+    if (tickThrottledFrameRequests) {
+      TakeVideoFrameRequestCallbacksFrom(el, videoFrameRequestCallbacks);
+    } else if (!doc->ShouldThrottleFrameRequests()) {
+      elemsToRemove.AppendElement(el);
+      TakeVideoFrameRequestCallbacksFrom(el, videoFrameRequestCallbacks);
+    }
+  }
+
+  if (tickThrottledFrameRequests) {
+    mThrottledVideoFrameRequestCallbackElems.Clear();
+  } else {
+    for (HTMLVideoElement* el2r : elemsToRemove) {
+      mThrottledVideoFrameRequestCallbackElems.RemoveElement(el2r);
+    }
+  }
+
+  //// Now grab unthrottled frame request callbacks.
+  for (HTMLVideoElement* el : mVideoFrameRequestCallbackElems) {
+    if (!el->CanTakeVideoFrameRequestCallbacks()) {
+      Document* doc = el->OwnerDoc();
+      MOZ_RELEASE_ASSERT(doc);
+      doc->NotifyVideoFrameCallbacks(el);
+      MOZ_RELEASE_ASSERT(false);
+      continue;
+    }
+
+    TakeVideoFrameRequestCallbacksFrom(el, videoFrameRequestCallbacks);
+    MOZ_RELEASE_ASSERT(videoFrameRequestCallbacks.Length() > 0,
+                       "Retreived callbacks list length should not be zero!");
+  }
+
+  //// Reset mFrameRequestCallbackDocs so they can be readded as needed.
+  mVideoFrameRequestCallbackElems.Clear();
+
+  if (!videoFrameRequestCallbacks.IsEmpty()) {
+    Maybe<TimeStamp> nextTickHint = GetNextTickHint();
+
+    for (const HTMLVideoElementCallbacks& elemCallbacks :
+         videoFrameRequestCallbacks) {
+      TimeStamp startTime = TimeStamp::Now();
+
+      Document* doc = elemCallbacks.mHTMLVideoElement->OwnerDoc();
+
+      nsPIDOMWindowInner* innerWindow = doc->GetInnerWindow();
+      DOMHighResTimeStamp timeStamp = 0;
+      DOMHighResTimeStamp nextTickTimeStamp = 0;
+      if (innerWindow) {
+        if (Performance* perf = innerWindow->GetPerformance()) {
+          timeStamp = perf->TimeStampToDOMHighResForRendering(aNowTime);
+          nextTickTimeStamp =
+              nextTickHint
+                  ? perf->TimeStampToDOMHighResForRendering(*nextTickHint)
+                  : timeStamp;
+        }
+        // else window is partially torn down already
+      }
+
+      for (auto& callback : elemCallbacks.mCallbacks) {
+        HTMLVideoElement* el = elemCallbacks.mHTMLVideoElement;
+        if (el->IsVideoFrameCallbackCancelled(callback.mHandle)) {
+          continue;
+        }
+
+        if (!el->CanTakeVideoFrameRequestCallbacks()) {
+          // FIXME mVideoFrameRequestCallbackElems.AppendElement(el);
+          mThrottledVideoFrameRequestCallbackElems.AppendElement(el);
+          doc->NotifyVideoFrameCallbacks(el);
+          MOZ_RELEASE_ASSERT(false,
+                             "callback shouldn't be broken at this point.");
+          continue;
+        }
+
+        nsCOMPtr<nsIGlobalObject> global(innerWindow ? innerWindow->AsGlobal()
+                                                     : nullptr);
+        CallbackDebuggerNotificationGuard guard(
+            global, DebuggerNotificationType::RequestAnimationFrameCallback);
+
+        VideoFrameCallbackMetadata metadata;
+        metadata.mPresentationTime = timeStamp;
+        metadata.mExpectedDisplayTime = nextTickTimeStamp;
+        el->GetVideoFrameCallbackMetadata(aNowTime, metadata);
+
+        LogVideoFrameRequestCallback::Run run(callback.mCallback);
+        MOZ_KnownLive(callback.mCallback)->Call(timeStamp, metadata);
+      }
+    }
+  }
+}
+
 static StaticAutoPtr<AutoTArray<RefPtr<Task>, 8>> sPendingIdleTasks;
 
 void nsRefreshDriver::DispatchIdleTaskAfterTickUnlessExists(Task* aTask) {
@@ -2704,6 +2926,7 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime,
   RunFullscreenSteps();
 
   // Step 14. For each doc of docs, run the animation frame callbacks for doc.
+  RunVideoFrameRequestCallbacks(aNowTime);
   RunFrameRequestCallbacks(aNowTime);
   MaybeIncreaseMeasuredTicksSinceLoading();
 

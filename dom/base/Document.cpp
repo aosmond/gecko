@@ -1347,6 +1347,7 @@ Document::Document(const char* aContentType)
       mFontFaceSetDirty(true),
       mDidFireDOMContentLoaded(true),
       mFrameRequestCallbacksScheduled(false),
+      mVideoFrameCallbacksScheduled(false),
       mIsTopLevelContentDocument(false),
       mIsContentDocument(false),
       mDidCallBeginLoad(false),
@@ -7109,24 +7110,43 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   // that variable can change. Also consider if you should change
   // WouldScheduleFrameRequestCallbacks() instead of adding more stuff to this
   // condition.
-  bool shouldBeScheduled =
+  bool scheduleAFs =
       WouldScheduleFrameRequestCallbacks() && !mFrameRequestManager.IsEmpty();
-  if (shouldBeScheduled == mFrameRequestCallbacksScheduled) {
-    // nothing to do
+  bool scheduleVFCs =
+      WouldScheduleFrameRequestCallbacks() && !mPendingVFCs.IsEmpty();
+
+  if ((scheduleAFs == mFrameRequestCallbacksScheduled) &&
+      (scheduleVFCs == mVideoFrameCallbacksScheduled)) {
     return;
+  }
+
+  if (!mRescheduledVFCs.IsEmpty()) {
+    mPendingVFCs.AppendElements(mRescheduledVFCs);
+    mRescheduledVFCs.Clear();
   }
 
   PresShell* presShell = aOldPresShell ? aOldPresShell : mPresShell;
   MOZ_RELEASE_ASSERT(presShell);
-
   nsRefreshDriver* rd = presShell->GetPresContext()->RefreshDriver();
-  if (shouldBeScheduled) {
-    rd->ScheduleFrameRequestCallbacks(this);
-  } else {
-    rd->RevokeFrameRequestCallbacks(this);
+
+  if (scheduleAFs != mFrameRequestCallbacksScheduled) {
+    scheduleAFs ? rd->ScheduleFrameRequestCallbacks(this)
+                : rd->RevokeFrameRequestCallbacks(this);
+    mFrameRequestCallbacksScheduled = scheduleAFs;
   }
 
-  mFrameRequestCallbacksScheduled = shouldBeScheduled;
+  if (scheduleVFCs != mVideoFrameCallbacksScheduled) {
+    for (auto& el : mPendingVFCs) {
+      scheduleVFCs ? rd->ScheduleVideoFrameRequestCallbacks(el)
+                   : rd->RevokeVideoFrameRequestCallbacks(el);
+    }
+    mPendingVFCs.Clear();
+    mVideoFrameCallbacksScheduled = scheduleVFCs;
+  }
+
+  if (!mRescheduledVFCs.IsEmpty()) {
+    mVideoFrameCallbacksScheduled = false;
+  }
 }
 
 void Document::TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks) {
@@ -7135,6 +7155,25 @@ void Document::TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks) {
   // No need to manually remove ourselves from the refresh driver; it will
   // handle that part.  But we do have to update our state.
   mFrameRequestCallbacksScheduled = false;
+}
+
+void Document::NotifyVideoFrameCallbacks(HTMLVideoElement* aElement) {
+  if (mPendingVFCs.IndexOf(aElement) != mPendingVFCs.NoIndex) {
+    return;
+  }
+  mPendingVFCs.AppendElement(aElement);
+
+  mVideoFrameCallbacksScheduled = false;
+  UpdateFrameRequestCallbackSchedulingState();
+}
+
+void Document::DelayVideoFrameCallbacks(HTMLVideoElement* aElement) {
+  if (mRescheduledVFCs.IndexOf(aElement) != mRescheduledVFCs.NoIndex) {
+    return;
+  }
+  mRescheduledVFCs.AppendElement(aElement);
+  mVideoFrameCallbacksScheduled = false;
+  // FIXME UpdateFrameRequestCallbackSchedulingState();
 }
 
 bool Document::ShouldThrottleFrameRequests() const {
