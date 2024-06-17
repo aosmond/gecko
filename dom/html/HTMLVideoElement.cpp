@@ -79,6 +79,7 @@ NS_IMPL_ISUPPORTS_CYCLE_COLLECTION_INHERITED_0(HTMLVideoElement,
 NS_IMPL_CYCLE_COLLECTION_CLASS(HTMLVideoElement)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(HTMLVideoElement)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mVisualCloneSource)
@@ -87,6 +88,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(HTMLMediaElement)
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLVideoElement,
                                                   HTMLMediaElement)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVideoFrameRequestManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneTargetPromise)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVisualCloneSource)
@@ -674,6 +676,152 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
     PauseInternal();
     mCanAutoplayFlag = true;
     return;
+  }
+}
+
+class HTMLVideoElement::VideoFrameRequestRunnable final : public Runnable {
+ public:
+  explicit VideoFrameRequestRunnable(HTMLVideoElement* aOwner)
+      : Runnable("HTMLVideoElement::VideoFrameRequestRunnable"),
+        mOwner(aOwner) {}
+
+  void Destroy() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mOwner = nullptr;
+  }
+
+  nsresult Run() override {
+    if (!NS_IsMainThread()) {
+      NS_DispatchToMainThread(this);
+      return NS_OK;
+    }
+
+    if (mOwner) {
+      mOwner->OnComposite(this);
+    }
+    return NS_OK;
+  }
+
+ private:
+  ~VideoFrameRequestRunnable() override { MOZ_ASSERT(!mOwner); }
+
+  WeakPtr<HTMLVideoElement> mOwner;
+};
+
+void HTMLVideoElement::ResetState() {
+  MaybeClearCompositeRunnable();
+  HTMLMediaElement::ResetState();
+  MaybeSetCompositeRunnable();
+}
+
+void HTMLVideoElement::OnComposite(VideoFrameRequestRunnable* aRunnable) {
+  // We may have raced with a change in the image container, and/or with our
+  // pending requests getting cancelled.
+  if (mImageContainerNotifyRunnable != aRunnable ||
+      !mImageContainerNotifyPending || mVideoFrameRequestManager.IsEmpty()) {
+    return;
+  }
+
+  if (Document* doc = OwnerDoc()) {
+    doc->ScheduleVideoFrameCallbacks(this);
+  }
+}
+
+void HTMLVideoElement::MaybeSetCompositeRunnable() {
+  if (mImageContainerNotifyPending) {
+    MOZ_ASSERT(mImageContainerNotifyRunnable);
+    MOZ_ASSERT(!mVideoFrameRequestManager.IsEmpty());
+    return;
+  }
+
+  if (mVideoFrameRequestManager.IsEmpty()) {
+    return;
+  }
+
+  RefPtr<ImageContainer> container = GetImageContainer();
+  if (!container) {
+    return;
+  }
+
+  mImageContainerNotifyRunnable = new VideoFrameRequestRunnable(this);
+  mImageContainerNotifyPending = true;
+  container->SetNotifyRunnable(mImageContainerNotifyRunnable);
+}
+
+void HTMLVideoElement::MaybeClearCompositeRunnable() {
+  if (!mImageContainerNotifyRunnable) {
+    return;
+  }
+
+  if (RefPtr<ImageContainer> container = GetImageContainer()) {
+    container->ClearNotifyRunnable();
+  }
+
+  mImageContainerNotifyPending = false;
+  mImageContainerNotifyRunnable->Destroy();
+  mImageContainerNotifyRunnable = nullptr;
+}
+
+void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd,
+    nsTArray<VideoFrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+  mImageContainerNotifyPending = false;
+
+  // Ensure we did not race with shutting down the video.
+  if (!mHasPlayedOrSeeked || !mMediaInfo.mVideo.IsValid()) {
+    return;
+  }
+
+  // Attempt to find the next image to be presented on this tick.
+  layers::Image* img = nullptr;
+  uint32_t maybeCompositedFrames = 0;
+  if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
+    maybeCompositedFrames = container->GetMaybeCompositedCount();
+
+    layers::AutoLockImage lockImage(container);
+    img = lockImage.GetImage(aNowTime);
+    if (!img) {
+      img = lockImage.GetImage();
+    }
+  }
+
+  if (maybeCompositedFrames == 0) {
+    return;
+  }
+
+  // If we don't have an image that would be displayed now, we were called too
+  // late. In that case, we are expected to make the display time match the
+  // presentation time to indicate it is already complete.
+  if (!img) {
+    aMd.mExpectedDisplayTime = aMd.mPresentationTime;
+  }
+
+  aMd.mWidth = mMediaInfo.mVideo.mDisplay.Width();
+  aMd.mHeight = mMediaInfo.mVideo.mDisplay.Height();
+  aMd.mMediaTime = CurrentTime();
+  aMd.mPresentedFrames = maybeCompositedFrames;
+
+  mVideoFrameRequestManager.Take(aCallbacks);
+  MaybeClearCompositeRunnable();
+}
+
+uint32_t HTMLVideoElement::RequestVideoFrameCallback(
+    VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
+  uint32_t handle = 0;
+  aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+  MaybeSetCompositeRunnable();
+  return handle;
+}
+
+bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
+  return mVideoFrameRequestManager.IsCanceled(aHandle);
+}
+
+void HTMLVideoElement::CancelVideoFrameCallback(uint32_t aHandle) {
+  mVideoFrameRequestManager.Cancel(aHandle);
+  if (mVideoFrameRequestManager.IsEmpty()) {
+    MaybeClearCompositeRunnable();
   }
 }
 

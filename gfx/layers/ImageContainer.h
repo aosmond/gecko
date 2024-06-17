@@ -558,10 +558,31 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
    * frameID is not the same as the entry's.
    * Every expired image that is never composited is counted as dropped.
    */
-  uint32_t GetDroppedImageCount() { return mDroppedImageCount; }
+  uint32_t GetDroppedImageCount() {
+    RecursiveMutexAutoLock lock(mRecursiveMutex);
+    return mDroppedImageCount;
+  }
+
+  /**
+   * Returns the number of images that have been painted and dropped.
+   */
+  uint32_t GetMaybeCompositedCount() {
+    RecursiveMutexAutoLock lock(mRecursiveMutex);
+    return mDroppedImageCount + mPaintCount;
+  }
 
   void NotifyComposite(const ImageCompositeNotification& aNotification);
   void NotifyDropped(uint32_t aDropped);
+
+  void SetNotifyRunnable(RefPtr<Runnable>&& aRunnable) {
+    RecursiveMutexAutoLock lock(mRecursiveMutex);
+    mNotifyRunnable = std::move(aRunnable);
+  }
+
+  void ClearNotifyRunnable() {
+    RecursiveMutexAutoLock lock(mRecursiveMutex);
+    mNotifyRunnable = nullptr;
+  }
 
   already_AddRefed<ImageContainerListener> GetImageContainerListener() const;
 
@@ -633,12 +654,14 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
   TimeDuration mPaintDelay MOZ_GUARDED_BY(mRecursiveMutex);
 
   // See GetDroppedImageCount.
-  mozilla::Atomic<uint32_t> mDroppedImageCount;
+  uint32_t mDroppedImageCount MOZ_GUARDED_BY(mRecursiveMutex);
 
   // This is the image factory used by this container, layer managers using
   // this container can set an alternative image factory that will be used to
   // create images for this container.
   RefPtr<ImageFactory> mImageFactory MOZ_GUARDED_BY(mRecursiveMutex);
+
+  RefPtr<Runnable> mNotifyRunnable MOZ_GUARDED_BY(mRecursiveMutex);
 
   gfx::IntSize mScaleHint MOZ_GUARDED_BY(mRecursiveMutex);
 

@@ -10,6 +10,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/dom/HTMLMediaElement.h"
+#include "mozilla/dom/VideoFrameProvider.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "Units.h"
 
@@ -152,11 +153,22 @@ class HTMLVideoElement final : public HTMLMediaElement {
   void CreateVideoWakeLockIfNeeded();
   void ReleaseVideoWakeLockIfExists();
 
+  void ResetState() override;
+
   gfx::IntSize GetVideoIntrinsicDimensions();
 
   RefPtr<WakeLock> mScreenWakeLock;
 
   WatchManager<HTMLVideoElement> mVideoWatchManager;
+
+  class VideoFrameRequestRunnable;
+
+  void MaybeSetCompositeRunnable();
+  void MaybeClearCompositeRunnable();
+  void OnComposite(VideoFrameRequestRunnable* aRunnable);
+
+  RefPtr<VideoFrameRequestRunnable> mImageContainerNotifyRunnable;
+  bool mImageContainerNotifyPending = false;
 
  private:
   bool SetVisualCloneTarget(
@@ -188,6 +200,18 @@ class HTMLVideoElement final : public HTMLMediaElement {
   // SetVisualCloneTarget() instead.
   RefPtr<HTMLVideoElement> mVisualCloneSource;
 
+  VideoFrameRequestManager mVideoFrameRequestManager;
+
+ public:
+  uint32_t RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback,
+                                     ErrorResult& aRv);
+  void CancelVideoFrameCallback(uint32_t aHandle);
+  void TakeVideoFrameRequestCallbacks(const TimeStamp& aNowTime,
+                                      VideoFrameCallbackMetadata& aMd,
+                                      nsTArray<VideoFrameRequest>& aCallbacks);
+  bool IsVideoFrameCallbackCancelled(uint32_t aHandle);
+
+ private:
   static void MapAttributesIntoRule(MappedDeclarationsBuilder&);
 
   static bool IsVideoStatsEnabled();

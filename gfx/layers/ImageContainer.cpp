@@ -473,10 +473,21 @@ void ImageContainer::NotifyComposite(
     mPaintDelay = aNotification.firstCompositeTimeStamp() -
                   aNotification.imageTimeStamp();
   }
+
+  auto notifyRunnable = std::move(mNotifyRunnable);
+  if (notifyRunnable) {
+    notifyRunnable->Run();
+  }
 }
 
 void ImageContainer::NotifyDropped(uint32_t aDropped) {
+  RecursiveMutexAutoLock lock(mRecursiveMutex);
   mDroppedImageCount += aDropped;
+
+  auto notifyRunnable = std::move(mNotifyRunnable);
+  if (notifyRunnable) {
+    notifyRunnable->Run();
+  }
 }
 
 void ImageContainer::EnsureRecycleAllocatorForRDD(
