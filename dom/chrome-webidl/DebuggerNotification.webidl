@@ -10,11 +10,14 @@ enum DebuggerNotificationType {
   "clearInterval",
   "requestAnimationFrame",
   "cancelAnimationFrame",
+  "requestVideoFrameCallback",
+  "cancelVideoFrameCallback",
 
   // CallbackDebuggerNotification
   "setTimeoutCallback",
   "setIntervalCallback",
   "requestAnimationFrameCallback",
+  "requestVideoFrameCallbackFire",
 
   // EventCallbackDebuggerNotification
   "domEvent",
