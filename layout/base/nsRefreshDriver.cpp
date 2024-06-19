@@ -2725,6 +2725,8 @@ void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
   mVideoFrameRequestCallbackElems.Clear();
 
   if (!videoFrameRequestCallbacks.IsEmpty()) {
+    Maybe<TimeStamp> nextTickHint = GetNextTickHint();
+
     for (const HTMLVideoElementCallbacks& elemCallbacks :
          videoFrameRequestCallbacks) {
       TimeStamp startTime = TimeStamp::Now();
@@ -2733,9 +2735,14 @@ void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
 
       nsPIDOMWindowInner* innerWindow = doc->GetInnerWindow();
       DOMHighResTimeStamp timeStamp = 0;
+      DOMHighResTimeStamp nextTickTimeStamp = 0;
       if (innerWindow) {
         if (Performance* perf = innerWindow->GetPerformance()) {
           timeStamp = perf->TimeStampToDOMHighResForRendering(aNowTime);
+          if (nextTickHint) {
+            nextTickTimeStamp =
+                perf->TimeStampToDOMHighResForRendering(*nextTickHint);
+          }
         }
         // else window is partially torn down already
       }
@@ -2772,9 +2779,13 @@ void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
             "%s:%s:%d AZ - EXECUTING REQUESTVIDEOFRAMECALLBACK CALLBACK\n",
             __FILE__, __func__, __LINE__);
 
+        VideoFrameCallbackMetadata metadata;
+        metadata.mPresentationTime = timeStamp;
+        metadata.mExpectedDisplayTime = nextTickTimeStamp;
+        el->GetVideoFrameCallbackMetadata(metadata);
+
         LogVideoFrameRequestCallback::Run run(callback.mCallback);
-        MOZ_KnownLive(callback.mCallback)
-            ->Call(timeStamp, el->GetVideoFrameCallbackMetadata());
+        MOZ_KnownLive(callback.mCallback)->Call(timeStamp, metadata);
       }
     }
   }
