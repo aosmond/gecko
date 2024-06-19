@@ -197,7 +197,7 @@ class HTMLVideoElement final : public HTMLMediaElement {
   unsigned long RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback);
   void CancelVideoFrameCallback(unsigned long aHandle);
   void TakeVideoFrameRequestCallbacks(nsTArray<VideoFrameRequest>& aCallbacks);
-  VideoFrameCallbackMetadata GetVideoFrameCallbackMetadata();
+  void GetVideoFrameCallbackMetadata(VideoFrameCallbackMetadata& aMd);
   bool IsVideoFrameCallbackCancelled(uint32_t aHandle);
 
  private:

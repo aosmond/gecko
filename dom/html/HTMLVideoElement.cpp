@@ -683,7 +683,8 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
   }
 }
 
-VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
+void HTMLVideoElement::GetVideoFrameCallbackMetadata(
+    VideoFrameCallbackMetadata& aMd) {
   /*
       VideoFrameCallbackMetadata(HTMLMediaElement* aElement,
           DOMHighResTimeStamp aPresentationTime,
@@ -766,8 +767,6 @@ VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
 
   // current time + 1 frame?
 
-  DOMHighResTimeStamp mdPresentationTime = CurrentTime();
-  DOMHighResTimeStamp mdExpectedDisplayTime = CurrentTime();  // FIX ME
   unsigned long mdWidth = videoInfo.mDisplay.Width();
   unsigned long mdHeight = videoInfo.mDisplay.Height();
 
@@ -778,13 +777,10 @@ VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
   DOMHighResTimeStamp mdReceiveTime = CurrentTime();   // FIX ME
   DOMHighResTimeStamp mdRtpTimestamp = CurrentTime();  // FIX ME
 
-  VideoFrameCallbackMetadata md;
-  md.mPresentationTime = mdPresentationTime;
-  md.mExpectedDisplayTime = mdExpectedDisplayTime;
-  md.mWidth = mdWidth;
-  md.mHeight = mdHeight;
-  md.mMediaTime = mdMediaTime;
-  md.mPresentedFrames = mdPresentedFrames;
+  aMd.mWidth = mdWidth;
+  aMd.mHeight = mdHeight;
+  aMd.mMediaTime = mdMediaTime;
+  aMd.mPresentedFrames = mdPresentedFrames;
   /*md.mProcessingDuration = mdProcessingDuration;
   md.mCaptureTime = mdCaptureTime;
   md.mReceiveTime = mdReceiveTime;
@@ -793,8 +789,6 @@ VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
   printf_stderr(
       "\n%s:%s:%d AZ - HTMLVideoElement generated VideoFrameCallbackMetadata "
       "with:\n"
-      "presentationTime: %f \n"
-      "expectedDisplayTime: %f \n"
       "width: %lu \n"
       "height: %lu \n"
       "mediaTime: %f \n"
@@ -803,9 +797,9 @@ VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
       "captureTime: %f \n"
       "receiveTime: %f \n"
       "rtpTimestamp: %f \n\n",
-      __FILE__, __func__, __LINE__, mdPresentationTime, mdExpectedDisplayTime,
-      mdWidth, mdHeight, mdMediaTime, mdPresentedFrames, mdProcessingDuration,
-      mdCaptureTime, mdReceiveTime, mdRtpTimestamp);
+      __FILE__, __func__, __LINE__, mdWidth, mdHeight, mdMediaTime,
+      mdPresentedFrames, mdProcessingDuration, mdCaptureTime, mdReceiveTime,
+      mdRtpTimestamp);
 
   /*
   VideoFrameCallbackMetadata* md = new VideoFrameCallbackMetadata(
@@ -851,7 +845,6 @@ VideoFrameCallbackMetadata HTMLVideoElement::GetVideoFrameCallbackMetadata() {
                  mRtpTimestamp
                 );
    */
-  return md;
 }
 
 void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
