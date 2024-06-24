@@ -191,13 +191,16 @@ class HTMLVideoElement final : public HTMLMediaElement {
 
   // TODO: AZ NEW
  private:
+  uint32_t GetMaybeCompositedFrames();
+
   VideoFrameRequestManager mVideoFrameRequestManager;
 
  public:
   unsigned long RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback);
   void CancelVideoFrameCallback(unsigned long aHandle);
   void TakeVideoFrameRequestCallbacks(nsTArray<VideoFrameRequest>& aCallbacks);
-  void GetVideoFrameCallbackMetadata(VideoFrameCallbackMetadata& aMd);
+  void GetVideoFrameCallbackMetadata(const TimeStamp& aNowTime,
+                                     VideoFrameCallbackMetadata& aMd);
   bool IsVideoFrameCallbackCancelled(uint32_t aHandle);
 
  private:

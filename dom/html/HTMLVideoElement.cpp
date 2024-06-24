@@ -298,6 +298,22 @@ uint32_t HTMLVideoElement::MozPresentedFrames() {
   return mDecoder ? mDecoder->GetFrameStatistics().GetPresentedFrames() : 0;
 }
 
+uint32_t HTMLVideoElement::GetMaybeCompositedFrames() {
+  MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
+  if (!IsVideoStatsEnabled()) {
+    return 0;
+  }
+
+  if (OwnerDoc()->ShouldResistFingerprinting(
+          RFPTarget::VideoElementMozFrames)) {
+    return nsRFPService::GetSpoofedPresentedFrames(TotalPlayTime(),
+                                                   VideoWidth(), VideoHeight());
+  }
+
+  return mDecoder ? mDecoder->GetFrameStatistics().GetMaybeCompositedFrames()
+                  : 0;
+}
+
 uint32_t HTMLVideoElement::MozPaintedFrames() {
   MOZ_ASSERT(NS_IsMainThread(), "Should be on main thread.");
   if (!IsVideoStatsEnabled()) {
@@ -684,7 +700,7 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
 }
 
 void HTMLVideoElement::GetVideoFrameCallbackMetadata(
-    VideoFrameCallbackMetadata& aMd) {
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd) {
   /*
       VideoFrameCallbackMetadata(HTMLMediaElement* aElement,
           DOMHighResTimeStamp aPresentationTime,
@@ -706,13 +722,12 @@ void HTMLVideoElement::GetVideoFrameCallbackMetadata(
   const VideoInfo& videoInfo = mediaInfo.mVideo;
   VideoFrameContainer* videoFrameContainer = GetVideoFrameContainer();
   FrameStatistics* frameStats = GetFrameStatistics();
-  ImageContainer* imageContainer = GetImageContainer();
 
   Maybe<int32_t> vfr = videoInfo.GetFrameRate();
   double frameDelay = videoFrameContainer->GetFrameDelay();
   double paintDelay = 0.12345;
-  if (imageContainer)
-    paintDelay = imageContainer->GetPaintDelay().ToMilliseconds();
+  // if (imageContainer)
+  //   paintDelay = imageContainer->GetPaintDelay().ToMilliseconds();
   float videoFrameRate = 1;
 
   if (vfr && vfr.isSome()) {
@@ -722,7 +737,7 @@ void HTMLVideoElement::GetVideoFrameCallbackMetadata(
 
   // Maybe<int32_t> videoFrameRate = videoInfo.GetFrameRate();
 
-  gfx::IntSize intSize = imageContainer->GetCurrentSize();
+  gfx::IntSize intSize;  // = imageContainer->GetCurrentSize();
   // VideoTracks?
   // frameStats->GetPresentedFrames();
 
@@ -771,11 +786,27 @@ void HTMLVideoElement::GetVideoFrameCallbackMetadata(
   unsigned long mdHeight = videoInfo.mDisplay.Height();
 
   double mdMediaTime = CurrentTime();
-  unsigned long mdPresentedFrames = MozPresentedFrames();
+  unsigned long mdPresentedFrames = GetMaybeCompositedFrames();
   double mdProcessingDuration = 0.1;                   // FIX ME
   DOMHighResTimeStamp mdCaptureTime = CurrentTime();   // FIX ME
   DOMHighResTimeStamp mdReceiveTime = CurrentTime();   // FIX ME
   DOMHighResTimeStamp mdRtpTimestamp = CurrentTime();  // FIX ME
+
+  layers::Image* img = nullptr;
+  if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
+    layers::AutoLockImage lockImage(container);
+    img = lockImage.GetImage(aNowTime);
+    if (!img) {
+      img = lockImage.GetImage();
+    }
+  }
+
+  // If we don't have an image that would be displayed now, we were called too
+  // late. In that case, we are expected to make the display time match the
+  // presentation time to indicate it is already complete.
+  if (!img) {
+    aMd.mExpectedDisplayTime = aMd.mPresentationTime;
+  }
 
   aMd.mWidth = mdWidth;
   aMd.mHeight = mdHeight;

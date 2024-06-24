@@ -2739,10 +2739,10 @@ void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
       if (innerWindow) {
         if (Performance* perf = innerWindow->GetPerformance()) {
           timeStamp = perf->TimeStampToDOMHighResForRendering(aNowTime);
-          if (nextTickHint) {
-            nextTickTimeStamp =
-                perf->TimeStampToDOMHighResForRendering(*nextTickHint);
-          }
+          nextTickTimeStamp =
+              nextTickHint
+                  ? perf->TimeStampToDOMHighResForRendering(*nextTickHint)
+                  : timeStamp;
         }
         // else window is partially torn down already
       }
@@ -2782,7 +2782,7 @@ void nsRefreshDriver::RunVideoFrameRequestCallbacks(TimeStamp aNowTime) {
         VideoFrameCallbackMetadata metadata;
         metadata.mPresentationTime = timeStamp;
         metadata.mExpectedDisplayTime = nextTickTimeStamp;
-        el->GetVideoFrameCallbackMetadata(metadata);
+        el->GetVideoFrameCallbackMetadata(aNowTime, metadata);
 
         LogVideoFrameRequestCallback::Run run(callback.mCallback);
         MOZ_KnownLive(callback.mCallback)->Call(timeStamp, metadata);
