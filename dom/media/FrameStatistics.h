@@ -111,6 +111,15 @@ class FrameStatistics {
     return mFrameStatisticsData.mPresentedFrames;
   }
 
+  // Returns the number of decoded frames which have been sent to the compositor
+  // process for compositing.
+  // Can be called on any thread.
+  uint64_t GetCompositedFrames() const {
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    return mFrameStatisticsData.mPresentedFrames +
+           mFrameStatisticsData.mDroppedCompositorFrames;
+  }
+
   // Returns the number of presented and dropped frames
   // Can be called on any thread.
   uint64_t GetTotalFrames() const {
