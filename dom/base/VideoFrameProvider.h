@@ -10,36 +10,36 @@
 
 namespace mozilla::dom {
 
-//class VideoFrameCallbackMetadata;
-//class VideoFrameRequestCallback;
+// class VideoFrameCallbackMetadata;
+// class VideoFrameRequestCallback;
 
 // template me OK
 struct VideoFrameRequest {
-  VideoFrameRequest(VideoFrameRequestCallback& aCallback, int32_t aHandle);
+  VideoFrameRequest(VideoFrameRequestCallback& aCallback, uint32_t aHandle);
   ~VideoFrameRequest();
 
   // Comparator operators to allow RemoveElementSorted with an
   // integer argument on arrays of VideoFrameRequest
-  bool operator==(int32_t aHandle) const { return mHandle == aHandle; }
-  bool operator<(int32_t aHandle) const { return mHandle < aHandle; }
+  bool operator==(uint32_t aHandle) const { return mHandle == aHandle; }
+  bool operator<(uint32_t aHandle) const { return mHandle < aHandle; }
 
   RefPtr<VideoFrameRequestCallback> mCallback;
-  int32_t mHandle;
+  uint32_t mHandle;
 };
 
-//NON_VIRTUAL_ADDREF_RELEASE(mozilla::dom::VideoFrameRequest)
+// NON_VIRTUAL_ADDREF_RELEASE(mozilla::dom::VideoFrameRequest)
 
-class VideoFrameRequestManager {
+class VideoFrameRequestManager final {
  public:
   VideoFrameRequestManager() = default;
   ~VideoFrameRequestManager() = default;
 
-  nsresult Schedule(VideoFrameRequestCallback& aCallback, int32_t* aHandle);
-  bool Cancel(int32_t aHandle);
+  nsresult Schedule(VideoFrameRequestCallback& aCallback, uint32_t* aHandle);
+  bool Cancel(uint32_t aHandle);
 
   bool IsEmpty() const { return mCallbacks.IsEmpty(); }
 
-  bool IsCanceled(int32_t aHandle) const {
+  bool IsCanceled(uint32_t aHandle) const {
     return !mCanceledCallbacks.empty() && mCanceledCallbacks.has(aHandle);
   }
 
@@ -57,12 +57,12 @@ class VideoFrameRequestManager {
 
   // The set of frame request callbacks that were canceled but which we failed
   // to find in mFrameRequestCallbacks.
-  mozilla::HashSet<int32_t> mCanceledCallbacks;
+  mozilla::HashSet<uint32_t> mCanceledCallbacks;
 
   /**
    * The current frame request callback handle
    */
-  int32_t mCallbackCounter = 0;
+  uint32_t mCallbackCounter = 0;
 };
 
 inline void ImplCycleCollectionUnlink(VideoFrameRequestManager& aField) {
@@ -70,9 +70,9 @@ inline void ImplCycleCollectionUnlink(VideoFrameRequestManager& aField) {
 }
 
 inline void ImplCycleCollectionTraverse(
-    nsCycleCollectionTraversalCallback& aCallback, VideoFrameRequestManager& aField,
-    const char* aName, uint32_t aFlags) {
+    nsCycleCollectionTraversalCallback& aCallback,
+    VideoFrameRequestManager& aField, const char* aName, uint32_t aFlags) {
   aField.Traverse(aCallback);
 }
-}
+}  // namespace mozilla::dom
 #endif  // mozilla_dom_VideoFrameProvider_h

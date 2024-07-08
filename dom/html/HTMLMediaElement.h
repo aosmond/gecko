@@ -852,7 +852,7 @@ class HTMLMediaElement : public nsGenericHTMLElement,
 
   MediaDecoderOwner::NextFrameStatus NextFrameStatus();
 
-  void SetDecoder(MediaDecoder* aDecoder);
+  virtual void SetDecoder(MediaDecoder* aDecoder);
 
   void PlayInternal(bool aHandlingUserInput);
 
@@ -1058,7 +1058,7 @@ class HTMLMediaElement : public nsGenericHTMLElement,
   /**
    * Shutdown and clear mDecoder and maintain associated invariants.
    */
-  void ShutdownDecoder();
+  virtual void ShutdownDecoder();
   /**
    * Execute the initial steps of the load algorithm that ensure existing
    * loads are aborted, the element is emptied, and a new load ID is

@@ -106,6 +106,7 @@ partial interface HTMLVideoElement {
 };
 
 partial interface HTMLVideoElement {
+  [Throws]
   unsigned long requestVideoFrameCallback(VideoFrameRequestCallback callback);
   undefined cancelVideoFrameCallback(unsigned long handle);
 };

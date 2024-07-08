@@ -153,11 +153,22 @@ class HTMLVideoElement final : public HTMLMediaElement {
   void CreateVideoWakeLockIfNeeded();
   void ReleaseVideoWakeLockIfExists();
 
+  void SetDecoder(MediaDecoder* aDecoder) override;
+  void ShutdownDecoder() override;
+
   gfx::IntSize GetVideoIntrinsicDimensions();
 
   RefPtr<WakeLock> mScreenWakeLock;
 
   WatchManager<HTMLVideoElement> mVideoWatchManager;
+
+  class VideoFrameRequestCallbackListener;
+  void MaybeAddFrameStatisticsPresentListener();
+  void MaybeRemoveFrameStatisticsPresentListener();
+  void OnFrameStatisticsPresented(
+      VideoFrameRequestCallbackListener* aPresentListener);
+
+  RefPtr<VideoFrameRequestCallbackListener> mFrameStatisticsPresentListener;
 
  private:
   bool SetVisualCloneTarget(
@@ -195,8 +206,9 @@ class HTMLVideoElement final : public HTMLMediaElement {
   VideoFrameRequestManager mVideoFrameRequestManager;
 
  public:
-  unsigned long RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback);
-  void CancelVideoFrameCallback(unsigned long aHandle);
+  uint32_t RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback,
+                                     ErrorResult& aRv);
+  void CancelVideoFrameCallback(uint32_t aHandle);
   void TakeVideoFrameRequestCallbacks(nsTArray<VideoFrameRequest>& aCallbacks);
   void GetVideoFrameCallbackMetadata(const TimeStamp& aNowTime,
                                      VideoFrameCallbackMetadata& aMd);

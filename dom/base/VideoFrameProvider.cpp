@@ -3,20 +3,21 @@
 
 namespace mozilla::dom {
 
-VideoFrameRequest::VideoFrameRequest(VideoFrameRequestCallback& aCallback, int32_t aHandle)
+VideoFrameRequest::VideoFrameRequest(VideoFrameRequestCallback& aCallback,
+                                     uint32_t aHandle)
     : mCallback(&aCallback), mHandle(aHandle) {
-  //LogVideoFrameRequestCallback::LogDispatch(mCallback);
+  // LogVideoFrameRequestCallback::LogDispatch(mCallback);
 }
 
 VideoFrameRequest::~VideoFrameRequest() = default;
 
-nsresult VideoFrameRequestManager::Schedule(VideoFrameRequestCallback& aCallback,
-                                       int32_t* aHandle) {
-  if (mCallbackCounter == INT32_MAX) {
+nsresult VideoFrameRequestManager::Schedule(
+    VideoFrameRequestCallback& aCallback, uint32_t* aHandle) {
+  if (mCallbackCounter == UINT32_MAX) {
     // Can't increment without overflowing; bail out
     return NS_ERROR_NOT_AVAILABLE;
   }
-  int32_t newHandle = ++mCallbackCounter;
+  uint32_t newHandle = ++mCallbackCounter;
 
   mCallbacks.AppendElement(VideoFrameRequest(aCallback, newHandle));
 
@@ -24,7 +25,7 @@ nsresult VideoFrameRequestManager::Schedule(VideoFrameRequestCallback& aCallback
   return NS_OK;
 }
 
-bool VideoFrameRequestManager::Cancel(int32_t aHandle) {
+bool VideoFrameRequestManager::Cancel(uint32_t aHandle) {
   // mCallbacks is stored sorted by handle
   if (mCallbacks.RemoveElementSorted(aHandle)) {
     return true;
@@ -36,11 +37,12 @@ bool VideoFrameRequestManager::Cancel(int32_t aHandle) {
 
 void VideoFrameRequestManager::Unlink() { mCallbacks.Clear(); }
 
-void VideoFrameRequestManager::Traverse(nsCycleCollectionTraversalCallback& aCB) {
+void VideoFrameRequestManager::Traverse(
+    nsCycleCollectionTraversalCallback& aCB) {
   for (auto& i : mCallbacks) {
-    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(aCB,
-                                       "VideoFrameRequestManager::mCallbacks[i]");
+    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(
+        aCB, "VideoFrameRequestManager::mCallbacks[i]");
     aCB.NoteXPCOMChild(i.mCallback);
   }
 }
-}
+}  // namespace mozilla::dom

@@ -8,6 +8,7 @@
 
 #include "mozilla/AppShutdown.h"
 #include "mozilla/AsyncEventDispatcher.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/dom/HTMLVideoElementBinding.h"
 #include "nsGenericHTMLElement.h"
 #include "nsGkAtoms.h"
@@ -697,6 +698,91 @@ void HTMLVideoElement::OnVisibilityChange(Visibility aNewVisibility) {
   }
 }
 
+class HTMLVideoElement::VideoFrameRequestCallbackListener final
+    : public FrameStatisticsPresentListener {
+ public:
+  explicit VideoFrameRequestCallbackListener(HTMLVideoElement* aOwner)
+      : mOwner(aOwner) {}
+
+  void Destroy() {
+    MOZ_ASSERT(NS_IsMainThread());
+    mOwner = nullptr;
+  }
+
+  void OnPresent() override {
+    if (mCallbackPending.exchange(true)) {
+      return;
+    }
+
+    NS_DispatchToMainThread(
+        NS_NewRunnableFunction(__func__, [self = RefPtr{this}] {
+          if (self->mOwner) {
+            self->mOwner->OnFrameStatisticsPresented(self);
+          }
+        }));
+  }
+
+  void ClearCallbackPending() { mCallbackPending = false; }
+
+ private:
+  ~VideoFrameRequestCallbackListener() override { MOZ_ASSERT(!mOwner); }
+
+  WeakPtr<HTMLVideoElement> mOwner;
+  Atomic<bool> mCallbackPending{false};
+};
+
+void HTMLVideoElement::OnFrameStatisticsPresented(
+    VideoFrameRequestCallbackListener* aPresentListener) {
+  // We may have raced with a change in the decoder, and/or with our pending
+  // requests getting cancelled.
+  if (mFrameStatisticsPresentListener != aPresentListener ||
+      mVideoFrameRequestManager.IsEmpty()) {
+    return;
+  }
+
+  if (Document* doc = OwnerDoc()) {
+    doc->NotifyVideoFrameCallbacks(this);
+  }
+}
+
+void HTMLVideoElement::MaybeAddFrameStatisticsPresentListener() {
+  if (!mDecoder || mVideoFrameRequestManager.IsEmpty() ||
+      mFrameStatisticsPresentListener) {
+    return;
+  }
+
+  mFrameStatisticsPresentListener = new VideoFrameRequestCallbackListener(this);
+  mDecoder->GetFrameStatistics().AddPresentListener(
+      mFrameStatisticsPresentListener);
+}
+
+void HTMLVideoElement::MaybeRemoveFrameStatisticsPresentListener() {
+  if (!mFrameStatisticsPresentListener) {
+    return;
+  }
+
+  if (mDecoder) {
+    mDecoder->GetFrameStatistics().RemovePresentListener(
+        mFrameStatisticsPresentListener);
+  } else {
+    MOZ_ASSERT_UNREACHABLE(
+        "Has mFrameStatisticsPresentListener without mDecoder");
+  }
+
+  mFrameStatisticsPresentListener->Destroy();
+  mFrameStatisticsPresentListener = nullptr;
+}
+
+void HTMLVideoElement::SetDecoder(MediaDecoder* aDecoder) {
+  HTMLMediaElement::SetDecoder(aDecoder);
+  MaybeAddFrameStatisticsPresentListener();
+}
+
+void HTMLVideoElement::ShutdownDecoder() {
+  MaybeRemoveFrameStatisticsPresentListener();
+  HTMLMediaElement::ShutdownDecoder();
+}
+
 void HTMLVideoElement::GetVideoFrameCallbackMetadata(
     const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd) {
   // Attempt to find the next image to be presented on this tick.
@@ -728,14 +814,13 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   mVideoFrameRequestManager.Take(aCallbacks);
 }
 
-unsigned long HTMLVideoElement::RequestVideoFrameCallback(
-    VideoFrameRequestCallback& aCallback) {
-  int32_t handle;
-  auto rv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
-
-  Document* doc = OwnerDoc();
-  MOZ_RELEASE_ASSERT(doc);
-  doc->NotifyVideoFrameCallbacks(this);
+uint32_t HTMLVideoElement::RequestVideoFrameCallback(
+    VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
+  uint32_t handle = 0;
+  aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+  if (!mVideoFrameRequestManager.IsEmpty()) {
+    MaybeAddFrameStatisticsPresentListener();
+  }
   return handle;
 }
 
@@ -743,8 +828,11 @@ bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
   return mVideoFrameRequestManager.IsCanceled(aHandle);
 }
 
-void HTMLVideoElement::CancelVideoFrameCallback(unsigned long aHandle) {
+void HTMLVideoElement::CancelVideoFrameCallback(uint32_t aHandle) {
   mVideoFrameRequestManager.Cancel(aHandle);
+  if (mVideoFrameRequestManager.IsEmpty()) {
+    MaybeRemoveFrameStatisticsPresentListener();
+  }
 }
 
 }  // namespace mozilla::dom
