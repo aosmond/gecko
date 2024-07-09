@@ -31,9 +31,13 @@
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/Performance.h"
+#include "mozilla/dom/RTCRtpReceiver.h"
+#include "mozilla/dom/RTCRtpSourcesBinding.h"
 #include "mozilla/dom/TimeRanges.h"
 #include "mozilla/dom/VideoPlaybackQuality.h"
 #include "mozilla/dom/VideoStreamTrack.h"
+#include "mozilla/dom/VideoTrack.h"
+#include "mozilla/dom/VideoTrackList.h"
 #include "mozilla/StaticPrefs_media.h"
 #include "mozilla/Unused.h"
 
@@ -743,6 +747,22 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   aMd.mPresentedFrames = frameID;
 
   // TODO: We should set captureTime, receiveTime and rtpTimestamp for WebRTC.
+  if (mSrcStream && mVideoTrackList) {
+    if (auto* track = mVideoTrackList->GetSelectedTrack()) {
+      if (auto* streamTrack = track->GetVideoStreamTrack()) {
+        auto& source = streamTrack->GetSource();
+        if (auto* receiver = source.GetRTCRtpReceiver()) {
+          nsTArray<RTCRtpContributingSource> contribs;
+          receiver->GetContributingSources(contribs);
+
+          if (!contribs.IsEmpty()) {
+            aMd.mRtpTimestamp.Construct(contribs[0].mRtpTimestamp);
+            aMd.mReceiveTime.Construct(contribs[0].mTimestamp);
+          }
+        }
+      }
+    }
+  }
 
   mLastPresentedFrameID = frameID;
   mVideoFrameRequestManager.Take(aCallbacks);

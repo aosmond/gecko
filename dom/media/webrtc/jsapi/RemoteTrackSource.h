@@ -33,6 +33,8 @@ class RemoteTrackSource : public dom::MediaStreamTrackSource {
     return dom::MediaSourceEnum::Other;
   }
 
+  dom::RTCRtpReceiver* GetRTCRtpReceiver() const override { return mReceiver; }
+
   RefPtr<ApplyConstraintsPromise> ApplyConstraints(
       const dom::MediaTrackConstraints& aConstraints,
       dom::CallerType aCallerType) override;

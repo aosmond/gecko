@@ -227,6 +227,7 @@ LOCAL_INCLUDES += [
     "/dom/canvas",
     "/dom/html/input",
     "/dom/media",
+    "/dom/media/webrtc",
     "/dom/security",
     "/dom/xul",
     "/image",
@@ -237,6 +238,8 @@ LOCAL_INCLUDES += [
     "/layout/xul",
     "/netwerk/base",
     "/parser/htmlparser",
+    "/third_party/libwebrtc",
+    "/third_party/libwebrtc/third_party/abseil-cpp",
 ]
 
 FINAL_LIBRARY = "xul"

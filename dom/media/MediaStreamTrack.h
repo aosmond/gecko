@@ -39,6 +39,7 @@ class MediaMgrError;
 namespace dom {
 
 class AudioStreamTrack;
+class RTCRtpReceiver;
 class VideoStreamTrack;
 enum class CallerType : uint32_t;
 
@@ -139,6 +140,8 @@ class MediaStreamTrackSource : public nsISupports {
    * lifetime.
    */
   virtual const PeerIdentity* GetPeerIdentity() const { return nullptr; }
+
+  virtual RTCRtpReceiver* GetRTCRtpReceiver() const { return nullptr; }
 
   /**
    * MediaStreamTrack::GetLabel (see spec) calls through to here.
