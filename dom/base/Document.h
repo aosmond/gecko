@@ -3055,12 +3055,17 @@ class Document : public nsINode,
   bool IsCanceledFrameRequestCallback(int32_t aHandle) const;
 
   /**
+   * Put this document's video frame request callbacks into the provided
+   * list, and forget about them.
+   */
+  void TakeVideoFrameRequestCallbacks(
+      nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks);
+
+  /**
    * Put this document's frame request callbacks into the provided
    * list, and forget about them.
    */
-  void TakeFrameRequestCallbacks(
-      nsTArray<FrameRequest>& aCallbacks,
-      nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks);
+  void TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks);
 
   /**
    * @return true if this document's frame request callbacks should be

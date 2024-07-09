@@ -55,16 +55,12 @@ bool FrameRequestManager::Cancel(int32_t aHandle) {
 }
 
 void FrameRequestManager::Take(
-    nsTArray<FrameRequest>& aCallbacks,
     nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks) {
   MOZ_ASSERT(NS_IsMainThread());
-  aCallbacks = std::move(mCallbacks);
   aVideoCallbacks = std::move(mVideoCallbacks);
-  mCanceledCallbacks.clear();
 }
 
 void FrameRequestManager::Take(nsTArray<FrameRequest>& aCallbacks) {
-  MOZ_ASSERT(IsCurrentThreadRunningWorker());
   aCallbacks = std::move(mCallbacks);
   mCanceledCallbacks.clear();
 }

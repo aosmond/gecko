@@ -7129,12 +7129,15 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   mFrameRequestCallbacksScheduled = shouldBeScheduled;
 }
 
-void Document::TakeFrameRequestCallbacks(
-    nsTArray<FrameRequest>& aCallbacks,
+void Document::TakeVideoFrameRequestCallbacks(
     nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks) {
-  MOZ_ASSERT(aCallbacks.IsEmpty());
   MOZ_ASSERT(aVideoCallbacks.IsEmpty());
-  mFrameRequestManager.Take(aCallbacks, aVideoCallbacks);
+  mFrameRequestManager.Take(aVideoCallbacks);
+}
+
+void Document::TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+  mFrameRequestManager.Take(aCallbacks);
   // No need to manually remove ourselves from the refresh driver; it will
   // handle that part.  But we do have to update our state.
   mFrameRequestCallbacksScheduled = false;

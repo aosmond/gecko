@@ -48,8 +48,7 @@ class FrameRequestManager {
     return !mCanceledCallbacks.empty() && mCanceledCallbacks.has(aHandle);
   }
 
-  void Take(nsTArray<FrameRequest>& aCallbacks,
-            nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks);
+  void Take(nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks);
   void Take(nsTArray<FrameRequest>& aCallbacks);
 
   void Unlink();
