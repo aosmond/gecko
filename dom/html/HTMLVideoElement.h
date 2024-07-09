@@ -209,14 +209,10 @@ class HTMLVideoElement final : public HTMLMediaElement {
   uint32_t RequestVideoFrameCallback(VideoFrameRequestCallback& aCallback,
                                      ErrorResult& aRv);
   void CancelVideoFrameCallback(uint32_t aHandle);
-  void TakeVideoFrameRequestCallbacks(nsTArray<VideoFrameRequest>& aCallbacks);
-  void GetVideoFrameCallbackMetadata(const TimeStamp& aNowTime,
-                                     VideoFrameCallbackMetadata& aMd);
+  void TakeVideoFrameRequestCallbacks(const TimeStamp& aNowTime,
+                                      VideoFrameCallbackMetadata& aMd,
+                                      nsTArray<VideoFrameRequest>& aCallbacks);
   bool IsVideoFrameCallbackCancelled(uint32_t aHandle);
-
-  bool CanTakeVideoFrameRequestCallbacks() const {
-    return mHasPlayedOrSeeked && mMediaInfo.mVideo.IsValid();
-  }
 
  private:
   static void MapAttributesIntoRule(MappedDeclarationsBuilder&);

@@ -741,7 +741,7 @@ void HTMLVideoElement::OnFrameStatisticsPresented(
   }
 
   if (Document* doc = OwnerDoc()) {
-    doc->NotifyVideoFrameCallbacks(this);
+    doc->ScheduleVideoFrameCallbacks(this);
   }
 }
 
@@ -783,8 +783,20 @@ void HTMLVideoElement::ShutdownDecoder() {
   HTMLMediaElement::ShutdownDecoder();
 }
 
-void HTMLVideoElement::GetVideoFrameCallbackMetadata(
-    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd) {
+void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
+    const TimeStamp& aNowTime, VideoFrameCallbackMetadata& aMd,
+    nsTArray<VideoFrameRequest>& aCallbacks) {
+  MOZ_ASSERT(aCallbacks.IsEmpty());
+
+  // Ensure we did not race with shutting down the video.
+  if (mHasPlayedOrSeeked && mMediaInfo.mVideo.IsValid()) {
+    return;
+  }
+  uint32_t maybeCompositedFrames = GetMaybeCompositedFrames();
+  if (maybeCompositedFrames == 0) {
+    return;
+  }
+
   // Attempt to find the next image to be presented on this tick.
   layers::Image* img = nullptr;
   if (RefPtr<layers::ImageContainer> container = GetImageContainer()) {
@@ -805,12 +817,8 @@ void HTMLVideoElement::GetVideoFrameCallbackMetadata(
   aMd.mWidth = mMediaInfo.mVideo.mDisplay.Width();
   aMd.mHeight = mMediaInfo.mVideo.mDisplay.Height();
   aMd.mMediaTime = CurrentTime();
-  aMd.mPresentedFrames = GetMaybeCompositedFrames();
-}
+  aMd.mPresentedFrames = maybeCompositedFrames;
 
-void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
-    nsTArray<VideoFrameRequest>& aCallbacks) {
-  MOZ_ASSERT(aCallbacks.IsEmpty());
   mVideoFrameRequestManager.Take(aCallbacks);
 }
 

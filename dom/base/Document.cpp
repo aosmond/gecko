@@ -1347,7 +1347,6 @@ Document::Document(const char* aContentType)
       mFontFaceSetDirty(true),
       mDidFireDOMContentLoaded(true),
       mFrameRequestCallbacksScheduled(false),
-      mVideoFrameCallbacksScheduled(false),
       mIsTopLevelContentDocument(false),
       mIsContentDocument(false),
       mDidCallBeginLoad(false),
@@ -7110,12 +7109,10 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   // that variable can change. Also consider if you should change
   // WouldScheduleFrameRequestCallbacks() instead of adding more stuff to this
   // condition.
-  bool wouldSchedule = WouldScheduleFrameRequestCallbacks();
-  bool scheduleAFs = wouldSchedule && !mFrameRequestManager.IsEmpty();
-  bool scheduleVFCs = wouldSchedule && !mPendingVFCs.IsEmpty();
+  bool shouldBeScheduled =
+      WouldScheduleFrameRequestCallbacks() && !mFrameRequestManager.IsEmpty();
 
-  if ((scheduleAFs == mFrameRequestCallbacksScheduled) &&
-      (scheduleVFCs == mVideoFrameCallbacksScheduled)) {
+  if (shouldBeScheduled == mFrameRequestCallbacksScheduled) {
     return;
   }
 
@@ -7123,35 +7120,24 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   MOZ_RELEASE_ASSERT(presShell);
   nsRefreshDriver* rd = presShell->GetPresContext()->RefreshDriver();
 
-  if (scheduleAFs != mFrameRequestCallbacksScheduled) {
-    scheduleAFs ? rd->ScheduleFrameRequestCallbacks(this)
-                : rd->RevokeFrameRequestCallbacks(this);
-    mFrameRequestCallbacksScheduled = scheduleAFs;
+  if (shouldBeScheduled) {
+    rd->ScheduleFrameRequestCallbacks(this);
+  } else {
+    rd->RevokeFrameRequestCallbacks(this);
   }
 
-  if (scheduleVFCs != mVideoFrameCallbacksScheduled) {
-    scheduleVFCs ? rd->ScheduleVideoFrameRequestCallbacks(this)
-                 : rd->RevokeVideoFrameRequestCallbacks(this);
-    mVideoFrameCallbacksScheduled = scheduleVFCs;
-  }
+  mFrameRequestCallbacksScheduled = shouldBeScheduled;
 }
 
-void Document::TakeFrameRequestCallbacks(nsTArray<FrameRequest>& aCallbacks) {
+void Document::TakeFrameRequestCallbacks(
+    nsTArray<FrameRequest>& aCallbacks,
+    nsTArray<RefPtr<HTMLVideoElement>>& aVideoCallbacks) {
   MOZ_ASSERT(aCallbacks.IsEmpty());
-  mFrameRequestManager.Take(aCallbacks);
+  MOZ_ASSERT(aVideoCallbacks.IsEmpty());
+  mFrameRequestManager.Take(aCallbacks, aVideoCallbacks);
   // No need to manually remove ourselves from the refresh driver; it will
   // handle that part.  But we do have to update our state.
   mFrameRequestCallbacksScheduled = false;
-}
-
-void Document::NotifyVideoFrameCallbacks(HTMLVideoElement* aElement) {
-  if (mPendingVFCs.IndexOf(aElement) != mPendingVFCs.NoIndex) {
-    return;
-  }
-  mPendingVFCs.AppendElement(aElement);
-
-  mVideoFrameCallbacksScheduled = false;
-  UpdateFrameRequestCallbackSchedulingState();
 }
 
 bool Document::ShouldThrottleFrameRequests() const {
@@ -13679,6 +13665,16 @@ void Document::CancelFrameRequestCallback(int32_t aHandle) {
 
 bool Document::IsCanceledFrameRequestCallback(int32_t aHandle) const {
   return mFrameRequestManager.IsCanceled(aHandle);
+}
+
+void Document::ScheduleVideoFrameCallbacks(HTMLVideoElement* aElement) {
+  mFrameRequestManager.Schedule(aElement);
+  UpdateFrameRequestCallbackSchedulingState();
+}
+
+void Document::CancelVideoFrameCallbacks(HTMLVideoElement* aElement) {
+  mFrameRequestManager.Cancel(aElement);
+  UpdateFrameRequestCallbackSchedulingState();
 }
 
 nsresult Document::GetStateObject(JS::MutableHandle<JS::Value> aState) {

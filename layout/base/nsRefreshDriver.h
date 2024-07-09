@@ -38,10 +38,6 @@ class imgIRequest;
 class nsIRunnable;
 
 namespace mozilla {
-namespace dom {
-class HTMLVideoElement;
-}
-
 class AnimationEventDispatcher;
 class PendingFullscreenEvent;
 class PresShell;
@@ -494,21 +490,6 @@ class nsRefreshDriver final : public mozilla::layers::TransactionIdAllocator,
   void UpdateAnimationsAndSendEvents();
   MOZ_CAN_RUN_SCRIPT
   void RunFrameRequestCallbacks(mozilla::TimeStamp aNowTime);
-
- public:
-  void ScheduleVideoFrameRequestCallbacks(
-      mozilla::dom::HTMLVideoElement* aElement);
-  void RevokeVideoFrameRequestCallbacks(
-      mozilla::dom::HTMLVideoElement* aElement);
-
- private:
-  MOZ_CAN_RUN_SCRIPT
-  void RunVideoFrameRequestCallbacks(mozilla::TimeStamp aNowTime);
-
- public:
-  nsTArray<mozilla::dom::HTMLVideoElement*> mVideoFrameRequestCallbackElems;
-  nsTArray<mozilla::dom::HTMLVideoElement*>
-      mThrottledVideoFrameRequestCallbackElems;
 
  private:
   void UpdateIntersectionObservations(mozilla::TimeStamp aNowTime);
