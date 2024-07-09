@@ -737,10 +737,12 @@ void HTMLVideoElement::OnFrameStatisticsPresented(
   // requests getting cancelled.
   if (mFrameStatisticsPresentListener != aPresentListener ||
       mVideoFrameRequestManager.IsEmpty()) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::OnFrameStatisticsPresented -- stale listener/no callbacks\n", this);
     return;
   }
 
   if (Document* doc = OwnerDoc()) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::OnFrameStatisticsPresented -- schedule callbacks\n", this);
     doc->ScheduleVideoFrameCallbacks(this);
   }
 }
@@ -748,9 +750,11 @@ void HTMLVideoElement::OnFrameStatisticsPresented(
 void HTMLVideoElement::MaybeAddFrameStatisticsPresentListener() {
   if (!mDecoder || mVideoFrameRequestManager.IsEmpty() ||
       mFrameStatisticsPresentListener) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::MaybeAddFrameStatisticsPresentListener -- no decoder/no callbacks/has listener\n", this);
     return;
   }
 
+  printf_stderr("[AO] [%p] HTMLVideoElement::MaybeAddFrameStatisticsPresentListener -- created\n", this);
   mFrameStatisticsPresentListener = new VideoFrameRequestCallbackListener(this);
   mDecoder->GetFrameStatistics().AddPresentListener(
       mFrameStatisticsPresentListener);
@@ -760,6 +764,8 @@ void HTMLVideoElement::MaybeRemoveFrameStatisticsPresentListener() {
   if (!mFrameStatisticsPresentListener) {
     return;
   }
+
+  printf_stderr("[AO] [%p] HTMLVideoElement::MaybeRemoveFrameStatisticsPresentListener\n", this);
 
   if (mDecoder) {
     mDecoder->GetFrameStatistics().RemovePresentListener(
@@ -790,10 +796,12 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
 
   // Ensure we did not race with shutting down the video.
   if (!mHasPlayedOrSeeked || !mMediaInfo.mVideo.IsValid()) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- invalid state\n", this);
     return;
   }
   uint32_t maybeCompositedFrames = GetMaybeCompositedFrames();
   if (maybeCompositedFrames == 0) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- no frames\n", this);
     return;
   }
 
@@ -820,11 +828,13 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   aMd.mPresentedFrames = maybeCompositedFrames;
 
   mVideoFrameRequestManager.Take(aCallbacks);
+  printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- %zu callbacks\n", this, aCallbacks.Length());
   MaybeRemoveFrameStatisticsPresentListener();
 }
 
 uint32_t HTMLVideoElement::RequestVideoFrameCallback(
     VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] HTMLVideoElement::RequestVideoFrameCallback\n", this);
   uint32_t handle = 0;
   aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
   if (!mVideoFrameRequestManager.IsEmpty()) {
@@ -838,6 +848,7 @@ bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
 }
 
 void HTMLVideoElement::CancelVideoFrameCallback(uint32_t aHandle) {
+  printf_stderr("[AO] [%p] HTMLVideoElement::CancelVideoFrameCallback\n", this);
   mVideoFrameRequestManager.Cancel(aHandle);
   if (mVideoFrameRequestManager.IsEmpty()) {
     MaybeRemoveFrameStatisticsPresentListener();
