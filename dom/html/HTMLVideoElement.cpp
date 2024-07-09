@@ -752,16 +752,27 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
       if (auto* streamTrack = track->GetVideoStreamTrack()) {
         auto& source = streamTrack->GetSource();
         if (auto* receiver = source.GetRTCRtpReceiver()) {
-          nsTArray<RTCRtpContributingSource> contribs;
-          receiver->GetContributingSources(contribs);
+          nsTArray<RTCRtpSynchronizationSource> contribs;
+          receiver->GetSynchronizationSources(contribs);
 
           if (!contribs.IsEmpty()) {
             aMd.mRtpTimestamp.Construct(contribs[0].mRtpTimestamp);
             aMd.mReceiveTime.Construct(contribs[0].mTimestamp);
+          } else {
+            printf_stderr("[AO] [%p] no contribs\n", this);
           }
+        } else {
+          printf_stderr("[AO] [%p] no receiver\n", this);
         }
+      } else {
+        printf_stderr("[AO] [%p] no stream track\n", this);
       }
+    } else {
+      printf_stderr("[AO] [%p] no selected track\n", this);
     }
+  } else {
+    printf_stderr("[AO] [%p] mSrcStream %p mVideoTrackList %p\n", this,
+                  mSrcStream.get(), mVideoTrackList.get());
   }
 
   mLastPresentedFrameID = frameID;
