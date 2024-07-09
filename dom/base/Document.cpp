@@ -7110,19 +7110,13 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   // that variable can change. Also consider if you should change
   // WouldScheduleFrameRequestCallbacks() instead of adding more stuff to this
   // condition.
-  bool scheduleAFs =
-      WouldScheduleFrameRequestCallbacks() && !mFrameRequestManager.IsEmpty();
-  bool scheduleVFCs =
-      WouldScheduleFrameRequestCallbacks() && !mPendingVFCs.IsEmpty();
+  bool wouldSchedule = WouldScheduleFrameRequestCallbacks();
+  bool scheduleAFs = wouldSchedule && !mFrameRequestManager.IsEmpty();
+  bool scheduleVFCs = wouldSchedule && !mPendingVFCs.IsEmpty();
 
   if ((scheduleAFs == mFrameRequestCallbacksScheduled) &&
       (scheduleVFCs == mVideoFrameCallbacksScheduled)) {
     return;
-  }
-
-  if (!mRescheduledVFCs.IsEmpty()) {
-    mPendingVFCs.AppendElements(mRescheduledVFCs);
-    mRescheduledVFCs.Clear();
   }
 
   PresShell* presShell = aOldPresShell ? aOldPresShell : mPresShell;
@@ -7136,16 +7130,9 @@ void Document::UpdateFrameRequestCallbackSchedulingState(
   }
 
   if (scheduleVFCs != mVideoFrameCallbacksScheduled) {
-    for (auto& el : mPendingVFCs) {
-      scheduleVFCs ? rd->ScheduleVideoFrameRequestCallbacks(el)
-                   : rd->RevokeVideoFrameRequestCallbacks(el);
-    }
-    mPendingVFCs.Clear();
+    scheduleVFCs ? rd->ScheduleVideoFrameRequestCallbacks(this)
+                 : rd->RevokeVideoFrameRequestCallbacks(this);
     mVideoFrameCallbacksScheduled = scheduleVFCs;
-  }
-
-  if (!mRescheduledVFCs.IsEmpty()) {
-    mVideoFrameCallbacksScheduled = false;
   }
 }
 
@@ -7165,15 +7152,6 @@ void Document::NotifyVideoFrameCallbacks(HTMLVideoElement* aElement) {
 
   mVideoFrameCallbacksScheduled = false;
   UpdateFrameRequestCallbackSchedulingState();
-}
-
-void Document::DelayVideoFrameCallbacks(HTMLVideoElement* aElement) {
-  if (mRescheduledVFCs.IndexOf(aElement) != mRescheduledVFCs.NoIndex) {
-    return;
-  }
-  mRescheduledVFCs.AppendElement(aElement);
-  mVideoFrameCallbacksScheduled = false;
-  // FIXME UpdateFrameRequestCallbackSchedulingState();
 }
 
 bool Document::ShouldThrottleFrameRequests() const {

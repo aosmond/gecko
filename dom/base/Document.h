@@ -5077,14 +5077,13 @@ class Document : public nsINode,
 
   nsCOMPtr<nsIDocumentEncoder> mCachedEncoder;
 
+  FrameRequestManager mFrameRequestManager;
+
  public:
-  nsTArray<HTMLVideoElement*> mPendingVFCs;
-  nsTArray<HTMLVideoElement*> mRescheduledVFCs;
   void NotifyVideoFrameCallbacks(HTMLVideoElement* aElement);
-  void DelayVideoFrameCallbacks(HTMLVideoElement* aElement);
 
  protected:
-  FrameRequestManager mFrameRequestManager;
+  nsTArray<HTMLVideoElement*> mPendingVFCs;
 
   // This object allows us to evict ourself from the back/forward cache.  The
   // pointer is non-null iff we're currently in the bfcache.
