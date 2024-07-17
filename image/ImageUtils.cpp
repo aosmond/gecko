@@ -8,6 +8,7 @@
 #include "Decoder.h"
 #include "DecoderFactory.h"
 #include "IDecodingTask.h"
+#include "mozilla/AppShutdown.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/Logging.h"
 #include "nsNetUtil.h"
@@ -34,7 +35,7 @@ class AnonymousDecoderTask : public IDecodingTask {
   TaskPriority Priority() const final { return TaskPriority::eLow; }
 
   void Resume() final {
-    if (!mOwner.IsDead()) {
+    if (!AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdownFinal) && !mOwner.IsDead()) {
       MOZ_LOG(sLog, LogLevel::Debug,
               ("[%p] AnonymousDecoderTask::Resume -- queue", this));
       DecodePool::Singleton()->AsyncRun(this);

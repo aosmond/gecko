@@ -128,13 +128,13 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 void ImageDecoder::Destroy() {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug, ("ImageDecoder %p Destroy", this));
 
-  if (mDecoder) {
-    mDecoder->Destroy();
-  }
-
   if (mReadRequest) {
     mReadRequest->Destroy();
     mReadRequest = nullptr;
+  }
+
+  if (mDecoder) {
+    mDecoder->Destroy();
   }
 
   if (mTracks) {
