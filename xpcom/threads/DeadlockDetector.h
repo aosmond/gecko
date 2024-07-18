@@ -85,8 +85,12 @@ class DeadlockDetector {
         : mOrderedLT()  // FIXME bug 456272: set to empirical dep size?
           ,
           mExternalRefs(),
-          mResource(aResource) {}
-    ~OrderingEntry() {}
+          mResource(aResource) {
+      printf_stderr("[AO] OE -- res %p e %p\n", aResource, this);
+    }
+    ~OrderingEntry() {
+      printf_stderr("[AO] ~OE -- res %p e %p\n", mResource, this);
+    }
 
     size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const {
       size_t n = aMallocSizeOf(this);
@@ -161,7 +165,9 @@ class DeadlockDetector {
     PRAutoLock _(mLock);
     mOrdering.WithEntryHandle(aResource, [&](auto&& entry) {
       MOZ_RELEASE_ASSERT(!entry.HasEntry());
-      entry.Insert(MakeUnique<OrderingEntry>(aResource));
+      auto data = MakeUnique<OrderingEntry>(aResource);
+      printf_stderr("[AO] Add -- res %p e %p\n", aResource, data.get());
+      entry.Insert(std::move(data));
     });
   }
 
@@ -169,16 +175,21 @@ class DeadlockDetector {
     PRAutoLock _(mLock);
 
     OrderingEntry* entry = mOrdering.Get(aResource);
+    printf_stderr("[AO] Rem -- res %p e %p refs %zu orders %zu\n", aResource,
+                  entry, entry->mExternalRefs.Length(),
+                  entry->mOrderedLT.Length());
 
     // Iterate the external refs and remove the entry from them.
     HashEntryArray& refs = entry->mExternalRefs;
     for (index_type i = 0; i < refs.Length(); i++) {
+      printf_stderr("[AO] Rem -- refs[%zu] = %p\n", i, refs[i]);
       refs[i]->mOrderedLT.RemoveElementSorted(entry);
     }
 
     // Iterate orders and remove this entry from their refs.
     HashEntryArray& orders = entry->mOrderedLT;
     for (index_type i = 0; i < orders.Length(); i++) {
+      printf_stderr("[AO] Rem -- orders[%zu] = %p\n", i, orders[i]);
       orders[i]->mExternalRefs.RemoveElementSorted(entry);
     }
 
@@ -254,6 +265,8 @@ class DeadlockDetector {
     // |aLast|, |aProposed| are unordered according to our
     // poset.  this is fine, but we now need to add this
     // ordering constraint.
+    printf_stderr("[AO] Acq -- cur %p e %p pro %p e %p\n", aLast, current,
+                  aProposed, proposed);
     current->mOrderedLT.InsertElementSorted(proposed);
     proposed->mExternalRefs.InsertElementSorted(current);
     return 0;
