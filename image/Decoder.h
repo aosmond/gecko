@@ -8,6 +8,7 @@
 
 #include "FrameAnimator.h"
 #include "RasterImage.h"
+#include "mozilla/AtomicBitfields.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/NotNull.h"
 #include "mozilla/RefPtr.h"
@@ -179,7 +180,7 @@ class Decoder {
    */
   bool HasProgress() const {
     return mProgress != NoProgress || !mInvalidRect.IsEmpty() ||
-           mFinishedNewFrame;
+           LoadFinishedNewFrame();
   }
 
   /*
@@ -296,8 +297,8 @@ class Decoder {
   bool HasAnimation() const { return mImageMetadata.HasAnimation(); }
 
   // Error tracking
-  bool HasError() const { return mError; }
-  bool ShouldReportError() const { return mShouldReportError; }
+  bool HasError() const { return LoadError(); }
+  bool ShouldReportError() const { return LoadShouldReportError(); }
 
   // Finalize frames
   void SetFinalizeFrames(bool aFinalize) { mFinalizeFrames = aFinalize; }
@@ -306,12 +307,12 @@ class Decoder {
   /// Did we finish decoding enough that calling Decode() again would be
   /// useless?
   bool GetDecodeDone() const {
-    return mReachedTerminalState || mDecodeDone ||
+    return LoadReachedTerminalState() || LoadDecodeDone() ||
            (mMetadataDecode && HasSize() && !WantsFrameCount()) || HasError();
   }
 
   /// Are we in the middle of a frame right now? Used for assertions only.
-  bool InFrame() const { return mInFrame; }
+  bool InFrame() const { return LoadInFrame(); }
 
   /// Is the image valid if embedded inside an ICO.
   virtual bool IsValidICOResource() const { return false; }
@@ -437,10 +438,10 @@ class Decoder {
     return mFirstFrameRefreshArea;
   }
 
-  bool HasFrameToTake() const { return mHasFrameToTake; }
+  bool HasFrameToTake() const { return LoadHasFrameToTake(); }
   void ClearHasFrameToTake() {
-    MOZ_ASSERT(mHasFrameToTake);
-    mHasFrameToTake = false;
+    MOZ_ASSERT(LoadHasFrameToTake());
+    StoreHasFrameToTake(false);
   }
 
   IDecoderFrameRecycler* GetFrameRecycler() const { return mFrameRecycler; }
@@ -574,7 +575,7 @@ class Decoder {
       return 0;
     }
 
-    return mInFrame ? mFrameCount - 1 : mFrameCount;
+    return LoadInFrame() ? mFrameCount - 1 : mFrameCount;
   }
 
   RawAccessFrameRef AllocateFrameInternal(
@@ -633,18 +634,19 @@ class Decoder {
   bool mInitialized : 1;
   bool mMetadataDecode : 1;
   bool mHaveExplicitOutputSize : 1;
-  bool mInFrame : 1;
-  bool mFinishedNewFrame : 1;  // True if PostFrameStop() has been called since
-                               // the last call to TakeCompleteFrameCount().
-  // Has a new frame that AnimationSurfaceProvider can take. Unfortunately this
-  // has to be separate from mFinishedNewFrame because the png decoder yields a
-  // new frame before calling PostFrameStop().
-  bool mHasFrameToTake : 1;
-  bool mReachedTerminalState : 1;
-  bool mDecodeDone : 1;
-  bool mError : 1;
-  bool mShouldReportError : 1;
   bool mFinalizeFrames : 1;
+
+  MOZ_ATOMIC_BITFIELDS(
+      mAtomicBitfields, 8,
+      ((bool, InFrame, 1),
+       // True if PostFrameStop() has been called since
+       // the last call to TakeCompleteFrameCount().
+       (bool, FinishedNewFrame, 1),
+       // Has a new frame that AnimationSurfaceProvider can take. Unfortunately
+       // this has to be separate from FinishedNewFrame because the png decoder
+       // yields a new frame before calling PostFrameStop().
+       (bool, HasFrameToTake, 1), (bool, ReachedTerminalState, 1),
+       (bool, DecodeDone, 1), (bool, Error, 1), (bool, ShouldReportError, 1)))
 };
 
 }  // namespace image

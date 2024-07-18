@@ -60,13 +60,6 @@ Decoder::Decoder(RasterImage* aImage)
       mInitialized(false),
       mMetadataDecode(false),
       mHaveExplicitOutputSize(false),
-      mInFrame(false),
-      mFinishedNewFrame(false),
-      mHasFrameToTake(false),
-      mReachedTerminalState(false),
-      mDecodeDone(false),
-      mError(false),
-      mShouldReportError(false),
       mFinalizeFrames(true) {}
 
 Decoder::~Decoder() {
@@ -189,7 +182,7 @@ LexerResult Decoder::Decode(IResumable* aOnResume /* = nullptr */) {
 
   // We reached a terminal state; we're now done decoding.
   MOZ_ASSERT(lexerResult.is<TerminalState>());
-  mReachedTerminalState = true;
+  StoreReachedTerminalState(true);
 
   // If decoding failed, record that fact.
   if (lexerResult.as<TerminalState>() == TerminalState::FAILURE) {
@@ -207,8 +200,8 @@ LexerResult Decoder::TerminateFailure() {
   PostError();
 
   // Perform final cleanup if need be.
-  if (!mReachedTerminalState) {
-    mReachedTerminalState = true;
+  if (!LoadReachedTerminalState()) {
+    StoreReachedTerminalState(true);
     CompleteDecode();
   }
 
@@ -244,18 +237,18 @@ void Decoder::CompleteDecode() {
 
   // If the implementation left us mid-frame, finish that up. Note that it may
   // have left us transparent.
-  if (mInFrame) {
+  if (LoadInFrame()) {
     PostHasTransparency();
     PostFrameStop();
   }
 
   // If PostDecodeDone() has not been called, we may need to send teardown
   // notifications if it is unrecoverable.
-  if (mDecodeDone) {
+  if (LoadDecodeDone()) {
     MOZ_ASSERT(HasError() || mCurrentFrame, "Should have an error or a frame");
   } else {
     // We should always report an error to the console in this case.
-    mShouldReportError = true;
+    StoreShouldReportError(true);
 
     if (GetCompleteFrameCount() > 0) {
       // We're usable if we have at least one complete frame, so do exactly
@@ -280,8 +273,8 @@ Maybe<OrientedIntSize> Decoder::ExplicitOutputSize() const {
 }
 
 Maybe<uint32_t> Decoder::TakeCompleteFrameCount() {
-  const bool finishedNewFrame = mFinishedNewFrame;
-  mFinishedNewFrame = false;
+  const bool finishedNewFrame = LoadFinishedNewFrame();
+  StoreFinishedNewFrame(false);
   return finishedNewFrame ? Some(GetCompleteFrameCount()) : Nothing();
 }
 
@@ -304,7 +297,7 @@ nsresult Decoder::AllocateFrame(const gfx::IntSize& aOutputSize,
                                         std::move(mCurrentFrame));
 
   if (mCurrentFrame) {
-    mHasFrameToTake = true;
+    StoreHasFrameToTake(true);
 
     // Gather the raw pointers the decoders will use.
     mCurrentFrame->GetImageData(&mImageData, &mImageDataLength);
@@ -317,8 +310,8 @@ nsresult Decoder::AllocateFrame(const gfx::IntSize& aOutputSize,
     MOZ_ASSERT_IF(mFrameCount > 1, HasAnimation());
 
     // Update our state to reflect the new frame.
-    MOZ_ASSERT(!mInFrame, "Starting new frame but not done with old one!");
-    mInFrame = true;
+    MOZ_ASSERT(!LoadInFrame(), "Starting new frame but not done with old one!");
+    StoreInFrame(true);
   }
 
   return mCurrentFrame ? NS_OK : NS_ERROR_FAILURE;
@@ -424,7 +417,7 @@ nsresult Decoder::BeforeFinishInternal() { return NS_OK; }
 nsresult Decoder::FinishInternal() { return NS_OK; }
 
 nsresult Decoder::FinishWithErrorInternal() {
-  MOZ_ASSERT(!mInFrame);
+  MOZ_ASSERT(!LoadInFrame());
   return NS_OK;
 }
 
@@ -477,12 +470,12 @@ void Decoder::PostFrameCount(uint32_t aFrameCount) {
 void Decoder::PostFrameStop(Opacity aFrameOpacity) {
   // We should be mid-frame
   MOZ_ASSERT(!IsMetadataDecode(), "Stopping frame during metadata decode");
-  MOZ_ASSERT(mInFrame, "Stopping frame when we didn't start one");
+  MOZ_ASSERT(LoadInFrame(), "Stopping frame when we didn't start one");
   MOZ_ASSERT(mCurrentFrame, "Stopping frame when we don't have one");
 
   // Update our state.
-  mInFrame = false;
-  mFinishedNewFrame = true;
+  StoreInFrame(false);
+  StoreFinishedNewFrame(true);
 
   mCurrentFrame->Finish(
       aFrameOpacity, mFinalizeFrames,
@@ -528,7 +521,7 @@ void Decoder::PostInvalidation(const OrientedIntRect& aRect,
                                const Maybe<OrientedIntRect>& aRectAtOutputSize
                                /* = Nothing() */) {
   // We should be mid-frame
-  MOZ_ASSERT(mInFrame, "Can't invalidate when not mid-frame!");
+  MOZ_ASSERT(LoadInFrame(), "Can't invalidate when not mid-frame!");
   MOZ_ASSERT(mCurrentFrame, "Can't invalidate when not mid-frame!");
 
   // Record this invalidation, unless we're not sending partial invalidations
@@ -546,9 +539,9 @@ void Decoder::PostLoopCount(int32_t aLoopCount) {
 
 void Decoder::PostDecodeDone() {
   MOZ_ASSERT(!IsMetadataDecode(), "Done with decoding in metadata decode");
-  MOZ_ASSERT(!mInFrame, "Can't be done decoding if we're mid-frame!");
-  MOZ_ASSERT(!mDecodeDone, "Decode already done!");
-  mDecodeDone = true;
+  MOZ_ASSERT(!LoadInFrame(), "Can't be done decoding if we're mid-frame!");
+  MOZ_ASSERT(!LoadDecodeDone(), "Decode already done!");
+  StoreDecodeDone(true);
 
   // Some metadata that we track should take into account every frame in the
   // image. If this is a first-frame-only decode, our accumulated loop length
@@ -563,15 +556,15 @@ void Decoder::PostDecodeDone() {
 }
 
 void Decoder::PostError() {
-  mError = true;
+  StoreError(true);
 
-  if (mInFrame) {
+  if (LoadInFrame()) {
     MOZ_ASSERT(mCurrentFrame);
     MOZ_ASSERT(mFrameCount > 0);
     mCurrentFrame->Abort();
-    mInFrame = false;
+    StoreInFrame(false);
     --mFrameCount;
-    mHasFrameToTake = false;
+    StoreHasFrameToTake(false);
   }
 }
 
