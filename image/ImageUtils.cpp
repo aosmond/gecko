@@ -9,6 +9,7 @@
 #include "DecoderFactory.h"
 #include "IDecodingTask.h"
 #include "mozilla/AppShutdown.h"
+#include "mozilla/DebugOnly.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/Logging.h"
 #include "nsNetUtil.h"
@@ -34,12 +35,30 @@ class AnonymousDecoderTask : public IDecodingTask {
 
   TaskPriority Priority() const final { return TaskPriority::eLow; }
 
-  void Resume() final {
-    if (!AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdownFinal) && !mOwner.IsDead()) {
-      MOZ_LOG(sLog, LogLevel::Debug,
-              ("[%p] AnonymousDecoderTask::Resume -- queue", this));
-      DecodePool::Singleton()->AsyncRun(this);
+  bool IsValid() const {
+    return !AppShutdown::IsInOrBeyond(ShutdownPhase::XPCOMShutdownFinal) &&
+           !mOwner.IsDead();
+  }
+
+  bool MaybeStart() {
+    if (!IsValid()) {
+      return false;
     }
+
+    MOZ_LOG(sLog, LogLevel::Debug,
+            ("[%p] AnonymousDecoderTask::Start -- queue", this));
+    DecodePool::Singleton()->AsyncRun(this);
+    return true;
+  }
+
+  void Resume() final {
+    if (!IsValid()) {
+      return;
+    }
+
+    MOZ_LOG(sLog, LogLevel::Debug,
+            ("[%p] AnonymousDecoderTask::Resume -- queue", this));
+    DecodePool::Singleton()->AsyncRun(this);
   }
 
   void Run() final {
@@ -51,7 +70,7 @@ class AnonymousDecoderTask : public IDecodingTask {
                 ("[%p] AnonymousDecoderTask::Run -- need more data", this));
         MOZ_ASSERT(result == LexerResult(Yield::NEED_MORE_DATA));
         OnNeedMoreData();
-        break;
+        return;
       }
 
       // Check if we have a new frame to process.
@@ -283,23 +302,23 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
       mMetadataResult.mFrameCountComplete = true;
       mMetadataTask = nullptr;
       mFrameCountTask = nullptr;
-    } else if (mFrameCountTask) {
+    } else if (mFrameCountTask && !mFrameCountTaskRunning) {
       MOZ_LOG(
           sLog, LogLevel::Debug,
           ("[%p] AnonymousDecoderImpl::OnMetadata -- start frame count task",
            this));
-      DecodePool::Singleton()->AsyncRun(mFrameCountTask);
+      mFrameCountTaskRunning = mFrameCountTask->MaybeStart();
       return;
     }
 
     mMetadataPromise.Resolve(mMetadataResult, __func__);
 
-    if (mFramesTask && mFramesToDecode > 0) {
+    if (mFramesTask && mFramesToDecode > 0 && !mFramesTaskRunning) {
       MOZ_LOG(sLog, LogLevel::Debug,
               ("[%p] AnonymousDecoderImpl::OnMetadata -- start frames task, "
                "want %zu",
                this, mFramesToDecode));
-      DecodePool::Singleton()->AsyncRun(mFramesTask);
+      mFramesTaskRunning = mFramesTask->MaybeStart();
     }
   }
 
@@ -330,13 +349,13 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
 
     if (mMetadataTask) {
       mMetadataTask = nullptr;
-      if (mFramesTask && mFramesToDecode > 0) {
+      if (mFramesTask && mFramesToDecode > 0 && !mFramesTaskRunning) {
         MOZ_LOG(
             sLog, LogLevel::Debug,
             ("[%p] AnonymousDecoderImpl::OnFrameCount -- start frames task, "
              "want %zu",
              this, mFramesToDecode));
-        DecodePool::Singleton()->AsyncRun(mFramesTask);
+        mFramesTaskRunning = mFramesTask->MaybeStart();
       }
     }
 
@@ -354,8 +373,11 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
                         RefPtr<gfx::SourceSurface>&& aSurface) override {
     MutexAutoLock lock(mMutex);
 
+    MOZ_DIAGNOSTIC_ASSERT(mFramesTaskRunning);
+
     // We must have already gotten destroyed before frame decoding finished.
     if (!mFramesTask) {
+      mFramesTaskRunning = false;
       return false;
     }
 
@@ -383,6 +405,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
     if (!mFramesPromise.IsEmpty()) {
       mFramesPromise.Resolve(std::move(mPendingFramesResult), __func__);
     }
+    mFramesTaskRunning = false;
     return false;
   }
 
@@ -422,10 +445,10 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
       return DecodeMetadataPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
     }
 
-    if (mMetadataPromise.IsEmpty()) {
+    if (!mMetadataTaskRunning) {
       MOZ_LOG(sLog, LogLevel::Debug,
               ("[%p] AnonymousDecoderImpl::DecodeMetadata -- queue", this));
-      DecodePool::Singleton()->AsyncRun(mMetadataTask);
+      mMetadataTaskRunning = mMetadataTask->MaybeStart();
     }
 
     return mMetadataPromise.Ensure(__func__);
@@ -471,10 +494,10 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
 
     // If we are not waiting on any frames, then we know we paused decoding.
     // If we still are metadata decoding, we need to wait.
-    if (mFramesToDecode == 0 && !mMetadataTask) {
+    if (mFramesToDecode == 0 && !mMetadataTask && !mFramesTaskRunning) {
       MOZ_LOG(sLog, LogLevel::Debug,
               ("[%p] AnonymousDecoderImpl::DecodeFrames -- queue", this));
-      DecodePool::Singleton()->AsyncRun(mFramesTask);
+      mFramesTaskRunning = mFramesTask->MaybeStart();
     }
 
     mFramesToDecode = std::max(mFramesToDecode, aCount);
@@ -504,6 +527,9 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
   DecodeFramesResult mPendingFramesResult MOZ_GUARDED_BY(mMutex);
   size_t mFramesToDecode MOZ_GUARDED_BY(mMutex) = 1;
   uint32_t mFrameCount MOZ_GUARDED_BY(mMutex) = 0;
+  bool mMetadataTaskRunning MOZ_GUARDED_BY(mMutex) = false;
+  bool mFrameCountTaskRunning MOZ_GUARDED_BY(mMutex) = false;
+  bool mFramesTaskRunning MOZ_GUARDED_BY(mMutex) = false;
 };
 
 /* static */ already_AddRefed<AnonymousDecoder> ImageUtils::CreateDecoder(
