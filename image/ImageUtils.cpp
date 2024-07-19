@@ -107,6 +107,7 @@ class AnonymousDecoderTask : public IDecodingTask {
   // possible.
   virtual bool OnFrameAvailable(RefPtr<imgFrame>&& aFrame,
                                 RefPtr<gfx::SourceSurface>&& aSurface) {
+    MOZ_ASSERT_UNREACHABLE("Unhandled frame!");
     return true;
   }
 
