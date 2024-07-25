@@ -52,6 +52,7 @@
 #include "mozilla/dom/Document.h"
 #include "mozilla/dom/DocumentTimeline.h"
 #include "mozilla/dom/DocumentInlines.h"
+#include "mozilla/dom/HTMLVideoElement.h"
 #include "nsIXULRuntime.h"
 #include "jsapi.h"
 #include "nsContentUtils.h"
@@ -2360,7 +2361,7 @@ void nsRefreshDriver::UpdateAnimationsAndSendEvents() {
   }
 }
 
-void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
+void nsRefreshDriver::RunVideoAndFrameRequestCallbacks(TimeStamp aNowTime) {
   if (!mNeedToRunFrameRequestCallbacks) {
     return;
   }
@@ -2413,10 +2414,75 @@ void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
     }
   }
 
+  // For each fully active Document in docs, for each associated video element
+  // for that Document, run the video frame request callbacks passing now as the
+  // timestamp.
+  Maybe<TimeStamp> nextTickHint;
+  for (Document* doc : docs) {
+    nsTArray<RefPtr<HTMLVideoElement>> videoElms;
+    doc->TakeVideoFrameRequestCallbacks(videoElms);
+    if (videoElms.IsEmpty()) {
+      continue;
+    }
+    if (!nextTickHint) {
+      nextTickHint = GetNextTickHint();
+    }
+    AUTO_PROFILER_TRACING_MARKER_INNERWINDOWID(
+        "Paint", "requestVideoFrame callbacks", GRAPHICS, doc->InnerWindowID());
+    DOMHighResTimeStamp timeStamp = 0;
+    DOMHighResTimeStamp nextTickTimeStamp = 0;
+    if (nsPIDOMWindowInner* innerWindow = doc->GetInnerWindow()) {
+      if (Performance* perf = innerWindow->GetPerformance()) {
+        timeStamp = perf->TimeStampToDOMHighResForRendering(aNowTime);
+        nextTickTimeStamp =
+            nextTickHint
+                ? perf->TimeStampToDOMHighResForRendering(*nextTickHint)
+                : timeStamp;
+      }
+      // else window is partially torn down already
+    }
+    for (const auto& videoElm : videoElms) {
+      nsTArray<VideoFrameRequest> callbacks;
+      VideoFrameCallbackMetadata metadata;
+
+      // Presentation time is our best estimate of when the video frame was
+      // submitted for compositing. Given that we decode frames in advance,
+      // this can be most closely estimated as the vsync time (aNowTime), as
+      // that is when the compositor samples the ImageHost to get the next
+      // frame to present.
+      metadata.mPresentationTime = timeStamp;
+
+      // Expected display time is our best estimate of when the video frame we
+      // are submitting for compositing this cycle is shown to the user's eye.
+      // This will generally be when the next vsync triggers, assuming we do
+      // not fall behind on compositing.
+      metadata.mExpectedDisplayTime = nextTickTimeStamp;
+
+      // TakeVideoFrameRequestCallbacks is responsible for populating the rest
+      // of the metadata fields. If it is not ready, or there has been no
+      // change, it will not populate metadata nor yield any callbacks.
+      videoElm->TakeVideoFrameRequestCallbacks(aNowTime, nextTickHint, metadata,
+                                               callbacks);
+
+      for (auto& callback : callbacks) {
+        if (videoElm->IsVideoFrameCallbackCancelled(callback.mHandle)) {
+          continue;
+        }
+
+        // MOZ_KnownLive is OK, because the stack array frameRequestCallbacks
+        // keeps callback alive and the mCallback strong reference can't be
+        // mutated by the call.
+        LogVideoFrameRequestCallback::Run run(callback.mCallback);
+        MOZ_KnownLive(callback.mCallback)->Call(timeStamp, metadata);
+      }
+    }
+  }
+
+  // Next check for and run frame request callbacks.
   for (Document* doc : docs) {
     nsTArray<FrameRequest> callbacks;
     doc->TakeFrameRequestCallbacks(callbacks);
-    if (NS_WARN_IF(callbacks.IsEmpty())) {
+    if (callbacks.IsEmpty()) {
       continue;
     }
 
@@ -2680,7 +2746,7 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime,
   // OffscreenCanvasRenderingContext2D, context, has been lost, then it must run
   // the context lost steps for each such context.
 
-  // TODO: Step 13.5. (https://wicg.github.io/video-rvfc/#video-rvfc-procedures):
+  // Step 13.5. (https://wicg.github.io/video-rvfc/#video-rvfc-procedures):
   //
   //   For each fully active Document in docs, for each associated video element
   //   for that Document, run the video frame request callbacks passing now as
@@ -2689,7 +2755,7 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime,
   // Step 14. For each doc of docs, run the animation frame callbacks for doc,
   // passing in the relative high resolution time given frameTimestamp and doc's
   // relevant global object as the timestamp.
-  RunFrameRequestCallbacks(aNowTime);
+  RunVideoAndFrameRequestCallbacks(aNowTime);
 
   MaybeIncreaseMeasuredTicksSinceLoading();
 
