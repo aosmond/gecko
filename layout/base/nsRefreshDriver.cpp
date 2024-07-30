@@ -2383,9 +2383,15 @@ void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
   if (NS_WARN_IF(!mPresContext)) {
     return;
   }
-  // Grab all of our frame request callbacks up front.
+  // Grab all of our documents that can fire frame request callbacks up front.
   AutoTArray<RefPtr<Document>, 8> docs;
   auto ShouldCollect = [](const Document* aDoc) {
+    // TODO(emilio): Consider removing HasFrameRequestCallbacks() to deal with
+    // callbacks posted from other documents more per spec?
+    //
+    // If we do that we also need to tweak the throttling code to not set
+    // mNeedToRunFrameRequestCallbacks unnecessarily... Check what other engines
+    // do too.
     return aDoc->HasFrameRequestCallbacks() &&
            aDoc->ShouldFireFrameRequestCallbacks();
   };
@@ -2393,44 +2399,52 @@ void nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime) {
     docs.AppendElement(mPresContext->Document());
   }
   mPresContext->Document()->CollectDescendantDocuments(docs, ShouldCollect);
-
-  for (Document* doc : docs) {
-    if (!tickThrottledFrameRequests && doc->ShouldThrottleFrameRequests()) {
-      // Skip throttled docs if it's not time to un-throttle them yet.
+  // Skip throttled docs if it's not time to un-throttle them yet.
+  if (!tickThrottledFrameRequests) {
+    const size_t sizeBefore = docs.Length();
+    docs.RemoveElementsBy(
+        [](Document* aDoc) { return aDoc->ShouldThrottleFrameRequests(); });
+    if (sizeBefore != docs.Length()) {
       // FIXME(emilio): It's a bit subtle to just set this to true here, but
       // matches pre-existing behavior for throttled docs. It seems at least we
       // should EnsureTimerStarted too? But that kinda defeats the throttling, a
       // little bit? For now, preserve behavior.
       mNeedToRunFrameRequestCallbacks = true;
-      continue;
     }
+  }
 
-    AutoTArray<FrameRequest, 8> callbacks;
+  RunFrameRequestCallbacks(docs, aNowTime);
+}
+
+void nsRefreshDriver::RunFrameRequestCallbacks(
+    const nsTArray<RefPtr<Document>>& aDocs, TimeStamp aNowTime) {
+  for (Document* doc : aDocs) {
+    nsTArray<FrameRequest> callbacks;
     doc->TakeFrameRequestCallbacks(callbacks);
     if (NS_WARN_IF(callbacks.IsEmpty())) {
       continue;
     }
-    AUTO_PROFILER_TRACING_MARKER_INNERWINDOWID(
-        "Paint", "requestAnimationFrame callbacks", GRAPHICS,
-        doc->InnerWindowID());
-    TimeStamp startTime = TimeStamp::Now();
-    nsCOMPtr<nsIGlobalObject> global;
+
     DOMHighResTimeStamp timeStamp = 0;
-    if (nsPIDOMWindowInner* innerWindow = doc->GetInnerWindow()) {
+    RefPtr innerWindow = nsGlobalWindowInner::Cast(doc->GetInnerWindow());
+    if (innerWindow) {
       if (Performance* perf = innerWindow->GetPerformance()) {
         timeStamp = perf->TimeStampToDOMHighResForRendering(aNowTime);
       }
-      global = nsGlobalWindowInner::Cast(innerWindow);
       // else window is partially torn down already
     }
 
+    AUTO_PROFILER_TRACING_MARKER_INNERWINDOWID(
+        "Paint", "requestAnimationFrame callbacks", GRAPHICS,
+        doc->InnerWindowID());
+    const TimeStamp startTime = TimeStamp::Now();
     for (const auto& callback : callbacks) {
       if (doc->IsCanceledFrameRequestCallback(callback.mHandle)) {
         continue;
       }
 
       CallbackDebuggerNotificationGuard guard(
-          global, DebuggerNotificationType::RequestAnimationFrameCallback);
+          innerWindow, DebuggerNotificationType::RequestAnimationFrameCallback);
 
       // MOZ_KnownLive is OK, because the stack array frameRequestCallbacks
       // keeps callback alive and the mCallback strong reference can't be
@@ -2666,8 +2680,22 @@ void nsRefreshDriver::Tick(VsyncId aId, TimeStamp aNowTime,
   // Step 12. For each doc of docs, run the fullscreen steps for doc.
   RunFullscreenSteps();
 
-  // Step 14. For each doc of docs, run the animation frame callbacks for doc.
+  // TODO: Step 13. For each doc of docs, if the user agent detects that the
+  // backing storage associated with a CanvasRenderingContext2D or an
+  // OffscreenCanvasRenderingContext2D, context, has been lost, then it must run
+  // the context lost steps for each such context.
+
+  // TODO: Step 13.5. (https://wicg.github.io/video-rvfc/#video-rvfc-procedures):
+  //
+  //   For each fully active Document in docs, for each associated video element
+  //   for that Document, run the video frame request callbacks passing now as
+  //   the timestamp.
+  //
+  // Step 14. For each doc of docs, run the animation frame callbacks for doc,
+  // passing in the relative high resolution time given frameTimestamp and doc's
+  // relevant global object as the timestamp.
   RunFrameRequestCallbacks(aNowTime);
+
   MaybeIncreaseMeasuredTicksSinceLoading();
 
   // Step 17. For each doc of docs, if the focused area of doc is not a
