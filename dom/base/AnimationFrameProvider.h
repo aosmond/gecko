@@ -12,15 +12,32 @@
 
 namespace mozilla::dom {
 
+class HTMLVideoElement;
+
 using FrameRequest = RequestCallbackEntry<FrameRequestCallback>;
+using FrameRequestManagerBase = RequestCallbackManager<FrameRequestCallback>;
 
-using FrameRequestManager = RequestCallbackManager<FrameRequestCallback>;
+class FrameRequestManager final : public FrameRequestManagerBase {
+ public:
+  FrameRequestManager();
+  ~FrameRequestManager();
 
-// Force instantiation.
-template void ImplCycleCollectionUnlink(FrameRequestManager& aField);
-template void ImplCycleCollectionTraverse(
-    nsCycleCollectionTraversalCallback& aCallback, FrameRequestManager& aField,
-    const char* aName, uint32_t aFlags);
+  using FrameRequestManagerBase::Cancel;
+  using FrameRequestManagerBase::Schedule;
+  using FrameRequestManagerBase::Take;
+
+  void Schedule(HTMLVideoElement*);
+  bool Cancel(HTMLVideoElement*);
+  bool IsEmpty() const {
+    return FrameRequestManagerBase::IsEmpty() && mVideoCallbacks.IsEmpty();
+  }
+  void Take(nsTArray<RefPtr<HTMLVideoElement>>&);
+  void Unlink();
+  void Traverse(nsCycleCollectionTraversalCallback&);
+
+ private:
+  nsTArray<RefPtr<HTMLVideoElement>> mVideoCallbacks;
+};
 
 }  // namespace mozilla::dom
 
