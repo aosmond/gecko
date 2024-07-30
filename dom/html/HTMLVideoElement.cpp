@@ -709,6 +709,7 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   // If we did not find any current images, we must have fired too early, or we
   // are in the process of shutting down. Wait for the next invalidation.
   if (images.IsEmpty()) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- skip, no images\n", this);
     return;
   }
 
@@ -746,11 +747,13 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   // fired too early. Wait for the next invalidation.
   if (frameID == layers::kContainerFrameID_Invalid ||
       frameID == mLastPresentedFrameID) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- skip, no valid frame\n", this);
     return;
   }
 
   double currentTime = CurrentTime();
   if (currentTime <= 0.0) {
+    printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- skip, no current time\n", this);
     return;
   }
 
@@ -780,12 +783,14 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
 
   mLastPresentedFrameID = frameID;
   mVideoFrameRequestManager.Take(aCallbacks);
+  printf_stderr("[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- success %u, frame ID %u\n", this, uint32_t(aCallbacks.Length()), frameID);
 }
 
 uint32_t HTMLVideoElement::RequestVideoFrameCallback(
     VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
   uint32_t handle = 0;
   aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);
+  printf_stderr("[AO] [%p] HTMLVideoElement::RequestVideoFrameCallback -- success %d, handle %u\n", this, !aRv.Failed(), handle);
   return handle;
 }
 
@@ -794,6 +799,7 @@ bool HTMLVideoElement::IsVideoFrameCallbackCancelled(uint32_t aHandle) {
 }
 
 void HTMLVideoElement::CancelVideoFrameCallback(uint32_t aHandle) {
+  printf_stderr("[AO] [%p] HTMLVideoElement::CancelVideoFrameCallback -- handle %u\n", this, aHandle);
   mVideoFrameRequestManager.Cancel(aHandle);
 }
 
