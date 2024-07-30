@@ -749,6 +749,11 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
     return;
   }
 
+  double currentTime = CurrentTime();
+  if (currentTime <= 0.0) {
+    return;
+  }
+
   // If we have already displayed the expected frame, we need to make the
   // display time match the presentation time to indicate it is already
   // complete.
@@ -760,7 +765,7 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
 
   aMd.mWidth = frameSize.width;
   aMd.mHeight = frameSize.height;
-  aMd.mMediaTime = CurrentTime();
+  aMd.mMediaTime = currentTime;
 
   // Presented frames is a bit of a misnomer from a rendering perspective,
   // because we still need to advance regardless of composition. Video elements
