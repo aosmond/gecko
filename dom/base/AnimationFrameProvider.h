@@ -8,70 +8,19 @@
 #define mozilla_dom_AnimationFrameProvider_h
 
 #include "mozilla/dom/AnimationFrameProviderBinding.h"
-#include "mozilla/HashTable.h"
-#include "mozilla/RefPtr.h"
-#include "nsTArray.h"
+#include "mozilla/dom/RequestCallbackManager.h"
 
 namespace mozilla::dom {
 
-struct FrameRequest {
-  FrameRequest(FrameRequestCallback& aCallback, uint32_t aHandle);
-  ~FrameRequest();
+using FrameRequest = RequestCallbackEntry<FrameRequestCallback>;
 
-  // Comparator operators to allow RemoveElementSorted with an
-  // integer argument on arrays of FrameRequest
-  bool operator==(uint32_t aHandle) const { return mHandle == aHandle; }
-  bool operator<(uint32_t aHandle) const { return mHandle < aHandle; }
+using FrameRequestManager = RequestCallbackManager<FrameRequestCallback>;
 
-  RefPtr<FrameRequestCallback> mCallback;
-  uint32_t mHandle;
-};
-
-class FrameRequestManager {
- public:
-  FrameRequestManager() = default;
-  ~FrameRequestManager() = default;
-
-  nsresult Schedule(FrameRequestCallback& aCallback, uint32_t* aHandle);
-  bool Cancel(uint32_t aHandle);
-
-  bool IsEmpty() const { return mCallbacks.IsEmpty(); }
-
-  bool IsCanceled(uint32_t aHandle) const {
-    return !mCanceledCallbacks.empty() && mCanceledCallbacks.has(aHandle);
-  }
-
-  void Take(nsTArray<FrameRequest>& aCallbacks) {
-    aCallbacks = std::move(mCallbacks);
-    mCanceledCallbacks.clear();
-  }
-
-  void Unlink();
-
-  void Traverse(nsCycleCollectionTraversalCallback& aCB);
-
- private:
-  nsTArray<FrameRequest> mCallbacks;
-
-  // The set of frame request callbacks that were canceled but which we failed
-  // to find in mFrameRequestCallbacks.
-  HashSet<uint32_t> mCanceledCallbacks;
-
-  /**
-   * The current frame request callback handle
-   */
-  uint32_t mCallbackCounter = 0;
-};
-
-inline void ImplCycleCollectionUnlink(FrameRequestManager& aField) {
-  aField.Unlink();
-}
-
-inline void ImplCycleCollectionTraverse(
+// Force instantiation.
+template void ImplCycleCollectionUnlink(FrameRequestManager& aField);
+template void ImplCycleCollectionTraverse(
     nsCycleCollectionTraversalCallback& aCallback, FrameRequestManager& aField,
-    const char* aName, uint32_t aFlags) {
-  aField.Traverse(aCallback);
-}
+    const char* aName, uint32_t aFlags);
 
 }  // namespace mozilla::dom
 
