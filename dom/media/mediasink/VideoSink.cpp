@@ -476,6 +476,7 @@ void VideoSink::RenderVideoFrames(int32_t aMaxFrames, int64_t aClockTime,
     }
     img->mFrameID = frame->mFrameID;
     img->mProducerID = mProducerID;
+    img->mMediaTime = frame->mTime.ToSeconds();
 
     VSINK_LOG_V("playing video frame %" PRId64
                 " (id=%x, vq-queued=%zu, clock=%" PRId64 ")",
