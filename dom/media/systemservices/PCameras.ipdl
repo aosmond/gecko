@@ -32,7 +32,7 @@ struct VideoFrameProperties
   // the ShMem is at least this large
   uint32_t bufferSize;
   // From webrtc::VideoFrame
-  uint32_t timeStamp;
+  uint32_t rtpTimeStamp;
   int64_t ntpTimeMs;
   int64_t renderTimeMs;
   // See webrtc/**/rotation.h
