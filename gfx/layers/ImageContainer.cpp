@@ -329,8 +329,13 @@ void ImageContainer::SetCurrentImageInternal(
     OwningImage* img = newImages.AppendElement();
     img->mImage = aImages[i].mImage;
     img->mTimeStamp = aImages[i].mTimeStamp;
+    img->mProcessingDuration = aImages[i].mProcessingDuration;
+    img->mWebrtcCaptureTime = aImages[i].mWebrtcCaptureTime;
+    img->mWebrtcReceiveTimeUs = aImages[i].mWebrtcReceiveTimeUs;
+    img->mRtpTimestamp = aImages[i].mRtpTimestamp;
     img->mFrameID = aImages[i].mFrameID;
     img->mProducerID = aImages[i].mProducerID;
+    img->mMediaTime = aImages[i].mMediaTime;
     for (const auto& oldImg : mCurrentImages) {
       if (oldImg.mFrameID == img->mFrameID &&
           oldImg.mProducerID == img->mProducerID) {
