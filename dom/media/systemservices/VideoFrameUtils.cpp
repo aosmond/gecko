@@ -28,7 +28,7 @@ void VideoFrameUtils::InitFrameBufferProperties(
   // the buffer is at least this size of larger.
   aDestProps.bufferSize() = TotalRequiredBufferSize(aVideoFrame);
 
-  aDestProps.timeStamp() = aVideoFrame.timestamp();
+  aDestProps.rtpTimeStamp() = aVideoFrame.rtp_timestamp();
   aDestProps.ntpTimeMs() = aVideoFrame.ntp_time_ms();
   aDestProps.renderTimeMs() = aVideoFrame.render_time_ms();
 
