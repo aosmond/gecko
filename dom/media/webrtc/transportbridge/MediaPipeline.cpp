@@ -1476,7 +1476,14 @@ class MediaPipelineReceiveVideo::PipelineListener
 
     VideoSegment segment;
     auto size = image->GetSize();
-    segment.AppendFrame(image.forget(), size, principal);
+    auto processingDuration =
+        aVideoFrame.processing_time()
+            ? TimeDuration::FromMicroseconds(
+                  aVideoFrame.processing_time()->Elapsed().us())
+            : TimeDuration::Zero();
+    segment.AppendFrame(image.forget(), size, principal,
+                        /* aForceBlack */ false, TimeStamp::Now(),
+                        processingDuration);
     mSource->AppendData(&segment);
   }
 
