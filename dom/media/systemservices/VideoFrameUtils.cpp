@@ -32,6 +32,13 @@ void VideoFrameUtils::InitFrameBufferProperties(
   aDestProps.ntpTimeMs() = aVideoFrame.ntp_time_ms();
   aDestProps.renderTimeMs() = aVideoFrame.render_time_ms();
 
+  if (aVideoFrame.processing_time()) {
+    aDestProps.processingDurationUs() =
+        aVideoFrame.processing_time()->Elapsed().us();
+  } else {
+    aDestProps.processingDurationUs() = 0;
+  }
+
   aDestProps.rotation() = aVideoFrame.rotation();
 
   auto i420 = aVideoFrame.video_frame_buffer()->ToI420();

@@ -93,6 +93,7 @@ struct VideoChunk {
   TrackTime mDuration;
   VideoFrame mFrame;
   TimeStamp mTimeStamp;
+  TimeDuration mProcessingDuration;
 };
 
 class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
@@ -112,7 +113,8 @@ class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
                    const IntSize& aIntrinsicSize,
                    const PrincipalHandle& aPrincipalHandle,
                    bool aForceBlack = false,
-                   TimeStamp aTimeStamp = TimeStamp::Now());
+                   TimeStamp aTimeStamp = TimeStamp::Now(),
+                   TimeDuration aProcessingDuration = TimeDuration::Zero());
   void ExtendLastFrameBy(TrackTime aDuration) {
     if (aDuration <= 0) {
       return;

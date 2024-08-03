@@ -329,6 +329,7 @@ void ImageContainer::SetCurrentImageInternal(
     OwningImage* img = newImages.AppendElement();
     img->mImage = aImages[i].mImage;
     img->mTimeStamp = aImages[i].mTimeStamp;
+    img->mProcessingDuration = aImages[i].mProcessingDuration;
     img->mFrameID = aImages[i].mFrameID;
     img->mProducerID = aImages[i].mProducerID;
     for (const auto& oldImg : mCurrentImages) {

@@ -337,17 +337,20 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
   RefPtr<SharedRGBImage> CreateSharedRGBImage();
 
   struct NonOwningImage {
-    explicit NonOwningImage(Image* aImage = nullptr,
-                            TimeStamp aTimeStamp = TimeStamp(),
-                            FrameID aFrameID = 0, ProducerID aProducerID = 0)
+    explicit NonOwningImage(
+        Image* aImage = nullptr, TimeStamp aTimeStamp = TimeStamp(),
+        FrameID aFrameID = 0, ProducerID aProducerID = 0,
+        TimeDuration aProcessingDuration = TimeDuration::Zero())
         : mImage(aImage),
           mTimeStamp(aTimeStamp),
           mFrameID(aFrameID),
-          mProducerID(aProducerID) {}
+          mProducerID(aProducerID),
+          mProcessingDuration(aProcessingDuration) {}
     Image* mImage;
     TimeStamp mTimeStamp;
     FrameID mFrameID;
     ProducerID mProducerID;
+    TimeDuration mProcessingDuration;
   };
   /**
    * Set aImages as the list of timestamped to display. The Images must have
@@ -443,6 +446,7 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
     OwningImage() : mFrameID(0), mProducerID(0), mComposited(false) {}
     RefPtr<Image> mImage;
     TimeStamp mTimeStamp;
+    TimeDuration mProcessingDuration;
     FrameID mFrameID;
     ProducerID mProducerID;
     bool mComposited;
