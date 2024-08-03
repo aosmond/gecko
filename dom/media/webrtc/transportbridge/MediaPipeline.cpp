@@ -1421,8 +1421,7 @@ class MediaPipelineReceiveVideo::PipelineListener
     mForceDropFrames = false;
   }
 
-  void RenderVideoFrame(const webrtc::VideoFrameBuffer& aBuffer,
-                        uint32_t aTimeStamp, int64_t aRenderTime) {
+  void RenderVideoFrame(const webrtc::VideoFrame& aVideoFrame) {
     PrincipalHandle principal;
     {
       MutexAutoLock lock(mMutex);
@@ -1432,16 +1431,16 @@ class MediaPipelineReceiveVideo::PipelineListener
       principal = mPrincipalHandle;
     }
     RefPtr<Image> image;
-    if (aBuffer.type() == webrtc::VideoFrameBuffer::Type::kNative) {
+    const webrtc::VideoFrameBuffer& buffer = *aVideoFrame.video_frame_buffer();
+    if (buffer.type() == webrtc::VideoFrameBuffer::Type::kNative) {
       // We assume that only native handles are used with the
       // WebrtcMediaDataCodec decoder.
-      const ImageBuffer* imageBuffer =
-          static_cast<const ImageBuffer*>(&aBuffer);
+      const ImageBuffer* imageBuffer = static_cast<const ImageBuffer*>(&buffer);
       image = imageBuffer->GetNativeImage();
     } else {
-      MOZ_ASSERT(aBuffer.type() == webrtc::VideoFrameBuffer::Type::kI420);
+      MOZ_ASSERT(buffer.type() == webrtc::VideoFrameBuffer::Type::kI420);
       rtc::scoped_refptr<const webrtc::I420BufferInterface> i420(
-          aBuffer.GetI420());
+          buffer.GetI420());
 
       MOZ_ASSERT(i420->DataY());
       // Create a video frame using |buffer|.
@@ -1501,9 +1500,8 @@ class MediaPipelineReceiveVideo::PipelineRenderer
 
   // Implement VideoRenderer
   void FrameSizeChange(unsigned int aWidth, unsigned int aHeight) override {}
-  void RenderVideoFrame(const webrtc::VideoFrameBuffer& aBuffer,
-                        uint32_t aTimeStamp, int64_t aRenderTime) override {
-    mPipeline->mListener->RenderVideoFrame(aBuffer, aTimeStamp, aRenderTime);
+  void RenderVideoFrame(const webrtc::VideoFrame& aVideoFrame) override {
+    mPipeline->mListener->RenderVideoFrame(aVideoFrame);
   }
 
  private:
