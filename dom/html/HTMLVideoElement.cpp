@@ -715,6 +715,7 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   gfx::IntSize frameSize;
   ImageContainer::FrameID frameID = layers::kContainerFrameID_Invalid;
   TimeDuration processingDuration;
+  double frameTime = -1.0;
   bool composited = false;
 
   // We are guaranteed that the images are in timestamp order. It is possible we
@@ -729,6 +730,7 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
       frameSize = image.mImage->GetSize();
       frameID = image.mFrameID;
       processingDuration = image.mProcessingDuration;
+      frameTime = image.mMediaTime;
       composited = true;
     } else if (!aNextTickTime || image.mTimeStamp <= aNextTickTime.ref()) {
       // Image should be the next to be composited. mComposited will be false
@@ -738,6 +740,7 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
       frameSize = image.mImage->GetSize();
       frameID = image.mFrameID;
       processingDuration = image.mProcessingDuration;
+      frameTime = image.mMediaTime;
       composited = false;
     } else {
       // Image is for a future composition.
@@ -763,7 +766,7 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
 
   aMd.mWidth = frameSize.width;
   aMd.mHeight = frameSize.height;
-  aMd.mMediaTime = CurrentTime();
+  aMd.mMediaTime = frameTime >= 0.0 ? frameTime : CurrentTime();
 
   // If we have a processing duration, we need to round it to the nearest 100
   // microseconds as per the standard (5. Security and Privacy Considerations).

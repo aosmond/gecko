@@ -10,6 +10,7 @@
 #include "nsCOMPtr.h"
 #include "gfxPoint.h"
 #include "ImageContainer.h"
+#include "TimeUnits.h"
 
 namespace mozilla {
 
@@ -94,6 +95,10 @@ struct VideoChunk {
   VideoFrame mFrame;
   TimeStamp mTimeStamp;
   TimeDuration mProcessingDuration;
+  media::TimeUnit mMediaTime;
+  Maybe<int64_t> mWebrtcReceiveTime;
+  Maybe<int64_t> mWebrtcCaptureTime;
+  Maybe<uint32_t> mRtpTimestamp;
 };
 
 class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
@@ -114,7 +119,8 @@ class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
                    const PrincipalHandle& aPrincipalHandle,
                    bool aForceBlack = false,
                    TimeStamp aTimeStamp = TimeStamp::Now(),
-                   TimeDuration aProcessingDuration = TimeDuration::Zero());
+                   TimeDuration aProcessingDuration = TimeDuration::Zero(),
+                   media::TimeUnit aMediaTime = media::TimeUnit::Invalid());
   void ExtendLastFrameBy(TrackTime aDuration) {
     if (aDuration <= 0) {
       return;

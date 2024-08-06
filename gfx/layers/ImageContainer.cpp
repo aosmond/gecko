@@ -332,6 +332,7 @@ void ImageContainer::SetCurrentImageInternal(
     img->mProcessingDuration = aImages[i].mProcessingDuration;
     img->mFrameID = aImages[i].mFrameID;
     img->mProducerID = aImages[i].mProducerID;
+    img->mMediaTime = aImages[i].mMediaTime;
     for (const auto& oldImg : mCurrentImages) {
       if (oldImg.mFrameID == img->mFrameID &&
           oldImg.mProducerID == img->mProducerID) {
