@@ -101,7 +101,8 @@ class VideoOutput : public DirectMediaTrackListener {
         continue;
       }
       images.AppendElement(ImageContainer::NonOwningImage(
-          image, chunk.mTimeStamp, frameId, mProducerID));
+          image, chunk.mTimeStamp, frameId, mProducerID, TimeDuration::Zero(),
+          chunk.mMediaTime.IsValid() ? chunk.mMediaTime.ToSeconds() : -1.0));
 
       lastPrincipalHandle = chunk.GetPrincipalHandle();
 

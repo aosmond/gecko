@@ -340,17 +340,20 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
     explicit NonOwningImage(
         Image* aImage = nullptr, TimeStamp aTimeStamp = TimeStamp(),
         FrameID aFrameID = 0, ProducerID aProducerID = 0,
-        TimeDuration aProcessingDuration = TimeDuration::Zero())
+        TimeDuration aProcessingDuration = TimeDuration::Zero(),
+        double aMediaTime = -1.0)
         : mImage(aImage),
           mTimeStamp(aTimeStamp),
           mFrameID(aFrameID),
           mProducerID(aProducerID),
-          mProcessingDuration(aProcessingDuration) {}
+          mProcessingDuration(aProcessingDuration),
+          mMediaTime(aMediaTime) {}
     Image* mImage;
     TimeStamp mTimeStamp;
     FrameID mFrameID;
     ProducerID mProducerID;
     TimeDuration mProcessingDuration;
+    double mMediaTime = -1.0;
   };
   /**
    * Set aImages as the list of timestamped to display. The Images must have
@@ -443,13 +446,13 @@ class ImageContainer final : public SupportsThreadSafeWeakPtr<ImageContainer> {
   bool HasCurrentImage();
 
   struct OwningImage {
-    OwningImage() : mFrameID(0), mProducerID(0), mComposited(false) {}
     RefPtr<Image> mImage;
     TimeStamp mTimeStamp;
     TimeDuration mProcessingDuration;
-    FrameID mFrameID;
-    ProducerID mProducerID;
-    bool mComposited;
+    FrameID mFrameID = 0;
+    ProducerID mProducerID = 0;
+    double mMediaTime = -1.0;
+    bool mComposited = false;
   };
   /**
    * Copy the current Image list to aImages.

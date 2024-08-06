@@ -88,10 +88,12 @@ void VideoSegment::AppendFrame(already_AddRefed<Image>&& aImage,
                                const IntSize& aIntrinsicSize,
                                const PrincipalHandle& aPrincipalHandle,
                                bool aForceBlack, TimeStamp aTimeStamp,
-                               TimeDuration aProcessingDuration) {
+                               TimeDuration aProcessingDuration,
+                               media::TimeUnit aMediaTime) {
   VideoChunk* chunk = AppendChunk(0);
   chunk->mTimeStamp = aTimeStamp;
   chunk->mProcessingDuration = aProcessingDuration;
+  chunk->mMediaTime = aMediaTime;
   VideoFrame frame(std::move(aImage), aIntrinsicSize);
   MOZ_ASSERT_IF(!IsNull(), !aTimeStamp.IsNull());
   frame.SetForceBlack(aForceBlack);
