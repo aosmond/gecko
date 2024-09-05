@@ -8,6 +8,7 @@
 #include "GMPUtils.h"
 #include "nsIRunnable.h"
 #ifdef XP_WIN
+#  include "mozilla/WinDllServices.h"
 #  include "WinUtils.h"
 #endif
 #include "GMPLog.h"
@@ -97,17 +98,29 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
           prefSerializer->SerializeToSharedMemory(GeckoProcessType_GMPlugin,
                                                   /* remoteType */ ""_ns);
 
+#if defined(XP_WIN)
+      RefPtr<DllServices> dllSvc(DllServices::Get());
+      bool isReadyForBackgroundProcessing =
+          dllSvc->IsReadyForBackgroundProcessing();
+#endif
+
       MonitorAutoLock lock(mMonitor);
       MOZ_ASSERT(!mComplete);
       if (success) {
         mPrefSerializer = std::move(prefSerializer);
       }
+#if defined(XP_WIN)
+      mDllServicesReady = isReadyForBackgroundProcessing;
+#endif
       mComplete = true;
       lock.Notify();
       return NS_OK;
     }
 
     void Wait(int32_t aTimeoutMs,
+#ifdef XP_WIN
+              bool& aDllServicesReadyOut,
+#endif
               UniquePtr<ipc::SharedPreferenceSerializer>& aOut) {
       MonitorAutoLock lock(mMonitor);
 
@@ -118,6 +131,9 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
         }
       }
 
+#ifdef XP_WIN
+      aDllServicesReadyOut = mDllServicesReady;
+#endif
       aOut = std::move(mPrefSerializer);
     }
 
@@ -125,6 +141,9 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
     Monitor mMonitor;
     UniquePtr<ipc::SharedPreferenceSerializer> mPrefSerializer
         MOZ_GUARDED_BY(mMonitor);
+#ifdef XP_WIN
+    bool mDllServicesReady MOZ_GUARDED_BY(mMonitor) = false;
+#endif
     bool mComplete MOZ_GUARDED_BY(mMonitor) = false;
   };
 
@@ -150,7 +169,11 @@ bool GMPProcessParent::Launch(int32_t aTimeoutMs) {
     // is blocking. This is also important for the buffering of pref updates,
     // since we know any tasks dispatched with updates won't run until we launch
     // (or fail to launch) the process.
-    prefTask->Wait(aTimeoutMs, prefSerializer);
+    prefTask->Wait(aTimeoutMs,
+#ifdef XP_WIN
+                   mDllServicesReady,
+#endif
+                   prefSerializer);
     if (NS_WARN_IF(!prefSerializer)) {
       return false;
     }
