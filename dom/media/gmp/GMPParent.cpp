@@ -313,16 +313,6 @@ class NotifyGMPProcessLoadedTask : public Runnable {
       return NS_ERROR_FAILURE;
     }
 
-#if defined(XP_WIN)
-    RefPtr<DllServices> dllSvc(DllServices::Get());
-    bool isReadyForBackgroundProcessing =
-        dllSvc->IsReadyForBackgroundProcessing();
-    gmpEventTarget->Dispatch(NewRunnableMethod<bool, bool>(
-        "GMPParent::SendInitDllServices", mGMPParent,
-        &GMPParent::SendInitDllServices, isReadyForBackgroundProcessing,
-        Telemetry::CanRecordReleaseData()));
-#endif
-
     if (canProfile) {
       ipc::Endpoint<PProfilerChild> profilerParent(
           ProfilerParent::CreateForProcess(mProcessId));
@@ -390,11 +380,25 @@ nsresult GMPParent::LoadProcess() {
     GMP_PARENT_LOG_DEBUG("%s: Opened channel to new child process",
                          __FUNCTION__);
 
+    bool ok;
+
+#ifdef XP_WIN
+    ok = SendInitDllServices(mProcess->IsDllServicesReady(),
+                             Telemetry::CanRecordReleaseData());
+    if (!ok) {
+      GMP_PARENT_LOG_DEBUG(
+          "%s: Failed to send init dll services to child process",
+          __FUNCTION__);
+      return NS_ERROR_FAILURE;
+    }
+    GMP_PARENT_LOG_DEBUG("%s: Sent init dll services to child process",
+                         __FUNCTION__);
+#endif
+
     // ComputeStorageId may return empty string, we leave the error handling to
     // CDM. The CDM will reject the promise once we provide a empty string of
     // storage id.
-    bool ok =
-        SendProvideStorageId(CDMStorageIdProvider::ComputeStorageId(mNodeId));
+    ok = SendProvideStorageId(CDMStorageIdProvider::ComputeStorageId(mNodeId));
     if (!ok) {
       GMP_PARENT_LOG_DEBUG("%s: Failed to send storage id to child process",
                            __FUNCTION__);
@@ -404,7 +408,7 @@ nsresult GMPParent::LoadProcess() {
 
 #if defined(XP_WIN) || defined(XP_LINUX)
     if (!mLibs.IsEmpty()) {
-      bool ok = SendPreloadLibs(mLibs);
+      ok = SendPreloadLibs(mLibs);
       if (!ok) {
         GMP_PARENT_LOG_DEBUG("%s: Failed to send preload-libs to child process",
                              __FUNCTION__);
