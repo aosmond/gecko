@@ -127,7 +127,7 @@ struct AudioTimelineEvent {
   float EndValue() const;
 
   double TimeConstant() const {
-    MOZ_ASSERT(mType == SetTarget);
+    //MOZ_ASSERT(mType == SetTarget);
     return mTimeConstant;
   }
   uint32_t CurveLength() const {

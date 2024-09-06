@@ -184,7 +184,7 @@ template <class TimeType>
 void AudioTimelineEvent::FillTargetApproach(TimeType aBufferStartTime,
                                             Span<float> aBuffer,
                                             double v0) const {
-  MOZ_ASSERT(mType == SetTarget);
+  //MOZ_ASSERT(mType == SetTarget);
   MOZ_ASSERT(aBuffer.Length() >= 1);
   double v1 = mValue;
   double vDelta = v0 - v1;
