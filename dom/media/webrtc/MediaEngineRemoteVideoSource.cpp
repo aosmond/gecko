@@ -571,10 +571,11 @@ int MediaEngineRemoteVideoSource::DeliverFrame(
     MOZ_ASSERT(mState == kStarted);
     VideoSegment segment;
     mImageSize = image->GetSize();
-    segment.AppendFrame(
+    segment.AppendWebrtcLocalFrame(
         image.forget(), mImageSize, mPrincipal, /* aForceBlack */ false,
         TimeStamp::Now(),
-        TimeDuration::FromMicroseconds(aProps.processingDurationUs()));
+        TimeDuration::FromMicroseconds(aProps.processingDurationUs()),
+        aProps.captureTime());
     mTrack->AppendData(&segment);
   }
 

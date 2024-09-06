@@ -11,6 +11,7 @@
 #include "gfxPoint.h"
 #include "ImageContainer.h"
 #include "TimeUnits.h"
+#include "mozilla/Variant.h"
 
 namespace mozilla {
 
@@ -96,8 +97,9 @@ struct VideoChunk {
   TimeStamp mTimeStamp;
   TimeDuration mProcessingDuration;
   media::TimeUnit mMediaTime;
-  Maybe<int64_t> mWebrtcReceiveTime;
-  Maybe<int64_t> mWebrtcCaptureTime;
+  Variant<Nothing, TimeStamp, int64_t> mWebrtcCaptureTime =
+      AsVariant(Nothing());
+  Maybe<int64_t> mWebrtcReceiveTimeUs;
   Maybe<uint32_t> mRtpTimestamp;
 };
 
@@ -121,6 +123,20 @@ class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
                    TimeStamp aTimeStamp = TimeStamp::Now(),
                    TimeDuration aProcessingDuration = TimeDuration::Zero(),
                    media::TimeUnit aMediaTime = media::TimeUnit::Invalid());
+  void AppendWebrtcRemoteFrame(already_AddRefed<Image>&& aImage,
+                               const IntSize& aIntrinsicSize,
+                               const PrincipalHandle& aPrincipalHandle,
+                               bool aForceBlack, TimeStamp aTimeStamp,
+                               TimeDuration aProcessingDuration,
+                               uint32_t aRtpTimestamp,
+                               int64_t aWebrtcCaptureTimeNtp,
+                               const Maybe<int64_t>& aWebrtcReceiveTimeUs);
+  void AppendWebrtcLocalFrame(already_AddRefed<Image>&& aImage,
+                              const IntSize& aIntrinsicSize,
+                              const PrincipalHandle& aPrincipalHandle,
+                              bool aForceBlack, TimeStamp aTimeStamp,
+                              TimeDuration aProcessingDuration,
+                              TimeStamp aWebrtcCaptureTime);
   void ExtendLastFrameBy(TrackTime aDuration) {
     if (aDuration <= 0) {
       return;

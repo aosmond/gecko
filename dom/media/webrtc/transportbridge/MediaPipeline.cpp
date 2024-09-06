@@ -1474,6 +1474,14 @@ class MediaPipelineReceiveVideo::PipelineListener
       image = std::move(yuvImage);
     }
 
+    Maybe<webrtc::Timestamp> receiveTime;
+    for (auto i = aVideoFrame.packet_infos().cbegin();
+         i != aVideoFrame.packet_infos().cend(); ++i) {
+      if (!receiveTime || *receiveTime < i->receive_time()) {
+        receiveTime = Some(i->receive_time());
+      }
+    }
+
     VideoSegment segment;
     auto size = image->GetSize();
     auto processingDuration =
@@ -1481,9 +1489,11 @@ class MediaPipelineReceiveVideo::PipelineListener
             ? TimeDuration::FromMicroseconds(
                   aVideoFrame.processing_time()->Elapsed().us())
             : TimeDuration::Zero();
-    segment.AppendFrame(image.forget(), size, principal,
-                        /* aForceBlack */ false, TimeStamp::Now(),
-                        processingDuration);
+    segment.AppendWebrtcRemoteFrame(
+        image.forget(), size, principal,
+        /* aForceBlack */ false, TimeStamp::Now(), processingDuration,
+        aVideoFrame.rtp_timestamp(), aVideoFrame.ntp_time_ms(),
+        receiveTime ? Some(receiveTime->us()) : Nothing());
     mSource->AppendData(&segment);
   }
 

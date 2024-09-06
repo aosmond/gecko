@@ -24,6 +24,8 @@ uint32_t VideoFrameUtils::TotalRequiredBufferSize(
 void VideoFrameUtils::InitFrameBufferProperties(
     const webrtc::VideoFrame& aVideoFrame,
     camera::VideoFrameProperties& aDestProps) {
+  aDestProps.captureTime() = TimeStamp::Now();
+
   // The VideoFrameBuffer image data stored in the accompanying buffer
   // the buffer is at least this size of larger.
   aDestProps.bufferSize() = TotalRequiredBufferSize(aVideoFrame);
