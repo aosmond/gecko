@@ -712,35 +712,25 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
     return;
   }
 
-  gfx::IntSize frameSize;
-  ImageContainer::FrameID frameID = layers::kContainerFrameID_Invalid;
-  TimeDuration processingDuration;
-  double frameTime = -1.0;
-  bool composited = false;
-
   // We are guaranteed that the images are in timestamp order. It is possible we
   // are already behind if the compositor notifications have not been processed
   // yet, so as per the standard, this is a best effort attempt at synchronizing
   // with the state of the GPU process.
+  const ImageContainer::OwningImage* selected = nullptr;
+  bool composited = false;
   for (const auto& image : images) {
     if (image.mTimeStamp <= aNowTime) {
       // Image should already have been composited. Because we might not be in
       // the display list, we cannot rely upon its mComposited status, and
       // should just assume it has indeed been composited.
-      frameSize = image.mImage->GetSize();
-      frameID = image.mFrameID;
-      processingDuration = image.mProcessingDuration;
-      frameTime = image.mMediaTime;
+      selected = &image;
       composited = true;
     } else if (!aNextTickTime || image.mTimeStamp <= aNextTickTime.ref()) {
       // Image should be the next to be composited. mComposited will be false
       // if the compositor hasn't rendered the frame yet or notified us of the
       // render yet, but it is in progress. If it is true, then we know the
       // next vsync will display the frame.
-      frameSize = image.mImage->GetSize();
-      frameID = image.mFrameID;
-      processingDuration = image.mProcessingDuration;
-      frameTime = image.mMediaTime;
+      selected = &image;
       composited = false;
     } else {
       // Image is for a future composition.
@@ -750,14 +740,15 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
 
   // If all of the available images are for future compositions, we must have
   // fired too early. Wait for the next invalidation.
-  if (frameID == layers::kContainerFrameID_Invalid ||
-      frameID == mLastPresentedFrameID) {
+  if (!selected || selected->mFrameID == layers::kContainerFrameID_Invalid ||
+      selected->mFrameID == mLastPresentedFrameID) {
     return;
   }
 
   // If we have got a dummy frame, then we must have suspended decoding and have
   // no actual frame to present. This should only happen if we raced on
   // requesting a callback, and the media state machine advancing.
+  gfx::IntSize frameSize = selected->mImage->GetSize();
   if (NS_WARN_IF(frameSize.IsEmpty())) {
     return;
   }
@@ -773,13 +764,15 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
 
   aMd.mWidth = frameSize.width;
   aMd.mHeight = frameSize.height;
-  aMd.mMediaTime = frameTime >= 0.0 ? frameTime : CurrentTime();
+  aMd.mMediaTime =
+      selected->mMediaTime >= 0.0 ? selected->mMediaTime : CurrentTime();
 
   // If we have a processing duration, we need to round it to the nearest 100
   // microseconds as per the standard (5. Security and Privacy Considerations).
-  if (processingDuration > TimeDuration::Zero()) {
+  if (selected->mProcessingDuration > TimeDuration::Zero()) {
     aMd.mProcessingDuration.Construct(
-        std::round(processingDuration.ToSeconds() * 10000.0) / 10000.0);
+        std::round(selected->mProcessingDuration.ToSeconds() * 10000.0) /
+        10000.0);
   }
 
   // Presented frames is a bit of a misnomer from a rendering perspective,
@@ -787,13 +780,13 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   // that are outside of the DOM, or are not visible, still advance the video in
   // the background, and presumably the caller still needs some way to know how
   // many frames we have advanced.
-  aMd.mPresentedFrames = frameID;
+  aMd.mPresentedFrames = selected->mFrameID;
 
   // TODO(Bug 1908246): We should set processingDuration.
   // TODO(Bug 1908245): We should set captureTime, receiveTime and rtpTimestamp
   // for WebRTC.
 
-  mLastPresentedFrameID = frameID;
+  mLastPresentedFrameID = selected->mFrameID;
   mVideoFrameRequestManager.Take(aCallbacks);
 
   NS_DispatchToMainThread(NewRunnableMethod(
