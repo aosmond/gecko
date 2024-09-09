@@ -100,9 +100,21 @@ class VideoOutput : public DirectMediaTrackListener {
         // We ignore null images.
         continue;
       }
-      images.AppendElement(ImageContainer::NonOwningImage(
+      ImageContainer::NonOwningImage nonOwningImage(
           image, chunk.mTimeStamp, frameId, mProducerID, TimeDuration::Zero(),
-          chunk.mMediaTime.IsValid() ? chunk.mMediaTime.ToSeconds() : -1.0));
+          chunk.mMediaTime.IsValid() ? chunk.mMediaTime.ToSeconds() : -1.0);
+      nonOwningImage.mWebrtcCaptureTime = chunk.mWebrtcCaptureTime;
+      nonOwningImage.mWebrtcReceiveTimeUs = chunk.mWebrtcReceiveTimeUs;
+      nonOwningImage.mRtpTimestamp = chunk.mRtpTimestamp;
+      images.AppendElement(std::move(nonOwningImage));
+      printf_stderr(
+          "[AO] [%p] VideoOutput::SendFrames -- add frame %u, image %p, rtp %d "
+          "(%u), receive %d (%ld), capture %d\n",
+          this, frameId, image, chunk.mRtpTimestamp.isSome(),
+          chunk.mRtpTimestamp ? chunk.mRtpTimestamp.value() : 0,
+          chunk.mWebrtcReceiveTimeUs.isSome(),
+          chunk.mWebrtcReceiveTimeUs ? chunk.mWebrtcReceiveTimeUs.value() : 0,
+          !chunk.mWebrtcCaptureTime.is<Nothing>());
 
       lastPrincipalHandle = chunk.GetPrincipalHandle();
 
@@ -158,7 +170,16 @@ class VideoOutput : public DirectMediaTrackListener {
         // future. If this happens, we clear the buffered frames and start over.
         mFrames.ClearAndRetainStorage();
       }
-      mFrames.AppendElement(std::make_pair(NewFrameID(), *i));
+      auto frameId = NewFrameID();
+      printf_stderr(
+          "[AO] [%p] VideoOutput::NotifyRealtimeTrackData -- add frame %u, "
+          "image %p, rtp %d (%u), receive %d (%ld), capture %d\n",
+          this, frameId, i->mFrame.GetImage(), i->mRtpTimestamp.isSome(),
+          i->mRtpTimestamp ? i->mRtpTimestamp.value() : 0,
+          i->mWebrtcReceiveTimeUs.isSome(),
+          i->mWebrtcReceiveTimeUs ? i->mWebrtcReceiveTimeUs.value() : 0,
+          !i->mWebrtcCaptureTime.is<Nothing>());
+      mFrames.AppendElement(std::make_pair(frameId, *i));
       mLastFrameTime = i->mTimeStamp;
     }
 
@@ -221,7 +242,17 @@ class VideoOutput : public DirectMediaTrackListener {
         VideoSegment v;
         v.AppendFrame(nullptr, gfx::IntSize(640, 480), PRINCIPAL_HANDLE_NONE,
                       true, TimeStamp::Now());
-        mFrames.AppendElement(std::make_pair(NewFrameID(), *v.GetLastChunk()));
+        const auto& i = v.GetLastChunk();
+        auto frameId = NewFrameID();
+        printf_stderr(
+            "[AO] [%p] VideoOutput::NotifyEnabledStateChanged -- add frame %u, "
+            "image %p, rtp %d (%u), receive %d (%ld), capture %d\n",
+            this, frameId, i->mFrame.GetImage(), i->mRtpTimestamp.isSome(),
+            i->mRtpTimestamp ? i->mRtpTimestamp.value() : 0,
+            i->mWebrtcReceiveTimeUs.isSome(),
+            i->mWebrtcReceiveTimeUs ? i->mWebrtcReceiveTimeUs.value() : 0,
+            !i->mWebrtcCaptureTime.is<Nothing>());
+        mFrames.AppendElement(std::make_pair(frameId, *i));
       }
       SendFramesEnsureLocked();
     }
@@ -282,10 +313,7 @@ class FirstFrameVideoOutput : public VideoOutput {
 
         // Pick the first frame and run it through the rendering code.
         VideoSegment segment;
-        segment.AppendFrame(do_AddRef(c->mFrame.GetImage()),
-                            c->mFrame.GetIntrinsicSize(),
-                            c->mFrame.GetPrincipalHandle(),
-                            c->mFrame.GetForceBlack(), c->mTimeStamp);
+        segment.AppendFrame(*c);
         VideoOutput::NotifyRealtimeTrackData(aGraph, aTrackOffset, segment);
         return;
       }

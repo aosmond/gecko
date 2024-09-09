@@ -24,9 +24,9 @@ dictionary VideoFrameCallbackMetadata {
   double processingDuration;
 
   //TODO(Bug 1908245)
-  //DOMHighResTimeStamp captureTime;
-  //DOMHighResTimeStamp receiveTime;
-  //unsigned long rtpTimestamp;
+  DOMHighResTimeStamp captureTime;
+  DOMHighResTimeStamp receiveTime;
+  unsigned long rtpTimestamp;
 };
 
 callback VideoFrameRequestCallback =

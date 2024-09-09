@@ -98,6 +98,7 @@ static void NotifySetCurrent(Image* aImage) {
 void VideoFrameContainer::SetCurrentFrame(const gfx::IntSize& aIntrinsicSize,
                                           Image* aImage,
                                           const TimeStamp& aTargetTime) {
+  printf_stderr("[AO] [%p] VideoFrameContainer::SetCurrentFrame\n", this);
 #ifdef MOZ_WIDGET_ANDROID
   NotifySetCurrent(aImage);
 #endif
@@ -115,6 +116,7 @@ void VideoFrameContainer::SetCurrentFrame(const gfx::IntSize& aIntrinsicSize,
 void VideoFrameContainer::SetCurrentFrames(
     const gfx::IntSize& aIntrinsicSize,
     const nsTArray<ImageContainer::NonOwningImage>& aImages) {
+  printf_stderr("[AO] [%p] VideoFrameContainer::SetCurrentFrames\n", this);
 #ifdef MOZ_WIDGET_ANDROID
   // When there are multiple frames, only the last one is effective
   // (see bug 1299068 comment 4). Here I just count on VideoSink and VideoOutput
@@ -131,6 +133,8 @@ void VideoFrameContainer::SetCurrentFrames(
 void VideoFrameContainer::SetCurrentFramesLocked(
     const gfx::IntSize& aIntrinsicSize,
     const nsTArray<ImageContainer::NonOwningImage>& aImages) {
+  printf_stderr("[AO] [%p] VideoFrameContainer::SetCurrentFramesLocked\n",
+                this);
   mMutex.AssertCurrentThreadOwns();
 
   if (auto size = Some(aIntrinsicSize); size != mIntrinsicSize) {
@@ -211,8 +215,21 @@ void VideoFrameContainer::ClearFutureFrames(TimeStamp aNow) {
       }
       img = &image;
     }
-    currentFrame.AppendElement(ImageContainer::NonOwningImage(
-        img->mImage, img->mTimeStamp, img->mFrameID, img->mProducerID));
+    printf_stderr(
+        "[AO] [%p] VideoFrameContainer::ClearFutureFrames -- readd frame %u, "
+        "image %p, rtp %d (%u), receive %d (%ld), capture %d\n",
+        this, img->mFrameID, img->mImage.get(), img->mRtpTimestamp.isSome(),
+        img->mRtpTimestamp ? img->mRtpTimestamp.value() : 0,
+        img->mWebrtcReceiveTimeUs.isSome(),
+        img->mWebrtcReceiveTimeUs ? img->mWebrtcReceiveTimeUs.value() : 0,
+        !img->mWebrtcCaptureTime.is<Nothing>());
+    ImageContainer::NonOwningImage owningImage(
+        img->mImage, img->mTimeStamp, img->mFrameID, img->mProducerID,
+        img->mProcessingDuration, img->mMediaTime);
+    owningImage.mWebrtcCaptureTime = img->mWebrtcCaptureTime;
+    owningImage.mWebrtcReceiveTimeUs = img->mWebrtcReceiveTimeUs;
+    owningImage.mRtpTimestamp = img->mRtpTimestamp;
+    currentFrame.AppendElement(std::move(owningImage));
     mImageContainer->SetCurrentImages(currentFrame);
   }
 }

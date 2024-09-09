@@ -9,6 +9,7 @@
 #include "mozilla/AppShutdown.h"
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/dom/HTMLVideoElementBinding.h"
+#include "mozilla/dom/RTCStatsReport.h"
 #include "nsGenericHTMLElement.h"
 #include "nsGkAtoms.h"
 #include "nsSize.h"
@@ -775,6 +776,70 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
         10000.0);
   }
 
+  if (selected->mRtpTimestamp) {
+    printf_stderr("[AO] got rtp time\n");
+    aMd.mRtpTimestamp.Construct(*selected->mRtpTimestamp);
+  }
+
+  if (selected->mWebrtcCaptureTime.is<int64_t>()) {
+    auto captureTimeNtp = selected->mWebrtcCaptureTime.as<int64_t>();
+    printf_stderr("[AO] got capture time -- %ld\n", captureTimeNtp);
+    if (mSelectedVideoStreamTrack && captureTimeNtp > 0) {
+      if (const auto* timestampMaker =
+              mSelectedVideoStreamTrack->GetSource().GetTimestampMaker()) {
+        aMd.mCaptureTime.Construct(
+            RTCStatsTimestamp::FromNtp(
+                *timestampMaker,
+                webrtc::Timestamp::Micros(
+                    selected->mWebrtcCaptureTime.as<int64_t>()))
+                .ToDom());
+        //        if (nsPIDOMWindowInner* win = OwnerDoc()->GetInnerWindow()) {
+        //          if (Performance* perf = win->GetPerformance()) {
+        //            aMd.mReceiveTime.Construct(
+        //                perf->TimeStampToDOMHighResForRendering(receiveTime));
+        //          }
+        //        }
+      } else {
+        printf_stderr("[AO] got capture time -- no timestampMaker\n");
+      }
+    } else {
+      printf_stderr("[AO] got capture time -- no selected track\n");
+    }
+  }
+
+  if (selected->mWebrtcReceiveTimeUs) {
+    auto receiveTime1970 = *selected->mWebrtcReceiveTimeUs;
+    printf_stderr("[AO] got receive time -- %ld\n", receiveTime1970);
+    if (mSelectedVideoStreamTrack && receiveTime1970 > 0) {
+      if (const auto* timestampMaker =
+              mSelectedVideoStreamTrack->GetSource().GetTimestampMaker()) {
+        aMd.mReceiveTime.Construct(
+            RTCStatsTimestamp::FromRealtime(
+                *timestampMaker, webrtc::Timestamp::Micros(receiveTime1970))
+                .ToDom());
+        //        if (nsPIDOMWindowInner* win = OwnerDoc()->GetInnerWindow()) {
+        //          if (Performance* perf = win->GetPerformance()) {
+        //            aMd.mReceiveTime.Construct(
+        //                perf->TimeStampToDOMHighResForRendering(receiveTime));
+        //          }
+        //        }
+      } else {
+        printf_stderr("[AO] got receive time -- no timestampMaker\n");
+      }
+    } else {
+      printf_stderr("[AO] got receive time -- no selected track\n");
+    }
+  }
+
+  if (selected->mWebrtcCaptureTime.is<TimeStamp>()) {
+    if (nsPIDOMWindowInner* win = OwnerDoc()->GetInnerWindow()) {
+      if (Performance* perf = win->GetPerformance()) {
+        aMd.mCaptureTime.Construct(perf->TimeStampToDOMHighResForRendering(
+            selected->mWebrtcCaptureTime.as<TimeStamp>()));
+      }
+    }
+  }
+
   // Presented frames is a bit of a misnomer from a rendering perspective,
   // because we still need to advance regardless of composition. Video elements
   // that are outside of the DOM, or are not visible, still advance the video in
@@ -786,6 +851,10 @@ void HTMLVideoElement::TakeVideoFrameRequestCallbacks(
   // TODO(Bug 1908245): We should set captureTime, receiveTime and rtpTimestamp
   // for WebRTC.
 
+  printf_stderr(
+      "[AO] [%p] HTMLVideoElement::TakeVideoFrameRequestCallbacks -- frame ID "
+      "%u (prev %u), image %p\n",
+      this, selected->mFrameID, mLastPresentedFrameID, selected->mImage.get());
   mLastPresentedFrameID = selected->mFrameID;
   mVideoFrameRequestManager.Take(aCallbacks);
 
@@ -805,6 +874,8 @@ void HTMLVideoElement::FinishedVideoFrameRequestCallbacks() {
 
 uint32_t HTMLVideoElement::RequestVideoFrameCallback(
     VideoFrameRequestCallback& aCallback, ErrorResult& aRv) {
+  printf_stderr("[AO] [%p] HTMLVideoElement::RequestVideoFrameCallback\n",
+                this);
   bool hasPending = HasPendingCallbacks();
   uint32_t handle = 0;
   aRv = mVideoFrameRequestManager.Schedule(aCallback, &handle);

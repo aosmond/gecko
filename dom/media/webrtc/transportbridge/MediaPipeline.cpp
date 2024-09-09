@@ -1489,6 +1489,11 @@ class MediaPipelineReceiveVideo::PipelineListener
             ? TimeDuration::FromMicroseconds(
                   aVideoFrame.processing_time()->Elapsed().us())
             : TimeDuration::Zero();
+    printf_stderr(
+        "[AO] [%p] PipelineListener::RenderVideoFrame -- "
+        "AppendWebrtcRemoteFrame, rtp %u, ntp %ld, receiveTime %ld, image %p\n",
+        this, aVideoFrame.rtp_timestamp(), aVideoFrame.ntp_time_ms(),
+        receiveTime ? receiveTime->us() : -1, image.get());
     segment.AppendWebrtcRemoteFrame(
         image.forget(), size, principal,
         /* aForceBlack */ false, TimeStamp::Now(), processingDuration,

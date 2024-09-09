@@ -976,9 +976,17 @@ void ExternalEngineStateMachine::OnRequestVideo() {
             RunningEngineUpdate(MediaData::Type::VIDEO_DATA);
             // Send image to PIP window.
             if (mSecondaryVideoContainer.Ref()) {
+              printf_stderr(
+                  "[AO] [%p] ExternalEngineStateMachine::OnRequestVideo -- set "
+                  "secondary\n",
+                  this);
               mSecondaryVideoContainer.Ref()->SetCurrentFrame(
                   mVideoDisplay, aVideo->mImage, TimeStamp::Now());
             } else {
+              printf_stderr(
+                  "[AO] [%p] ExternalEngineStateMachine::OnRequestVideo -- set "
+                  "primary\n",
+                  this);
               mVideoFrameContainer->SetCurrentFrame(
                   mVideoDisplay, aVideo->mImage, TimeStamp::Now());
             }

@@ -566,6 +566,10 @@ int MediaEngineRemoteVideoSource::DeliverFrame(
         }));
   }
 
+  printf_stderr(
+      "[AO] [%p] MediaEngineRemoteVideoSource::DeliverFrame -- "
+      "AppendWebrtcLocalFrame\n",
+      this);
   {
     MutexAutoLock lock(mMutex);
     MOZ_ASSERT(mState == kStarted);

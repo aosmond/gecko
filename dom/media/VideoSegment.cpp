@@ -84,6 +84,11 @@ already_AddRefed<Image> VideoFrame::CreateBlackImage(
   return image.forget();
 }
 
+void VideoSegment::AppendFrame(const VideoChunk& aChunk) {
+  VideoChunk* chunk = AppendChunk(0);
+  *chunk = aChunk;
+}
+
 void VideoSegment::AppendFrame(already_AddRefed<Image>&& aImage,
                                const IntSize& aIntrinsicSize,
                                const PrincipalHandle& aPrincipalHandle,

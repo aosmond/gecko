@@ -349,8 +349,12 @@ void VideoSink::Redraw(const VideoInfo& aInfo) {
       video->mImage = mBlankImage;
     }
     video->MarkSentToCompositor();
+    printf_stderr("[AO] [%p] VideoSink::Redraw -- set primary (has video)\n",
+                  this);
     mContainer->SetCurrentFrame(video->mDisplay, video->mImage, now);
     if (mSecondaryContainer) {
+      printf_stderr(
+          "[AO] [%p] VideoSink::Redraw -- set secondary (has video)\n", this);
       mSecondaryContainer->SetCurrentFrame(video->mDisplay, video->mImage, now);
     }
     return;
@@ -362,9 +366,12 @@ void VideoSink::Redraw(const VideoInfo& aInfo) {
 
   RefPtr<Image> blank =
       mContainer->GetImageContainer()->CreatePlanarYCbCrImage();
+  printf_stderr("[AO] [%p] VideoSink::Redraw -- set primary (blank)\n", this);
   mContainer->SetCurrentFrame(aInfo.mDisplay, blank, now);
 
   if (mSecondaryContainer) {
+    printf_stderr("[AO] [%p] VideoSink::Redraw -- set secondary (blank)\n",
+                  this);
     mSecondaryContainer->SetCurrentFrame(aInfo.mDisplay, blank, now);
   }
 }
@@ -491,9 +498,13 @@ void VideoSink::RenderVideoFrames(int32_t aMaxFrames, int64_t aClockTime,
   }
 
   if (images.Length() > 0) {
+    printf_stderr("[AO] [%p] VideoSink::RenderVideoFrames -- set primary\n",
+                  this);
     mContainer->SetCurrentFrames(frames[0]->mDisplay, images);
 
     if (mSecondaryContainer) {
+      printf_stderr("[AO] [%p] VideoSink::RenderVideoFrames -- set secondary\n",
+                    this);
       mSecondaryContainer->SetCurrentFrames(frames[0]->mDisplay, images);
     }
   }

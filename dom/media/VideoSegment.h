@@ -116,6 +116,7 @@ class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
 
   ~VideoSegment();
 
+  void AppendFrame(const VideoChunk& aChunk);
   void AppendFrame(already_AddRefed<Image>&& aImage,
                    const IntSize& aIntrinsicSize,
                    const PrincipalHandle& aPrincipalHandle,
