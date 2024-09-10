@@ -21,13 +21,10 @@ dictionary VideoFrameCallbackMetadata {
 
   required unsigned long presentedFrames;
 
-  //TODO(Bug 1908246)
-  //double processingDuration;
-
-  //TODO(Bug 1908245)
-  //DOMHighResTimeStamp captureTime;
-  //DOMHighResTimeStamp receiveTime;
-  //unsigned long rtpTimestamp;
+  double processingDuration;
+  DOMHighResTimeStamp captureTime;
+  DOMHighResTimeStamp receiveTime;
+  unsigned long rtpTimestamp;
 };
 
 callback VideoFrameRequestCallback =

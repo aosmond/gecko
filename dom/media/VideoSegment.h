@@ -10,6 +10,8 @@
 #include "nsCOMPtr.h"
 #include "gfxPoint.h"
 #include "ImageContainer.h"
+#include "TimeUnits.h"
+#include "mozilla/Variant.h"
 
 namespace mozilla {
 
@@ -93,6 +95,12 @@ struct VideoChunk {
   TrackTime mDuration;
   VideoFrame mFrame;
   TimeStamp mTimeStamp;
+  TimeDuration mProcessingDuration;
+  media::TimeUnit mMediaTime;
+  Variant<Nothing, TimeStamp, int64_t> mWebrtcCaptureTime =
+      AsVariant(Nothing());
+  Maybe<int64_t> mWebrtcReceiveTimeUs;
+  Maybe<uint32_t> mRtpTimestamp;
 };
 
 class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
@@ -108,11 +116,30 @@ class VideoSegment : public MediaSegmentBase<VideoSegment, VideoChunk> {
 
   ~VideoSegment();
 
+  void AppendFrame(const VideoChunk& aChunk,
+                   const Maybe<bool>& aForceBlack = Nothing(),
+                   const Maybe<TimeStamp>& aTimeStamp = Nothing());
   void AppendFrame(already_AddRefed<Image>&& aImage,
                    const IntSize& aIntrinsicSize,
                    const PrincipalHandle& aPrincipalHandle,
                    bool aForceBlack = false,
-                   TimeStamp aTimeStamp = TimeStamp::Now());
+                   TimeStamp aTimeStamp = TimeStamp::Now(),
+                   TimeDuration aProcessingDuration = TimeDuration::Zero(),
+                   media::TimeUnit aMediaTime = media::TimeUnit::Invalid());
+  void AppendWebrtcRemoteFrame(already_AddRefed<Image>&& aImage,
+                               const IntSize& aIntrinsicSize,
+                               const PrincipalHandle& aPrincipalHandle,
+                               bool aForceBlack, TimeStamp aTimeStamp,
+                               TimeDuration aProcessingDuration,
+                               uint32_t aRtpTimestamp,
+                               int64_t aWebrtcCaptureTimeNtp,
+                               const Maybe<int64_t>& aWebrtcReceiveTimeUs);
+  void AppendWebrtcLocalFrame(already_AddRefed<Image>&& aImage,
+                              const IntSize& aIntrinsicSize,
+                              const PrincipalHandle& aPrincipalHandle,
+                              bool aForceBlack, TimeStamp aTimeStamp,
+                              TimeDuration aProcessingDuration,
+                              TimeStamp aWebrtcCaptureTime);
   void ExtendLastFrameBy(TrackTime aDuration) {
     if (aDuration <= 0) {
       return;

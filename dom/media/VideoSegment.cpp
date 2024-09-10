@@ -84,12 +84,70 @@ already_AddRefed<Image> VideoFrame::CreateBlackImage(
   return image.forget();
 }
 
+void VideoSegment::AppendFrame(const VideoChunk& aChunk,
+                               const Maybe<bool>& aForceBlack,
+                               const Maybe<TimeStamp>& aTimeStamp) {
+  VideoChunk* chunk = AppendChunk(0);
+  chunk->mTimeStamp = aTimeStamp ? *aTimeStamp : aChunk.mTimeStamp;
+  chunk->mProcessingDuration = aChunk.mProcessingDuration;
+  chunk->mMediaTime = aChunk.mMediaTime;
+  chunk->mWebrtcCaptureTime = aChunk.mWebrtcCaptureTime;
+  chunk->mWebrtcReceiveTimeUs = aChunk.mWebrtcReceiveTimeUs;
+  chunk->mRtpTimestamp = aChunk.mRtpTimestamp;
+  VideoFrame frame(do_AddRef(aChunk.mFrame.GetImage()),
+                   aChunk.mFrame.GetIntrinsicSize());
+  MOZ_ASSERT_IF(!IsNull(), !aChunk.mTimeStamp.IsNull());
+  frame.SetForceBlack(aForceBlack ? *aForceBlack
+                                  : aChunk.mFrame.GetForceBlack());
+  frame.SetPrincipalHandle(aChunk.mFrame.GetPrincipalHandle());
+  chunk->mFrame.TakeFrom(&frame);
+}
+
 void VideoSegment::AppendFrame(already_AddRefed<Image>&& aImage,
                                const IntSize& aIntrinsicSize,
                                const PrincipalHandle& aPrincipalHandle,
-                               bool aForceBlack, TimeStamp aTimeStamp) {
+                               bool aForceBlack, TimeStamp aTimeStamp,
+                               TimeDuration aProcessingDuration,
+                               media::TimeUnit aMediaTime) {
   VideoChunk* chunk = AppendChunk(0);
   chunk->mTimeStamp = aTimeStamp;
+  chunk->mProcessingDuration = aProcessingDuration;
+  chunk->mMediaTime = aMediaTime;
+  VideoFrame frame(std::move(aImage), aIntrinsicSize);
+  MOZ_ASSERT_IF(!IsNull(), !aTimeStamp.IsNull());
+  frame.SetForceBlack(aForceBlack);
+  frame.SetPrincipalHandle(aPrincipalHandle);
+  chunk->mFrame.TakeFrom(&frame);
+}
+
+void VideoSegment::AppendWebrtcRemoteFrame(
+    already_AddRefed<Image>&& aImage, const IntSize& aIntrinsicSize,
+    const PrincipalHandle& aPrincipalHandle, bool aForceBlack,
+    TimeStamp aTimeStamp, TimeDuration aProcessingDuration,
+    uint32_t aRtpTimestamp, int64_t aWebrtcCaptureTimeNtp,
+    const Maybe<int64_t>& aWebrtcReceiveTimeUs) {
+  VideoChunk* chunk = AppendChunk(0);
+  chunk->mTimeStamp = aTimeStamp;
+  chunk->mProcessingDuration = aProcessingDuration;
+  chunk->mWebrtcCaptureTime = AsVariant(aWebrtcCaptureTimeNtp);
+  chunk->mWebrtcReceiveTimeUs = aWebrtcReceiveTimeUs;
+  chunk->mRtpTimestamp = Some(aRtpTimestamp);
+  VideoFrame frame(std::move(aImage), aIntrinsicSize);
+  MOZ_ASSERT_IF(!IsNull(), !aTimeStamp.IsNull());
+  frame.SetForceBlack(aForceBlack);
+  frame.SetPrincipalHandle(aPrincipalHandle);
+  chunk->mFrame.TakeFrom(&frame);
+}
+
+void VideoSegment::AppendWebrtcLocalFrame(
+    already_AddRefed<Image>&& aImage, const IntSize& aIntrinsicSize,
+    const PrincipalHandle& aPrincipalHandle, bool aForceBlack,
+    TimeStamp aTimeStamp, TimeDuration aProcessingDuration,
+    TimeStamp aWebrtcCaptureTime) {
+  VideoChunk* chunk = AppendChunk(0);
+  chunk->mTimeStamp = aTimeStamp;
+  chunk->mProcessingDuration = aProcessingDuration;
+  chunk->mWebrtcCaptureTime = AsVariant(aWebrtcCaptureTime);
   VideoFrame frame(std::move(aImage), aIntrinsicSize);
   MOZ_ASSERT_IF(!IsNull(), !aTimeStamp.IsNull());
   frame.SetForceBlack(aForceBlack);

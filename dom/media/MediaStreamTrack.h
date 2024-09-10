@@ -40,6 +40,7 @@ namespace dom {
 
 class AudioStreamTrack;
 class VideoStreamTrack;
+class RTCStatsTimestampMaker;
 enum class CallerType : uint32_t;
 
 /**
@@ -139,6 +140,10 @@ class MediaStreamTrackSource : public nsISupports {
    * lifetime.
    */
   virtual const PeerIdentity* GetPeerIdentity() const { return nullptr; }
+
+  virtual const RTCStatsTimestampMaker* GetTimestampMaker() const {
+    return nullptr;
+  }
 
   /**
    * MediaStreamTrack::GetLabel (see spec) calls through to here.
