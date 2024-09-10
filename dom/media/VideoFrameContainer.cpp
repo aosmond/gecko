@@ -203,16 +203,18 @@ void VideoFrameContainer::ClearFutureFrames(TimeStamp aNow) {
 
   if (!kungFuDeathGrip.IsEmpty()) {
     AutoTArray<ImageContainer::NonOwningImage, 1> currentFrame;
-    ImageContainer::OwningImage& img = kungFuDeathGrip[0];
+    const ImageContainer::OwningImage* img = &kungFuDeathGrip[0];
     // Find the current image in case there are several.
     for (const auto& image : kungFuDeathGrip) {
       if (image.mTimeStamp > aNow) {
         break;
       }
-      img = image;
+      img = &image;
     }
     currentFrame.AppendElement(ImageContainer::NonOwningImage(
-        img.mImage, img.mTimeStamp, img.mFrameID, img.mProducerID));
+        img->mImage, img->mTimeStamp, img->mFrameID, img->mProducerID,
+        img->mProcessingDuration, img->mMediaTime, img->mWebrtcCaptureTime,
+        img->mWebrtcReceiveTime, img->mRtpTimestamp));
     mImageContainer->SetCurrentImages(currentFrame);
   }
 }
