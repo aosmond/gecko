@@ -8,6 +8,9 @@
 #define GFX_IMAGETYPES_H
 
 #include <stdint.h>  // for uint32_t
+#include "mozilla/Maybe.h"
+#include "mozilla/TimeStamp.h"
+#include "mozilla/Variant.h"
 
 namespace mozilla {
 
@@ -117,6 +120,14 @@ constexpr ContainerFrameID kContainerFrameID_Invalid = 0;
 
 typedef uint32_t ContainerProducerID;
 constexpr ContainerProducerID kContainerProducerID_Invalid = 0;
+
+// int64_t represents a WebRTC NTP timestamp.
+typedef Variant<Nothing, TimeStamp, int64_t> ContainerCaptureTime;
+
+// int64_t represents a WebRTC Realtime timestamp.
+typedef Maybe<int64_t> ContainerReceiveTime;
+
+typedef Maybe<uint32_t> ContainerRtpTimestamp;
 
 }  // namespace layers
 
