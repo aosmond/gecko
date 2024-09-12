@@ -20,6 +20,8 @@
 #ifdef XP_WIN
 #  include "WinUtils.h"
 #  include "nsWindowsDllInterceptor.h"
+#  include "mozilla/NativeNt.h"
+#  include "mozilla/WindowsVersion.h"
 #  include <windows.h>
 #  include <strsafe.h>
 #  include <unordered_map>
@@ -175,6 +177,7 @@ bool ChromiumCDMAdapter::Supports(int32_t aModuleVersion,
 
 #ifdef XP_WIN
 
+static WindowsDllInterceptor sKernelBase32Intercept;
 static WindowsDllInterceptor sKernel32Intercept;
 
 typedef DWORD(WINAPI* QueryDosDeviceWFnPtr)(_In_opt_ LPCWSTR lpDeviceName,
@@ -183,6 +186,13 @@ typedef DWORD(WINAPI* QueryDosDeviceWFnPtr)(_In_opt_ LPCWSTR lpDeviceName,
 
 static WindowsDllInterceptor::FuncHookType<QueryDosDeviceWFnPtr>
     sOriginalQueryDosDeviceWFnPtr;
+
+typedef BOOL(WINAPI* GetProcessMitigationPolicyFnPtr)(
+    HANDLE hProcess, PROCESS_MITIGATION_POLICY MitigationPolicy, PVOID lpBuffer,
+    SIZE_T dwLength);
+
+static WindowsDllInterceptor::FuncHookType<GetProcessMitigationPolicyFnPtr>
+    sOriginalGetProcessMitigationPolicyFnPtr;
 
 static std::unordered_map<std::wstring, std::wstring>* sDeviceNames = nullptr;
 
@@ -242,6 +252,21 @@ static std::wstring GetDeviceMapping(const std::wstring& aDosDeviceName) {
   return std::wstring(buf, buf + rv);
 }
 
+BOOL WINAPI MozGetProcessMitigationPolicy(
+    HANDLE hProcess, PROCESS_MITIGATION_POLICY MitigationPolicy, PVOID lpBuffer,
+    SIZE_T dwLength) {
+  if (MitigationPolicy != ProcessSystemCallDisablePolicy ||
+      dwLength != sizeof(PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY)) {
+    return FALSE;
+  }
+
+  auto* policy =
+      reinterpret_cast<PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY*>(
+          lpBuffer);
+  policy->Flags = 0;
+  return TRUE;
+}
+
 static void InitializeHooks() {
   static bool initialized = false;
   if (initialized) {
@@ -253,9 +278,27 @@ static void InitializeHooks() {
     sDeviceNames->emplace(name, GetDeviceMapping(name));
   }
 
-  sKernel32Intercept.Init("kernelbase.dll");
-  sOriginalQueryDosDeviceWFnPtr.Set(sKernel32Intercept, "QueryDosDeviceW",
+  sKernelBase32Intercept.Init("kernelbase.dll");
+  sOriginalQueryDosDeviceWFnPtr.Set(sKernelBase32Intercept, "QueryDosDeviceW",
                                     &QueryDosDeviceWHook);
+
+  if (!IsWin8OrLater()) {
+    auto k32mod = ::GetModuleHandleW(L"kernel32.dll");
+    interceptor::MMPolicyInProcess policy;
+    auto k32Exports = nt::PEExportSection<interceptor::MMPolicyInProcess>::Get(
+        k32mod, policy);
+    if (k32Exports.ReplaceExportNameTableEntry("GetProcessPreferredUILanguages",
+                                               "GetProcessMitigationPolicy")) {
+      sKernel32Intercept.Init("kernel32.dll");
+      if (!sOriginalGetProcessMitigationPolicyFnPtr.Set(
+              sKernel32Intercept, "GetProcessMitigationPolicy",
+              &MozGetProcessMitigationPolicy)) {
+        GMP_LOG_WARNING("Failed to hook GetProcessMitigationPolicy");
+      }
+    } else {
+      GMP_LOG_WARNING("Failed to rename to GetProcessMitigationPolicy");
+    }
+  }
 }
 #endif
 
