@@ -329,9 +329,6 @@ class MediaData {
   // Duration of sample, in microseconds.
   media::TimeUnit mDuration;
 
-  // How long it took to process the sample.
-  media::TimeUnit mProcessingDuration = media::TimeUnit::Invalid();
-
   bool mKeyframe;
 
   media::TimeUnit GetEndTime() const { return mTime + mDuration; }
@@ -507,19 +504,21 @@ class VideoData : public MediaData {
       const media::TimeUnit& aTime, const media::TimeUnit& aDuration,
       const YCbCrBuffer& aBuffer, bool aKeyframe,
       const media::TimeUnit& aTimecode, const IntRect& aPicture,
+      const media::TimeUnit& aProcessingDuration,
       layers::KnowsCompositor* aAllocator);
 
   static already_AddRefed<VideoData> CreateAndCopyData(
       const VideoInfo& aInfo, ImageContainer* aContainer, int64_t aOffset,
       const media::TimeUnit& aTime, const media::TimeUnit& aDuration,
       const YCbCrBuffer& aBuffer, const YCbCrBuffer::Plane& aAlphaPlane,
-      bool aKeyframe, const media::TimeUnit& aTimecode,
-      const IntRect& aPicture);
+      bool aKeyframe, const media::TimeUnit& aTimecode, const IntRect& aPicture,
+      const media::TimeUnit& aProcessingDuration);
 
   static already_AddRefed<VideoData> CreateFromImage(
       const IntSize& aDisplay, int64_t aOffset, const media::TimeUnit& aTime,
       const media::TimeUnit& aDuration, const RefPtr<Image>& aImage,
-      bool aKeyframe, const media::TimeUnit& aTimecode);
+      bool aKeyframe, const media::TimeUnit& aTimecode,
+      const media::TimeUnit& aProcessingDuration);
 
   // Initialize PlanarYCbCrImage. Only When aCopyData is true,
   // video data is copied to PlanarYCbCrImage.
@@ -546,7 +545,7 @@ class VideoData : public MediaData {
   VideoData(int64_t aOffset, const media::TimeUnit& aTime,
             const media::TimeUnit& aDuration, bool aKeyframe,
             const media::TimeUnit& aTimecode, IntSize aDisplay,
-            uint32_t aFrameID);
+            uint32_t aFrameID, const media::TimeUnit& aProcessingDuration);
 
   nsCString ToString() const;
 
@@ -565,6 +564,9 @@ class VideoData : public MediaData {
   }
 
   const media::TimeUnit& NextKeyFrameTime() const { return mNextKeyFrameTime; }
+
+  // How long it took to process the sample.
+  media::TimeUnit mProcessingDuration;
 
  protected:
   ~VideoData();

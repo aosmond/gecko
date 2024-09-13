@@ -220,11 +220,13 @@ static MediaResult ValidateBufferAndPicture(
 VideoData::VideoData(int64_t aOffset, const TimeUnit& aTime,
                      const TimeUnit& aDuration, bool aKeyframe,
                      const TimeUnit& aTimecode, IntSize aDisplay,
-                     layers::ImageContainer::FrameID aFrameID)
+                     layers::ImageContainer::FrameID aFrameID,
+                     const TimeUnit& aProcessingDuration)
     : MediaData(Type::VIDEO_DATA, aOffset, aTime, aDuration),
       mDisplay(aDisplay),
       mFrameID(aFrameID),
       mSentToCompositor(false),
+      mProcessingDuration(aProcessingDuration),
       mNextKeyFrameTime(TimeUnit::Invalid()) {
   MOZ_ASSERT(!mDuration.IsNegative(), "Frame must have non-negative duration.");
   mKeyframe = aKeyframe;
@@ -330,12 +332,14 @@ Result<already_AddRefed<VideoData>, MediaResult> VideoData::CreateAndCopyData(
     const VideoInfo& aInfo, ImageContainer* aContainer, int64_t aOffset,
     const TimeUnit& aTime, const TimeUnit& aDuration,
     const YCbCrBuffer& aBuffer, bool aKeyframe, const TimeUnit& aTimecode,
-    const IntRect& aPicture, layers::KnowsCompositor* aAllocator) {
+    const IntRect& aPicture, const TimeUnit& aProcessingDuration,
+    layers::KnowsCompositor* aAllocator) {
   if (!aContainer) {
     // Create a dummy VideoData with no image. This gives us something to
     // send to media streams if necessary.
     RefPtr<VideoData> v(new VideoData(aOffset, aTime, aDuration, aKeyframe,
-                                      aTimecode, aInfo.mDisplay, 0));
+                                      aTimecode, aInfo.mDisplay, 0,
+                                      aProcessingDuration));
     return v.forget();
   }
 
@@ -347,7 +351,8 @@ Result<already_AddRefed<VideoData>, MediaResult> VideoData::CreateAndCopyData(
   PerformanceRecorder<PlaybackStage> perfRecorder(MediaStage::CopyDecodedVideo,
                                                   aInfo.mImage.height);
   RefPtr<VideoData> v(new VideoData(aOffset, aTime, aDuration, aKeyframe,
-                                    aTimecode, aInfo.mDisplay, 0));
+                                    aTimecode, aInfo.mDisplay, 0,
+                                    aProcessingDuration));
 
   // Currently our decoder only knows how to output to ImageFormat::PLANAR_YCBCR
   // format.
@@ -394,12 +399,14 @@ already_AddRefed<VideoData> VideoData::CreateAndCopyData(
     const VideoInfo& aInfo, ImageContainer* aContainer, int64_t aOffset,
     const TimeUnit& aTime, const TimeUnit& aDuration,
     const YCbCrBuffer& aBuffer, const YCbCrBuffer::Plane& aAlphaPlane,
-    bool aKeyframe, const TimeUnit& aTimecode, const IntRect& aPicture) {
+    bool aKeyframe, const TimeUnit& aTimecode, const IntRect& aPicture,
+    const TimeUnit& aProcessingDuration) {
   if (!aContainer) {
     // Create a dummy VideoData with no image. This gives us something to
     // send to media streams if necessary.
     RefPtr<VideoData> v(new VideoData(aOffset, aTime, aDuration, aKeyframe,
-                                      aTimecode, aInfo.mDisplay, 0));
+                                      aTimecode, aInfo.mDisplay, 0,
+                                      aProcessingDuration));
     return v.forget();
   }
 
@@ -410,7 +417,8 @@ already_AddRefed<VideoData> VideoData::CreateAndCopyData(
   }
 
   RefPtr<VideoData> v(new VideoData(aOffset, aTime, aDuration, aKeyframe,
-                                    aTimecode, aInfo.mDisplay, 0));
+                                    aTimecode, aInfo.mDisplay, 0,
+                                    aProcessingDuration));
 
   // Convert from YUVA to BGRA format on the software side.
   RefPtr<layers::SharedRGBImage> videoImage =
@@ -466,9 +474,10 @@ already_AddRefed<VideoData> VideoData::CreateAndCopyData(
 already_AddRefed<VideoData> VideoData::CreateFromImage(
     const IntSize& aDisplay, int64_t aOffset, const TimeUnit& aTime,
     const TimeUnit& aDuration, const RefPtr<Image>& aImage, bool aKeyframe,
-    const TimeUnit& aTimecode) {
+    const TimeUnit& aTimecode, const TimeUnit& aProcessingDuration) {
   RefPtr<VideoData> v(new VideoData(aOffset, aTime, aDuration, aKeyframe,
-                                    aTimecode, aDisplay, 0));
+                                    aTimecode, aDisplay, 0,
+                                    aProcessingDuration));
   v->mImage = aImage;
   return v.forget();
 }
