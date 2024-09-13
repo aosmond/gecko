@@ -344,6 +344,7 @@ class DecodedStreamData final {
 
   void WriteVideoToSegment(layers::Image* aImage, const TimeUnit& aStart,
                            const TimeUnit& aEnd,
+                           const TimeUnit& aProcessingDuration,
                            const gfx::IntSize& aIntrinsicSize,
                            const TimeStamp& aTimeStamp, VideoSegment* aOutput,
                            const PrincipalHandle& aPrincipalHandle,
@@ -374,6 +375,8 @@ class DecodedStreamData final {
   // The last video image sent to the track. Useful if we need to replicate
   // the image.
   RefPtr<layers::Image> mLastVideoImage;
+  // The processing duration of the last video image sent to the track.
+  media::TimeUnit mLastVideoImageProcessingDuration;
   gfx::IntSize mLastVideoImageDisplaySize;
   bool mHaveSentFinishAudio;
   bool mHaveSentFinishVideo;
@@ -842,12 +845,12 @@ void DecodedStream::CheckIsDataAudible(const AudioData* aData) {
 
 void DecodedStreamData::WriteVideoToSegment(
     layers::Image* aImage, const TimeUnit& aStart, const TimeUnit& aEnd,
-    const gfx::IntSize& aIntrinsicSize, const TimeStamp& aTimeStamp,
-    VideoSegment* aOutput, const PrincipalHandle& aPrincipalHandle,
-    double aPlaybackRate) {
+    const TimeUnit& aProcessingDuration, const gfx::IntSize& aIntrinsicSize,
+    const TimeStamp& aTimeStamp, VideoSegment* aOutput,
+    const PrincipalHandle& aPrincipalHandle, double aPlaybackRate) {
   RefPtr<layers::Image> image = aImage;
   aOutput->AppendFrame(image.forget(), aIntrinsicSize, aPrincipalHandle, false,
-                       aTimeStamp, media::TimeUnit::Invalid(), aStart);
+                       aTimeStamp, aProcessingDuration, aStart);
   // Extend this so we get accurate durations for all frames.
   // Because this track is pushed, we need durations so the graph can track
   // when playout of the track has finished.
@@ -987,6 +990,7 @@ void DecodedStream::SendVideo(const PrincipalHandle& aPrincipalHandle) {
           std::max(mData->mLastVideoTimeStamp,
                    currentTime + (lastEnd - currentPosition).ToTimeDuration());
       mData->WriteVideoToSegment(mData->mLastVideoImage, lastEnd, v->mTime,
+                                 mData->mLastVideoImageProcessingDuration,
                                  mData->mLastVideoImageDisplaySize, t, &output,
                                  aPrincipalHandle, mPlaybackRate);
       lastEnd = v->mTime;
@@ -1005,8 +1009,10 @@ void DecodedStream::SendVideo(const PrincipalHandle& aPrincipalHandle) {
           lastEnd + TimeUnit::FromMicroseconds(
                         mData->mVideoTrack->TrackTimeToMicroseconds(1) + 1));
       mData->mLastVideoImage = v->mImage;
+      mData->mLastVideoImageProcessingDuration = v->mProcessingDuration;
       mData->mLastVideoImageDisplaySize = v->mDisplay;
-      mData->WriteVideoToSegment(v->mImage, lastEnd, end, v->mDisplay, t,
+      mData->WriteVideoToSegment(v->mImage, lastEnd, end,
+                                 v->mProcessingDuration, v->mDisplay, t,
                                  &output, aPrincipalHandle, mPlaybackRate);
     }
   }
@@ -1041,6 +1047,7 @@ void DecodedStream::SendVideo(const PrincipalHandle& aPrincipalHandle) {
       auto start = mData->mLastVideoEndTime.valueOr(mStartTime.ref());
       mData->WriteVideoToSegment(
           mData->mLastVideoImage, start, start,
+          mData->mLastVideoImageProcessingDuration,
           mData->mLastVideoImageDisplaySize,
           currentTime + (start - currentPosition).ToTimeDuration(), &endSegment,
           aPrincipalHandle, mPlaybackRate);

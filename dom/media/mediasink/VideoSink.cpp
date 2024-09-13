@@ -350,10 +350,10 @@ void VideoSink::Redraw(const VideoInfo& aInfo) {
     }
     video->MarkSentToCompositor();
     mContainer->SetCurrentFrame(video->mDisplay, video->mImage, now,
-                                media::TimeUnit::Invalid(), video->mTime);
+                                video->mProcessingDuration, video->mTime);
     if (mSecondaryContainer) {
       mSecondaryContainer->SetCurrentFrame(video->mDisplay, video->mImage, now,
-                                           media::TimeUnit::Invalid(),
+                                           video->mProcessingDuration,
                                            video->mTime);
     }
     return;
@@ -483,6 +483,7 @@ void VideoSink::RenderVideoFrames(int32_t aMaxFrames, int64_t aClockTime,
     }
     img->mFrameID = frame->mFrameID;
     img->mProducerID = mProducerID;
+    img->mProcessingDuration = frame->mProcessingDuration;
     img->mMediaTime = frame->mTime;
 
     VSINK_LOG_V("playing video frame %" PRId64

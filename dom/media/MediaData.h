@@ -329,6 +329,9 @@ class MediaData {
   // Duration of sample, in microseconds.
   media::TimeUnit mDuration;
 
+  // How long it took to process the sample.
+  media::TimeUnit mProcessingDuration = media::TimeUnit::Invalid();
+
   bool mKeyframe;
 
   media::TimeUnit GetEndTime() const { return mTime + mDuration; }
