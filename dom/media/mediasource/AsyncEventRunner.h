@@ -12,13 +12,22 @@
 namespace mozilla {
 
 template <typename T>
-class AsyncEventRunner : public Runnable {
+class AsyncEventRunner : public CancelableRunnable {
  public:
   AsyncEventRunner(T* aTarget, const char* aName)
-      : Runnable("AsyncEventRunner"), mTarget(aTarget), mName(aName) {}
+      : CancelableRunnable("AsyncEventRunner"),
+        mTarget(aTarget),
+        mName(aName) {}
 
   NS_IMETHOD Run() override {
-    mTarget->DispatchSimpleEvent(mName);
+    if (mTarget) {
+      mTarget->DispatchSimpleEvent(mName);
+    }
+    return NS_OK;
+  }
+
+  nsresult Cancel() override {
+    mTarget = nullptr;
     return NS_OK;
   }
 
