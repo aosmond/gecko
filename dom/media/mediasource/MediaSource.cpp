@@ -88,8 +88,7 @@ static bool IsVP9Forced(DecoderDoctorDiagnostics* aDiagnostics) {
 
 namespace dom {
 
-static void RecordTypeForTelemetry(const nsAString& aType,
-                                   nsPIDOMWindowInner* aWindow) {
+static void RecordTypeForTelemetry(const nsAString& aType) {
   Maybe<MediaContainerType> containerType = MakeMediaContainerType(aType);
   if (!containerType) {
     return;
@@ -216,14 +215,13 @@ void MediaSource::IsTypeSupported(const nsAString& aType,
 /* static */
 already_AddRefed<MediaSource> MediaSource::Constructor(
     const GlobalObject& aGlobal, ErrorResult& aRv) {
-  nsCOMPtr<nsPIDOMWindowInner> window =
-      do_QueryInterface(aGlobal.GetAsSupports());
-  if (!window) {
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aGlobal.GetAsSupports());
+  if (!global) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
 
-  RefPtr<MediaSource> mediaSource = new MediaSource(window);
+  RefPtr<MediaSource> mediaSource = new MediaSource(global);
   return mediaSource.forget();
 }
 
@@ -291,16 +289,15 @@ void MediaSource::SetDuration(const media::TimeUnit& aDuration) {
 already_AddRefed<SourceBuffer> MediaSource::AddSourceBuffer(
     const nsAString& aType, ErrorResult& aRv) {
   MOZ_ASSERT(NS_IsMainThread());
-  nsCOMPtr<nsPIDOMWindowInner> window = GetOwnerWindow();
-  Document* doc = window ? window->GetExtantDoc() : nullptr;
+  nsIGlobalObject* global = GetOwnerGlobal();
   DecoderDoctorDiagnostics diagnostics;
-  IsTypeSupported(
-      aType, &diagnostics, aRv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
-  RecordTypeForTelemetry(aType, window);
+  IsTypeSupported(aType, &diagnostics, aRv,
+                  global ? Some(global->ShouldResistFingerprinting(
+                               RFPTarget::MediaCapabilities))
+                         : Nothing());
+  RecordTypeForTelemetry(aType);
   bool supported = !aRv.Failed();
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  diagnostics.StoreFormatDiagnostics(global, aType, supported, __func__);
   MSE_API("AddSourceBuffer(aType=%s)%s", NS_ConvertUTF16toUTF8(aType).get(),
           supported ? "" : " [not supported]");
   if (!supported) {
@@ -446,16 +443,14 @@ bool MediaSource::IsTypeSupported(const GlobalObject& aOwner,
   MOZ_ASSERT(NS_IsMainThread());
   DecoderDoctorDiagnostics diagnostics;
   IgnoredErrorResult rv;
-  nsCOMPtr<nsPIDOMWindowInner> window =
-      do_QueryInterface(aOwner.GetAsSupports());
-  Document* doc = window ? window->GetExtantDoc() : nullptr;
-  IsTypeSupported(
-      aType, &diagnostics, rv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aOwner.GetAsSupports());
+  IsTypeSupported(aType, &diagnostics, rv,
+                  global ? Some(global->ShouldResistFingerprinting(
+                               RFPTarget::MediaCapabilities))
+                         : Nothing());
   bool supported = !rv.Failed();
-  RecordTypeForTelemetry(aType, window);
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  RecordTypeForTelemetry(aType);
+  diagnostics.StoreFormatDiagnostics(global, aType, supported, __func__);
   MOZ_LOG(GetMediaSourceAPILog(), mozilla::LogLevel::Debug,
           ("MediaSource::%s: IsTypeSupported(aType=%s) %s", __func__,
            NS_ConvertUTF16toUTF8(aType).get(),
@@ -541,23 +536,19 @@ void MediaSource::Detach() {
   mDecoder = nullptr;
 }
 
-MediaSource::MediaSource(nsPIDOMWindowInner* aWindow)
-    : DOMEventTargetHelper(aWindow),
+MediaSource::MediaSource(nsIGlobalObject* aGlobalObject)
+    : DOMEventTargetHelper(aGlobalObject),
       mDecoder(nullptr),
-      mPrincipal(nullptr),
+      mPrincipal(aGlobalObject->PrincipalOrNull()),
       mAbstractMainThread(AbstractThread::MainThread()),
       mReadyState(MediaSourceReadyState::Closed) {
   MOZ_ASSERT(NS_IsMainThread());
   mSourceBuffers = new SourceBufferList(this);
   mActiveSourceBuffers = new SourceBufferList(this);
 
-  nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(aWindow);
-  if (sop) {
-    mPrincipal = sop->GetPrincipal();
-  }
-
-  MSE_API("MediaSource(aWindow=%p) mSourceBuffers=%p mActiveSourceBuffers=%p",
-          aWindow, mSourceBuffers.get(), mActiveSourceBuffers.get());
+  MSE_API(
+      "MediaSource(aGlobalObject=%p) mSourceBuffers=%p mActiveSourceBuffers=%p",
+      aGlobalObject, mSourceBuffers.get(), mActiveSourceBuffers.get());
 }
 
 void MediaSource::SetReadyState(MediaSourceReadyState aState) {

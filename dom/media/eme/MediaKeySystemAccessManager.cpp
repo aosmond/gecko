@@ -421,7 +421,7 @@ void MediaKeySystemAccessManager::RequestMediaKeySystemAccess(
     aRequest->RejectPromiseWithNotSupportedError(
         "Key system is unsupported"_ns);
     aRequest->mDiagnostics.StoreMediaKeySystemAccess(
-        mWindow->GetExtantDoc(), aRequest->mKeySystem, false, __func__);
+        mWindow->AsGlobal(), aRequest->mKeySystem, false, __func__);
     return;
   }
 
@@ -437,7 +437,7 @@ void MediaKeySystemAccessManager::RequestMediaKeySystemAccess(
     }
     aRequest->RejectPromiseWithNotSupportedError("EME has been preffed off"_ns);
     aRequest->mDiagnostics.StoreMediaKeySystemAccess(
-        mWindow->GetExtantDoc(), aRequest->mKeySystem, false, __func__);
+        mWindow->AsGlobal(), aRequest->mKeySystem, false, __func__);
     return;
   }
 
@@ -477,7 +477,7 @@ void MediaKeySystemAccessManager::RequestMediaKeySystemAccess(
       aRequest->RejectPromiseWithNotSupportedError(
           "Timed out while waiting for a CDM update"_ns);
       aRequest->mDiagnostics.StoreMediaKeySystemAccess(
-          mWindow->GetExtantDoc(), aRequest->mKeySystem, false, __func__);
+          mWindow->AsGlobal(), aRequest->mKeySystem, false, __func__);
       return;
     }
 
@@ -501,7 +501,7 @@ void MediaKeySystemAccessManager::RequestMediaKeySystemAccess(
       // this request.
       EME_LOG("Failed to await %s for installation",
               NS_ConvertUTF16toUTF8(keySystem).get());
-      diagnostics.StoreMediaKeySystemAccess(mWindow->GetExtantDoc(), keySystem,
+      diagnostics.StoreMediaKeySystemAccess(mWindow->AsGlobal(), keySystem,
                                             false, __func__);
     }
     return;
@@ -554,8 +554,7 @@ void MediaKeySystemAccessManager::RequestMediaKeySystemAccess(
                  request->RejectPromiseWithNotSupportedError(
                      "Key system configuration is not supported"_ns);
                  request->mDiagnostics.StoreMediaKeySystemAccess(
-                     mWindow->GetExtantDoc(), request->mKeySystem, false,
-                     __func__);
+                     mWindow->AsGlobal(), request->mKeySystem, false, __func__);
                }
              });
 }
@@ -574,7 +573,7 @@ void MediaKeySystemAccessManager::ProvideAccess(
   RefPtr<MediaKeySystemAccess> access(new MediaKeySystemAccess(
       mWindow, aRequest->mKeySystem, aRequest->mSupportedConfig.ref()));
   aRequest->ResolvePromise(access);
-  diagnostics.StoreMediaKeySystemAccess(mWindow->GetExtantDoc(),
+  diagnostics.StoreMediaKeySystemAccess(mWindow->AsGlobal(),
                                         aRequest->mKeySystem, true, __func__);
 }
 

@@ -14,11 +14,9 @@
 #include "mozilla/dom/DecoderDoctorNotificationBinding.h"
 #include "nsString.h"
 
-namespace mozilla {
+class nsIGlobalObject;
 
-namespace dom {
-class Document;
-}
+namespace mozilla {
 
 struct DecoderDoctorEvent {
   enum Domain {
@@ -51,21 +49,23 @@ class DecoderDoctorDiagnostics {
   // given format. All diagnostics for a document will be analyzed together
   // within a short timeframe.
   // Should only be called once.
-  void StoreFormatDiagnostics(dom::Document* aDocument,
+  void StoreFormatDiagnostics(nsIGlobalObject* aGlobalObject,
                               const nsAString& aFormat, bool aCanPlay,
                               const char* aCallSite);
 
-  void StoreMediaKeySystemAccess(dom::Document* aDocument,
+  void StoreMediaKeySystemAccess(nsIGlobalObject* aGlobalObject,
                                  const nsAString& aKeySystem, bool aIsSupported,
                                  const char* aCallSite);
 
-  void StoreEvent(dom::Document* aDocument, const DecoderDoctorEvent& aEvent,
-                  const char* aCallSite);
+  void StoreEvent(nsIGlobalObject* aGlobalObject,
+                  const DecoderDoctorEvent& aEvent, const char* aCallSite);
 
-  void StoreDecodeError(dom::Document* aDocument, const MediaResult& aError,
-                        const nsString& aMediaSrc, const char* aCallSite);
+  void StoreDecodeError(nsIGlobalObject* aGlobalObject,
+                        const MediaResult& aError, const nsString& aMediaSrc,
+                        const char* aCallSite);
 
-  void StoreDecodeWarning(dom::Document* aDocument, const MediaResult& aWarning,
+  void StoreDecodeWarning(nsIGlobalObject* aGlobalObject,
+                          const MediaResult& aWarning,
                           const nsString& aMediaSrc, const char* aCallSite);
 
   enum DiagnosticsType {

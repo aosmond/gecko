@@ -24,7 +24,7 @@
 
 struct JSContext;
 class JSObject;
-class nsPIDOMWindowInner;
+class nsIGlobalObject;
 
 namespace mozilla {
 
@@ -134,7 +134,7 @@ class MediaSource final : public DOMEventTargetHelper,
 
   ~MediaSource();
 
-  explicit MediaSource(nsPIDOMWindowInner* aWindow);
+  explicit MediaSource(nsIGlobalObject* aWindow);
 
   friend class AsyncEventRunner<MediaSource>;
   void DispatchSimpleEvent(const char* aName);
