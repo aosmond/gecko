@@ -385,16 +385,14 @@ void SourceBuffer::ChangeType(const nsAString& aType, ErrorResult& aRv) {
   //    previously) of SourceBuffer objects in the sourceBuffers attribute of
   //    the parent media source , then throw a NotSupportedError exception and
   //    abort these steps.
-  Document* doc = mMediaSource->GetOwnerWindow()
-                      ? mMediaSource->GetOwnerWindow()->GetExtantDoc()
-                      : nullptr;
+  nsIGlobalObject* global = mMediaSource->GetOwnerGlobal();
   DecoderDoctorDiagnostics diagnostics;
-  MediaSource::IsTypeSupported(
-      aType, &diagnostics, aRv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
+  MediaSource::IsTypeSupported(aType, &diagnostics, aRv,
+                               global ? Some(global->ShouldResistFingerprinting(
+                                            RFPTarget::MediaCapabilities))
+                                      : Nothing());
   bool supported = !aRv.Failed();
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  diagnostics.StoreFormatDiagnostics(global, aType, supported, __func__);
   MSE_API("ChangeType(aType=%s)%s", NS_ConvertUTF16toUTF8(aType).get(),
           supported ? "" : " [not supported]");
   if (!supported) {
