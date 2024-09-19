@@ -2259,8 +2259,8 @@ void HTMLMediaElement::SetFormatDiagnosticsReportForMimeType(
     const nsAString& aMimeType, DecoderDoctorReportType aType) {
   DecoderDoctorDiagnostics diagnostics;
   diagnostics.SetDecoderDoctorReportType(aType);
-  diagnostics.StoreFormatDiagnostics(OwnerDoc(), aMimeType, false /* can play*/,
-                                     __func__);
+  diagnostics.StoreFormatDiagnostics(OwnerDoc()->GetParentObject(), aMimeType,
+                                     false /* can play*/, __func__);
 }
 
 void HTMLMediaElement::SetDecodeError(const nsAString& aError,
@@ -2292,7 +2292,8 @@ void HTMLMediaElement::SetDecodeError(const nsAString& aError,
   for (auto& error : kSupportedErrorList) {
     if (strcmp(error.mName, NS_ConvertUTF16toUTF8(aError).get()) == 0) {
       DecoderDoctorDiagnostics diagnostics;
-      diagnostics.StoreDecodeError(OwnerDoc(), error.mResult, u""_ns, __func__);
+      diagnostics.StoreDecodeError(OwnerDoc()->GetParentObject(), error.mResult,
+                                   u""_ns, __func__);
       return;
     }
   }
@@ -2301,7 +2302,7 @@ void HTMLMediaElement::SetDecodeError(const nsAString& aError,
 
 void HTMLMediaElement::SetAudioSinkFailedStartup() {
   DecoderDoctorDiagnostics diagnostics;
-  diagnostics.StoreEvent(OwnerDoc(),
+  diagnostics.StoreEvent(OwnerDoc()->GetParentObject(),
                          {DecoderDoctorEvent::eAudioSinkStartup,
                           NS_ERROR_DOM_MEDIA_CUBEB_INITIALIZATION_ERR},
                          __func__);
@@ -2962,7 +2963,7 @@ void HTMLMediaElement::LoadFromSourceChildren() {
     if (child->GetAttr(nsGkAtoms::type, type) && !type.IsEmpty()) {
       DecoderDoctorDiagnostics diagnostics;
       CanPlayStatus canPlay = GetCanPlay(type, &diagnostics);
-      diagnostics.StoreFormatDiagnostics(OwnerDoc(), type,
+      diagnostics.StoreFormatDiagnostics(OwnerDoc()->GetParentObject(), type,
                                          canPlay != CANPLAY_NO, __func__);
       if (canPlay == CANPLAY_NO) {
         // Check that at least one other source child exists and report that
@@ -5097,8 +5098,8 @@ CanPlayStatus HTMLMediaElement::GetCanPlay(
 void HTMLMediaElement::CanPlayType(const nsAString& aType, nsAString& aResult) {
   DecoderDoctorDiagnostics diagnostics;
   CanPlayStatus canPlay = GetCanPlay(aType, &diagnostics);
-  diagnostics.StoreFormatDiagnostics(OwnerDoc(), aType, canPlay != CANPLAY_NO,
-                                     __func__);
+  diagnostics.StoreFormatDiagnostics(OwnerDoc()->GetParentObject(), aType,
+                                     canPlay != CANPLAY_NO, __func__);
   switch (canPlay) {
     case CANPLAY_NO:
       aResult.Truncate();
@@ -5197,8 +5198,8 @@ nsresult HTMLMediaElement::InitializeDecoderForChannel(
 
   RefPtr<HTMLMediaElement> self = this;
   auto reportCanPlay = [&, self](bool aCanPlay) {
-    diagnostics.StoreFormatDiagnostics(self->OwnerDoc(), mimeUTF16, aCanPlay,
-                                       __func__);
+    diagnostics.StoreFormatDiagnostics(self->OwnerDoc()->GetParentObject(),
+                                       mimeUTF16, aCanPlay, __func__);
     if (!aCanPlay) {
       nsAutoString src;
       self->GetCurrentSrc(src);
@@ -5677,7 +5678,8 @@ void HTMLMediaElement::DecodeError(const MediaResult& aError) {
   ReportLoadError("MediaLoadDecodeError", params);
 
   DecoderDoctorDiagnostics diagnostics;
-  diagnostics.StoreDecodeError(OwnerDoc(), aError, src, __func__);
+  diagnostics.StoreDecodeError(OwnerDoc()->GetParentObject(), aError, src,
+                               __func__);
 
   if (mIsLoadingFromSourceChildren) {
     mErrorSink->ResetError();
@@ -5700,7 +5702,8 @@ void HTMLMediaElement::DecodeWarning(const MediaResult& aError) {
   nsAutoString src;
   GetCurrentSrc(src);
   DecoderDoctorDiagnostics diagnostics;
-  diagnostics.StoreDecodeWarning(OwnerDoc(), aError, src, __func__);
+  diagnostics.StoreDecodeWarning(OwnerDoc()->GetParentObject(), aError, src,
+                                 __func__);
 }
 
 bool HTMLMediaElement::HasError() const { return GetError(); }

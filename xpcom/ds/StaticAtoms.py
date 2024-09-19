@@ -316,7 +316,6 @@ STATIC_ATOMS = [
     Atom("decimalFormat", "decimal-format"),
     Atom("decimalSeparator", "decimal-separator"),
     Atom("declare", "declare"),
-    Atom("decoderDoctor", "decoder-doctor"),
     Atom("decoding", "decoding"),
     Atom("decrement", "decrement"),
     Atom("_default", "default"),

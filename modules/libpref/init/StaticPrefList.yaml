@@ -11045,8 +11045,85 @@
 #endif  # MOZ_WMF
 
 - name: media.decoder-doctor.testing
-  type: bool
+  type: RelaxedAtomicBool
   value: false
+  mirror: always
+
+- name: media.decoder-doctor.testing.fake-error
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+# Whether we report partial failures.
+- name: media.decoder-doctor.verbose
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+
+# Filter what triggers user notifications.
+# See DecoderDoctorDocumentWatcher::ReportAnalysis for details.
+- name: media.decoder-doctor.notifications-allowed
+  type: DataMutexString
+#ifdef NIGHTLY_BUILD
+  value: "MediaWMFNeeded,MediaWidevineNoWMF,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec,MediaPlatformDecoderNotFound,MediaDecodeError"
+#else
+  value: "MediaWMFNeeded,MediaWidevineNoWMF,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec,MediaPlatformDecoderNotFound"
+#endif
+  mirror: always
+
+- name: media.decoder-doctor.decode-errors-allowed
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.decode-warnings-allowed
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.WidevineNoWMF.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.WidevineWMFNeeded.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.PlatformDecoderNotFound.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.CannotPlayNoDecoders.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.NoDecoders.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.CannotInitializePulseAudio.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.UnsupportedLibavcodec.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.DecodeError.formats
+  type: DataMutexString
+  value: ""
+  mirror: always
+
+- name: media.decoder-doctor.DecodeWarning.formats
+  type: DataMutexString
+  value: ""
   mirror: always
 
 - name: media.hardware-video-decoding.enabled

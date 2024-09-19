@@ -31,6 +31,7 @@
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/Unused.h"
+#include "mozilla/dom/Document.h"
 #include "mozilla/dom/DOMTypes.h"
 #include "mozilla/glean/GleanMetrics.h"
 #include "nsComponentManagerUtils.h"
@@ -503,7 +504,7 @@ void MediaDecoder::OnDecoderDoctorEvent(DecoderDoctorEvent aEvent) {
     return;
   }
   DecoderDoctorDiagnostics diags;
-  diags.StoreEvent(doc, aEvent, __func__);
+  diags.StoreEvent(doc->GetParentObject(), aEvent, __func__);
 }
 
 void MediaDecoder::OnNextFrameStatus(

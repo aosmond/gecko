@@ -88,8 +88,7 @@ static bool IsVP9Forced(DecoderDoctorDiagnostics* aDiagnostics) {
 
 namespace dom {
 
-static void RecordTypeForTelemetry(const nsAString& aType,
-                                   nsPIDOMWindowInner* aWindow) {
+static void RecordTypeForTelemetry(const nsAString& aType) {
   Maybe<MediaContainerType> containerType = MakeMediaContainerType(aType);
   if (!containerType) {
     return;
@@ -290,16 +289,15 @@ void MediaSource::SetDuration(const media::TimeUnit& aDuration) {
 already_AddRefed<SourceBuffer> MediaSource::AddSourceBuffer(
     const nsAString& aType, ErrorResult& aRv) {
   MOZ_ASSERT(mOwningEventTarget->IsOnCurrentThread());
-  nsCOMPtr<nsPIDOMWindowInner> window = GetOwnerWindow();
-  Document* doc = window ? window->GetExtantDoc() : nullptr;
+  nsIGlobalObject* global = GetOwnerGlobal();
   DecoderDoctorDiagnostics diagnostics;
-  IsTypeSupported(
-      aType, &diagnostics, aRv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
-  RecordTypeForTelemetry(aType, window);
+  IsTypeSupported(aType, &diagnostics, aRv,
+                  global ? Some(global->ShouldResistFingerprinting(
+                               RFPTarget::MediaCapabilities))
+                         : Nothing());
+  RecordTypeForTelemetry(aType);
   bool supported = !aRv.Failed();
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  diagnostics.StoreFormatDiagnostics(global, aType, supported, __func__);
   MSE_API("AddSourceBuffer(aType=%s)%s", NS_ConvertUTF16toUTF8(aType).get(),
           supported ? "" : " [not supported]");
   if (!supported) {
@@ -444,16 +442,14 @@ bool MediaSource::IsTypeSupported(const GlobalObject& aOwner,
                                   const nsAString& aType) {
   DecoderDoctorDiagnostics diagnostics;
   IgnoredErrorResult rv;
-  nsCOMPtr<nsPIDOMWindowInner> window =
-      do_QueryInterface(aOwner.GetAsSupports());
-  Document* doc = window ? window->GetExtantDoc() : nullptr;
-  IsTypeSupported(
-      aType, &diagnostics, rv,
-      doc ? Some(doc->ShouldResistFingerprinting(RFPTarget::MediaCapabilities))
-          : Nothing());
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(aOwner.GetAsSupports());
+  IsTypeSupported(aType, &diagnostics, rv,
+                  global ? Some(global->ShouldResistFingerprinting(
+                               RFPTarget::MediaCapabilities))
+                         : Nothing());
   bool supported = !rv.Failed();
-  RecordTypeForTelemetry(aType, window);
-  diagnostics.StoreFormatDiagnostics(doc, aType, supported, __func__);
+  RecordTypeForTelemetry(aType);
+  diagnostics.StoreFormatDiagnostics(global, aType, supported, __func__);
   MOZ_LOG(GetMediaSourceAPILog(), mozilla::LogLevel::Debug,
           ("MediaSource::%s: IsTypeSupported(aType=%s) %s", __func__,
            NS_ConvertUTF16toUTF8(aType).get(),

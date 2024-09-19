@@ -206,17 +206,6 @@ pref("media.play-stand-alone", true);
 // changes are made.
 pref("media.gmp.storage.version.expected", 1);
 
-// Filter what triggers user notifications.
-// See DecoderDoctorDocumentWatcher::ReportAnalysis for details.
-#ifdef NIGHTLY_BUILD
-  pref("media.decoder-doctor.notifications-allowed", "MediaWMFNeeded,MediaWidevineNoWMF,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec,MediaPlatformDecoderNotFound,MediaDecodeError");
-#else
-  pref("media.decoder-doctor.notifications-allowed", "MediaWMFNeeded,MediaWidevineNoWMF,MediaCannotInitializePulseAudio,MediaCannotPlayNoDecoders,MediaUnsupportedLibavcodec,MediaPlatformDecoderNotFound");
-#endif
-pref("media.decoder-doctor.decode-errors-allowed", "");
-pref("media.decoder-doctor.decode-warnings-allowed", "");
-// Whether we report partial failures.
-pref("media.decoder-doctor.verbose", false);
 // URL to report decode issues
 pref("media.decoder-doctor.new-issue-endpoint", "https://webcompat.com/issues/new");
 
