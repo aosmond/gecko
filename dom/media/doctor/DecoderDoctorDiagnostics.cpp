@@ -7,16 +7,20 @@
 #include "DecoderDoctorDiagnostics.h"
 
 #include <string.h>
+#include <unordered_map>
 
 #include "VideoUtils.h"
+#include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerPrivate.h"
+#include "mozilla/GlobalTeardownObserver.h"
 #include "mozilla/Logging.h"
-#include "mozilla/Preferences.h"
-#include "mozilla/TimeStamp.h"
 #include "mozilla/StaticPrefs_media.h"
-#include "mozilla/dom/Document.h"
 #include "mozilla/Services.h"
+#include "mozilla/ThreadLocal.h"
+#include "mozilla/TimeStamp.h"
 #include "nsContentUtils.h"
 #include "nsGkAtoms.h"
+#include "nsGlobalWindowInner.h"
 #include "nsIObserverService.h"
 #include "nsIScriptError.h"
 #include "nsITimer.h"
@@ -44,10 +48,12 @@ namespace mozilla {
 // nothing new happened, StopWatching() will remove the document property and
 // timer (if present), so no more work will happen and the watcher will be
 // destroyed once all references are gone.
-class DecoderDoctorDocumentWatcher : public nsITimerCallback, public nsINamed {
+class DecoderDoctorGlobalWatcher final : public GlobalTeardownObserver,
+                                         public nsITimerCallback,
+                                         public nsINamed {
  public:
-  static already_AddRefed<DecoderDoctorDocumentWatcher> RetrieveOrCreate(
-      dom::Document* aDocument);
+  static already_AddRefed<DecoderDoctorGlobalWatcher> RetrieveOrCreate(
+      nsIGlobalObject* aGlobal);
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSITIMERCALLBACK
@@ -56,20 +62,15 @@ class DecoderDoctorDocumentWatcher : public nsITimerCallback, public nsINamed {
   void AddDiagnostics(DecoderDoctorDiagnostics&& aDiagnostics,
                       const char* aCallSite);
 
+  void DisconnectFromOwner() override;
+
  private:
-  explicit DecoderDoctorDocumentWatcher(dom::Document* aDocument);
-  virtual ~DecoderDoctorDocumentWatcher();
+  explicit DecoderDoctorGlobalWatcher(nsIGlobalObject* aGlobal);
+  virtual ~DecoderDoctorGlobalWatcher();
 
   // This will prevent further work from happening, watcher will deregister
   // itself from document (if requested) and cancel any timer, and soon die.
   void StopWatching(bool aRemoveProperty);
-
-  // Remove property from document; will call DestroyPropertyCallback.
-  void RemovePropertyFromDocument();
-  // Callback for property destructor, will be automatically called when the
-  // document (in aObject) is being destroyed.
-  static void DestroyPropertyCallback(void* aObject, nsAtom* aPropertyName,
-                                      void* aPropertyValue, void* aData);
 
   static const uint32_t sAnalysisPeriod_ms = 1000;
   void EnsureTimerIsStarted();
@@ -79,17 +80,6 @@ class DecoderDoctorDocumentWatcher : public nsITimerCallback, public nsINamed {
   // set in `media.decoder-doctor.testing.fake-error`.
   void SynthesizeFakeAnalysis();
   bool ShouldSynthesizeFakeAnalysis() const;
-
-  // Raw pointer to a Document.
-  // Must be non-null during construction.
-  // Nulled when we want to stop watching, because either:
-  // 1. The document has been destroyed (notified through
-  //    DestroyPropertyCallback).
-  // 2. We have not received new diagnostic information within a short time
-  //    period, so we just stop watching.
-  // Once nulled, no more actual work will happen, and the watcher will be
-  // destroyed soon.
-  dom::Document* mDocument;
 
   struct Diagnostics {
     Diagnostics(DecoderDoctorDiagnostics&& aDiagnostics, const char* aCallSite,
@@ -113,116 +103,102 @@ class DecoderDoctorDocumentWatcher : public nsITimerCallback, public nsINamed {
 
   nsCOMPtr<nsITimer> mTimer;  // Keep timer alive until we run.
   DiagnosticsSequence::size_type mDiagnosticsHandled = 0;
+
+  static MOZ_THREAD_LOCAL(DecoderDoctorGlobalWatcher*) sWorkerWatcher;
+
+  static std::unordered_map<nsIGlobalObject*, DecoderDoctorGlobalWatcher*>
+      sMainWatchers;
 };
 
-NS_IMPL_ISUPPORTS(DecoderDoctorDocumentWatcher, nsITimerCallback, nsINamed)
+NS_IMPL_ISUPPORTS(DecoderDoctorGlobalWatcher, nsITimerCallback, nsINamed)
+
+MOZ_THREAD_LOCAL(DecoderDoctorGlobalWatcher*)
+DecoderDoctorGlobalWatcher::sWorkerWatcher;
+
+std::unordered_map<nsIGlobalObject*, DecoderDoctorGlobalWatcher*>
+    DecoderDoctorGlobalWatcher::sMainWatchers;
 
 // static
-already_AddRefed<DecoderDoctorDocumentWatcher>
-DecoderDoctorDocumentWatcher::RetrieveOrCreate(dom::Document* aDocument) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aDocument);
-  RefPtr<DecoderDoctorDocumentWatcher> watcher =
-      static_cast<DecoderDoctorDocumentWatcher*>(
-          aDocument->GetProperty(nsGkAtoms::decoderDoctor));
-  if (!watcher) {
-    watcher = new DecoderDoctorDocumentWatcher(aDocument);
-    if (NS_WARN_IF(NS_FAILED(aDocument->SetProperty(
-            nsGkAtoms::decoderDoctor, watcher.get(), DestroyPropertyCallback,
-            /*transfer*/ false)))) {
-      DD_WARN(
-          "DecoderDoctorDocumentWatcher::RetrieveOrCreate(doc=%p) - Could not "
-          "set property in document, will destroy new watcher[%p]",
-          aDocument, watcher.get());
+already_AddRefed<DecoderDoctorGlobalWatcher>
+DecoderDoctorGlobalWatcher::RetrieveOrCreate(nsIGlobalObject* aGlobalObject) {
+  MOZ_ASSERT(aGlobalObject);
+
+  if (!aGlobalObject->IsDying()) {
+    return nullptr;
+  }
+
+  if (dom::IsCurrentThreadRunningWorker()) {
+    if (NS_WARN_IF(!sWorkerWatcher.init())) {
       return nullptr;
     }
-    // Document owns watcher through this property.
-    // Released in DestroyPropertyCallback().
-    NS_ADDREF(watcher.get());
+
+    if (sWorkerWatcher.get()) {
+      return do_AddRef(sWorkerWatcher.get());
+    }
+
+    RefPtr<DecoderDoctorGlobalWatcher> watcher =
+        new DecoderDoctorGlobalWatcher(aGlobalObject);
+    sWorkerWatcher.set(watcher.get());
+    return watcher.forget();
   }
+
+  if (NS_WARN_IF(!NS_IsMainThread())) {
+    MOZ_ASSERT_UNREACHABLE("Cannot use off main or DOM worker threads!");
+    return nullptr;
+  }
+
+  auto i = sMainWatchers.find(aGlobalObject);
+  if (i != sMainWatchers.end()) {
+    return do_AddRef(i->second);
+  }
+
+  RefPtr<DecoderDoctorGlobalWatcher> watcher =
+      new DecoderDoctorGlobalWatcher(aGlobalObject);
+  sMainWatchers[aGlobalObject] = watcher;
   return watcher.forget();
 }
 
-DecoderDoctorDocumentWatcher::DecoderDoctorDocumentWatcher(
-    dom::Document* aDocument)
-    : mDocument(aDocument) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(mDocument);
+DecoderDoctorGlobalWatcher::DecoderDoctorGlobalWatcher(
+    nsIGlobalObject* aGlobalObject)
+    : GlobalTeardownObserver(aGlobalObject) {
+  MOZ_ASSERT(GetOwnerGlobal());
   DD_DEBUG(
-      "DecoderDoctorDocumentWatcher[%p]::DecoderDoctorDocumentWatcher(doc=%p)",
-      this, mDocument);
+      "DecoderDoctorGlobalWatcher[%p]::DecoderDoctorGlobalWatcher(global=%p)",
+      this, GetOwnerGlobal());
 }
 
-DecoderDoctorDocumentWatcher::~DecoderDoctorDocumentWatcher() {
-  MOZ_ASSERT(NS_IsMainThread());
+DecoderDoctorGlobalWatcher::~DecoderDoctorGlobalWatcher() {
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
   DD_DEBUG(
-      "DecoderDoctorDocumentWatcher[%p, doc=%p <- expect "
-      "0]::~DecoderDoctorDocumentWatcher()",
-      this, mDocument);
-  // mDocument should have been reset through StopWatching()!
-  MOZ_ASSERT(!mDocument);
+      "DecoderDoctorGlobalWatcher[%p, global=%p <- expect "
+      "0]::~DecoderDoctorGlobalWatcher()",
+      this, GetOwnerGlobal());
+  MOZ_ASSERT(!GetOwnerGlobal());
 }
 
-void DecoderDoctorDocumentWatcher::RemovePropertyFromDocument() {
-  MOZ_ASSERT(NS_IsMainThread());
-  DecoderDoctorDocumentWatcher* watcher =
-      static_cast<DecoderDoctorDocumentWatcher*>(
-          mDocument->GetProperty(nsGkAtoms::decoderDoctor));
-  if (!watcher) {
-    return;
-  }
-  DD_DEBUG(
-      "DecoderDoctorDocumentWatcher[%p, "
-      "doc=%p]::RemovePropertyFromDocument()\n",
-      watcher, watcher->mDocument);
-  // This will call our DestroyPropertyCallback.
-  mDocument->RemoveProperty(nsGkAtoms::decoderDoctor);
-}
-
-// Callback for property destructors. |aObject| is the object
-// the property is being removed for, |aPropertyName| is the property
-// being removed, |aPropertyValue| is the value of the property, and |aData|
-// is the opaque destructor data that was passed to SetProperty().
-// static
-void DecoderDoctorDocumentWatcher::DestroyPropertyCallback(
-    void* aObject, nsAtom* aPropertyName, void* aPropertyValue, void*) {
-  MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aPropertyName == nsGkAtoms::decoderDoctor);
-  DecoderDoctorDocumentWatcher* watcher =
-      static_cast<DecoderDoctorDocumentWatcher*>(aPropertyValue);
-  MOZ_ASSERT(watcher);
-#ifdef DEBUG
-  auto* document = static_cast<dom::Document*>(aObject);
-  MOZ_ASSERT(watcher->mDocument == document);
-#endif
-  DD_DEBUG(
-      "DecoderDoctorDocumentWatcher[%p, doc=%p]::DestroyPropertyCallback()\n",
-      watcher, watcher->mDocument);
-  // 'false': StopWatching should not try and remove the property.
-  watcher->StopWatching(false);
-  NS_RELEASE(watcher);
-}
-
-void DecoderDoctorDocumentWatcher::StopWatching(bool aRemoveProperty) {
-  MOZ_ASSERT(NS_IsMainThread());
-  // StopWatching() shouldn't be called twice.
-  MOZ_ASSERT(mDocument);
-
-  if (aRemoveProperty) {
-    RemovePropertyFromDocument();
-  }
-
-  // Forget document now, this will prevent more work from being started.
-  mDocument = nullptr;
+void DecoderDoctorGlobalWatcher::DisconnectFromOwner() {
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
+  DD_DEBUG("DecoderDoctorGlobalWatcher[%p, global=%p]::DisconnectFromOwner()\n",
+           this, GetOwnerGlobal());
 
   if (mTimer) {
     mTimer->Cancel();
     mTimer = nullptr;
   }
+
+  if (NS_IsMainThread()) {
+    if (auto* global = GetOwnerGlobal()) {
+      sMainWatchers.erase(global);
+    }
+  } else if (sWorkerWatcher.init() && sWorkerWatcher.get() == this) {
+    sWorkerWatcher.set(nullptr);
+  }
+
+  GlobalTeardownObserver::DisconnectFromOwner();
 }
 
-void DecoderDoctorDocumentWatcher::EnsureTimerIsStarted() {
-  MOZ_ASSERT(NS_IsMainThread());
+void DecoderDoctorGlobalWatcher::EnsureTimerIsStarted() {
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
 
   if (!mTimer) {
     NS_NewTimerWithCallback(getter_AddRefs(mTimer), this, sAnalysisPeriod_ms,
@@ -247,6 +223,7 @@ struct NotificationAndReportStringId {
   dom::DecoderDoctorNotificationType mNotificationType;
   // Console message id. Key in dom/locales/.../chrome/dom/dom.properties.
   const char* mReportStringId;
+  DataMutexString::ConstAutoLock (*mFormatsPrefFn)() = nullptr;
   static const int maxReportParams = 4;
   ReportParam mReportParams[maxReportParams];
 };
@@ -255,38 +232,47 @@ struct NotificationAndReportStringId {
 static const NotificationAndReportStringId sMediaWidevineNoWMF = {
     dom::DecoderDoctorNotificationType::Platform_decoder_not_found,
     "MediaWidevineNoWMF",
+    &StaticPrefs::media_decoder_doctor_WidevineNoWMF_formats,
     {ReportParam::None}};
 static const NotificationAndReportStringId sMediaWMFNeeded = {
     dom::DecoderDoctorNotificationType::Platform_decoder_not_found,
     "MediaWMFNeeded",
+    &StaticPrefs::media_decoder_doctor_WidevineWMFNeeded_formats,
     {ReportParam::Formats}};
 static const NotificationAndReportStringId sMediaFFMpegNotFound = {
     dom::DecoderDoctorNotificationType::Platform_decoder_not_found,
     "MediaPlatformDecoderNotFound",
+    &StaticPrefs::media_decoder_doctor_PlatformDecoderNotFound_formats,
     {ReportParam::Formats}};
 static const NotificationAndReportStringId sMediaCannotPlayNoDecoders = {
     dom::DecoderDoctorNotificationType::Cannot_play,
     "MediaCannotPlayNoDecoders",
+    &StaticPrefs::media_decoder_doctor_CannotPlayNoDecoders_formats,
     {ReportParam::Formats}};
 static const NotificationAndReportStringId sMediaNoDecoders = {
     dom::DecoderDoctorNotificationType::Can_play_but_some_missing_decoders,
     "MediaNoDecoders",
+    &StaticPrefs::media_decoder_doctor_NoDecoders_formats,
     {ReportParam::Formats}};
 static const NotificationAndReportStringId sCannotInitializePulseAudio = {
     dom::DecoderDoctorNotificationType::Cannot_initialize_pulseaudio,
     "MediaCannotInitializePulseAudio",
+    &StaticPrefs::media_decoder_doctor_CannotInitializePulseAudio_formats,
     {ReportParam::None}};
 static const NotificationAndReportStringId sUnsupportedLibavcodec = {
     dom::DecoderDoctorNotificationType::Unsupported_libavcodec,
     "MediaUnsupportedLibavcodec",
+    &StaticPrefs::media_decoder_doctor_UnsupportedLibavcodec_formats,
     {ReportParam::None}};
 static const NotificationAndReportStringId sMediaDecodeError = {
     dom::DecoderDoctorNotificationType::Decode_error,
     "MediaDecodeError",
+    &StaticPrefs::media_decoder_doctor_DecodeError_formats,
     {ReportParam::ResourceURL, ReportParam::DecodeIssue}};
 static const NotificationAndReportStringId sMediaDecodeWarning = {
     dom::DecoderDoctorNotificationType::Decode_warning,
     "MediaDecodeWarning",
+    &StaticPrefs::media_decoder_doctor_DecodeWarning_formats,
     {ReportParam::ResourceURL, ReportParam::DecodeIssue}};
 
 static const NotificationAndReportStringId* const
@@ -358,11 +344,22 @@ static bool IsNotificationAllowedOnPlatform(
   return false;
 }
 
+static void DispatchNotifyObservers(nsPIDOMWindowInner* aWindow,
+                                    const nsAutoString& aData) {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (obs) {
+    obs->NotifyObservers(aWindow, "decoder-doctor-notification", aData.get());
+  }
+}
+
 static void DispatchNotification(
-    nsISupports* aSubject, const NotificationAndReportStringId& aNotification,
-    bool aIsSolved, const nsAString& aFormats, const nsAString& aDecodeIssue,
+    nsIGlobalObject* aGlobalObject,
+    const NotificationAndReportStringId& aNotification, bool aIsSolved,
+    const nsAString& aFormats, const nsAString& aDecodeIssue,
     const nsACString& aDocURL, const nsAString& aResourceURL) {
-  if (!aSubject) {
+  if (!aGlobalObject) {
     return;
   }
   dom::DecoderDoctorNotification data;
@@ -394,9 +391,21 @@ static void DispatchNotification(
   }
   DD_DEBUG("DecoderDoctorDiagnostics/DispatchEvent() %s",
            NS_ConvertUTF16toUTF8(json).get());
-  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-  if (obs) {
-    obs->NotifyObservers(aSubject, "decoder-doctor-notification", json.get());
+
+  if (NS_IsMainThread()) {
+    DispatchNotifyObservers(aGlobalObject->GetAsInnerWindow(), json);
+    return;
+  }
+
+  if (auto* workerPrivate = dom::GetCurrentThreadWorkerPrivate()) {
+    uint64_t windowID = workerPrivate->WindowID();
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "DecoderDoctorDiagnostics::DispatchNotification", [windowID, json]() {
+          if (auto* window =
+                  nsGlobalWindowInner::GetInnerWindowWithId(windowID)) {
+            DispatchNotifyObservers(window, json);
+          }
+        }));
   }
 }
 
@@ -404,12 +413,30 @@ static void ReportToConsole(dom::Document* aDocument,
                             const char* aConsoleStringId,
                             const nsTArray<nsString>& aParams) {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aDocument);
+  if (!aDocument) {
+    return;
+  }
+
+  if (StaticPrefs::media_decoder_doctor_testing()) {
+    Unused << nsContentUtils::DispatchTrustedEvent(
+        aDocument, aDocument, u"mozreportmediaerror"_ns, CanBubble::eNo,
+        Cancelable::eNo);
+  }
+
+  nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "Media"_ns,
+                                  aDocument, nsContentUtils::eDOM_PROPERTIES,
+                                  aConsoleStringId, aParams);
+}
+
+static void ReportToConsole(nsIGlobalObject* aGlobalObject,
+                            const char* aConsoleStringId,
+                            nsTArray<nsString>&& aParams) {
+  MOZ_ASSERT(aGlobalObject);
 
   DD_DEBUG(
-      "DecoderDoctorDiagnostics.cpp:ReportToConsole(doc=%p) ReportToConsole"
+      "DecoderDoctorDiagnostics.cpp:ReportToConsole(global=%p) ReportToConsole"
       " - aMsg='%s' params={%s%s%s%s}",
-      aDocument, aConsoleStringId,
+      aGlobalObject, aConsoleStringId,
       aParams.IsEmpty() ? "<no params>"
                         : NS_ConvertUTF16toUTF8(aParams[0]).get(),
       (aParams.Length() < 1 || aParams[0].IsEmpty()) ? "" : ", ",
@@ -417,14 +444,28 @@ static void ReportToConsole(dom::Document* aDocument,
           ? ""
           : NS_ConvertUTF16toUTF8(aParams[0]).get(),
       aParams.Length() < 2 ? "" : ", ...");
-  if (StaticPrefs::media_decoder_doctor_testing()) {
-    Unused << nsContentUtils::DispatchTrustedEvent(
-        aDocument, aDocument, u"mozreportmediaerror"_ns, CanBubble::eNo,
-        Cancelable::eNo);
+
+  if (NS_IsMainThread()) {
+    if (auto* window = aGlobalObject->GetAsInnerWindow()) {
+      ReportToConsole(window->GetExtantDoc(), aConsoleStringId, aParams);
+    }
+    return;
   }
-  nsContentUtils::ReportToConsole(nsIScriptError::warningFlag, "Media"_ns,
-                                  aDocument, nsContentUtils::eDOM_PROPERTIES,
-                                  aConsoleStringId, aParams);
+
+  if (auto* workerPrivate = dom::GetCurrentThreadWorkerPrivate()) {
+    uint64_t windowID = workerPrivate->WindowID();
+    nsCString consoleStringId(aConsoleStringId);
+    NS_DispatchToMainThread(NS_NewRunnableFunction(
+        "DecoderDoctorDiagnostics::ReportToConsole",
+        [windowID, consoleStringId = std::move(consoleStringId),
+         params = std::move(aParams)]() {
+          if (auto* window =
+                  nsGlobalWindowInner::GetInnerWindowWithId(windowID)) {
+            ReportToConsole(window->GetExtantDoc(), consoleStringId.Data(),
+                            params);
+          }
+        }));
+  }
 }
 
 static bool AllowNotification(
@@ -435,10 +476,10 @@ static bool AllowNotification(
   // - Comma-separater list of ids -> Allow if aReportStringId (from
   //                                  dom.properties) is one of them.
   // - Nothing (missing or empty) -> Disable everything.
-  nsAutoCString filter;
-  Preferences::GetCString("media.decoder-doctor.notifications-allowed", filter);
-  return filter.EqualsLiteral("*") ||
-         StringListContains(filter, aNotification.mReportStringId);
+  const auto prefLock =
+      StaticPrefs::media_decoder_doctor_notifications_allowed();
+  return prefLock->EqualsLiteral("*") ||
+         StringListContains(*prefLock, aNotification.mReportStringId);
 }
 
 static bool AllowDecodeIssue(const MediaResult& aDecodeIssue,
@@ -455,12 +496,16 @@ static bool AllowDecodeIssue(const MediaResult& aDecodeIssue,
   // - Comma-separater list of ids -> Allow if the issue name is one of them.
   // - Nothing (missing or empty) -> Disable everything.
   nsAutoCString filter;
-  Preferences::GetCString(aDecodeIssueIsError
-                              ? "media.decoder-doctor.decode-errors-allowed"
-                              : "media.decoder-doctor.decode-warnings-allowed",
-                          filter);
-  if (filter.EqualsLiteral("*")) {
-    return true;
+  {
+    const auto prefLock =
+        aDecodeIssueIsError
+            ? StaticPrefs::media_decoder_doctor_decode_errors_allowed()
+            : StaticPrefs::media_decoder_doctor_decode_warnings_allowed();
+    if (prefLock->EqualsLiteral("*")) {
+      return true;
+    }
+
+    filter.Assign(*prefLock);
   }
 
   nsCString decodeIssueName;
@@ -468,7 +513,7 @@ static bool AllowDecodeIssue(const MediaResult& aDecodeIssue,
   return StringListContains(filter, decodeIssueName);
 }
 
-static void ReportAnalysis(dom::Document* aDocument,
+static void ReportAnalysis(nsIGlobalObject* aGlobalObject,
                            const NotificationAndReportStringId& aNotification,
                            bool aIsSolved, const nsAString& aFormats = u""_ns,
                            const MediaResult& aDecodeIssue = NS_OK,
@@ -477,7 +522,7 @@ static void ReportAnalysis(dom::Document* aDocument,
                            const nsAString& aResourceURL = u""_ns) {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (!aDocument) {
+  if (!aGlobalObject) {
     return;
   }
 
@@ -520,7 +565,8 @@ static void ReportAnalysis(dom::Document* aDocument,
           break;
       }
     }
-    ReportToConsole(aDocument, aNotification.mReportStringId, params);
+    ReportToConsole(aGlobalObject, aNotification.mReportStringId,
+                    std::move(params));
   }
 
   const bool allowNotification = AllowNotification(aNotification);
@@ -532,9 +578,8 @@ static void ReportAnalysis(dom::Document* aDocument,
       aNotification.mReportStringId, aDecodeIssue.ErrorName().get(),
       allowNotification, allowDecodeIssue);
   if (allowNotification && allowDecodeIssue) {
-    DispatchNotification(aDocument->GetInnerWindow(), aNotification, aIsSolved,
-                         aFormats, decodeIssueDescription, aDocURL,
-                         aResourceURL);
+    DispatchNotification(aGlobalObject, aNotification, aIsSolved, aFormats,
+                         decodeIssueDescription, aDocURL, aResourceURL);
   }
 }
 
@@ -576,29 +621,34 @@ static const char* GetLinkStatusString() {
 #endif
 }
 
-void DecoderDoctorDocumentWatcher::SynthesizeFakeAnalysis() {
-  MOZ_ASSERT(NS_IsMainThread());
+void DecoderDoctorGlobalWatcher::SynthesizeFakeAnalysis() {
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
 
   nsAutoCString errorType;
-  Preferences::GetCString("media.decoder-doctor.testing.fake-error", errorType);
+  {
+    const auto prefLock =
+        StaticPrefs::media_decoder_doctor_testing_fake_error();
+    errorType.Assign(*prefLock);
+  }
+
   MOZ_ASSERT(!errorType.IsEmpty());
   for (const auto& id : sAllNotificationsAndReportStringIds) {
     if (strcmp(id->mReportStringId, errorType.get()) == 0) {
       if (id->mNotificationType ==
           dom::DecoderDoctorNotificationType::Decode_error) {
-        ReportAnalysis(mDocument, *id, false /* isSolved */, u"*"_ns,
+        ReportAnalysis(GetOwnerGlobal(), *id, false /* isSolved */, u"*"_ns,
                        NS_ERROR_DOM_MEDIA_DECODE_ERR, true /* IsDecodeError */);
       } else {
-        ReportAnalysis(mDocument, *id, false /* isSolved */, u"*"_ns, NS_OK,
-                       false /* IsDecodeError */);
+        ReportAnalysis(GetOwnerGlobal(), *id, false /* isSolved */, u"*"_ns,
+                       NS_OK, false /* IsDecodeError */);
       }
       return;
     }
   }
 }
 
-void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
-  MOZ_ASSERT(NS_IsMainThread());
+void DecoderDoctorGlobalWatcher::SynthesizeAnalysis() {
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
 
   nsAutoString playableFormats;
   nsAutoString unplayableFormats;
@@ -679,10 +729,11 @@ void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
   // key systems or formats were previously recorded as having issues.
   if (!supportedKeySystems.IsEmpty() || !playableFormats.IsEmpty()) {
     DD_DEBUG(
-        "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
+        "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
         "supported key systems '%s', playable formats '%s'; See if they show "
         "issues have been solved...",
-        this, mDocument, NS_ConvertUTF16toUTF8(supportedKeySystems).Data(),
+        this, GetOwnerGlobal(),
+        NS_ConvertUTF16toUTF8(supportedKeySystems).Data(),
         NS_ConvertUTF16toUTF8(playableFormats).get());
     const nsAString* workingFormatsArray[] = {&supportedKeySystems,
                                               &playableFormats};
@@ -690,11 +741,16 @@ void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
     // key systems with issues.
     for (const NotificationAndReportStringId* id :
          sAllNotificationsAndReportStringIds) {
-      nsAutoCString formatsPref("media.decoder-doctor.");
-      formatsPref += id->mReportStringId;
-      formatsPref += ".formats";
+      if (!id->mFormatsPrefFn) {
+        continue;
+      }
+
       nsAutoString formatsWithIssues;
-      Preferences::GetString(formatsPref.Data(), formatsWithIssues);
+      {
+        const auto prefLock = id->mFormatsPrefFn();
+        formatsWithIssues.Assign(NS_ConvertUTF8toUTF16(*prefLock));
+      }
+
       if (formatsWithIssues.IsEmpty()) {
         continue;
       }
@@ -706,13 +762,13 @@ void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
           if (FormatsListContains(formatsWithIssues, workingFormat)) {
             // This now-working format used not to work -> Report solved issue.
             DD_INFO(
-                "DecoderDoctorDocumentWatcher[%p, "
-                "doc=%p]::SynthesizeAnalysis() - %s solved ('%s' now works, it "
-                "was in pref(%s)='%s')",
-                this, mDocument, id->mReportStringId,
-                NS_ConvertUTF16toUTF8(workingFormat).get(), formatsPref.Data(),
+                "DecoderDoctorGlobalWatcher[%p, "
+                "global=%p]::SynthesizeAnalysis() - %s solved ('%s' now works, "
+                "it was in pref='%s')",
+                this, GetOwnerGlobal(), id->mReportStringId,
+                NS_ConvertUTF16toUTF8(workingFormat).get(),
                 NS_ConvertUTF16toUTF8(formatsWithIssues).get());
-            ReportAnalysis(mDocument, *id, true, workingFormat);
+            ReportAnalysis(GetOwnerGlobal(), *id, true, workingFormat);
             // This particular Notification&ReportId has been solved, no need
             // to keep looking at other keysys/formats that might solve it too.
             solved = true;
@@ -725,9 +781,9 @@ void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
       }
       if (!solved) {
         DD_DEBUG(
-            "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
-            "%s not solved (pref(%s)='%s')",
-            this, mDocument, id->mReportStringId, formatsPref.Data(),
+            "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
+            "%s not solved (pref='%s')",
+            this, GetOwnerGlobal(), id->mReportStringId,
             NS_ConvertUTF16toUTF8(formatsWithIssues).get());
       }
     }
@@ -740,11 +796,11 @@ void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
     switch (lastKeySystemIssue) {
       case DecoderDoctorDiagnostics::eWidevineWithNoWMF:
         DD_INFO(
-            "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
+            "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
             "unsupported key systems: %s, Widevine without WMF",
-            this, mDocument,
+            this, GetOwnerGlobal(),
             NS_ConvertUTF16toUTF8(unsupportedKeySystems).get());
-        ReportAnalysis(mDocument, sMediaWidevineNoWMF, false,
+        ReportAnalysis(GetOwnerGlobal(), sMediaWidevineNoWMF, false,
                        unsupportedKeySystems);
         return;
       default:
@@ -760,96 +816,101 @@ void DecoderDoctorDocumentWatcher::SynthesizeAnalysis() {
       // going through expected decoders from most to least desirable.
       if (!formatsRequiringWMF.IsEmpty()) {
         DD_INFO(
-            "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
+            "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
             "unplayable formats: %s -> Cannot play media because WMF was not "
             "found",
-            this, mDocument, NS_ConvertUTF16toUTF8(formatsRequiringWMF).get());
-        ReportAnalysis(mDocument, sMediaWMFNeeded, false, formatsRequiringWMF);
+            this, GetOwnerGlobal(),
+            NS_ConvertUTF16toUTF8(formatsRequiringWMF).get());
+        ReportAnalysis(GetOwnerGlobal(), sMediaWMFNeeded, false,
+                       formatsRequiringWMF);
         return;
       }
       if (!formatsRequiringFFMpeg.IsEmpty()) {
         MOZ_DIAGNOSTIC_ASSERT(formatsLibAVCodecUnsupported.IsEmpty());
         DD_INFO(
-            "DecoderDoctorDocumentWatcher[%p, "
-            "doc=%p]::SynthesizeAnalysis() - unplayable formats: %s -> "
+            "DecoderDoctorGlobalWatcher[%p, "
+            "global=%p]::SynthesizeAnalysis() - unplayable formats: %s -> "
             "Cannot play media because ffmpeg was not found (Reason: %s)",
-            this, mDocument,
+            this, GetOwnerGlobal(),
             NS_ConvertUTF16toUTF8(formatsRequiringFFMpeg).get(),
             GetLinkStatusString());
-        ReportAnalysis(mDocument, sMediaFFMpegNotFound, false,
+        ReportAnalysis(GetOwnerGlobal(), sMediaFFMpegNotFound, false,
                        formatsRequiringFFMpeg);
         return;
       }
       if (!formatsLibAVCodecUnsupported.IsEmpty()) {
         MOZ_DIAGNOSTIC_ASSERT(formatsRequiringFFMpeg.IsEmpty());
         DD_INFO(
-            "DecoderDoctorDocumentWatcher[%p, "
-            "doc=%p]::SynthesizeAnalysis() - unplayable formats: %s -> "
+            "DecoderDoctorGlobalWatcher[%p, "
+            "global=%p]::SynthesizeAnalysis() - unplayable formats: %s -> "
             "Cannot play media because of unsupported %s (Reason: %s)",
-            this, mDocument,
+            this, GetOwnerGlobal(),
             NS_ConvertUTF16toUTF8(formatsLibAVCodecUnsupported).get(),
             GetLinkStatusLibraryName(), GetLinkStatusString());
-        ReportAnalysis(mDocument, sUnsupportedLibavcodec, false,
+        ReportAnalysis(GetOwnerGlobal(), sUnsupportedLibavcodec, false,
                        formatsLibAVCodecUnsupported);
         return;
       }
       DD_INFO(
-          "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
+          "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
           "Cannot play media, unplayable formats: %s",
-          this, mDocument, NS_ConvertUTF16toUTF8(unplayableFormats).get());
-      ReportAnalysis(mDocument, sMediaCannotPlayNoDecoders, false,
+          this, GetOwnerGlobal(),
+          NS_ConvertUTF16toUTF8(unplayableFormats).get());
+      ReportAnalysis(GetOwnerGlobal(), sMediaCannotPlayNoDecoders, false,
                      unplayableFormats);
       return;
     }
 
     DD_INFO(
-        "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - Can "
+        "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - Can "
         "play media, but no decoders for some requested formats: %s",
-        this, mDocument, NS_ConvertUTF16toUTF8(unplayableFormats).get());
-    if (Preferences::GetBool("media.decoder-doctor.verbose", false)) {
-      ReportAnalysis(mDocument, sMediaNoDecoders, false, unplayableFormats);
+        this, GetOwnerGlobal(), NS_ConvertUTF16toUTF8(unplayableFormats).get());
+    if (StaticPrefs::media_decoder_doctor_verbose()) {
+      ReportAnalysis(GetOwnerGlobal(), sMediaNoDecoders, false,
+                     unplayableFormats);
     }
     return;
   }
 
   if (firstDecodeError) {
     DD_INFO(
-        "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
+        "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
         "Decode error: %s",
-        this, mDocument, firstDecodeError->Description().get());
-    ReportAnalysis(mDocument, sMediaDecodeError, false, u""_ns,
-                   *firstDecodeError,
-                   true,  // aDecodeIssueIsError=true
-                   mDocument->GetDocumentURI()->GetSpecOrDefault(),
-                   *firstDecodeErrorMediaSrc);
+        this, GetOwnerGlobal(), firstDecodeError->Description().get());
+    auto clientInfo = GetOwnerGlobal()->GetClientInfo();
+    ReportAnalysis(
+        GetOwnerGlobal(), sMediaDecodeError, false, u""_ns, *firstDecodeError,
+        true,  // aDecodeIssueIsError=true
+        clientInfo ? clientInfo->URL() : ""_ns, *firstDecodeErrorMediaSrc);
     return;
   }
 
   if (firstDecodeWarning) {
     DD_INFO(
-        "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - "
+        "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - "
         "Decode warning: %s",
-        this, mDocument, firstDecodeWarning->Description().get());
-    ReportAnalysis(mDocument, sMediaDecodeWarning, false, u""_ns,
+        this, GetOwnerGlobal(), firstDecodeWarning->Description().get());
+    auto clientInfo = GetOwnerGlobal()->GetClientInfo();
+    ReportAnalysis(GetOwnerGlobal(), sMediaDecodeWarning, false, u""_ns,
                    *firstDecodeWarning,
                    false,  // aDecodeIssueIsError=false
-                   mDocument->GetDocumentURI()->GetSpecOrDefault(),
+                   clientInfo ? clientInfo->URL() : ""_ns,
                    *firstDecodeWarningMediaSrc);
     return;
   }
 
   DD_DEBUG(
-      "DecoderDoctorDocumentWatcher[%p, doc=%p]::SynthesizeAnalysis() - Can "
+      "DecoderDoctorGlobalWatcher[%p, global=%p]::SynthesizeAnalysis() - Can "
       "play media, decoders available for all requested formats",
-      this, mDocument);
+      this, GetOwnerGlobal());
 }
 
-void DecoderDoctorDocumentWatcher::AddDiagnostics(
+void DecoderDoctorGlobalWatcher::AddDiagnostics(
     DecoderDoctorDiagnostics&& aDiagnostics, const char* aCallSite) {
-  MOZ_ASSERT(NS_IsMainThread());
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
   MOZ_ASSERT(aDiagnostics.Type() != DecoderDoctorDiagnostics::eEvent);
 
-  if (!mDocument) {
+  if (!GetOwnerGlobal()) {
     return;
   }
 
@@ -870,32 +931,32 @@ void DecoderDoctorDocumentWatcher::AddDiagnostics(
   }
 
   DD_DEBUG(
-      "DecoderDoctorDocumentWatcher[%p, "
-      "doc=%p]::AddDiagnostics(DecoderDoctorDiagnostics{%s}, call site '%s')",
-      this, mDocument, aDiagnostics.GetDescription().Data(), aCallSite);
+      "DecoderDoctorGlobalWatcher[%p, "
+      "global=%p]::AddDiagnostics(DecoderDoctorDiagnostics{%s}, call site "
+      "'%s')",
+      this, GetOwnerGlobal(), aDiagnostics.GetDescription().Data(), aCallSite);
   mDiagnosticsSequence.AppendElement(
       Diagnostics(std::move(aDiagnostics), aCallSite, now));
   EnsureTimerIsStarted();
 }
 
-bool DecoderDoctorDocumentWatcher::ShouldSynthesizeFakeAnalysis() const {
+bool DecoderDoctorGlobalWatcher::ShouldSynthesizeFakeAnalysis() const {
   if (!StaticPrefs::media_decoder_doctor_testing()) {
     return false;
   }
-  nsAutoCString errorType;
-  Preferences::GetCString("media.decoder-doctor.testing.fake-error", errorType);
-  return !errorType.IsEmpty();
+  const auto prefLock = StaticPrefs::media_decoder_doctor_testing_fake_error();
+  return prefLock->IsEmpty();
 }
 
 NS_IMETHODIMP
-DecoderDoctorDocumentWatcher::Notify(nsITimer* timer) {
-  MOZ_ASSERT(NS_IsMainThread());
+DecoderDoctorGlobalWatcher::Notify(nsITimer* timer) {
+  NS_ASSERT_OWNINGTHREAD(DecoderDoctorGlobalWatcher);
   MOZ_ASSERT(timer == mTimer);
 
   // Forget timer. (Assuming timer keeps itself and us alive during this call.)
   mTimer = nullptr;
 
-  if (!mDocument) {
+  if (!GetOwnerGlobal()) {
     return NS_OK;
   }
 
@@ -914,66 +975,66 @@ DecoderDoctorDocumentWatcher::Notify(nsITimer* timer) {
     EnsureTimerIsStarted();
   } else {
     DD_DEBUG(
-        "DecoderDoctorDocumentWatcher[%p, doc=%p]::Notify() - No new "
+        "DecoderDoctorGlobalWatcher[%p, global=%p]::Notify() - No new "
         "diagnostics to analyze -> Stop watching",
-        this, mDocument);
-    // Stop watching this document, we don't expect more diagnostics for now.
+        this, GetOwnerGlobal());
+    // Stop watching this global, we don't expect more diagnostics for now.
     // If more diagnostics come in, we'll treat them as another burst,
-    // separately. 'true' to remove the property from the document.
-    StopWatching(true);
+    // separately.
+    DisconnectFromOwner();
   }
 
   return NS_OK;
 }
 
 NS_IMETHODIMP
-DecoderDoctorDocumentWatcher::GetName(nsACString& aName) {
-  aName.AssignLiteral("DecoderDoctorDocumentWatcher_timer");
+DecoderDoctorGlobalWatcher::GetName(nsACString& aName) {
+  aName.AssignLiteral("DecoderDoctorGlobalWatcher_timer");
   return NS_OK;
 }
 
-void DecoderDoctorDiagnostics::StoreFormatDiagnostics(dom::Document* aDocument,
-                                                      const nsAString& aFormat,
-                                                      bool aCanPlay,
-                                                      const char* aCallSite) {
-  MOZ_ASSERT(NS_IsMainThread());
+void DecoderDoctorDiagnostics::StoreFormatDiagnostics(
+    nsIGlobalObject* aGlobalObject, const nsAString& aFormat, bool aCanPlay,
+    const char* aCallSite) {
   // Make sure we only store once.
   MOZ_ASSERT(mDiagnosticsType == eUnsaved);
   mDiagnosticsType = eFormatSupportCheck;
 
   if (NS_WARN_IF(aFormat.Length() > 2048)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(Document* "
-        "aDocument=%p, format= TOO LONG! '%s', can-play=%d, call site '%s')",
-        aDocument, this, NS_ConvertUTF16toUTF8(aFormat).get(), aCanPlay,
+        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(nsIGlobalObject* "
+        "aGlobalObject=%p, format= TOO LONG! '%s', can-play=%d, call site "
+        "'%s')",
+        aGlobalObject, this, NS_ConvertUTF16toUTF8(aFormat).get(), aCanPlay,
         aCallSite);
     return;
   }
 
-  if (NS_WARN_IF(!aDocument)) {
+  if (NS_WARN_IF(!aGlobalObject)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(Document* "
-        "aDocument=nullptr, format='%s', can-play=%d, call site '%s')",
+        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(nsIGlobalObject* "
+        "aGlobalObject=nullptr, format='%s', can-play=%d, call site '%s')",
         this, NS_ConvertUTF16toUTF8(aFormat).get(), aCanPlay, aCallSite);
     return;
   }
   if (NS_WARN_IF(aFormat.IsEmpty())) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(Document* "
-        "aDocument=%p, format=<empty>, can-play=%d, call site '%s')",
-        this, aDocument, aCanPlay, aCallSite);
+        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(nsIGlobalObject* "
+        "aGlobalObject=%p, format=<empty>, can-play=%d, call site '%s')",
+        this, aGlobalObject, aCanPlay, aCallSite);
     return;
   }
 
-  RefPtr<DecoderDoctorDocumentWatcher> watcher =
-      DecoderDoctorDocumentWatcher::RetrieveOrCreate(aDocument);
+  RefPtr<DecoderDoctorGlobalWatcher> watcher =
+      DecoderDoctorGlobalWatcher::RetrieveOrCreate(aGlobalObject);
 
   if (NS_WARN_IF(!watcher)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(Document* "
-        "aDocument=%p, format='%s', can-play=%d, call site '%s') - Could not "
+        "DecoderDoctorDiagnostics[%p]::StoreFormatDiagnostics(nsIGlobalObject* "
+        "aGlobalObject=%p, format='%s', can-play=%d, call site '%s') - Could "
+        "not "
         "create document watcher",
-        this, aDocument, NS_ConvertUTF16toUTF8(aFormat).get(), aCanPlay,
+        this, aGlobalObject, NS_ConvertUTF16toUTF8(aFormat).get(), aCanPlay,
         aCallSite);
     return;
   }
@@ -994,48 +1055,52 @@ void DecoderDoctorDiagnostics::StoreFormatDiagnostics(dom::Document* aDocument,
 }
 
 void DecoderDoctorDiagnostics::StoreMediaKeySystemAccess(
-    dom::Document* aDocument, const nsAString& aKeySystem, bool aIsSupported,
-    const char* aCallSite) {
-  MOZ_ASSERT(NS_IsMainThread());
+    nsIGlobalObject* aGlobalObject, const nsAString& aKeySystem,
+    bool aIsSupported, const char* aCallSite) {
   // Make sure we only store once.
   MOZ_ASSERT(mDiagnosticsType == eUnsaved);
   mDiagnosticsType = eMediaKeySystemAccessRequest;
 
   if (NS_WARN_IF(aKeySystem.Length() > 2048)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess(Document* "
-        "aDocument=%p, keysystem= TOO LONG! '%s', supported=%d, call site "
+        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess("
+        "nsIGlobalObject* "
+        "aGlobalObject=%p, keysystem= TOO LONG! '%s', supported=%d, call site "
         "'%s')",
-        aDocument, this, NS_ConvertUTF16toUTF8(aKeySystem).get(), aIsSupported,
-        aCallSite);
+        aGlobalObject, this, NS_ConvertUTF16toUTF8(aKeySystem).get(),
+        aIsSupported, aCallSite);
     return;
   }
 
-  if (NS_WARN_IF(!aDocument)) {
+  if (NS_WARN_IF(!aGlobalObject)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess(Document* "
-        "aDocument=nullptr, keysystem='%s', supported=%d, call site '%s')",
+        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess("
+        "nsIGlobalObject* "
+        "aGlobalObject=nullptr, keysystem='%s', supported=%d, call site '%s')",
         this, NS_ConvertUTF16toUTF8(aKeySystem).get(), aIsSupported, aCallSite);
     return;
   }
   if (NS_WARN_IF(aKeySystem.IsEmpty())) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess(Document* "
-        "aDocument=%p, keysystem=<empty>, supported=%d, call site '%s')",
-        this, aDocument, aIsSupported, aCallSite);
+        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess("
+        "nsIGlobalObject* "
+        "aGlobalObject=%p, keysystem=<empty>, supported=%d, call site '%s')",
+        this, aGlobalObject, aIsSupported, aCallSite);
     return;
   }
 
-  RefPtr<DecoderDoctorDocumentWatcher> watcher =
-      DecoderDoctorDocumentWatcher::RetrieveOrCreate(aDocument);
+  RefPtr<DecoderDoctorGlobalWatcher> watcher =
+      DecoderDoctorGlobalWatcher::RetrieveOrCreate(aGlobalObject);
 
   if (NS_WARN_IF(!watcher)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess(Document* "
-        "aDocument=%p, keysystem='%s', supported=%d, call site '%s') - Could "
+        "DecoderDoctorDiagnostics[%p]::StoreMediaKeySystemAccess("
+        "nsIGlobalObject* "
+        "aGlobalObject=%p, keysystem='%s', supported=%d, call site '%s') - "
+        "Could "
         "not create document watcher",
-        this, aDocument, NS_ConvertUTF16toUTF8(aKeySystem).get(), aIsSupported,
-        aCallSite);
+        this, aGlobalObject, NS_ConvertUTF16toUTF8(aKeySystem).get(),
+        aIsSupported, aCallSite);
     return;
   }
 
@@ -1050,19 +1115,18 @@ void DecoderDoctorDiagnostics::StoreMediaKeySystemAccess(
   MOZ_ASSERT(mDiagnosticsType == eMediaKeySystemAccessRequest);
 }
 
-void DecoderDoctorDiagnostics::StoreEvent(dom::Document* aDocument,
+void DecoderDoctorDiagnostics::StoreEvent(nsIGlobalObject* aGlobalObject,
                                           const DecoderDoctorEvent& aEvent,
                                           const char* aCallSite) {
-  MOZ_ASSERT(NS_IsMainThread());
   // Make sure we only store once.
   MOZ_ASSERT(mDiagnosticsType == eUnsaved);
   mDiagnosticsType = eEvent;
   mEvent = aEvent;
 
-  if (NS_WARN_IF(!aDocument)) {
+  if (NS_WARN_IF(!aGlobalObject)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreEvent(Document* "
-        "aDocument=nullptr, aEvent=%s, call site '%s')",
+        "DecoderDoctorDiagnostics[%p]::StoreEvent(nsIGlobalObject* "
+        "aGlobalObject=nullptr, aEvent=%s, call site '%s')",
         this, GetDescription().get(), aCallSite);
     return;
   }
@@ -1072,66 +1136,69 @@ void DecoderDoctorDiagnostics::StoreEvent(dom::Document* aDocument,
     case DecoderDoctorEvent::eAudioSinkStartup:
       if (aEvent.mResult == NS_ERROR_DOM_MEDIA_CUBEB_INITIALIZATION_ERR) {
         DD_INFO(
-            "DecoderDoctorDocumentWatcher[%p, doc=%p]::AddDiagnostics() - "
+            "DecoderDoctorGlobalWatcher[%p, global=%p]::AddDiagnostics() - "
             "unable to initialize PulseAudio",
-            this, aDocument);
-        ReportAnalysis(aDocument, sCannotInitializePulseAudio, false, u"*"_ns);
+            this, aGlobalObject);
+        ReportAnalysis(aGlobalObject, sCannotInitializePulseAudio, false,
+                       u"*"_ns);
       } else if (aEvent.mResult == NS_OK) {
         DD_INFO(
-            "DecoderDoctorDocumentWatcher[%p, doc=%p]::AddDiagnostics() - now "
+            "DecoderDoctorGlobalWatcher[%p, global=%p]::AddDiagnostics() - now "
             "able to initialize PulseAudio",
-            this, aDocument);
-        ReportAnalysis(aDocument, sCannotInitializePulseAudio, true, u"*"_ns);
+            this, aGlobalObject);
+        ReportAnalysis(aGlobalObject, sCannotInitializePulseAudio, true,
+                       u"*"_ns);
       }
       break;
   }
 }
 
-void DecoderDoctorDiagnostics::StoreDecodeError(dom::Document* aDocument,
+void DecoderDoctorDiagnostics::StoreDecodeError(nsIGlobalObject* aGlobalObject,
                                                 const MediaResult& aError,
                                                 const nsString& aMediaSrc,
                                                 const char* aCallSite) {
-  MOZ_ASSERT(NS_IsMainThread());
   // Make sure we only store once.
   MOZ_ASSERT(mDiagnosticsType == eUnsaved);
   mDiagnosticsType = eDecodeError;
 
   if (NS_WARN_IF(aError.Message().Length() > 2048)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreDecodeError(Document* "
-        "aDocument=%p, aError= TOO LONG! '%s', aMediaSrc=<provided>, call site "
+        "DecoderDoctorDiagnostics[%p]::StoreDecodeError(nsIGlobalObject* "
+        "aGlobalObject=%p, aError= TOO LONG! '%s', aMediaSrc=<provided>, call "
+        "site "
         "'%s')",
-        aDocument, this, aError.Description().get(), aCallSite);
+        aGlobalObject, this, aError.Description().get(), aCallSite);
     return;
   }
 
   if (NS_WARN_IF(aMediaSrc.Length() > 2048)) {
     DD_WARN(
-        "DecoderDoctorDiagnostics[%p]::StoreDecodeError(Document* "
-        "aDocument=%p, aError=%s, aMediaSrc= TOO LONG! <provided>, call site "
+        "DecoderDoctorDiagnostics[%p]::StoreDecodeError(nsIGlobalObject* "
+        "aGlobalObject=%p, aError=%s, aMediaSrc= TOO LONG! <provided>, call "
+        "site "
         "'%s')",
-        aDocument, this, aError.Description().get(), aCallSite);
+        aGlobalObject, this, aError.Description().get(), aCallSite);
     return;
   }
 
-  if (NS_WARN_IF(!aDocument)) {
+  if (NS_WARN_IF(!aGlobalObject)) {
     DD_WARN(
         "DecoderDoctorDiagnostics[%p]::StoreDecodeError("
-        "Document* aDocument=nullptr, aError=%s,"
+        "nsIGlobalObject* aGlobalObject=nullptr, aError=%s,"
         " aMediaSrc=<provided>, call site '%s')",
         this, aError.Description().get(), aCallSite);
     return;
   }
 
-  RefPtr<DecoderDoctorDocumentWatcher> watcher =
-      DecoderDoctorDocumentWatcher::RetrieveOrCreate(aDocument);
+  RefPtr<DecoderDoctorGlobalWatcher> watcher =
+      DecoderDoctorGlobalWatcher::RetrieveOrCreate(aGlobalObject);
 
   if (NS_WARN_IF(!watcher)) {
     DD_WARN(
         "DecoderDoctorDiagnostics[%p]::StoreDecodeError("
-        "Document* aDocument=%p, aError='%s', aMediaSrc=<provided>,"
+        "nsIGlobalObject* aGlobalObject=%p, aError='%s', aMediaSrc=<provided>,"
         " call site '%s') - Could not create document watcher",
-        this, aDocument, aError.Description().get(), aCallSite);
+        this, aGlobalObject, aError.Description().get(), aCallSite);
     return;
   }
 
@@ -1146,33 +1213,33 @@ void DecoderDoctorDiagnostics::StoreDecodeError(dom::Document* aDocument,
   MOZ_ASSERT(mDiagnosticsType == eDecodeError);
 }
 
-void DecoderDoctorDiagnostics::StoreDecodeWarning(dom::Document* aDocument,
-                                                  const MediaResult& aWarning,
-                                                  const nsString& aMediaSrc,
-                                                  const char* aCallSite) {
+void DecoderDoctorDiagnostics::StoreDecodeWarning(
+    nsIGlobalObject* aGlobalObject, const MediaResult& aWarning,
+    const nsString& aMediaSrc, const char* aCallSite) {
   MOZ_ASSERT(NS_IsMainThread());
   // Make sure we only store once.
   MOZ_ASSERT(mDiagnosticsType == eUnsaved);
   mDiagnosticsType = eDecodeWarning;
 
-  if (NS_WARN_IF(!aDocument)) {
+  if (NS_WARN_IF(!aGlobalObject)) {
     DD_WARN(
         "DecoderDoctorDiagnostics[%p]::StoreDecodeWarning("
-        "Document* aDocument=nullptr, aWarning=%s,"
+        "nsIGlobalObject* aGlobalObject=nullptr, aWarning=%s,"
         " aMediaSrc=<provided>, call site '%s')",
         this, aWarning.Description().get(), aCallSite);
     return;
   }
 
-  RefPtr<DecoderDoctorDocumentWatcher> watcher =
-      DecoderDoctorDocumentWatcher::RetrieveOrCreate(aDocument);
+  RefPtr<DecoderDoctorGlobalWatcher> watcher =
+      DecoderDoctorGlobalWatcher::RetrieveOrCreate(aGlobalObject);
 
   if (NS_WARN_IF(!watcher)) {
     DD_WARN(
         "DecoderDoctorDiagnostics[%p]::StoreDecodeWarning("
-        "Document* aDocument=%p, aWarning='%s', aMediaSrc=<provided>,"
+        "nsIGlobalObject* aGlobalObject=%p, aWarning='%s', "
+        "aMediaSrc=<provided>,"
         " call site '%s') - Could not create document watcher",
-        this, aDocument, aWarning.Description().get(), aCallSite);
+        this, aGlobalObject, aWarning.Description().get(), aCallSite);
     return;
   }
 
