@@ -50,11 +50,11 @@ async function run_test() {
 
   function checkBlacklist() {
     if (Services.appinfo.OS == "WINNT") {
-      var status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT2D);
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      var status = gfxInfo.getFeatureStatusStr("DIRECT2D");
+      Assert.equal(status, "STATUS_OK");
     } else if (Services.appinfo.OS == "Darwin") {
-      status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_OPENGL_LAYERS);
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      status = gfxInfo.getFeatureStatusStr("OPENGL_LAYERS");
+      Assert.equal(status, "STATUS_OK");
     }
 
     do_test_finished();

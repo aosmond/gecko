@@ -44,17 +44,15 @@ async function run_test() {
   function checkBlacklist() {
     var driverVersion = gfxInfo.adapterDriverVersion;
     if (driverVersion) {
-      var status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT2D);
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DEVICE);
+      var status = gfxInfo.getFeatureStatusStr("DIRECT2D");
+      Assert.equal(status, "BLOCKED_DEVICE");
 
-      status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_WEBRENDER);
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DEVICE);
+      status = gfxInfo.getFeatureStatusStr("WEBRENDER");
+      Assert.equal(status, "BLOCKED_DEVICE");
 
       // Make sure unrelated features aren't affected
-      status = gfxInfo.getFeatureStatus(
-        Ci.nsIGfxInfo.FEATURE_DIRECT3D_9_LAYERS
-      );
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      status = gfxInfo.getFeatureStatusStr("DIRECT3D_9_LAYERS");
+      Assert.equal(status, "STATUS_OK");
     }
     do_test_finished();
   }

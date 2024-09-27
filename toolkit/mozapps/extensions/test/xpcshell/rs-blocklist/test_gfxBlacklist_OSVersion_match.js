@@ -50,11 +50,11 @@ async function run_test() {
 
   function checkBlacklist() {
     if (Services.appinfo.OS == "WINNT") {
-      var status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT2D);
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+      var status = gfxInfo.getFeatureStatusStr("DIRECT2D");
+      Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     } else if (Services.appinfo.OS == "Darwin") {
-      status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_OPENGL_LAYERS);
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+      status = gfxInfo.getFeatureStatusStr("OPENGL_LAYERS");
+      Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     }
 
     do_test_finished();

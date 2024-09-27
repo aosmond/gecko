@@ -59,16 +59,16 @@ async function run_test() {
     executeSoon(ensureBlacklistSet);
   }
   function ensureBlacklistSet() {
-    var status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT2D);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    var status = gfxInfo.getFeatureStatusStr("DIRECT2D");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
     // Make sure unrelated features aren't affected
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT3D_9_LAYERS);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_9_LAYERS");
+    Assert.equal(status, "STATUS_OK");
 
     Assert.equal(
       Services.prefs.getIntPref("gfx.blacklist.direct2d"),
-      Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION
+      "BLOCKED_DRIVER_VERSION"
     );
 
     Services.obs.removeObserver(blacklistAdded, "blocklist-data-gfxItems");
@@ -101,12 +101,12 @@ async function run_test() {
     executeSoon(ensureBlacklistUnset);
   }
   function ensureBlacklistUnset() {
-    var status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT2D);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    var status = gfxInfo.getFeatureStatusStr("DIRECT2D");
+    Assert.equal(status, "STATUS_OK");
 
     // Make sure unrelated features aren't affected
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT3D_9_LAYERS);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_9_LAYERS");
+    Assert.equal(status, "STATUS_OK");
 
     var exists = false;
     try {

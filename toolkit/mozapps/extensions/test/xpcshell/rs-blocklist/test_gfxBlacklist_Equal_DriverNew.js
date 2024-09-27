@@ -55,49 +55,39 @@ async function run_test() {
   await promiseStartupManager();
 
   function checkBlacklist() {
-    var status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT2D);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    var status = gfxInfo.getFeatureStatusStr("DIRECT2D");
+    Assert.equal(status, "STATUS_OK");
 
     // Make sure unrelated features aren't affected
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT3D_9_LAYERS);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_9_LAYERS");
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT3D_11_LAYERS);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_11_LAYERS");
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_OPENGL_LAYERS);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("OPENGL_LAYERS");
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_DIRECT3D_11_ANGLE);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_11_ANGLE");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_HARDWARE_VIDEO_DECODING
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("HARDWARE_VIDEO_DECODING");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBRTC_HW_ACCELERATION_H264
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("WEBRTC_HW_ACCELERATION_H264");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBRTC_HW_ACCELERATION_DECODE
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("WEBRTC_HW_ACCELERATION_DECODE");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBRTC_HW_ACCELERATION_ENCODE
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("WEBRTC_HW_ACCELERATION_ENCODE");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_WEBGL_ANGLE);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("WEBGL_ANGLE");
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_CANVAS2D_ACCELERATION
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("CANVAS2D_ACCELERATION");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
     do_test_finished();
   }

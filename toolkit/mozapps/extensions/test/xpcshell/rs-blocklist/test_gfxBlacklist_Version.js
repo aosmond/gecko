@@ -54,128 +54,92 @@ async function run_test() {
     var failureId = {};
     var status;
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DIRECT2D,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("DIRECT2D", failureId);
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     Assert.equal(failureId.value, "FEATURE_FAILURE_DL_BLOCKLIST_g1");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DIRECT3D_9_LAYERS,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_9_LAYERS", failureId);
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     Assert.equal(failureId.value, "FEATURE_FAILURE_DL_BLOCKLIST_g2");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DIRECT3D_10_LAYERS,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_10_LAYERS", failureId);
+    Assert.equal(status, "STATUS_OK");
     Assert.equal(failureId.value, "");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DIRECT3D_10_1_LAYERS,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_10_1_LAYERS", failureId);
+    Assert.equal(status, "STATUS_OK");
     Assert.equal(failureId.value, "");
 
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_OPENGL_LAYERS);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("OPENGL_LAYERS");
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBGL_OPENGL,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("WEBGL_OPENGL", failureId);
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     Assert.equal(failureId.value, "FEATURE_FAILURE_DL_BLOCKLIST_g11");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBGL_ANGLE,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("WEBGL_ANGLE", failureId);
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     Assert.equal(failureId.value, "FEATURE_FAILURE_DL_BLOCKLIST_NO_ID");
 
-    status = gfxInfo.getFeatureStatus(Ci.nsIGfxInfo.FEATURE_WEBGL2, failureId);
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DRIVER_VERSION);
+    status = gfxInfo.getFeatureStatusStr("WEBGL2", failureId);
+    Assert.equal(status, "BLOCKED_DRIVER_VERSION");
     Assert.equal(failureId.value, "FEATURE_FAILURE_DL_BLOCKLIST_NO_ID");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_STAGEFRIGHT,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("STAGEFRIGHT", failureId);
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBRTC_HW_ACCELERATION_H264,
-      failureId
-    );
-    if (OS == "Android" && status != Ci.nsIGfxInfo.FEATURE_STATUS_OK) {
+    status = gfxInfo.getFeatureStatusStr("WEBRTC_HW_ACCELERATION_H264", failureId);
+    if (OS == "Android" && status != "STATUS_OK") {
       // Hardware acceleration for H.264 varies by device.
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DEVICE);
+      Assert.equal(status, "BLOCKED_DEVICE");
       Assert.equal(failureId.value, "FEATURE_FAILURE_WEBRTC_H264");
     } else {
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      Assert.equal(status, "STATUS_OK");
     }
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBRTC_HW_ACCELERATION_ENCODE,
+    status = gfxInfo.getFeatureStatusStr(
+      "WEBRTC_HW_ACCELERATION_ENCODE",
       failureId
     );
-    if (OS == "Android" && status != Ci.nsIGfxInfo.FEATURE_STATUS_OK) {
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DEVICE);
+    if (OS == "Android" && status != "STATUS_OK") {
+      Assert.equal(status, "BLOCKED_DEVICE");
       Assert.equal(failureId.value, "FEATURE_FAILURE_WEBRTC_ENCODE");
     } else {
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      Assert.equal(status, "STATUS_OK");
     }
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_WEBRTC_HW_ACCELERATION_DECODE,
+    status = gfxInfo.getFeatureStatusStr(
+      "WEBRTC_HW_ACCELERATION_DECODE",
       failureId
     );
-    if (OS == "Android" && status != Ci.nsIGfxInfo.FEATURE_STATUS_OK) {
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_DEVICE);
+    if (OS == "Android" && status != "STATUS_OK") {
+      Assert.equal(status, "BLOCKED_DEVICE");
       Assert.equal(failureId.value, "FEATURE_FAILURE_WEBRTC_DECODE");
     } else {
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      Assert.equal(status, "STATUS_OK");
     }
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DIRECT3D_11_LAYERS,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_11_LAYERS", failureId);
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_HARDWARE_VIDEO_DECODING,
-      failureId
-    );
-    if (OS == "Linux" && status != Ci.nsIGfxInfo.FEATURE_STATUS_OK) {
+    status = gfxInfo.getFeatureStatusStr("HARDWARE_VIDEO_DECODING", failureId);
+    if (OS == "Linux" && status != "STATUS_OK") {
       // Linux test suite is running on SW OpenGL backend and we disable
       // HW video decoding there.
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_BLOCKED_PLATFORM_TEST);
+      Assert.equal(status, "BLOCKED_PLATFORM_TEST");
       Assert.equal(
         failureId.value,
         "FEATURE_FAILURE_VIDEO_DECODING_TEST_FAILED"
       );
     } else {
-      Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+      Assert.equal(status, "STATUS_OK");
     }
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DIRECT3D_11_ANGLE,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DIRECT3D_11_ANGLE", failureId);
+    Assert.equal(status, "STATUS_OK");
 
-    status = gfxInfo.getFeatureStatus(
-      Ci.nsIGfxInfo.FEATURE_DX_INTEROP2,
-      failureId
-    );
-    Assert.equal(status, Ci.nsIGfxInfo.FEATURE_STATUS_OK);
+    status = gfxInfo.getFeatureStatusStr("DX_INTEROP2", failureId);
+    Assert.equal(status, "STATUS_OK");
 
     do_test_finished();
   }
