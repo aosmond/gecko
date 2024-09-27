@@ -200,6 +200,7 @@ EXPORTS.mozilla += [
 
 EXPORTS.mozilla.widget += [
     "CompositorWidget.h",
+    "GfxInfoFeatures.h",
     "IconLoader.h",
     "IMEData.h",
     "InitData.h",

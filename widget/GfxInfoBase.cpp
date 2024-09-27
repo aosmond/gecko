@@ -137,161 +137,20 @@ NS_IMPL_ISUPPORTS(GfxInfoBase, nsIGfxInfo, nsIObserver,
 #define SUGGESTED_VERSION_PREF BLOCKLIST_PREF_BRANCH "suggested-driver-version"
 
 static const char* GetPrefNameForFeature(int32_t aFeature) {
-  const char* name = nullptr;
+  const char* fullpref = nullptr;
   switch (aFeature) {
-    case nsIGfxInfo::FEATURE_DIRECT2D:
-      name = BLOCKLIST_PREF_BRANCH "direct2d";
-      break;
-    case nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS:
-      name = BLOCKLIST_PREF_BRANCH "layers.direct3d9";
-      break;
-    case nsIGfxInfo::FEATURE_DIRECT3D_10_LAYERS:
-      name = BLOCKLIST_PREF_BRANCH "layers.direct3d10";
-      break;
-    case nsIGfxInfo::FEATURE_DIRECT3D_10_1_LAYERS:
-      name = BLOCKLIST_PREF_BRANCH "layers.direct3d10-1";
-      break;
-    case nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS:
-      name = BLOCKLIST_PREF_BRANCH "layers.direct3d11";
-      break;
-    case nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE:
-      name = BLOCKLIST_PREF_BRANCH "direct3d11angle";
-      break;
-    case nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING:
-      name = BLOCKLIST_PREF_BRANCH "hardwarevideodecoding";
-      break;
-    case nsIGfxInfo::FEATURE_OPENGL_LAYERS:
-      name = BLOCKLIST_PREF_BRANCH "layers.opengl";
-      break;
-    case nsIGfxInfo::FEATURE_WEBGL_OPENGL:
-      name = BLOCKLIST_PREF_BRANCH "webgl.opengl";
-      break;
-    case nsIGfxInfo::FEATURE_WEBGL_ANGLE:
-      name = BLOCKLIST_PREF_BRANCH "webgl.angle";
-      break;
-    case nsIGfxInfo::UNUSED_FEATURE_WEBGL_MSAA:
-      name = BLOCKLIST_PREF_BRANCH "webgl.msaa";
-      break;
-    case nsIGfxInfo::FEATURE_STAGEFRIGHT:
-      name = BLOCKLIST_PREF_BRANCH "stagefright";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRTC_HW_ACCELERATION_H264:
-      name = BLOCKLIST_PREF_BRANCH "webrtc.hw.acceleration.h264";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRTC_HW_ACCELERATION_ENCODE:
-      name = BLOCKLIST_PREF_BRANCH "webrtc.hw.acceleration.encode";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRTC_HW_ACCELERATION_DECODE:
-      name = BLOCKLIST_PREF_BRANCH "webrtc.hw.acceleration.decode";
-      break;
-    case nsIGfxInfo::FEATURE_CANVAS2D_ACCELERATION:
-      name = BLOCKLIST_PREF_BRANCH "canvas2d.acceleration";
-      break;
-    case nsIGfxInfo::FEATURE_DX_INTEROP2:
-      name = BLOCKLIST_PREF_BRANCH "dx.interop2";
-      break;
-    case nsIGfxInfo::FEATURE_GPU_PROCESS:
-      name = BLOCKLIST_PREF_BRANCH "gpu.process";
-      break;
-    case nsIGfxInfo::FEATURE_WEBGL2:
-      name = BLOCKLIST_PREF_BRANCH "webgl2";
-      break;
-    case nsIGfxInfo::FEATURE_D3D11_KEYED_MUTEX:
-      name = BLOCKLIST_PREF_BRANCH "d3d11.keyed.mutex";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRENDER:
-      name = BLOCKLIST_PREF_BRANCH "webrender";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRENDER_COMPOSITOR:
-      name = BLOCKLIST_PREF_BRANCH "webrender.compositor";
-      break;
-    case nsIGfxInfo::FEATURE_DX_NV12:
-      name = BLOCKLIST_PREF_BRANCH "dx.nv12";
-      break;
-    case nsIGfxInfo::FEATURE_DX_P010:
-      name = BLOCKLIST_PREF_BRANCH "dx.p010";
-      break;
-    case nsIGfxInfo::FEATURE_DX_P016:
-      name = BLOCKLIST_PREF_BRANCH "dx.p016";
-      break;
-    case nsIGfxInfo::FEATURE_VP8_HW_DECODE:
-      name = BLOCKLIST_PREF_BRANCH "vp8.hw-decode";
-      break;
-    case nsIGfxInfo::FEATURE_VP9_HW_DECODE:
-      name = BLOCKLIST_PREF_BRANCH "vp9.hw-decode";
-      break;
-    case nsIGfxInfo::FEATURE_GL_SWIZZLE:
-      name = BLOCKLIST_PREF_BRANCH "gl.swizzle";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRENDER_SCISSORED_CACHE_CLEARS:
-      name = BLOCKLIST_PREF_BRANCH "webrender.scissored_cache_clears";
-      break;
-    case nsIGfxInfo::FEATURE_ALLOW_WEBGL_OUT_OF_PROCESS:
-      name = BLOCKLIST_PREF_BRANCH "webgl.allow-oop";
-      break;
-    case nsIGfxInfo::FEATURE_THREADSAFE_GL:
-      name = BLOCKLIST_PREF_BRANCH "gl.threadsafe";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRENDER_OPTIMIZED_SHADERS:
-      name = BLOCKLIST_PREF_BRANCH "webrender.optimized-shaders";
-      break;
-    case nsIGfxInfo::FEATURE_X11_EGL:
-      name = BLOCKLIST_PREF_BRANCH "x11.egl";
-      break;
-    case nsIGfxInfo::FEATURE_DMABUF:
-      name = BLOCKLIST_PREF_BRANCH "dmabuf";
-      break;
-    case nsIGfxInfo::FEATURE_WEBGPU:
-      name = BLOCKLIST_PREF_BRANCH "webgpu";
-      break;
-    case nsIGfxInfo::FEATURE_VIDEO_OVERLAY:
-      name = BLOCKLIST_PREF_BRANCH "video-overlay";
-      break;
-    case nsIGfxInfo::FEATURE_HW_DECODED_VIDEO_ZERO_COPY:
-      name = BLOCKLIST_PREF_BRANCH "hw-video-zero-copy";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRENDER_SHADER_CACHE:
-      name = BLOCKLIST_PREF_BRANCH "webrender.program-binary-disk";
-      break;
-    case nsIGfxInfo::FEATURE_WEBRENDER_PARTIAL_PRESENT:
-      name = BLOCKLIST_PREF_BRANCH "webrender.partial-present";
-      break;
-    case nsIGfxInfo::FEATURE_DMABUF_SURFACE_EXPORT:
-      name = BLOCKLIST_PREF_BRANCH "dmabuf.surface-export";
-      break;
-    case nsIGfxInfo::FEATURE_REUSE_DECODER_DEVICE:
-      name = BLOCKLIST_PREF_BRANCH "reuse-decoder-device";
-      break;
-    case nsIGfxInfo::FEATURE_BACKDROP_FILTER:
-      name = BLOCKLIST_PREF_BRANCH "backdrop.filter";
-      break;
-    case nsIGfxInfo::FEATURE_ACCELERATED_CANVAS2D:
-      name = BLOCKLIST_PREF_BRANCH "accelerated-canvas2d";
-      break;
-    case nsIGfxInfo::FEATURE_H264_HW_DECODE:
-      name = BLOCKLIST_PREF_BRANCH "h264.hw-decode";
-      break;
-    case nsIGfxInfo::FEATURE_AV1_HW_DECODE:
-      name = BLOCKLIST_PREF_BRANCH "av1.hw-decode";
-      break;
-    case nsIGfxInfo::FEATURE_VIDEO_SOFTWARE_OVERLAY:
-      name = BLOCKLIST_PREF_BRANCH "video-software-overlay";
-      break;
-    case nsIGfxInfo::FEATURE_WEBGL_USE_HARDWARE:
-      name = BLOCKLIST_PREF_BRANCH "webgl-use-hardware";
-      break;
-    case nsIGfxInfo::FEATURE_OVERLAY_VP_AUTO_HDR:
-      name = BLOCKLIST_PREF_BRANCH "overlay-vp-auto-hdr";
-      break;
-    case nsIGfxInfo::FEATURE_OVERLAY_VP_SUPER_RESOLUTION:
-      name = BLOCKLIST_PREF_BRANCH "overlay-vp-super-resolution";
-      break;
+#define GFXINFO_FEATURE(id, name, pref)    \
+  case nsIGfxInfo::FEATURE_##id:           \
+    fullpref = BLOCKLIST_PREF_BRANCH pref; \
+    break;
+#include "mozilla/widget/GfxInfoFeatures.h"
+#undef GFXINFO_FEATURE
     default:
       MOZ_ASSERT_UNREACHABLE("Unexpected nsIGfxInfo feature?!");
       break;
   }
 
-  return name;
+  return fullpref;
 }
 
 // Returns the value of the pref for the relevant feature in aValue.
@@ -448,144 +307,12 @@ static GfxDeviceFamily* BlocklistDevicesToDeviceFamily(
 
 static int32_t BlocklistFeatureToGfxFeature(const nsAString& aFeature) {
   MOZ_ASSERT(!aFeature.IsEmpty());
-  if (aFeature.EqualsLiteral("DIRECT2D")) {
-    return nsIGfxInfo::FEATURE_DIRECT2D;
+#define GFXINFO_FEATURE(id, name, pref) \
+  if (aFeature.EqualsLiteral(name)) {   \
+    return nsIGfxInfo::FEATURE_##id;    \
   }
-  if (aFeature.EqualsLiteral("DIRECT3D_9_LAYERS")) {
-    return nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS;
-  }
-  if (aFeature.EqualsLiteral("DIRECT3D_10_LAYERS")) {
-    return nsIGfxInfo::FEATURE_DIRECT3D_10_LAYERS;
-  }
-  if (aFeature.EqualsLiteral("DIRECT3D_10_1_LAYERS")) {
-    return nsIGfxInfo::FEATURE_DIRECT3D_10_1_LAYERS;
-  }
-  if (aFeature.EqualsLiteral("DIRECT3D_11_LAYERS")) {
-    return nsIGfxInfo::FEATURE_DIRECT3D_11_LAYERS;
-  }
-  if (aFeature.EqualsLiteral("DIRECT3D_11_ANGLE")) {
-    return nsIGfxInfo::FEATURE_DIRECT3D_11_ANGLE;
-  }
-  if (aFeature.EqualsLiteral("HARDWARE_VIDEO_DECODING")) {
-    return nsIGfxInfo::FEATURE_HARDWARE_VIDEO_DECODING;
-  }
-  if (aFeature.EqualsLiteral("OPENGL_LAYERS")) {
-    return nsIGfxInfo::FEATURE_OPENGL_LAYERS;
-  }
-  if (aFeature.EqualsLiteral("WEBGL_OPENGL")) {
-    return nsIGfxInfo::FEATURE_WEBGL_OPENGL;
-  }
-  if (aFeature.EqualsLiteral("WEBGL_ANGLE")) {
-    return nsIGfxInfo::FEATURE_WEBGL_ANGLE;
-  }
-  if (aFeature.EqualsLiteral("WEBGL_MSAA")) {
-    return nsIGfxInfo::UNUSED_FEATURE_WEBGL_MSAA;
-  }
-  if (aFeature.EqualsLiteral("STAGEFRIGHT")) {
-    return nsIGfxInfo::FEATURE_STAGEFRIGHT;
-  }
-  if (aFeature.EqualsLiteral("WEBRTC_HW_ACCELERATION_ENCODE")) {
-    return nsIGfxInfo::FEATURE_WEBRTC_HW_ACCELERATION_ENCODE;
-  }
-  if (aFeature.EqualsLiteral("WEBRTC_HW_ACCELERATION_DECODE")) {
-    return nsIGfxInfo::FEATURE_WEBRTC_HW_ACCELERATION_DECODE;
-  }
-  if (aFeature.EqualsLiteral("WEBRTC_HW_ACCELERATION_H264")) {
-    return nsIGfxInfo::FEATURE_WEBRTC_HW_ACCELERATION_H264;
-  }
-  if (aFeature.EqualsLiteral("CANVAS2D_ACCELERATION")) {
-    return nsIGfxInfo::FEATURE_CANVAS2D_ACCELERATION;
-  }
-  if (aFeature.EqualsLiteral("DX_INTEROP2")) {
-    return nsIGfxInfo::FEATURE_DX_INTEROP2;
-  }
-  if (aFeature.EqualsLiteral("GPU_PROCESS")) {
-    return nsIGfxInfo::FEATURE_GPU_PROCESS;
-  }
-  if (aFeature.EqualsLiteral("WEBGL2")) {
-    return nsIGfxInfo::FEATURE_WEBGL2;
-  }
-  if (aFeature.EqualsLiteral("D3D11_KEYED_MUTEX")) {
-    return nsIGfxInfo::FEATURE_D3D11_KEYED_MUTEX;
-  }
-  if (aFeature.EqualsLiteral("WEBRENDER")) {
-    return nsIGfxInfo::FEATURE_WEBRENDER;
-  }
-  if (aFeature.EqualsLiteral("WEBRENDER_COMPOSITOR")) {
-    return nsIGfxInfo::FEATURE_WEBRENDER_COMPOSITOR;
-  }
-  if (aFeature.EqualsLiteral("DX_NV12")) {
-    return nsIGfxInfo::FEATURE_DX_NV12;
-  }
-  if (aFeature.EqualsLiteral("VP8_HW_DECODE")) {
-    return nsIGfxInfo::FEATURE_VP8_HW_DECODE;
-  }
-  if (aFeature.EqualsLiteral("VP9_HW_DECODE")) {
-    return nsIGfxInfo::FEATURE_VP9_HW_DECODE;
-  }
-  if (aFeature.EqualsLiteral("GL_SWIZZLE")) {
-    return nsIGfxInfo::FEATURE_GL_SWIZZLE;
-  }
-  if (aFeature.EqualsLiteral("WEBRENDER_SCISSORED_CACHE_CLEARS")) {
-    return nsIGfxInfo::FEATURE_WEBRENDER_SCISSORED_CACHE_CLEARS;
-  }
-  if (aFeature.EqualsLiteral("ALLOW_WEBGL_OUT_OF_PROCESS")) {
-    return nsIGfxInfo::FEATURE_ALLOW_WEBGL_OUT_OF_PROCESS;
-  }
-  if (aFeature.EqualsLiteral("THREADSAFE_GL")) {
-    return nsIGfxInfo::FEATURE_THREADSAFE_GL;
-  }
-  if (aFeature.EqualsLiteral("X11_EGL")) {
-    return nsIGfxInfo::FEATURE_X11_EGL;
-  }
-  if (aFeature.EqualsLiteral("DMABUF")) {
-    return nsIGfxInfo::FEATURE_DMABUF;
-  }
-  if (aFeature.EqualsLiteral("WEBGPU")) {
-    return nsIGfxInfo::FEATURE_WEBGPU;
-  }
-  if (aFeature.EqualsLiteral("VIDEO_OVERLAY")) {
-    return nsIGfxInfo::FEATURE_VIDEO_OVERLAY;
-  }
-  if (aFeature.EqualsLiteral("HW_DECODED_VIDEO_ZERO_COPY")) {
-    return nsIGfxInfo::FEATURE_HW_DECODED_VIDEO_ZERO_COPY;
-  }
-  if (aFeature.EqualsLiteral("REUSE_DECODER_DEVICE")) {
-    return nsIGfxInfo::FEATURE_REUSE_DECODER_DEVICE;
-  }
-  if (aFeature.EqualsLiteral("WEBRENDER_PARTIAL_PRESENT")) {
-    return nsIGfxInfo::FEATURE_WEBRENDER_PARTIAL_PRESENT;
-  }
-  if (aFeature.EqualsLiteral("BACKDROP_FILTER")) {
-    return nsIGfxInfo::FEATURE_BACKDROP_FILTER;
-  }
-  if (aFeature.EqualsLiteral("ACCELERATED_CANVAS2D")) {
-    return nsIGfxInfo::FEATURE_ACCELERATED_CANVAS2D;
-  }
-  if (aFeature.EqualsLiteral("H264_HW_DECODE")) {
-    return nsIGfxInfo::FEATURE_H264_HW_DECODE;
-  }
-  if (aFeature.EqualsLiteral("AV1_HW_DECODE")) {
-    return nsIGfxInfo::FEATURE_AV1_HW_DECODE;
-  }
-  if (aFeature.EqualsLiteral("VIDEO_SOFTWARE_OVERLAY")) {
-    return nsIGfxInfo::FEATURE_VIDEO_SOFTWARE_OVERLAY;
-  }
-  if (aFeature.EqualsLiteral("WEBGL_USE_HARDWARE")) {
-    return nsIGfxInfo::FEATURE_WEBGL_USE_HARDWARE;
-  }
-  if (aFeature.EqualsLiteral("FEATURE_OVERLAY_VP_AUTO_HDR")) {
-    return nsIGfxInfo::FEATURE_OVERLAY_VP_AUTO_HDR;
-  }
-  if (aFeature.EqualsLiteral("FEATURE_OVERLAY_VP_SUPER_RESOLUTION")) {
-    return nsIGfxInfo::FEATURE_OVERLAY_VP_SUPER_RESOLUTION;
-  }
-  if (aFeature.EqualsLiteral("ALL")) {
-    return GfxDriverInfo::allFeatures;
-  }
-  if (aFeature.EqualsLiteral("OPTIONAL")) {
-    return GfxDriverInfo::optionalFeatures;
-  }
+#include "mozilla/widget/GfxInfoFeatures.h"
+#undef GFXINFO_FEATURE
 
   // If we don't recognize the feature, it may be new, and something
   // this version doesn't understand.  So, nothing to do.  This is
