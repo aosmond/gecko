@@ -27,7 +27,12 @@
 
 #define NS_OS_HOME_DIR "Home"
 
+/* Temporary directory, prefers system if writable. */
 #define NS_OS_TEMP_DIR "TmpD"
+
+/* Alternative temporary directory for the application, if available. */
+#define NS_ALT_TEMP_DIR "AltTmpD"
+
 #define NS_OS_CURRENT_WORKING_DIR "CurWorkD"
 /* Files stored in this directory will appear on the user's desktop,
  * if there is one, otherwise it's just the same as "Home"

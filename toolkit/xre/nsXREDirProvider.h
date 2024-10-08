@@ -134,6 +134,9 @@ class nsXREDirProvider final : public nsIDirectoryServiceProvider2,
 
   void Append(nsIFile* aDirectory);
 
+  nsresult GetProfileTempDir(nsIFile** aFile);
+  nsresult RemoveProfileTempDir();
+
   // On OSX, mGREDir points to .app/Contents/Resources
   nsCOMPtr<nsIFile> mGREDir;
   // On OSX, mGREBinDir points to .app/Contents/MacOS

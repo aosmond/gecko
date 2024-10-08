@@ -90,6 +90,8 @@
 
 #define PREF_OVERRIDE_DIRNAME "preferences"
 
+#define ALT_TMP_DIRNAME "temp"
+
 nsXREDirProvider* gDirServiceProvider = nullptr;
 nsIFile* gDataDirHomeLocal = nullptr;
 nsIFile* gDataDirHome = nullptr;
@@ -461,6 +463,8 @@ nsXREDirProvider::GetFile(const char* aProperty, bool* aPersistent,
     rv = file->AppendNative(nsLiteralCString(PREF_OVERRIDE_DIRNAME));
     NS_ENSURE_SUCCESS(rv, rv);
     rv = EnsureDirectoryExists(file);
+  } else if (!strcmp(aProperty, NS_ALT_TEMP_DIR)) {
+    rv = GetProfileTempDir(getter_AddRefs(file));
   } else {
     // We don't know anything about this property. Fail without warning, because
     // otherwise we'll get too much warning spam due to
@@ -695,6 +699,11 @@ void nsXREDirProvider::DoShutdown() {
         mozilla::ShutdownPhase::AppShutdownQM, nullptr);
     mozilla::AppShutdown::AdvanceShutdownPhase(
         mozilla::ShutdownPhase::AppShutdownTelemetry, nullptr);
+
+    if (XRE_IsParentProcess()) {
+      RemoveProfileTempDir();
+    }
+
     mAppStarted = false;
   }
 
@@ -998,6 +1007,35 @@ nsresult nsXREDirProvider::GetProfileDir(nsIFile** aResult) {
   }
   // If we failed to get mProfileDir, this will warn for us if appropriate.
   return GetProfileStartupDir(aResult);
+}
+
+nsresult nsXREDirProvider::GetProfileTempDir(nsIFile** aResult) {
+  if (mozilla::AppShutdown::IsInOrBeyond(
+          mozilla::ShutdownPhase::AppShutdownTelemetry)) {
+    return NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
+  }
+
+  nsCOMPtr<nsIFile> file;
+  nsresult rv = GetProfileDir(getter_AddRefs(file));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = file->AppendNative(nsLiteralCString(ALT_TMP_DIRNAME));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = EnsureDirectoryExists(file);
+  NS_ENSURE_SUCCESS(rv, rv);
+  file.forget(aResult);
+  return NS_OK;
+}
+
+nsresult nsXREDirProvider::RemoveProfileTempDir() {
+  MOZ_ASSERT(mozilla::AppShutdown::IsInOrBeyond(
+      mozilla::ShutdownPhase::AppShutdownTelemetry));
+
+  nsCOMPtr<nsIFile> file;
+  nsresult rv = GetProfileDir(getter_AddRefs(file));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = file->AppendNative(nsLiteralCString(ALT_TMP_DIRNAME));
+  NS_ENSURE_SUCCESS(rv, rv);
+  return file->Remove(true);
 }
 
 NS_IMETHODIMP

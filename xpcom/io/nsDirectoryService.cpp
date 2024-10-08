@@ -347,6 +347,28 @@ nsDirectoryService::GetFile(const char* aProp, bool* aPersistent,
   } else if (inAtom == nsGkAtoms::DirectoryService_OS_TemporaryDirectory) {
     rv = GetSpecialSystemDirectory(OS_TemporaryDirectory,
                                    getter_AddRefs(localFile));
+    if (NS_SUCCEEDED(rv)) {
+      bool isWritable = false;
+      rv = localFile->IsWritable(&isWritable);
+      if (NS_FAILED(rv)) {
+        localFile = nullptr;
+      } else if (!isWritable) {
+        rv = NS_ERROR_FILE_ACCESS_DENIED;
+        localFile = nullptr;
+      }
+    }
+
+    if (NS_FAILED(rv)) {
+      // Retry, but this time requesting the alternative temporary directory.
+      rv = Get(NS_ALT_TEMP_DIR, NS_GET_IID(nsIFile), getter_AddRefs(localFile));
+      if (NS_SUCCEEDED(rv)) {
+        bool isWritable = false;
+        rv = localFile->IsWritable(&isWritable);
+        if (NS_SUCCEEDED(rv) && !isWritable) {
+          rv = NS_ERROR_FILE_ACCESS_DENIED;
+        }
+      }
+    }
   } else if (inAtom == nsGkAtoms::DirectoryService_OS_CurrentWorkingDirectory) {
     rv = GetSpecialSystemDirectory(OS_CurrentWorkingDirectory,
                                    getter_AddRefs(localFile));
