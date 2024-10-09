@@ -884,9 +884,14 @@ browsertime-video-playback-latency:
     description: Raptor (browsertime) Video playback latency test
     mozharness:
         extra-options:
-            - --chimera
-            - --browsertime-no-ffwindowrecorder
-            - --extra-profiler-run
+            by-test-platform:
+                macosx.*shippable.*-qr.*:
+                    - --chimera
+                    - --extra-profiler-run
+                default:
+                    - --chimera
+                    - --browsertime-no-ffwindowrecorder
+                    - --extra-profiler-run
     run-on-projects:
         by-app:
             firefox:
