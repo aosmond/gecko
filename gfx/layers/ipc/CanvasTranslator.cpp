@@ -972,6 +972,20 @@ void CanvasTranslator::NotifyDeviceReset(const RemoteTextureOwnerIdSet& aIds) {
           &CanvasTranslator::SendNotifyDeviceReset, std::move(idArray)));
 }
 
+void CanvasTranslator::SimulateDeviceReset() {
+  RemoteTextureOwnerIdSet lost;
+  for (const auto& entry : mTextureInfo) {
+    const auto& info = entry.second;
+    if (info.GetDrawTargetWebgl() && mRemoteTextureOwner &&
+        mRemoteTextureOwner->IsRegistered(info.mRemoteTextureOwnerId)) {
+      lost.insert(info.mRemoteTextureOwnerId);
+    }
+  }
+  if (!lost.empty()) {
+    NotifyDeviceReset(lost);
+  }
+}
+
 gfx::DrawTargetWebgl* CanvasTranslator::GetDrawTargetWebgl(
     int64_t aTextureId, bool aCheckForFallback) const {
   auto result = mTextureInfo.find(aTextureId);

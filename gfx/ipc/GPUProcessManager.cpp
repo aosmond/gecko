@@ -22,6 +22,7 @@
 #include "mozilla/RemoteDecoderManagerParent.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/dom/ContentParent.h"
+#include "mozilla/gfx/CanvasManagerParent.h"
 #include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUChild.h"
 #include "mozilla/gfx/GPUParent.h"
@@ -661,6 +662,8 @@ void GPUProcessManager::SimulateDeviceReset() {
   } else {
     wr::RenderThread::Get()->SimulateDeviceReset();
   }
+
+  CanvasManagerParent::SimulateDeviceReset();
 }
 
 bool GPUProcessManager::FallbackFromAcceleration(wr::WebRenderError aError,

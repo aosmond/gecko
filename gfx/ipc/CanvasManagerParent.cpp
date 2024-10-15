@@ -104,6 +104,27 @@ CanvasManagerParent::ManagerSet CanvasManagerParent::sManagers;
   }
 }
 
+/* static */ void CanvasManagerParent::SimulateDeviceReset() {
+  CanvasRenderThread::Dispatch(NS_NewRunnableFunction(
+      "CanvasManagerParent::SimulateDeviceReset",
+      [] { CanvasManagerParent::SimulateDeviceResetInternal(); }));
+}
+
+/* static */ void CanvasManagerParent::SimulateDeviceResetInternal() {
+  MOZ_ASSERT(CanvasRenderThread::IsInCanvasRenderThread());
+
+  AutoTArray<RefPtr<layers::CanvasTranslator>, 16> actors;
+  for (const auto& manager : sManagers) {
+    for (const auto& canvas : manager->ManagedPCanvasParent()) {
+      actors.AppendElement(static_cast<layers::CanvasTranslator*>(canvas));
+    }
+  }
+
+  for (const auto& actor : actors) {
+    actor->SimulateDeviceReset();
+  }
+}
+
 CanvasManagerParent::CanvasManagerParent(
     layers::SharedSurfacesHolder* aSharedSurfacesHolder,
     const dom::ContentParentId& aContentId)

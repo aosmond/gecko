@@ -153,6 +153,11 @@ class CanvasTranslator final : public gfx::InlineTranslator,
   void DeviceResetAcknowledged();
 
   /**
+   * Simulate a device reset.
+   */
+  void SimulateDeviceReset();
+
+  /**
    * Used during playback of events to create DrawTargets. For the
    * CanvasTranslator this means creating TextureDatas and getting the
    * DrawTargets from those.

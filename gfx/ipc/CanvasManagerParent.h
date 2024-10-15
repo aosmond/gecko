@@ -35,6 +35,8 @@ class CanvasManagerParent final : public PCanvasManagerParent {
 
   static void DisableRemoteCanvas();
 
+  static void SimulateDeviceReset();
+
   CanvasManagerParent(layers::SharedSurfacesHolder* aSharedSurfacesHolder,
                       const dom::ContentParentId& aContentId);
 
@@ -54,6 +56,7 @@ class CanvasManagerParent final : public PCanvasManagerParent {
  private:
   static void ShutdownInternal();
   static void DisableRemoteCanvasInternal();
+  static void SimulateDeviceResetInternal();
 
   ~CanvasManagerParent() override;
 
