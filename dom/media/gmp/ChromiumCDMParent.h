@@ -10,6 +10,7 @@
 #include "GMPCrashHelper.h"
 #include "GMPCrashHelperHolder.h"
 #include "GMPMessageUtils.h"
+#include "GMPShmemManagerParent.h"
 #include "mozilla/gmp/PChromiumCDMParent.h"
 #include "mozilla/RefPtr.h"
 #include "nsTHashMap.h"
@@ -37,6 +38,7 @@ class GMPContentParent;
  * members of this class are GMP thread only.
  */
 class ChromiumCDMParent final : public PChromiumCDMParent,
+                                public GMPShmemManagerParent,
                                 public GMPCrashHelperHolder {
   friend class PChromiumCDMParent;
 
@@ -105,6 +107,8 @@ class ChromiumCDMParent final : public PChromiumCDMParent,
  protected:
   ~ChromiumCDMParent() = default;
 
+  GMP_INLINE_DECL_SHMEM_MANAGER_PARENT
+
   ipc::IPCResult Recv__delete__() override;
   ipc::IPCResult RecvOnResolvePromiseWithKeyStatus(const uint32_t& aPromiseId,
                                                    const uint32_t& aKeyStatus);
@@ -139,7 +143,6 @@ class ChromiumCDMParent final : public PChromiumCDMParent,
   ipc::IPCResult RecvShutdown();
   ipc::IPCResult RecvResetVideoDecoderComplete();
   ipc::IPCResult RecvDrainComplete();
-  ipc::IPCResult RecvIncreaseShmemPoolSize();
   void ActorDestroy(ActorDestroyReason aWhy) override;
   bool SendBufferToCDM(uint32_t aSizeInBytes);
 
@@ -163,8 +166,6 @@ class ChromiumCDMParent final : public PChromiumCDMParent,
 
   bool InitCDMInputBuffer(gmp::CDMInputBuffer& aBuffer, MediaRawData* aSample);
 
-  bool PurgeShmems();
-  bool EnsureSufficientShmems(size_t aVideoFrameSize);
   already_AddRefed<VideoData> CreateVideoFrame(const CDMVideoFrame& aFrame,
                                                Span<uint8_t> aData);
 
@@ -187,14 +188,6 @@ class ChromiumCDMParent final : public PChromiumCDMParent,
   int64_t mLastStreamOffset = 0;
 
   MozPromiseHolder<MediaDataDecoder::FlushPromise> mFlushDecoderPromise;
-
-  size_t mVideoFrameBufferSize = 0;
-
-  // Count of the number of shmems in the set used to return decoded video
-  // frames from the CDM to Gecko.
-  uint32_t mVideoShmemsActive = 0;
-  // Maximum number of shmems to use to return decoded video frames.
-  uint32_t mVideoShmemLimit;
 
   // Tracks if we have an outstanding request for output protection information.
   // This will be set to true if the CDM requests the information and we haven't
