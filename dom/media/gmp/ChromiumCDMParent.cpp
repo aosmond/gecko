@@ -18,7 +18,6 @@
 #include "VideoUtils.h"
 #include "content_decryption_module.h"
 #include "mozilla/ScopeExit.h"
-#include "mozilla/StaticPrefs_media.h"
 #include "mozilla/Unused.h"
 #include "mozilla/dom/MediaKeyMessageEventBinding.h"
 #include "mozilla/gmp/GMPTypes.h"
@@ -32,8 +31,7 @@ using namespace eme;
 ChromiumCDMParent::ChromiumCDMParent(GMPContentParent* aContentParent,
                                      uint32_t aPluginId)
     : mPluginId(aPluginId),
-      mContentParent(aContentParent),
-      mVideoShmemLimit(StaticPrefs::media_eme_chromium_api_video_shmems())
+      mContentParent(aContentParent)
 #ifdef DEBUG
       ,
       mGMPThread(aContentParent->GMPEventTarget())
@@ -372,7 +370,7 @@ bool ChromiumCDMParent::SendBufferToCDM(uint32_t aSizeInBytes) {
   if (!AllocShmem(aSizeInBytes, &shmem)) {
     return false;
   }
-  if (!SendGiveBuffer(std::move(shmem))) {
+  if (!MgrGiveShmem(std::move(shmem))) {
     DeallocShmem(shmem);
     return false;
   }
@@ -716,108 +714,15 @@ ipc::IPCResult ChromiumCDMParent::RecvDecrypted(const uint32_t& aId,
 
 ipc::IPCResult ChromiumCDMParent::RecvIncreaseShmemPoolSize() {
   MOZ_ASSERT(mGMPThread->IsOnCurrentThread());
-  GMP_LOG_DEBUG("%s(this=%p) limit=%" PRIu32 " active=%" PRIu32, __func__, this,
-                mVideoShmemLimit, mVideoShmemsActive);
 
-  // Put an upper limit on the number of shmems we tolerate the CDM asking
-  // for, to prevent a memory blow-out. In practice, we expect the CDM to
-  // need less than 5, but some encodings require more.
-  // We'd expect CDMs to not have video frames larger than 720p-1080p
-  // (due to DRM robustness requirements), which is about 1.5MB-3MB per
-  // frame.
-  if (mVideoShmemLimit > 50) {
+  if (!MgrIncreaseShmemPoolSize()) {
     mDecodePromise.RejectIfExists(
         MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                     RESULT_DETAIL("Failled to ensure CDM has enough shmems.")),
         __func__);
     Shutdown();
-    return IPC_OK();
   }
-  mVideoShmemLimit++;
-
-  EnsureSufficientShmems(mVideoFrameBufferSize);
-
   return IPC_OK();
-}
-
-bool ChromiumCDMParent::PurgeShmems() {
-  MOZ_ASSERT(mGMPThread->IsOnCurrentThread());
-  GMP_LOG_DEBUG(
-      "ChromiumCDMParent::PurgeShmems(this=%p) frame_size=%zu"
-      " limit=%" PRIu32 " active=%" PRIu32,
-      this, mVideoFrameBufferSize, mVideoShmemLimit, mVideoShmemsActive);
-
-  if (mVideoShmemsActive == 0) {
-    // We haven't allocated any shmems, nothing to do here.
-    return true;
-  }
-  if (!SendPurgeShmems()) {
-    return false;
-  }
-  mVideoShmemsActive = 0;
-  return true;
-}
-
-bool ChromiumCDMParent::EnsureSufficientShmems(size_t aVideoFrameSize) {
-  MOZ_ASSERT(mGMPThread->IsOnCurrentThread());
-  GMP_LOG_DEBUG(
-      "ChromiumCDMParent::EnsureSufficientShmems(this=%p) "
-      "size=%zu expected_size=%zu limit=%" PRIu32 " active=%" PRIu32,
-      this, aVideoFrameSize, mVideoFrameBufferSize, mVideoShmemLimit,
-      mVideoShmemsActive);
-
-  // The Chromium CDM API requires us to implement a synchronous
-  // interface to supply buffers to the CDM for it to write decrypted samples
-  // into. We want our buffers to be backed by shmems, in order to reduce
-  // the overhead of transferring decoded frames. However due to sandboxing
-  // restrictions, the CDM process cannot allocate shmems itself.
-  // We don't want to be doing synchronous IPC to request shmems from the
-  // content process, nor do we want to have to do intr IPC or make async
-  // IPC conform to the sync allocation interface. So instead we have the
-  // content process pre-allocate a set of shmems and give them to the CDM
-  // process in advance of them being needed.
-  //
-  // When the CDM needs to allocate a buffer for storing a decoded video
-  // frame, the CDM host gives it one of these shmems' buffers. When this
-  // is sent back to the content process, we upload it to a GPU surface,
-  // and send the shmem back to the CDM process so it can reuse it.
-  //
-  // Normally the CDM won't allocate more than one buffer at once, but
-  // we've seen cases where it allocates multiple buffers, returns one and
-  // holds onto the rest. So we need to ensure we have several extra
-  // shmems pre-allocated for the CDM. This threshold is set by the pref
-  // media.eme.chromium-api.video-shmems.
-  //
-  // We also have a failure recovery mechanism; if the CDM asks for more
-  // buffers than we have shmem's available, ChromiumCDMChild gives the
-  // CDM a non-shared memory buffer, and returns the frame to the parent
-  // in an nsTArray<uint8_t> instead of a shmem. The child then sends a
-  // message to the parent asking it to increase the number of shmems in
-  // the pool. Via this mechanism we should recover from incorrectly
-  // predicting how many shmems to pre-allocate.
-  //
-  // At decoder start up, we guess how big the shmems need to be based on
-  // the video frame dimensions. If we guess wrong, the CDM will follow
-  // the non-shmem path, and we'll re-create the shmems of the correct size.
-  // This meanns we can recover from guessing the shmem size wrong.
-  // We must re-take this path after every decoder de-init/re-init, as the
-  // frame sizes should change every time we switch video stream.
-
-  if (mVideoFrameBufferSize < aVideoFrameSize) {
-    if (!PurgeShmems()) {
-      return false;
-    }
-    mVideoFrameBufferSize = aVideoFrameSize;
-  }
-
-  while (mVideoShmemsActive < mVideoShmemLimit) {
-    if (!SendBufferToCDM(mVideoFrameBufferSize)) {
-      return false;
-    }
-    mVideoShmemsActive++;
-  }
-
-  return true;
 }
 
 ipc::IPCResult ChromiumCDMParent::RecvDecodedData(const CDMVideoFrame& aFrame,
@@ -830,7 +735,7 @@ ipc::IPCResult ChromiumCDMParent::RecvDecodedData(const CDMVideoFrame& aFrame,
     return IPC_OK();
   }
 
-  if (!EnsureSufficientShmems(aData.Length())) {
+  if (!MgrEnsureSufficientShmems(aData.Length())) {
     mDecodePromise.RejectIfExists(
         MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                     RESULT_DETAIL("Failled to ensure CDM has enough shmems.")),
@@ -880,7 +785,7 @@ ipc::IPCResult ChromiumCDMParent::RecvDecodedShmem(const CDMVideoFrame& aFrame,
 
   // Return the shmem to the CDM so the shmem can be reused to send us
   // another frame.
-  if (!SendGiveBuffer(std::move(aShmem))) {
+  if (!MgrGiveShmem(std::move(aShmem))) {
     mDecodePromise.RejectIfExists(
         MediaResult(NS_ERROR_OUT_OF_MEMORY,
                     RESULT_DETAIL("Can't return shmem to CDM process")),
@@ -1157,7 +1062,7 @@ RefPtr<MediaDataDecoder::InitPromise> ChromiumCDMParent::InitializeVideoDecoder(
         __func__);
   }
 
-  if (!EnsureSufficientShmems(bufferSize)) {
+  if (!MgrEnsureSufficientShmems(bufferSize)) {
     return MediaDataDecoder::InitPromise::CreateAndReject(
         MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR,
                     RESULT_DETAIL("Failed to init shmems for video decoder")),
@@ -1181,7 +1086,6 @@ RefPtr<MediaDataDecoder::InitPromise> ChromiumCDMParent::InitializeVideoDecoder(
   mImageContainer = aImageContainer;
   mKnowsCompositor = aKnowsCompositor;
   mVideoInfo = aInfo;
-  mVideoFrameBufferSize = bufferSize;
 
   return mInitVideoDecoderPromise.Ensure(__func__);
 }
@@ -1331,8 +1235,7 @@ RefPtr<ShutdownPromise> ChromiumCDMParent::ShutdownVideoDecoder() {
   // The ChromiumCDMChild will purge its shmems, so if the decoder is
   // reinitialized the shmems need to be re-allocated, and they may need
   // to be a different size.
-  mVideoShmemsActive = 0;
-  mVideoFrameBufferSize = 0;
+  MgrPurgeShmems();
   return ShutdownPromise::CreateAndResolve(true, __func__);
 }
 

@@ -7,6 +7,7 @@
 #define ChromiumCDMChild_h_
 
 #include "content_decryption_module.h"
+#include "GMPShmemManagerChild.h"
 #include "mozilla/gmp/PChromiumCDMChild.h"
 #include "SimpleMap.h"
 #include "WidevineVideoFrame.h"
@@ -15,11 +16,15 @@ namespace mozilla::gmp {
 
 class GMPContentChild;
 
-class ChromiumCDMChild : public PChromiumCDMChild, public cdm::Host_10 {
+class ChromiumCDMChild final : public PChromiumCDMChild,
+                               public GMPShmemManagerChild,
+                               public cdm::Host_10 {
  public:
   // Mark AddRef and Release as `final`, as they overload pure virtual
   // implementations in PChromiumCDMChild.
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(ChromiumCDMChild, final);
+
+  GMP_INLINE_DECL_SHMEM_MANAGER_CHILD(PChromiumCDMChild)
 
   explicit ChromiumCDMChild(GMPContentChild* aPlugin);
 
@@ -63,10 +68,8 @@ class ChromiumCDMChild : public PChromiumCDMChild, public cdm::Host_10 {
   void OnInitialized(bool aSuccess) override;
   // end cdm::Host_10 specific methods
 
-  void GiveBuffer(ipc::Shmem&& aBuffer);
-
  protected:
-  ~ChromiumCDMChild();
+  ~ChromiumCDMChild() override;
 
   bool OnResolveNewSessionPromiseInternal(uint32_t aPromiseId,
                                           const nsACString& aSessionId);
@@ -75,9 +78,6 @@ class ChromiumCDMChild : public PChromiumCDMChild, public cdm::Host_10 {
 
   void ActorDestroy(ActorDestroyReason aReason) override;
 
-  ipc::IPCResult RecvGiveBuffer(ipc::Shmem&& aShmem) override;
-  ipc::IPCResult RecvPurgeShmems() override;
-  void PurgeShmems();
   ipc::IPCResult RecvInit(const bool& aAllowDistinctiveIdentifier,
                           const bool& aAllowPersistentState,
                           InitResolver&& aResolver) override;
@@ -114,7 +114,6 @@ class ChromiumCDMChild : public PChromiumCDMChild, public cdm::Host_10 {
   ipc::IPCResult RecvDestroy() override;
 
   void ReturnOutput(WidevineVideoFrame& aFrame);
-  bool HasShmemOfSize(size_t aSize) const;
 
   template <typename MethodType, typename... ParamType>
   void CallMethod(MethodType, ParamType&&...);
@@ -130,7 +129,6 @@ class ChromiumCDMChild : public PChromiumCDMChild, public cdm::Host_10 {
   nsTArray<uint32_t> mLoadSessionPromiseIds;
 
   cdm::Size mCodedSize = {0, 0};
-  nsTArray<ipc::Shmem> mBuffers;
 
   bool mDecoderInitialized = false;
   bool mPersistentStateAllowed = false;

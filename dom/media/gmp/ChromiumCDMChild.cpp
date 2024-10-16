@@ -67,7 +67,7 @@ class CDMShmemBuffer : public CDMBuffer {
     if (mShmem.IsWritable()) {
       // The shmem wasn't extracted to send its data back up to the parent
       // process, so we can reuse the shmem.
-      mProtocol->GiveBuffer(std::move(mShmem));
+      mProtocol->MgrGiveShmem(std::move(mShmem));
     }
   }
 
@@ -106,46 +106,18 @@ class CDMShmemBuffer : public CDMBuffer {
   void operator=(const CDMShmemBuffer&);
 };
 
-static auto ToString(const nsTArray<ipc::Shmem>& aBuffers) {
-  return StringJoin(","_ns, aBuffers, [](auto& s, const ipc::Shmem& shmem) {
-    s.AppendInt(static_cast<uint32_t>(shmem.Size<uint8_t>()));
-  });
-}
-
 cdm::Buffer* ChromiumCDMChild::Allocate(uint32_t aCapacity) {
-  GMP_LOG_DEBUG("ChromiumCDMChild::Allocate(capacity=%" PRIu32
-                ") bufferSizes={%s}",
-                aCapacity, ToString(mBuffers).get());
   MOZ_ASSERT(IsOnMessageLoopThread());
 
-  if (mBuffers.IsEmpty()) {
-    Unused << SendIncreaseShmemPoolSize();
-  }
-
-  // Find the shmem with the least amount of wasted space if we were to
-  // select it for this sized allocation. We need to do this because shmems
-  // for decrypted audio as well as video frames are both stored in this
-  // list, and we don't want to use the video frame shmems for audio samples.
-  const size_t invalid = std::numeric_limits<size_t>::max();
-  size_t best = invalid;
-  auto wastedSpace = [this, aCapacity](size_t index) {
-    return mBuffers[index].Size<uint8_t>() - aCapacity;
-  };
-  for (size_t i = 0; i < mBuffers.Length(); i++) {
-    if (mBuffers[i].Size<uint8_t>() >= aCapacity &&
-        (best == invalid || wastedSpace(i) < wastedSpace(best))) {
-      best = i;
-    }
-  }
-  if (best == invalid) {
+  ipc::Shmem shmem;
+  bool success = MgrTakeShmem(aCapacity, &shmem);
+  if (!success) {
     // The parent process should have bestowed upon us a shmem of appropriate
     // size, but did not! Do a "dive and catch", and create an non-shared
     // memory buffer. The parent will detect this and send us an extra shmem
     // so future frames can be in shmems, i.e. returned on the fast path.
     return new WidevineBuffer(aCapacity);
   }
-  ipc::Shmem shmem = mBuffers[best];
-  mBuffers.RemoveElementAt(best);
   return new CDMShmemBuffer(this, shmem);
 }
 
@@ -379,18 +351,6 @@ void ChromiumCDMChild::ActorDestroy(ActorDestroyReason aReason) {
   mPlugin = nullptr;
 }
 
-void ChromiumCDMChild::PurgeShmems() {
-  for (ipc::Shmem& shmem : mBuffers) {
-    DeallocShmem(shmem);
-  }
-  mBuffers.Clear();
-}
-
-ipc::IPCResult ChromiumCDMChild::RecvPurgeShmems() {
-  PurgeShmems();
-  return IPC_OK();
-}
-
 mozilla::ipc::IPCResult ChromiumCDMChild::RecvInit(
     const bool& aAllowDistinctiveIdentifier, const bool& aAllowPersistentState,
     InitResolver&& aResolver) {
@@ -579,15 +539,6 @@ static void InitInputBuffer(const CDMInputBuffer& aBuffer,
   aInputBuffer.timestamp = aBuffer.mTimestamp();
 }
 
-bool ChromiumCDMChild::HasShmemOfSize(size_t aSize) const {
-  for (const ipc::Shmem& shmem : mBuffers) {
-    if (shmem.Size<uint8_t>() == aSize) {
-      return true;
-    }
-  }
-  return false;
-}
-
 mozilla::ipc::IPCResult ChromiumCDMChild::RecvDecrypt(
     const uint32_t& aId, const CDMInputBuffer& aBuffer) {
   MOZ_ASSERT(IsOnMessageLoopThread());
@@ -595,7 +546,7 @@ mozilla::ipc::IPCResult ChromiumCDMChild::RecvDecrypt(
 
   // Parent should have already gifted us a shmem to use as output.
   size_t outputShmemSize = aBuffer.mData().Size<uint8_t>();
-  MOZ_ASSERT(HasShmemOfSize(outputShmemSize));
+  MOZ_ASSERT(MgrHasShmem(outputShmemSize));
 
   // Ensure we deallocate the shmem used to send input.
   RefPtr<ChromiumCDMChild> self = this;
@@ -605,16 +556,8 @@ mozilla::ipc::IPCResult ChromiumCDMChild::RecvDecrypt(
   // On failure, we need to ensure that the shmem that the parent sent
   // for the CDM to use to return output back to the parent is deallocated.
   // Otherwise, it will leak.
-  auto autoDeallocateOutputShmem = MakeScopeExit([self, outputShmemSize] {
-    self->mBuffers.RemoveElementsBy(
-        [outputShmemSize, self](ipc::Shmem& aShmem) {
-          if (aShmem.Size<uint8_t>() != outputShmemSize) {
-            return false;
-          }
-          self->DeallocShmem(aShmem);
-          return true;
-        });
-  });
+  auto autoDeallocateOutputShmem = MakeScopeExit(
+      [self, outputShmemSize] { self->MgrForgetShmem(outputShmemSize); });
 
   if (!mCDM) {
     GMP_LOG_DEBUG("ChromiumCDMChild::RecvDecrypt() no CDM");
@@ -648,7 +591,7 @@ mozilla::ipc::IPCResult ChromiumCDMChild::RecvDecrypt(
   }
 
   // Success! Return the decrypted sample to parent.
-  MOZ_ASSERT(!HasShmemOfSize(outputShmemSize));
+  MOZ_ASSERT(!MgrHasShmem(outputShmemSize));
   ipc::Shmem shmem = buffer->ExtractShmem();
   if (SendDecrypted(aId, cdm::kSuccess, std::move(shmem))) {
     // No need to deallocate the output shmem; it should have been returned
@@ -694,7 +637,7 @@ mozilla::ipc::IPCResult ChromiumCDMChild::RecvDeinitializeVideoDecoder() {
     mCDM->DeinitializeDecoder(cdm::kStreamTypeVideo);
   }
   mDecoderInitialized = false;
-  PurgeShmems();
+  MgrPurgeShmems();
   return IPC_OK();
 }
 
@@ -844,23 +787,6 @@ mozilla::ipc::IPCResult ChromiumCDMChild::RecvDestroy() {
   Unused << Send__delete__(this);
 
   return IPC_OK();
-}
-
-mozilla::ipc::IPCResult ChromiumCDMChild::RecvGiveBuffer(ipc::Shmem&& aBuffer) {
-  MOZ_ASSERT(IsOnMessageLoopThread());
-
-  GiveBuffer(std::move(aBuffer));
-  return IPC_OK();
-}
-
-void ChromiumCDMChild::GiveBuffer(ipc::Shmem&& aBuffer) {
-  MOZ_ASSERT(IsOnMessageLoopThread());
-  size_t sz = aBuffer.Size<uint8_t>();
-  mBuffers.AppendElement(std::move(aBuffer));
-  GMP_LOG_DEBUG(
-      "ChromiumCDMChild::RecvGiveBuffer(capacity=%zu"
-      ") bufferSizes={%s} mDecoderInitialized=%d",
-      sz, ToString(mBuffers).get(), mDecoderInitialized);
 }
 
 }  // namespace mozilla::gmp
