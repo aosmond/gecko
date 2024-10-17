@@ -83,7 +83,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(ImageDecoder)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCompletePromise)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mOutstandingDecodes)
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
-  NS_IMPL_CYCLE_COLLECTION_UNLINK_WEAK_PTR
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(ImageDecoder)
@@ -127,6 +126,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 
 void ImageDecoder::Destroy() {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug, ("ImageDecoder %p Destroy", this));
+  MOZ_ASSERT(mOutstandingDecodes.IsEmpty());
 
   if (mReadRequest) {
     mReadRequest->Destroy();
@@ -275,15 +275,11 @@ MessageProcessedResult ImageDecoder::ProcessDecodeMetadataMessage(
   // 1.1. Run the Establish Tracks algorithm.
   mDecoder->DecodeMetadata()->Then(
       GetCurrentSerialEventTarget(), __func__,
-      [self = WeakPtr{this}](const image::DecodeMetadataResult& aMetadata) {
-        if (self) {
-          self->OnMetadataSuccess(aMetadata);
-        }
+      [self = RefPtr{this}](const image::DecodeMetadataResult& aMetadata) {
+        self->OnMetadataSuccess(aMetadata);
       },
-      [self = WeakPtr{this}](const nsresult& aErr) {
-        if (self) {
-          self->OnMetadataFailed(aErr);
-        }
+      [self = RefPtr{this}](const nsresult& aErr) {
+        self->OnMetadataFailed(aErr);
       });
   return MessageProcessedResult::Processed;
 }
@@ -785,15 +781,11 @@ void ImageDecoder::RequestFrameCount(uint32_t aKnownFrameCount) {
   mDecoder->DecodeFrameCount(aKnownFrameCount)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
-          [self = WeakPtr{this}](const image::DecodeFrameCountResult& aResult) {
-            if (self) {
-              self->OnFrameCountSuccess(aResult);
-            }
+          [self = RefPtr{this}](const image::DecodeFrameCountResult& aResult) {
+            self->OnFrameCountSuccess(aResult);
           },
-          [self = WeakPtr{this}](const nsresult& aErr) {
-            if (self) {
-              self->OnFrameCountFailed(aErr);
-            }
+          [self = RefPtr{this}](const nsresult& aErr) {
+            self->OnFrameCountFailed(aErr);
           });
 }
 
@@ -811,15 +803,11 @@ void ImageDecoder::RequestDecodeFrames(uint32_t aFramesToDecode) {
   mDecoder->DecodeFrames(aFramesToDecode)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
-          [self = WeakPtr{this}](const image::DecodeFramesResult& aResult) {
-            if (self) {
-              self->OnDecodeFramesSuccess(aResult);
-            }
+          [self = RefPtr{this}](const image::DecodeFramesResult& aResult) {
+            self->OnDecodeFramesSuccess(aResult);
           },
-          [self = WeakPtr{this}](const nsresult& aErr) {
-            if (self) {
-              self->OnDecodeFramesFailed(aErr);
-            }
+          [self = RefPtr{this}](const nsresult& aErr) {
+            self->OnDecodeFramesFailed(aErr);
           });
 }
 
