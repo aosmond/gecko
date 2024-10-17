@@ -55,7 +55,7 @@ struct ImageDecoderReadRequest final : public ReadRequest {
   void Complete(const MediaResult& aResult);
 
   RefPtr<WeakWorkerRef> mWorkerRef;
-  RefPtr<ImageDecoder> mDecoder;
+  WeakPtr<ImageDecoder> mDecoder;
   RefPtr<ReadableStreamDefaultReader> mReader;
   RefPtr<image::SourceBuffer> mSourceBuffer;
 };

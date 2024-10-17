@@ -20,7 +20,7 @@ extern mozilla::LazyLogModule gWebCodecsLog;
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_INHERITED(ImageDecoderReadRequest, ReadRequest,
-                                   mDecoder, mReader)
+                                   mReader)
 NS_IMPL_ADDREF_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_IMPL_RELEASE_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoderReadRequest)
