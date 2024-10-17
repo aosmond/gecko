@@ -129,7 +129,7 @@ void ImageDecoder::Destroy() {
   MOZ_ASSERT(mOutstandingDecodes.IsEmpty());
 
   if (mReadRequest) {
-    mReadRequest->Destroy();
+    mReadRequest->Destroy(/* aCancel */ false);
     mReadRequest = nullptr;
   }
 
@@ -983,7 +983,7 @@ void ImageDecoder::Close(const MediaResult& aResult) {
   }
 
   if (mReadRequest) {
-    mReadRequest->Destroy(/* aCycleCollect */ false);
+    mReadRequest->Destroy(/* aCancel */ true);
     mReadRequest = nullptr;
   }
 

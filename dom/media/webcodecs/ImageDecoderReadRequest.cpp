@@ -42,15 +42,14 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
                                          ImageDecoder* aDecoder,
                                          ReadableStream& aStream) {
   if (WorkerPrivate* wp = GetCurrentThreadWorkerPrivate()) {
-    mWorkerRef = WeakWorkerRef::Create(wp, [self = RefPtr{this}]() {
-      self->Destroy(/* aCycleCollect */ false);
-    });
+    mWorkerRef = WeakWorkerRef::Create(
+        wp, [self = RefPtr{this}]() { self->Destroy(/* aCancel */ true); });
     if (NS_WARN_IF(!mWorkerRef)) {
       MOZ_LOG(gWebCodecsLog, LogLevel::Error,
               ("ImageDecoderReadRequest %p Initialize -- cannot get worker ref",
                this));
       mSourceBuffer->Complete(NS_ERROR_FAILURE);
-      Destroy(/* aCycleCollect */ false);
+      Destroy(/* aCancel */ false);
       return false;
     }
   }
@@ -63,7 +62,7 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
         ("ImageDecoderReadRequest %p Initialize -- cannot get stream reader",
          this));
     mSourceBuffer->Complete(NS_ERROR_FAILURE);
-    Destroy(/* aCycleCollect */ false);
+    Destroy(/* aCancel */ false);
     return false;
   }
 
@@ -72,11 +71,11 @@ bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,
   return true;
 }
 
-void ImageDecoderReadRequest::Destroy(bool aCycleCollect /* = true */) {
+void ImageDecoderReadRequest::Destroy(bool aCancel) {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p Destroy", this));
 
-  if (!aCycleCollect) {
+  if (aCancel) {
     // Ensure we stop reading from the ReadableStream.
     Cancel();
   }
@@ -216,7 +215,7 @@ void ImageDecoderReadRequest::Complete(const MediaResult& aResult) {
     mDecoder->OnSourceBufferComplete(aResult);
   }
 
-  Destroy(/* aCycleComplete */ false);
+  Destroy(/* aCancel */ false);
 }
 
 void ImageDecoderReadRequest::ChunkSteps(JSContext* aCx,
