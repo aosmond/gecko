@@ -45,8 +45,9 @@ class AnonymousDecoderTask : public IDecodingTask {
       return false;
     }
 
-    MOZ_LOG(sLog, LogLevel::Debug,
-            ("[%p] AnonymousDecoderTask::Start -- queue", this));
+    MOZ_LOG(
+        sLog, LogLevel::Debug,
+        ("[%p] AnonymousDecoderTask::Start -- queue", mDecoder.get()));
     DecodePool::Singleton()->AsyncRun(this);
     return true;
   }
@@ -57,7 +58,7 @@ class AnonymousDecoderTask : public IDecodingTask {
     }
 
     MOZ_LOG(sLog, LogLevel::Debug,
-            ("[%p] AnonymousDecoderTask::Resume -- queue", this));
+            ("[%p] AnonymousDecoderTask::Resume -- queue", mDecoder.get()));
     DecodePool::Singleton()->AsyncRun(this);
   }
 
@@ -67,7 +68,8 @@ class AnonymousDecoderTask : public IDecodingTask {
       LexerResult result = mDecoder->Decode(WrapNotNull(this));
       if (result == LexerResult(Yield::NEED_MORE_DATA)) {
         MOZ_LOG(sLog, LogLevel::Debug,
-                ("[%p] AnonymousDecoderTask::Run -- need more data", this));
+                ("[%p] AnonymousDecoderTask::Run -- need more data",
+                 mDecoder.get()));
         MOZ_ASSERT(result == LexerResult(Yield::NEED_MORE_DATA));
         OnNeedMoreData();
         return;
@@ -79,8 +81,8 @@ class AnonymousDecoderTask : public IDecodingTask {
         RefPtr<gfx::SourceSurface> surface = frame->GetSourceSurface();
         if (surface) {
           MOZ_LOG(sLog, LogLevel::Debug,
-                  ("[%p] AnonymousDecoderTask::Run -- new frame %p", this,
-                   frame.get()));
+                  ("[%p] AnonymousDecoderTask::Run -- new frame %p",
+                   mDecoder.get(), frame.get()));
           resume = OnFrameAvailable(std::move(frame), std::move(surface));
         } else {
           MOZ_ASSERT_UNREACHABLE("No surface from frame?");
@@ -89,7 +91,7 @@ class AnonymousDecoderTask : public IDecodingTask {
 
       if (result.is<TerminalState>()) {
         MOZ_LOG(sLog, LogLevel::Debug,
-                ("[%p] AnonymousDecoderTask::Run -- complete", this));
+                ("[%p] AnonymousDecoderTask::Run -- complete", mDecoder.get()));
         OnComplete(result == LexerResult(TerminalState::SUCCESS));
         break;
       }
@@ -258,7 +260,12 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
 
   void DestroyLocked(nsresult aResult) MOZ_REQUIRES(mMutex) {
     MOZ_LOG(sLog, LogLevel::Debug,
-            ("[%p] AnonymousDecoderImpl::Destroy", this));
+            ("[%p] AnonymousDecoderImpl::Destroy -- wanted %zu frames, pending "
+             "%zu frames, finished %d, outstanding promises metadata %d, frame "
+             "count %d, frames %d",
+             this, mFramesToDecode, mPendingFramesResult.mFrames.Length(),
+             mPendingFramesResult.mFinished, !mMetadataPromise.IsEmpty(),
+             !mFrameCountPromise.IsEmpty(), !mFramesPromise.IsEmpty()));
 
     mFramesToDecode = 0;
     mMetadataTask = nullptr;
@@ -508,7 +515,9 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
   void CancelDecodeFrames() override {
     MutexAutoLock lock(mMutex);
     MOZ_LOG(sLog, LogLevel::Debug,
-            ("[%p] AnonymousDecoderImpl::CancelDecodeFrames", this));
+            ("[%p] AnonymousDecoderImpl::CancelDecodeFrames -- wanted %zu "
+             "frames, pending frames promise %d",
+             this, mFramesToDecode, !mFramesPromise.IsEmpty()));
     mFramesToDecode = 0;
     mFramesPromise.RejectIfExists(NS_ERROR_ABORT, __func__);
   }
@@ -526,7 +535,7 @@ class AnonymousDecoderImpl final : public AnonymousDecoder {
   RefPtr<imgFrame> mLastFrame MOZ_GUARDED_BY(mMutex);
   DecodeMetadataResult mMetadataResult MOZ_GUARDED_BY(mMutex);
   DecodeFramesResult mPendingFramesResult MOZ_GUARDED_BY(mMutex);
-  size_t mFramesToDecode MOZ_GUARDED_BY(mMutex) = 1;
+  size_t mFramesToDecode MOZ_GUARDED_BY(mMutex) = 0;
   uint32_t mFrameCount MOZ_GUARDED_BY(mMutex) = 0;
   bool mMetadataTaskRunning MOZ_GUARDED_BY(mMutex) = false;
   bool mFrameCountTaskRunning MOZ_GUARDED_BY(mMutex) = false;

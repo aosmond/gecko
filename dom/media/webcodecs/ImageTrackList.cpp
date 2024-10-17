@@ -11,6 +11,8 @@
 #include "mozilla/dom/Promise.h"
 #include "mozilla/image/ImageUtils.h"
 
+extern mozilla::LazyLogModule gWebCodecsLog;
+
 namespace mozilla::dom {
 
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(ImageTrackList, mParent, mDecoder,
@@ -98,6 +100,10 @@ void ImageTrackList::OnMetadataSuccess(
   auto track = MakeRefPtr<ImageTrack>(
       this, /* aIndex */ 0, /* aSelected */ true, aMetadata.mAnimated,
       aMetadata.mFrameCount, aMetadata.mFrameCountComplete, repetitions);
+
+  MOZ_LOG(
+      gWebCodecsLog, LogLevel::Debug,
+      ("ImageTrackList %p OnMetadataSuccess -- default track %p", this, track.get()));
 
   // 11. Queue a task to perform the following steps:
   //

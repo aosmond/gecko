@@ -127,6 +127,7 @@ JSObject* ImageDecoder::WrapObject(JSContext* aCx,
 
 void ImageDecoder::Destroy() {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug, ("ImageDecoder %p Destroy", this));
+  MOZ_ASSERT(mOutstandingDecodes.IsEmpty());
 
   if (mReadRequest) {
     mReadRequest->Destroy();
@@ -244,6 +245,10 @@ MessageProcessedResult ImageDecoder::ProcessConfigureMessage(
                       "Failed to create platform decoder"_ns));
     return MessageProcessedResult::Processed;
   }
+
+  MOZ_LOG(
+      gWebCodecsLog, LogLevel::Error,
+      ("ImageDecoder %p Initialize -- using tracks %p decoder %p", this, mTracks.get(), mDecoder.get()));
 
   // 4. Assign true to [[message queue blocked]].
   mMessageQueueBlocked = true;
@@ -811,12 +816,12 @@ void ImageDecoder::RequestDecodeFrames(uint32_t aFramesToDecode) {
   mDecoder->DecodeFrames(aFramesToDecode)
       ->Then(
           GetCurrentSerialEventTarget(), __func__,
-          [self = WeakPtr{this}](const image::DecodeFramesResult& aResult) {
+          [self = RefPtr{this}](const image::DecodeFramesResult& aResult) {
             if (self) {
               self->OnDecodeFramesSuccess(aResult);
             }
           },
-          [self = WeakPtr{this}](const nsresult& aErr) {
+          [self = RefPtr{this}](const nsresult& aErr) {
             if (self) {
               self->OnDecodeFramesFailed(aErr);
             }
@@ -924,6 +929,10 @@ void ImageDecoder::OnDecodeFramesSuccess(
   // 10.2.5. Decode Complete Frame (with frameIndex and promise)
   MOZ_ASSERT(mHasFramePending);
   mHasFramePending = false;
+
+  MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
+          ("ImageDecoder %p OnDecodeFramesSuccess -- closed %d tracks %p finished %d frames %zu", this,
+           mClosed, mTracks.get(), aResult.mFinished, aResult.mFrames.Length()));
 
   // 1. Assert that [[tracks established]] is true.
   MOZ_ASSERT(mTracksEstablished);
