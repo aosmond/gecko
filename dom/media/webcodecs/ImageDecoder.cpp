@@ -146,6 +146,8 @@ void ImageDecoder::Destroy() {
   mSourceBuffer = nullptr;
   mDecoder = nullptr;
   mParent = nullptr;
+  mWorkerRef = nullptr;
+  mShutdownBlocker = nullptr;
 }
 
 void ImageDecoder::QueueConfigureMessage(
@@ -572,7 +574,9 @@ void ImageDecoder::Initialize(const GlobalObject& aGlobal,
           [self = RefPtr{this}](bool /* aUnUsed*/) {
             self->Close(MediaResult(NS_ERROR_DOM_ABORT_ERR, "Shutdown"_ns));
           },
-          [self = RefPtr{this}](bool /* aUnUsed*/) {});
+          [self = RefPtr{this}](bool /* aUnUsed*/) {
+            self->Close(MediaResult(NS_ERROR_DOM_ABORT_ERR, "Shutdown"_ns));
+          });
     }
   } else if (WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate()) {
     mWorkerRef = WeakWorkerRef::Create(workerPrivate, [self = RefPtr{this}]() {
@@ -1030,6 +1034,9 @@ void ImageDecoder::Close(const MediaResult& aResult) {
     aResult.RejectTo(mCompletePromise);
     mComplete = true;
   }
+
+  mWorkerRef = nullptr;
+  mShutdownBlocker = nullptr;
 }
 
 void ImageDecoder::Reset() {
