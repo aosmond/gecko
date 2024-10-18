@@ -399,30 +399,6 @@ mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvShutdown() {
   return IPC_OK();
 }
 
-mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvParentShmemForPool(
-    Shmem&& aEncodedBuffer) {
-  if (aEncodedBuffer.IsWritable()) {
-    mVideoHost.SharedMemMgr()->MgrDeallocShmem(GMPSharedMem::kGMPEncodedData,
-                                               aEncodedBuffer);
-  }
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvNeedShmem(
-    const uint32_t& aFrameBufferSize, Shmem* aMem) {
-  ipc::Shmem mem;
-
-  if (!mVideoHost.SharedMemMgr()->MgrAllocShmem(GMPSharedMem::kGMPFrameData,
-                                                aFrameBufferSize, &mem)) {
-    GMP_LOG_ERROR("%s: Failed to get a shared mem buffer for Child! size %u",
-                  __FUNCTION__, aFrameBufferSize);
-    return IPC_FAIL(this, "Failed to get a shared mem buffer for Child!");
-  }
-  *aMem = mem;
-  mem = ipc::Shmem();
-  return IPC_OK();
-}
-
 mozilla::ipc::IPCResult GMPVideoDecoderParent::Recv__delete__() {
   GMP_LOG_DEBUG("GMPVideoDecoderParent[%p]::Recv__delete__()", this);
 

@@ -18,14 +18,11 @@ GMPVideoDecoderChild::GMPVideoDecoderChild(GMPContentChild* aPlugin)
       mPlugin(aPlugin),
       mVideoDecoder(nullptr),
       mVideoHost(this),
-      mNeedShmemIntrCount(0),
       mPendingDecodeComplete(false) {
   MOZ_ASSERT(mPlugin);
 }
 
-GMPVideoDecoderChild::~GMPVideoDecoderChild() {
-  MOZ_ASSERT(!mNeedShmemIntrCount);
-}
+GMPVideoDecoderChild::~GMPVideoDecoderChild() = default;
 
 void GMPVideoDecoderChild::Init(GMPVideoDecoder* aDecoder) {
   MOZ_ASSERT(aDecoder,
@@ -148,15 +145,6 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDecode(
   return IPC_OK();
 }
 
-mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvChildShmemForPool(
-    Shmem&& aFrameBuffer) {
-  GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr();
-  if (memMgr && aFrameBuffer.IsWritable()) {
-    memMgr->MgrDeallocShmem(GMPSharedMem::kGMPFrameData, aFrameBuffer);
-  }
-  return IPC_OK();
-}
-
 mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvReset() {
   if (!mVideoDecoder) {
     return IPC_FAIL(this, "!mVideoDecoder");
@@ -185,14 +173,7 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDecodingComplete() {
   MOZ_ASSERT(mPlugin);
   MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
 
-  if (mNeedShmemIntrCount) {
-    // There's a GMP blocked in Alloc() waiting for the CallNeedShem() to
-    // return a frame they can use. Don't call the GMP's DecodingComplete()
-    // now and don't delete the GMPVideoDecoderChild, defer processing the
-    // DecodingComplete() until once the Alloc() finishes.
-    mPendingDecodeComplete = true;
-    return IPC_OK();
-  }
+  // FIXME: Couldn't the Parent just Send__delete__ instead?
 
   // This will call ActorDestroy.
   Unused << Send__delete__(this);
@@ -210,38 +191,6 @@ void GMPVideoDecoderChild::ActorDestroy(ActorDestroyReason why) {
   mVideoHost.DoneWithAPI();
 
   mPlugin = nullptr;
-}
-
-bool GMPVideoDecoderChild::Alloc(size_t aSize, Shmem* aMem) {
-  if (NS_WARN_IF(!mPlugin)) {
-    return false;
-  }
-
-  MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
-
-  bool rv;
-#ifndef SHMEM_ALLOC_IN_CHILD
-  ++mNeedShmemIntrCount;
-  rv = SendNeedShmem(aSize, aMem);
-  --mNeedShmemIntrCount;
-  if (mPendingDecodeComplete && mNeedShmemIntrCount == 0) {
-    mPendingDecodeComplete = false;
-    mPlugin->GMPMessageLoop()->PostTask(
-        NewRunnableMethod("gmp::GMPVideoDecoderChild::RecvDecodingComplete",
-                          this, &GMPVideoDecoderChild::RecvDecodingComplete));
-  }
-#else
-  rv = AllocShmem(aSize, aType, aMem);
-#endif
-  return rv;
-}
-
-void GMPVideoDecoderChild::Dealloc(Shmem&& aMem) {
-#ifndef SHMEM_ALLOC_IN_CHILD
-  SendParentShmemForPool(std::move(aMem));
-#else
-  DeallocShmem(aMem);
-#endif
 }
 
 }  // namespace mozilla::gmp

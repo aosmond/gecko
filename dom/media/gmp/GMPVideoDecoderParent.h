@@ -10,7 +10,7 @@
 #include "gmp-video-decode.h"
 #include "mozilla/gmp/PGMPVideoDecoderParent.h"
 #include "GMPMessageUtils.h"
-#include "GMPSharedMemManager.h"
+#include "GMPShmemManagerParent.h"
 #include "GMPUtils.h"
 #include "GMPVideoHost.h"
 #include "GMPVideoDecoderProxy.h"
@@ -23,7 +23,7 @@ class GMPContentParent;
 
 class GMPVideoDecoderParent final : public PGMPVideoDecoderParent,
                                     public GMPVideoDecoderProxy,
-                                    public GMPSharedMemManager,
+                                    public GMPShmemManagerParent,
                                     public GMPCrashHelperHolder {
   friend class PGMPVideoDecoderParent;
 
@@ -53,19 +53,30 @@ class GMPVideoDecoderParent final : public PGMPVideoDecoderParent,
   GMPPluginType GetPluginType() const override { return mPluginType; }
   nsCString GetDisplayName() const override;
 
-  // GMPSharedMemManager
-  bool Alloc(size_t aSize, Shmem* aMem) override {
-    return AllocShmem(aSize, aMem);
+  // GMPShmemManager
+  bool ProtoPurgeShmems() final { return SendPurgeShmems(); }
+
+  bool ProtoGiveShmem(ipc::Shmem&& aShmem) final {
+    return SendGiveBuffer(std::move(aShmem));
   }
-  void Dealloc(Shmem&& aMem) override { DeallocShmem(aMem); }
+
+  bool ProtoAllocShmem(size_t aCapacity, ipc::Shmem* aShmem) final {
+    return AllocShmem(aCapacity, aShmem);
+  }
+
+  bool ProtoDeallocShmem(ipc::Shmem& aShmem) final {
+    return DeallocShmem(aShmem);
+  }
 
  private:
   ~GMPVideoDecoderParent();
 
   // PGMPVideoDecoderParent
   void ActorDestroy(ActorDestroyReason aWhy) override;
-  mozilla::ipc::IPCResult RecvDecoded(
-      const GMPVideoi420FrameData& aDecodedFrame) override;
+  mozilla::ipc::IPCResult RecvDecodedShmem(
+      const GMPVideoi420FrameData& aDecodedFrame, ipc::Shmem&& aShmem) override;
+  mozilla::ipc::IPCResult RecvDecodedData(
+      const GMPVideoi420FrameData& aDecodedFrame, nsTArray<uint8_t>&& aData) override;
   mozilla::ipc::IPCResult RecvReceivedDecodedReferenceFrame(
       const uint64_t& aPictureId) override;
   mozilla::ipc::IPCResult RecvReceivedDecodedFrame(
@@ -75,10 +86,6 @@ class GMPVideoDecoderParent final : public PGMPVideoDecoderParent,
   mozilla::ipc::IPCResult RecvResetComplete() override;
   mozilla::ipc::IPCResult RecvError(const GMPErr& aError) override;
   mozilla::ipc::IPCResult RecvShutdown() override;
-  mozilla::ipc::IPCResult RecvParentShmemForPool(
-      Shmem&& aEncodedBuffer) override;
-  mozilla::ipc::IPCResult RecvNeedShmem(const uint32_t& aFrameBufferSize,
-                                        Shmem* aMem) override;
   mozilla::ipc::IPCResult Recv__delete__() override;
 
   void UnblockResetAndDrain();
