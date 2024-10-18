@@ -21,7 +21,6 @@ namespace dom {
 class ImageDecoder;
 class ReadableStream;
 class ReadableStreamDefaultReader;
-class WeakWorkerRef;
 
 struct ImageDecoderReadRequest final : public ReadRequest {
  public:
@@ -54,7 +53,6 @@ struct ImageDecoderReadRequest final : public ReadRequest {
   MOZ_CAN_RUN_SCRIPT_BOUNDARY void Cancel();
   void Complete(const MediaResult& aResult);
 
-  RefPtr<WeakWorkerRef> mWorkerRef;
   RefPtr<ImageDecoder> mDecoder;
   RefPtr<ReadableStreamDefaultReader> mReader;
   RefPtr<image::SourceBuffer> mSourceBuffer;

@@ -17,8 +17,10 @@
 #include "mozilla/dom/VideoFrame.h"
 #include "mozilla/dom/VideoFrameBinding.h"
 #include "mozilla/dom/WebCodecsUtils.h"
+#include "mozilla/dom/WorkerRef.h"
 #include "mozilla/image/ImageUtils.h"
 #include "mozilla/image/SourceBuffer.h"
+#include "mozilla/media/MediaUtils.h"
 #include "mozilla/Logging.h"
 #include "mozilla/StaticPrefs_dom.h"
 #include "nsComponentManagerUtils.h"
@@ -560,6 +562,32 @@ void ImageDecoder::CheckOutstandingDecodes() {
 
 void ImageDecoder::Initialize(const GlobalObject& aGlobal,
                               const ImageDecoderInit& aInit, ErrorResult& aRv) {
+  if (NS_IsMainThread()) {
+    mShutdownBlocker = media::ShutdownBlockingTicket::Create(
+        u"ImageDecoder::mShutdownBlocker"_ns,
+        NS_LITERAL_STRING_FROM_CSTRING(__FILE__), __LINE__);
+    if (mShutdownBlocker) {
+      mShutdownBlocker->ShutdownPromise()->Then(
+          GetCurrentSerialEventTarget(), __func__,
+          [self = RefPtr{this}](bool /* aUnUsed*/) {
+            self->Close(MediaResult(NS_ERROR_DOM_ABORT_ERR, "Shutdown"_ns));
+          },
+          [self = RefPtr{this}](bool /* aUnUsed*/) {});
+    }
+  } else if (WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate()) {
+    mWorkerRef = WeakWorkerRef::Create(workerPrivate, [self = RefPtr{this}]() {
+      self->Close(MediaResult(NS_ERROR_DOM_ABORT_ERR, "Shutdown"_ns));
+    });
+  }
+
+  if (NS_WARN_IF(!mWorkerRef && !mShutdownBlocker)) {
+    MOZ_LOG(
+        gWebCodecsLog, LogLevel::Error,
+        ("ImageDecoder %p Initialize -- create shutdown blocker failed", this));
+    aRv.ThrowInvalidStateError("Could not allocate for encoded source buffer");
+    return;
+  }
+
   mCompletePromise = Promise::Create(mParent, aRv);
   if (NS_WARN_IF(aRv.Failed())) {
     MOZ_LOG(gWebCodecsLog, LogLevel::Error,
