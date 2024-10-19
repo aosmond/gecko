@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "GMPVideoPlaneImpl.h"
+#include <algorithm>
 #include "mozilla/gmp/GMPTypes.h"
 #include "GMPVideoHost.h"
 #include "GMPSharedMemManager.h"
@@ -16,13 +17,15 @@ GMPPlaneImpl::GMPPlaneImpl(GMPVideoHostImpl* aHost)
   mHost->PlaneCreated(this);
 }
 
-GMPPlaneImpl::GMPPlaneImpl(const GMPPlaneData& aPlaneData,
+GMPPlaneImpl::GMPPlaneImpl(const ipc::Shmem& aBuffer,
+                           const GMPPlaneData& aPlaneData,
                            GMPVideoHostImpl* aHost)
-    : mBuffer(aPlaneData.mBuffer()),
+    : mBuffer(aBuffer),
       mSize(aPlaneData.mSize()),
       mStride(aPlaneData.mStride()),
       mHost(aHost) {
   MOZ_ASSERT(mHost);
+  MOZ_ASSERT(aPlaneData.mOffset() == 0);
   mHost->PlaneCreated(this);
 }
 
@@ -49,15 +52,11 @@ void GMPPlaneImpl::ActorDestroyed() {
   mHost = nullptr;
 }
 
-bool GMPPlaneImpl::InitPlaneData(GMPPlaneData& aPlaneData) {
-  aPlaneData.mBuffer() = mBuffer;
+bool GMPPlaneImpl::InitPlaneData(ipc::Shmem& aBuffer,
+                                 GMPPlaneData& aPlaneData) {
+  aBuffer = std::move(mBuffer);
   aPlaneData.mSize() = mSize;
   aPlaneData.mStride() = mStride;
-
-  // This method is called right before Shmem is sent to another process.
-  // We need to effectively zero out our member copy so that we don't
-  // try to delete memory we don't own later.
-  mBuffer = ipc::Shmem();
 
   return true;
 }
@@ -84,7 +83,7 @@ GMPErr GMPPlaneImpl::MaybeResize(int32_t aNewSize) {
 
   DestroyBuffer();
 
-  mBuffer = new_mem;
+  mBuffer = std::move(new_mem);
 
   return GMPNoErr;
 }
@@ -123,7 +122,7 @@ GMPErr GMPPlaneImpl::Copy(const GMPPlane& aPlane) {
   }
 
   if (planeimpl.Buffer() && planeimpl.mSize > 0) {
-    memcpy(Buffer(), planeimpl.Buffer(), mSize);
+    memcpy(Buffer(), planeimpl.Buffer(), std::min(mSize, planeimpl.mSize));
   }
 
   mSize = planeimpl.mSize;
