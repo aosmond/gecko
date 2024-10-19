@@ -29,12 +29,13 @@ child:
                int64_t aRenderTimeMs);
   async Reset();
   async Drain();
-  async DecodingComplete();
-  async ChildShmemForPool(Shmem aFrameBuffer);
+  async GiveBuffer(Shmem aShmem);
+  async PurgeShmems();
+  async __delete__();
 
 parent:
-  async __delete__();
-  async Decoded(GMPVideoi420FrameData aDecodedFrame);
+  async DecodedShmem(GMPVideoi420FrameData aDecodedFrame, Shmem aData);
+  async DecodedData(GMPVideoi420FrameData aDecodedFrame, uint8_t[] aData);
   async ReceivedDecodedReferenceFrame(uint64_t aPictureId);
   async ReceivedDecodedFrame(uint64_t aPictureId);
   async InputDataExhausted();
@@ -42,8 +43,6 @@ parent:
   async ResetComplete();
   async Error(GMPErr aErr);
   async Shutdown();
-  async ParentShmemForPool(Shmem aEncodedBuffer);
-  sync NeedShmem(uint32_t aFrameBufferSize) returns (Shmem aMem);
 };
 
 } // namespace gmp
