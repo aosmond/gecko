@@ -9,7 +9,7 @@
 #include "nsString.h"
 #include "mozilla/gmp/PGMPVideoDecoderChild.h"
 #include "gmp-video-decode.h"
-#include "GMPSharedMemManager.h"
+#include "GMPShmemManagerChild.h"
 #include "GMPVideoHost.h"
 #include "mozilla/gmp/GMPTypes.h"
 
@@ -17,9 +17,9 @@ namespace mozilla::gmp {
 
 class GMPContentChild;
 
-class GMPVideoDecoderChild : public PGMPVideoDecoderChild,
+class GMPVideoDecoderChild final : public PGMPVideoDecoderChild,
                              public GMPVideoDecoderCallback,
-                             public GMPSharedMemManager {
+                             public GMPShmemManagerChild {
   friend class PGMPVideoDecoderChild;
 
  public:
@@ -41,21 +41,27 @@ class GMPVideoDecoderChild : public PGMPVideoDecoderChild,
   void ResetComplete() override;
   void Error(GMPErr aError) override;
 
-  // GMPSharedMemManager
-  bool Alloc(size_t aSize, Shmem* aMem) override;
-  void Dealloc(Shmem&& aMem) override;
+  // GMPShmemManagerChild
+  void ProtoRequestShmems() final {
+    Unused << SendIncreaseShmemPoolSize();
+  }
+
+  bool ProtoDeallocShmem(ipc::Shmem& aShmem) final {
+    return DeallocShmem(aShmem);
+  }
 
  private:
   virtual ~GMPVideoDecoderChild();
 
   // PGMPVideoDecoderChild
+  ipc::IPCResult RecvGiveBuffer(ipc::Shmem&& aShmem) override;
+  ipc::IPCResult RecvPurgeShmems() override;
   mozilla::ipc::IPCResult RecvInitDecode(const GMPVideoCodec& aCodecSettings,
                                          nsTArray<uint8_t>&& aCodecSpecific,
                                          const int32_t& aCoreCount);
   mozilla::ipc::IPCResult RecvDecode(
       const GMPVideoEncodedFrameData& aInputFrame, const bool& aMissingFrames,
       nsTArray<uint8_t>&& aCodecSpecificInfo, const int64_t& aRenderTimeMs);
-  mozilla::ipc::IPCResult RecvChildShmemForPool(Shmem&& aFrameBuffer);
   mozilla::ipc::IPCResult RecvReset();
   mozilla::ipc::IPCResult RecvDrain();
   mozilla::ipc::IPCResult RecvDecodingComplete();
@@ -65,9 +71,6 @@ class GMPVideoDecoderChild : public PGMPVideoDecoderChild,
   GMPVideoDecoder* mVideoDecoder;
   GMPVideoHostImpl mVideoHost;
 
-  // Non-zero when a GMP is blocked spinning the IPC message loop while
-  // waiting on an NeedShmem to complete.
-  int mNeedShmemIntrCount;
   bool mPendingDecodeComplete;
 };
 
