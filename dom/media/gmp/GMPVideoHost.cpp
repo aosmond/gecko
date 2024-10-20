@@ -50,7 +50,7 @@ GMPErr GMPVideoHostImpl::CreatePlane(GMPPlane** aPlane) {
   }
   *aPlane = nullptr;
 
-  auto p = new GMPPlaneImpl(this);
+  auto* p = new GMPPlaneImpl();
 
   *aPlane = p;
 
@@ -63,10 +63,6 @@ GMPSharedMemManager* GMPVideoHostImpl::SharedMemMgr() { return mSharedMemMgr; }
 void GMPVideoHostImpl::DoneWithAPI() { ActorDestroyed(); }
 
 void GMPVideoHostImpl::ActorDestroyed() {
-  for (uint32_t i = mPlanes.Length(); i > 0; i--) {
-    mPlanes[i - 1]->DoneWithAPI();
-    mPlanes.RemoveElementAt(i - 1);
-  }
   for (uint32_t i = mEncodedFrames.Length(); i > 0; i--) {
     mEncodedFrames[i - 1]->DoneWithAPI();
     mEncodedFrames.RemoveElementAt(i - 1);
@@ -76,14 +72,6 @@ void GMPVideoHostImpl::ActorDestroyed() {
     mDecodedFrames.RemoveElementAt(i - 1);
   }
   mSharedMemMgr = nullptr;
-}
-
-void GMPVideoHostImpl::PlaneCreated(GMPPlaneImpl* aPlane) {
-  mPlanes.AppendElement(aPlane);
-}
-
-void GMPVideoHostImpl::PlaneDestroyed(GMPPlaneImpl* aPlane) {
-  MOZ_ALWAYS_TRUE(mPlanes.RemoveElement(aPlane));
 }
 
 void GMPVideoHostImpl::EncodedFrameCreated(
