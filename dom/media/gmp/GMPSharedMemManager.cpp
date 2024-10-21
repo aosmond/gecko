@@ -8,17 +8,8 @@
 
 namespace mozilla::gmp {
 
-GMPSharedMemManager::~GMPSharedMemManager() {
-#ifdef DEBUG
-  for (const auto& pool : mPool) {
-    MOZ_ASSERT(pool.IsEmpty());
-  }
-#endif
-}
-
-void GMPSharedMemManager::PurgeSmallerShmem(nsTArray<ipc::Shmem>& aPool,
-                                            size_t aSize) {
-  aPool.RemoveElementsBy([&](ipc::Shmem& shmem) {
+void GMPSharedMemManager::PurgeSmallerShmem(size_t aSize) {
+  mPool.RemoveElementsBy([&](ipc::Shmem& shmem) {
     if (!shmem.IsWritable()) {
       MOZ_ASSERT_UNREACHABLE("Shmem must be writable!");
       return true;
@@ -31,31 +22,22 @@ void GMPSharedMemManager::PurgeSmallerShmem(nsTArray<ipc::Shmem>& aPool,
   });
 }
 
-bool GMPSharedMemManager::MgrTakeShmem(GMPSharedMemClass aClass,
-                                       ipc::Shmem* aMem) {
-  MOZ_ASSERT(MgrIsOnOwningThread());
-
-  auto& pool = mPool[size_t(aClass)];
-  if (pool.IsEmpty()) {
-    return false;
-  }
-
-  *aMem = pool.PopLastElement();
-  return true;
-}
-
 bool GMPSharedMemManager::MgrTakeShmem(GMPSharedMemClass aClass, size_t aSize,
                                        ipc::Shmem* aMem) {
   MOZ_ASSERT(MgrIsOnOwningThread());
 
-  auto& pool = mPool[size_t(aClass)];
+  // We can only provide shmems for the class that we collect in our pool.
+  if (aClass != mCollectClass) {
+    return false;
+  }
+
   size_t alignedSize = ipc::SharedMemory::PageAlignedSize(aSize);
-  PurgeSmallerShmem(pool, alignedSize);
-  if (pool.IsEmpty()) {
+  PurgeSmallerShmem(alignedSize);
+  if (mPool.IsEmpty()) {
     return MgrAllocShmem(alignedSize, aMem);
   }
 
-  *aMem = pool.PopLastElement();
+  *aMem = mPool.PopLastElement();
   return true;
 }
 
@@ -67,30 +49,66 @@ void GMPSharedMemManager::MgrGiveShmem(GMPSharedMemClass aClass,
     return;
   }
 
-  auto& pool = mPool[size_t(aClass)];
-  PurgeSmallerShmem(pool, aMem.Size<uint8_t>());
+  // If we are not collecting shmems of this class, return it immediately to the
+  // actor on the other side.
+  if (aClass != mCollectClass) {
+    MgrReturnShmem(aClass, std::move(aMem));
+    return;
+  }
 
-  if (pool.Length() >= kMaxPoolLength) {
+  PurgeSmallerShmem(mPool, aMem.Size<uint8_t>());
+
+  if (mPool.Length() >= kMaxPoolLength) {
     MgrDeallocShmem(aMem);
     return;
   }
 
-  pool.AppendElement(std::move(aMem));
+  mPool.AppendElement(std::move(aMem));
+}
+
+void GMPSharedMemManager::MgrCreateReturnShmems(GMPSharedMemClass aClass,
+                                                size_t aSize) {
+  if (aClass == mCollectClass) {
+    MOZ_ASSERT_UNREACHABLE("Used wrong shared mem class?");
+    return;
+  }
+
+  // If the new size is bigger, we know that by sending larger shmems, the
+  // remote side will just free the old shmems, so we can simply reset the
+  // outstanding count.
+  size_t alignedSize = ipc::SharedMemory::PageAlignedSize(aSize);
+  if (mReturnShmemSize < alignedSize) {
+    mReturnShmemSize = alignedSize;
+    mReturnPoolSize = 0;
+  }
+
+  if (mReturnShmemSize == 0) {
+    return;
+  }
+
+  // Due to OOMs, we might temporarily fail to allocate more buffers for the
+  // pool, so this is safe to call with the same size.
+  while (GMPSharedMemManager::kMaxPoolLength > mReturnPoolSize) {
+    ipc::Shmem shmem;
+    if (!MgrAllocShmem(mReturnShmemSize, &shmem) ||
+        !MgrReturnShmem(aClass, std::move(shmem))) {
+      break;
+    }
+    ++mReturnPoolSize;
+  }
 }
 
 void GMPSharedMemManager::MgrPurgeShmems() {
   MOZ_ASSERT(MgrIsOnOwningThread());
 
-  for (auto& pool : mPool) {
-    for (auto& shmem : pool) {
-      if (shmem.IsWritable()) {
-        MgrDeallocShmem(shmem);
-      } else {
-        MOZ_ASSERT_UNREACHABLE("Shmem must be writable!");
-      }
+  for (auto& shmem : mPool) {
+    if (shmem.IsWritable()) {
+      MgrDeallocShmem(shmem);
+    } else {
+      MOZ_ASSERT_UNREACHABLE("Shmem must be writable!");
     }
-    pool.Clear();
   }
+  mPool.Clear();
 }
 
 }  // namespace mozilla::gmp

@@ -42,8 +42,11 @@ class GMPVideoDecoderChild final : public PGMPVideoDecoderChild,
   void Error(GMPErr aError) override;
 
   // GMPSharedMemManager
-  bool MgrIsOnOwningThread() const override;
   void MgrDeallocShmem(Shmem& aMem) override { DeallocShmem(aMem); }
+
+ protected:
+  bool MgrIsOnOwningThread() const override;
+  void MgrReturnShmem(GMPSharedMemClass aClass, ipc::Shmem&& aMem) override;
 
  private:
   virtual ~GMPVideoDecoderChild();

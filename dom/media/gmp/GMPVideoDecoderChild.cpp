@@ -24,6 +24,12 @@ bool GMPVideoDecoderChild::MgrIsOnOwningThread() const {
   return !mPlugin || mPlugin->GMPMessageLoop() == MessageLoop::current();
 }
 
+void GMPVideoDecoderChild::MgrReturnShmem(GMPSharedMemClass aClass,
+                                          ipc::Shmem&& aMem) {
+  MOZ_ASSERT(aClass == GMPSharedMemClass::Encoded);
+  Unused << SendReturnShmem(std::move(aMem));
+}
+
 void GMPVideoDecoderChild::Init(GMPVideoDecoder* aDecoder) {
   MOZ_ASSERT(aDecoder,
              "Cannot initialize video decoder child without a video decoder!");
@@ -44,19 +50,11 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
 
   MOZ_ASSERT(mPlugin->GMPMessageLoop() == MessageLoop::current());
 
-  auto df = static_cast<GMPVideoi420FrameImpl*>(aDecodedFrame);
-
-  if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
-    ipc::Shmem inputShmem;
-    if (memMgr->MgrTakeShmem(GMPSharedMemClass::Encoded, &inputShmem)) {
-      Unused << SendReturnShmem(std::move(inputShmem));
-    }
-  }
-
   GMPVideoi420FrameData frameData;
   ipc::Shmem frameShmem;
   nsTArray<uint8_t> frameArray;
 
+  auto df = static_cast<GMPVideoi420FrameImpl*>(aDecodedFrame);
   if (df->InitFrameData(frameData, frameShmem)) {
     Unused << SendDecodedShmem(frameData, std::move(frameShmem));
   } else if (df->InitFrameData(frameData, frameArray)) {

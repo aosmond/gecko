@@ -30,7 +30,7 @@ namespace mozilla::gmp {
 // Dead: mIsOpen == false
 
 GMPVideoDecoderParent::GMPVideoDecoderParent(GMPContentParent* aPlugin)
-    : mIsOpen(false),
+    : GMPSharedMemManager(GMPSharedMemClass::Encoded) mIsOpen(false),
       mShuttingDown(false),
       mActorDestroyed(false),
       mIsAwaitingResetComplete(false),
@@ -130,16 +130,6 @@ nsresult GMPVideoDecoderParent::Decode(
     GMP_LOG_ERROR(
         "GMPVideoDecoderParent[%p]::Decode() ERROR; missing input shmem", this);
     return NS_ERROR_FAILURE;
-  }
-
-  if (mDecodedShmemSize > 0) {
-    if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
-      ipc::Shmem outputShmem;
-      if (memMgr->MgrTakeShmem(GMPSharedMemClass::Decoded, mDecodedShmemSize,
-                               &outputShmem)) {
-        Unused << SendGiveShmem(std::move(outputShmem));
-      }
-    }
   }
 
   if (!SendDecode(frameData, std::move(frameShmem), aMissingFrames,
@@ -343,13 +333,16 @@ mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecodedShmem(
 mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecodedData(
     const GMPVideoi420FrameData& aDecodedFrame,
     nsTArray<uint8_t>&& aDecodedArray) {
-  if (HandleDecoded(aDecodedFrame, aDecodedArray.Length())) {
-    mDecodedShmemSize = std::max(mDecodedShmemSize, aDecodedArray.Length());
-    auto* f = new GMPVideoi420FrameImpl(aDecodedFrame, std::move(aDecodedArray),
-                                        &mVideoHost);
-    mCallback->Decoded(f);
+  size_t arraySize = aDecodedArray.Length();
+  if (!HandleDecoded(aDecodedFrame, arraySize)) {
+    return IPC_OK();
   }
 
+  auto* f = new GMPVideoi420FrameImpl(aDecodedFrame, std::move(aDecodedArray),
+                                      &mVideoHost);
+  mCallback->Decoded(f);
+
+  MgrCreateReturnShmems(GMPSharedMemClass::Decoded, arraySize);
   return IPC_OK();
 }
 

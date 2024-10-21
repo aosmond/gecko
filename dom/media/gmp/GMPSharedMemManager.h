@@ -15,28 +15,33 @@ enum class GMPSharedMemClass { Decoded, Encoded };
 
 class GMPSharedMemManager {
  public:
-  GMPSharedMemManager() = default;
+  static constexpr size_t kMaxPoolLength = 16;
 
-  virtual ~GMPSharedMemManager();
+  explicit GMPSharedMemManager(GMPSharedMemClass aCollectClass)
+      : mCollectClass(aCollectClass) {}
 
-  bool MgrTakeShmem(GMPSharedMemClass aClass, ipc::Shmem* aMem);
+  virtual ~GMPSharedMemManager() { MOZ_ASSERT(mPool.IsEmpty()); }
+
   bool MgrTakeShmem(GMPSharedMemClass aClass, size_t aSize, ipc::Shmem* aMem);
   void MgrGiveShmem(GMPSharedMemClass aClass, ipc::Shmem&& aMem);
   void MgrPurgeShmems();
+
+  void MgrCreateReturnShmems(GMPSharedMemClass aClass, size_t aSize);
 
   virtual bool MgrAllocShmem(size_t aSize, ipc::Shmem* aMem) { return false; }
   virtual void MgrDeallocShmem(ipc::Shmem& aMem) = 0;
 
  protected:
+  virtual bool MgrReturnShmem(GMPSharedMemClass aClass, ipc::Shmem&& aMem) = 0;
   virtual bool MgrIsOnOwningThread() const = 0;
-
-  static constexpr size_t kMaxPools = 2;
 
  private:
   void PurgeSmallerShmem(nsTArray<ipc::Shmem>& aPool, size_t aSize);
 
-  static constexpr size_t kMaxPoolLength = 16;
-  AutoTArray<ipc::Shmem, kMaxPoolLength> mPool[kMaxPools];
+  AutoTArray<ipc::Shmem, kMaxPoolLength> mPool;
+  size_t mReturnShmemSize = 0;
+  size_t mReturnPoolSize = 0;
+  GMPSharedMemClass mCollectClass;
 };
 
 }  // namespace mozilla::gmp

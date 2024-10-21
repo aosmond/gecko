@@ -63,6 +63,11 @@ class GMPVideoDecoderParent final : public PGMPVideoDecoderParent,
  protected:
   bool MgrIsOnOwningThread() const override;
 
+  bool MgrReturnShmem(GMPSharedMemClass aClass, ipc::Shmem&& aMem) override {
+    MOZ_ASSERT(aClass == GMPSharedMemClass::Decoded);
+    return SendGiveShmem(std::move(aMem));
+  }
+
  private:
   ~GMPVideoDecoderParent();
 
