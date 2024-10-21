@@ -23,6 +23,7 @@ void GMPSharedMemManager::PurgeSmallerShmem(nsTArray<ipc::Shmem>& aPool,
     if (shmem.Size<uint8_t>() >= aSize) {
       return false;
     }
+    printf_stderr("[AO] [%p] GMPSharedMemManager::PurgeSmallerShmem -- %zu (min %zu)\n", this, shmem.Size<uint8_t>(), aSize);
     MgrDeallocShmem(shmem);
     return true;
   });
@@ -38,6 +39,7 @@ bool GMPSharedMemManager::MgrTakeShmem(GMPSharedMemClass aClass,
   }
 
   *aMem = pool.PopLastElement();
+  printf_stderr("[AO] [%p] GMPSharedMemManager::MgrTakeShmem -- reuse shmem %zu\n", this, aMem->Size<uint8_t>());
   return true;
 }
 
@@ -48,10 +50,16 @@ bool GMPSharedMemManager::MgrTakeShmem(GMPSharedMemClass aClass, size_t aSize,
   auto& pool = mPool[size_t(aClass)];
   PurgeSmallerShmem(pool, aSize);
   if (pool.IsEmpty()) {
-    return MgrAllocShmem(aSize, aMem);
+    if (MgrAllocShmem(aSize, aMem)) {
+      printf_stderr("[AO] [%p] GMPSharedMemManager::MgrTakeShmem -- shmem %zu\n", this, aSize);
+      return true;
+    }
+    printf_stderr("[AO] [%p] GMPSharedMemManager::MgrTakeShmem -- array %zu\n", this, aSize);
+    return false;
   }
 
   *aMem = pool.PopLastElement();
+  printf_stderr("[AO] [%p] GMPSharedMemManager::MgrTakeShmem -- reuse shmem %zu (min %zu)\n", this, aMem->Size<uint8_t>(), aSize);
   return true;
 }
 
@@ -60,6 +68,7 @@ void GMPSharedMemManager::MgrGiveShmem(GMPSharedMemClass aClass,
   AssertInOwningThread();
 
   if (!aMem.IsWritable()) {
+    printf_stderr("[AO] [%p] GMPSharedMemManager::MgrGiveShmem -- no shmem\n", this);
     return;
   }
 
@@ -67,10 +76,12 @@ void GMPSharedMemManager::MgrGiveShmem(GMPSharedMemClass aClass,
   PurgeSmallerShmem(pool, aMem.Size<uint8_t>());
 
   if (pool.Length() >= kMaxPoolLength) {
+    printf_stderr("[AO] [%p] GMPSharedMemManager::MgrGiveShmem -- drop shmem %zu\n", this, aMem.Size<uint8_t>());
     MgrDeallocShmem(aMem);
     return;
   }
 
+  printf_stderr("[AO] [%p] GMPSharedMemManager::MgrGiveShmem -- save shmem %zu\n", this, aMem.Size<uint8_t>());
   pool.AppendElement(std::move(aMem));
 }
 

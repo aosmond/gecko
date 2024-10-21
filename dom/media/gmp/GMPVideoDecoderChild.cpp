@@ -44,6 +44,7 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
 
   if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
     ipc::Shmem inputShmem;
+    printf_stderr("[AO] [%p] GMPVideoDecoderChild::Decoded -- take any shmem\n", memMgr);
     if (memMgr->MgrTakeShmem(GMPSharedMemClass::Encoded, &inputShmem)) {
       if (!SendReturnShmem(std::move(inputShmem))) {
         DeallocShmem(inputShmem);
@@ -56,10 +57,12 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
   nsTArray<uint8_t> frameArray;
 
   if (df->InitFrameData(frameData, frameShmem)) {
+    printf_stderr("[AO] [%p] GMPVideoDecoderChild::Decoded -- end decode, send shmem\n", this);
     if (!SendDecodedShmem(frameData, std::move(frameShmem))) {
       DeallocShmem(frameShmem);
     }
   } else if (df->InitFrameData(frameData, frameArray)) {
+    printf_stderr("[AO] [%p] GMPVideoDecoderChild::Decoded -- end decode, send array\n", this);
     Unused << SendDecodedData(frameData, std::move(frameArray));
   } else {
     MOZ_CRASH("Decoded without any frame data!");
@@ -172,6 +175,7 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDecode(
 
   // Ignore any return code. It is OK for this to fail without killing the
   // process.
+  printf_stderr("[AO] [%p] GMPVideoDecoderChild::RecvDecode -- start decode\n", this);
   mVideoDecoder->Decode(f, aMissingFrames, aCodecSpecificInfo.Elements(),
                         aCodecSpecificInfo.Length(), aRenderTimeMs);
 

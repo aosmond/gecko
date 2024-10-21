@@ -133,6 +133,7 @@ nsresult GMPVideoDecoderParent::Decode(
       ipc::Shmem outputShmem;
       if (memMgr->MgrTakeShmem(GMPSharedMemClass::Decoded, mDecodedShmemSize,
                                &outputShmem)) {
+        printf_stderr("[AO] [%p] GMPVideoDecoderParent::Decode -- send shmem %zu\n", this, outputShmem.Size<uint8_t>());
         if (!SendGiveShmem(std::move(outputShmem))) {
           DeallocShmem(outputShmem);
         }
