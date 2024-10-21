@@ -120,9 +120,7 @@ GMPErr GMPVideoEncoderParent::Encode(
       ipc::Shmem outputShmem;
       if (memMgr->MgrTakeShmem(GMPSharedMemClass::Encoded, mEncodedShmemSize,
                                &outputShmem)) {
-        if (!SendGiveShmem(std::move(outputShmem))) {
-          DeallocShmem(outputShmem);
-        }
+        Unused << SendGiveShmem(std::move(outputShmem));
       }
     }
   }
@@ -130,7 +128,6 @@ GMPErr GMPVideoEncoderParent::Encode(
   if (!SendEncode(frameData, std::move(frameShmem), aCodecSpecificInfo,
                   aFrameTypes)) {
     GMP_LOG_ERROR("%s::%s: failed to send encode", __CLASS__, __FUNCTION__);
-    DeallocShmem(frameShmem);
     return GMPGenericErr;
   }
 
@@ -232,10 +229,6 @@ void GMPVideoEncoderParent::ActorDestroy(ActorDestroyReason aWhy) {
 
 mozilla::ipc::IPCResult GMPVideoEncoderParent::RecvReturnShmem(
     ipc::Shmem&& aInputShmem) {
-  if (!aInputShmem.IsWritable()) {
-    return IPC_OK();
-  }
-
   if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
     memMgr->MgrGiveShmem(GMPSharedMemClass::Decoded, std::move(aInputShmem));
   } else {
