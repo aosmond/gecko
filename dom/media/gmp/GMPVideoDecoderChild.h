@@ -51,10 +51,11 @@ class GMPVideoDecoderChild final : public PGMPVideoDecoderChild,
   mozilla::ipc::IPCResult RecvInitDecode(const GMPVideoCodec& aCodecSettings,
                                          nsTArray<uint8_t>&& aCodecSpecific,
                                          const int32_t& aCoreCount);
+  mozilla::ipc::IPCResult RecvGiveShmem(ipc::Shmem&& aOutputShmem);
   mozilla::ipc::IPCResult RecvDecode(
       const GMPVideoEncodedFrameData& aInputFrame, ipc::Shmem&& aInputShmem,
       const bool& aMissingFrames, nsTArray<uint8_t>&& aCodecSpecificInfo,
-      const int64_t& aRenderTimeMs, Maybe<ipc::Shmem>&& aOutputShmem);
+      const int64_t& aRenderTimeMs);
   mozilla::ipc::IPCResult RecvReset();
   mozilla::ipc::IPCResult RecvDrain();
   void ActorDestroy(ActorDestroyReason why) override;

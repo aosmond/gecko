@@ -65,13 +65,13 @@ class GMPVideoDecoderParent final : public PGMPVideoDecoderParent,
 
   // PGMPVideoDecoderParent
   void ActorDestroy(ActorDestroyReason aWhy) override;
+  mozilla::ipc::IPCResult RecvReturnShmem(ipc::Shmem&& aInputShmem) override;
   mozilla::ipc::IPCResult RecvDecodedShmem(
-      const GMPVideoi420FrameData& aDecodedFrame, ipc::Shmem&& aDecodedShmem,
-      Maybe<ipc::Shmem>&& aInputShmem) override;
+      const GMPVideoi420FrameData& aDecodedFrame,
+      ipc::Shmem&& aDecodedShmem) override;
   mozilla::ipc::IPCResult RecvDecodedData(
       const GMPVideoi420FrameData& aDecodedFrame,
-      nsTArray<uint8_t>&& aDecodedArray,
-      Maybe<ipc::Shmem>&& aInputShmem) override;
+      nsTArray<uint8_t>&& aDecodedArray) override;
   mozilla::ipc::IPCResult RecvReceivedDecodedReferenceFrame(
       const uint64_t& aPictureId) override;
   mozilla::ipc::IPCResult RecvReceivedDecodedFrame(
@@ -83,7 +83,7 @@ class GMPVideoDecoderParent final : public PGMPVideoDecoderParent,
   mozilla::ipc::IPCResult RecvShutdown() override;
 
   bool HandleDecoded(const GMPVideoi420FrameData& aDecodedFrame,
-                     size_t aDecodedSize, Maybe<ipc::Shmem>&& aInputShmem);
+                     size_t aDecodedSize);
 
   void UnblockResetAndDrain();
   void CancelResetCompleteTimeout();

@@ -128,27 +128,24 @@ nsresult GMPVideoDecoderParent::Decode(
     return NS_ERROR_FAILURE;
   }
 
-  Maybe<ipc::Shmem> maybeOutputShmem;
   if (mDecodedShmemSize > 0) {
     if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
       ipc::Shmem outputShmem;
       if (memMgr->MgrTakeShmem(GMPSharedMemClass::Decoded, mDecodedShmemSize,
                                &outputShmem)) {
-        maybeOutputShmem.emplace(std::move(outputShmem));
+        if (!SendGiveShmem(std::move(outputShmem))) {
+          DeallocShmem(outputShmem);
+        }
       }
     }
   }
 
   if (!SendDecode(frameData, std::move(frameShmem), aMissingFrames,
-                  aCodecSpecificInfo, aRenderTimeMs,
-                  std::move(maybeOutputShmem))) {
+                  aCodecSpecificInfo, aRenderTimeMs)) {
     GMP_LOG_ERROR(
         "GMPVideoDecoderParent[%p]::Decode() ERROR; SendDecode() failure.",
         this);
     DeallocShmem(frameShmem);
-    if (maybeOutputShmem) {
-      DeallocShmem(*maybeOutputShmem);
-    }
     return NS_ERROR_FAILURE;
   }
   mFrameCount++;
@@ -287,16 +284,7 @@ void GMPVideoDecoderParent::ActorDestroy(ActorDestroyReason aWhy) {
 }
 
 bool GMPVideoDecoderParent::HandleDecoded(
-    const GMPVideoi420FrameData& aDecodedFrame, size_t aDecodedSize,
-    Maybe<ipc::Shmem>&& aInputShmem) {
-  if (aInputShmem) {
-    if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
-      memMgr->MgrGiveShmem(GMPSharedMemClass::Encoded, std::move(*aInputShmem));
-    } else {
-      DeallocShmem(*aInputShmem);
-    }
-  }
-
+    const GMPVideoi420FrameData& aDecodedFrame, size_t aDecodedSize) {
   --mFrameCount;
   if (aDecodedFrame.mUpdatedTimestamp() &&
       aDecodedFrame.mUpdatedTimestamp().value() != aDecodedFrame.mTimestamp()) {
@@ -328,25 +316,37 @@ bool GMPVideoDecoderParent::HandleDecoded(
   return false;
 }
 
+mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvReturnShmem(
+    ipc::Shmem&& aInputShmem) {
+  if (!aInputShmem.IsWritable()) {
+    return IPC_OK();
+  }
+
+  if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
+    memMgr->MgrGiveShmem(GMPSharedMemClass::Encoded, std::move(aInputShmem));
+  } else {
+    DeallocShmem(aInputShmem);
+  }
+
+  return IPC_OK();
+}
+
 mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecodedShmem(
-    const GMPVideoi420FrameData& aDecodedFrame, ipc::Shmem&& aDecodedShmem,
-    Maybe<ipc::Shmem>&& aInputShmem) {
-  if (HandleDecoded(aDecodedFrame, aDecodedShmem.Size<uint8_t>(),
-                    std::move(aInputShmem))) {
+    const GMPVideoi420FrameData& aDecodedFrame, ipc::Shmem&& aDecodedShmem) {
+  if (HandleDecoded(aDecodedFrame, aDecodedShmem.Size<uint8_t>())) {
     auto f = new GMPVideoi420FrameImpl(aDecodedFrame, std::move(aDecodedShmem),
                                        &mVideoHost);
     mCallback->Decoded(f);
+  } else {
+    DeallocShmem(aDecodedShmem);
   }
-
-  DeallocShmem(aDecodedShmem);
   return IPC_OK();
 }
 
 mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecodedData(
     const GMPVideoi420FrameData& aDecodedFrame,
-    nsTArray<uint8_t>&& aDecodedArray, Maybe<ipc::Shmem>&& aInputShmem) {
-  if (HandleDecoded(aDecodedFrame, aDecodedArray.Length(),
-                    std::move(aInputShmem))) {
+    nsTArray<uint8_t>&& aDecodedArray) {
+  if (HandleDecoded(aDecodedFrame, aDecodedArray.Length())) {
     mDecodedShmemSize = std::max(mDecodedShmemSize, aDecodedArray.Length());
     auto f = new GMPVideoi420FrameImpl(aDecodedFrame, std::move(aDecodedArray),
                                        &mVideoHost);
