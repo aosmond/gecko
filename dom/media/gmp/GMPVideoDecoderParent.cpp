@@ -30,8 +30,7 @@ namespace mozilla::gmp {
 // Dead: mIsOpen == false
 
 GMPVideoDecoderParent::GMPVideoDecoderParent(GMPContentParent* aPlugin)
-    : GMPSharedMemManager(aPlugin),
-      mIsOpen(false),
+    : mIsOpen(false),
       mShuttingDown(false),
       mActorDestroyed(false),
       mIsAwaitingResetComplete(false),
@@ -121,28 +120,35 @@ nsresult GMPVideoDecoderParent::Decode(
   GMPUniquePtr<GMPVideoEncodedFrameImpl> inputFrameImpl(
       static_cast<GMPVideoEncodedFrameImpl*>(aInputFrame.release()));
 
-  // Very rough kill-switch if the plugin stops processing.  If it's merely
-  // hung and continues, we'll come back to life eventually.
-  // 3* is because we're using 3 buffers per frame for i420 data for now.
-  if ((NumInUse(GMPSharedMem::kGMPFrameData) >
-       3 * GMPSharedMem::kGMPBufLimit) ||
-      (NumInUse(GMPSharedMem::kGMPEncodedData) > GMPSharedMem::kGMPBufLimit)) {
+  GMPVideoEncodedFrameData frameData;
+  ipc::Shmem frameShmem;
+  if (!inputFrameImpl->RelinquishFrameData(frameData, frameShmem)) {
     GMP_LOG_ERROR(
-        "GMPVideoDecoderParent[%p]::Decode() ERROR; shmem buffer limit hit "
-        "frame=%d encoded=%d",
-        this, NumInUse(GMPSharedMem::kGMPFrameData),
-        NumInUse(GMPSharedMem::kGMPEncodedData));
+        "GMPVideoDecoderParent[%p]::Decode() ERROR; missing input shmem", this);
     return NS_ERROR_FAILURE;
   }
 
-  GMPVideoEncodedFrameData frameData;
-  inputFrameImpl->RelinquishFrameData(frameData);
+  Maybe<ipc::Shmem> maybeOutputShmem;
+  if (mDecodedShmemSize > 0) {
+    if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
+      ipc::Shmem outputShmem;
+      if (memMgr->MgrTakeShmem(GMPSharedMemClass::Decoded, mDecodedShmemSize,
+                               &outputShmem)) {
+        maybeOutputShmem.emplace(std::move(outputShmem));
+      }
+    }
+  }
 
-  if (!SendDecode(frameData, aMissingFrames, aCodecSpecificInfo,
-                  aRenderTimeMs)) {
+  if (!SendDecode(frameData, std::move(frameShmem), aMissingFrames,
+                  aCodecSpecificInfo, aRenderTimeMs,
+                  std::move(maybeOutputShmem))) {
     GMP_LOG_ERROR(
         "GMPVideoDecoderParent[%p]::Decode() ERROR; SendDecode() failure.",
         this);
+    DeallocShmem(frameShmem);
+    if (maybeOutputShmem) {
+      DeallocShmem(*maybeOutputShmem);
+    }
     return NS_ERROR_FAILURE;
   }
   mFrameCount++;
@@ -246,7 +252,7 @@ nsresult GMPVideoDecoderParent::Shutdown() {
 
   mIsOpen = false;
   if (!mActorDestroyed) {
-    Unused << SendDecodingComplete();
+    Unused << Send__delete__(this);
   }
 
   return NS_OK;
@@ -280,36 +286,71 @@ void GMPVideoDecoderParent::ActorDestroy(ActorDestroyReason aWhy) {
   MaybeDisconnect(aWhy == AbnormalShutdown);
 }
 
-mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecoded(
-    const GMPVideoi420FrameData& aDecodedFrame) {
+bool GMPVideoDecoderParent::HandleDecoded(
+    const GMPVideoi420FrameData& aDecodedFrame, size_t aDecodedSize,
+    Maybe<ipc::Shmem>&& aInputShmem) {
+  if (aInputShmem) {
+    if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
+      memMgr->MgrGiveShmem(GMPSharedMemClass::Encoded, std::move(*aInputShmem));
+    } else {
+      DeallocShmem(*aInputShmem);
+    }
+  }
+
   --mFrameCount;
   if (aDecodedFrame.mUpdatedTimestamp() &&
       aDecodedFrame.mUpdatedTimestamp().value() != aDecodedFrame.mTimestamp()) {
     GMP_LOG_VERBOSE(
-        "GMPVideoDecoderParent[%p]::RecvDecoded() timestamp=[%" PRId64
+        "GMPVideoDecoderParent[%p]::HandleDecoded() timestamp=[%" PRId64
         " -> %" PRId64 "] frameCount=%d",
         this, aDecodedFrame.mTimestamp(),
         aDecodedFrame.mUpdatedTimestamp().value(), mFrameCount);
   } else {
     GMP_LOG_VERBOSE(
-        "GMPVideoDecoderParent[%p]::RecvDecoded() timestamp=%" PRId64
+        "GMPVideoDecoderParent[%p]::HandleDecoded() timestamp=%" PRId64
         " frameCount=%d",
         this, aDecodedFrame.mTimestamp(), mFrameCount);
   }
 
   if (mCallback) {
-    if (GMPVideoi420FrameImpl::CheckFrameData(aDecodedFrame)) {
-      auto f = new GMPVideoi420FrameImpl(aDecodedFrame, &mVideoHost);
-
-      mCallback->Decoded(f);
+    if (GMPVideoi420FrameImpl::CheckFrameData(aDecodedFrame, aDecodedSize)) {
+      return true;
     } else {
       GMP_LOG_ERROR(
-          "GMPVideoDecoderParent[%p]::RecvDecoded() "
+          "GMPVideoDecoderParent[%p]::HandleDecoded() "
           "timestamp=%" PRId64 " decoded frame corrupt, ignoring",
           this, aDecodedFrame.mTimestamp());
       // TODO: Verify if we should take more serious the arrival of
       // a corrupted frame, see bug 1750506.
     }
+  }
+
+  return false;
+}
+
+mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecodedShmem(
+    const GMPVideoi420FrameData& aDecodedFrame, ipc::Shmem&& aDecodedShmem,
+    Maybe<ipc::Shmem>&& aInputShmem) {
+  if (HandleDecoded(aDecodedFrame, aDecodedShmem.Size<uint8_t>(),
+                    std::move(aInputShmem))) {
+    auto f = new GMPVideoi420FrameImpl(aDecodedFrame, std::move(aDecodedShmem),
+                                       &mVideoHost);
+    mCallback->Decoded(f);
+  }
+
+  DeallocShmem(aDecodedShmem);
+  return IPC_OK();
+}
+
+mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvDecodedData(
+    const GMPVideoi420FrameData& aDecodedFrame,
+    nsTArray<uint8_t>&& aDecodedArray, Maybe<ipc::Shmem>&& aInputShmem) {
+  if (HandleDecoded(aDecodedFrame, aDecodedArray.Length(),
+                    std::move(aInputShmem))) {
+    mDecodedShmemSize = std::max(mDecodedShmemSize, aDecodedArray.Length());
+    auto f = new GMPVideoi420FrameImpl(aDecodedFrame, std::move(aDecodedArray),
+                                       &mVideoHost);
+    mCallback->Decoded(f);
   }
 
   return IPC_OK();
@@ -396,43 +437,6 @@ mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvShutdown() {
   GMP_LOG_DEBUG("GMPVideoDecoderParent[%p]::RecvShutdown()", this);
 
   Shutdown();
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvParentShmemForPool(
-    Shmem&& aEncodedBuffer) {
-  if (aEncodedBuffer.IsWritable()) {
-    mVideoHost.SharedMemMgr()->MgrDeallocShmem(GMPSharedMem::kGMPEncodedData,
-                                               aEncodedBuffer);
-  }
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult GMPVideoDecoderParent::RecvNeedShmem(
-    const uint32_t& aFrameBufferSize, Shmem* aMem) {
-  ipc::Shmem mem;
-
-  if (!mVideoHost.SharedMemMgr()->MgrAllocShmem(GMPSharedMem::kGMPFrameData,
-                                                aFrameBufferSize, &mem)) {
-    GMP_LOG_ERROR("%s: Failed to get a shared mem buffer for Child! size %u",
-                  __FUNCTION__, aFrameBufferSize);
-    return IPC_FAIL(this, "Failed to get a shared mem buffer for Child!");
-  }
-  *aMem = mem;
-  mem = ipc::Shmem();
-  return IPC_OK();
-}
-
-mozilla::ipc::IPCResult GMPVideoDecoderParent::Recv__delete__() {
-  GMP_LOG_DEBUG("GMPVideoDecoderParent[%p]::Recv__delete__()", this);
-
-  if (mPlugin) {
-    // Ignore any return code. It is OK for this to fail without killing the
-    // process.
-    mPlugin->VideoDecoderDestroyed(this);
-    mPlugin = nullptr;
-  }
-
   return IPC_OK();
 }
 
