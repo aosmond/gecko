@@ -139,6 +139,7 @@ nsresult GMPVideoDecoderParent::Decode(
     }
   }
 
+  printf_stderr("[AO] [%p] GMPVideoDecoderParent::Decode -- predicted %zu, shmem %zu\n", this, mDecodedShmemSize, maybeOutputShmem ? maybeOutputShmem->Size<uint8_t>() : 0);
   if (!SendDecode(frameData, std::move(frameShmem), aMissingFrames,
                   aCodecSpecificInfo, aRenderTimeMs,
                   std::move(maybeOutputShmem))) {

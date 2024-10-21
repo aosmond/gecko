@@ -49,6 +49,7 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
 
   if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
     ipc::Shmem inputShmem;
+    printf_stderr("[AO] [%p] GMPVideoDecoderChild::Decoded -- take any shmem\n", memMgr);
     if (memMgr->MgrTakeShmem(GMPSharedMemClass::Encoded, &inputShmem)) {
       maybeInputShmem.emplace(std::move(inputShmem));
     }
@@ -56,9 +57,11 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
 
   bool success = false;
   if (df->InitFrameData(frameData, frameShmem)) {
+    printf_stderr("[AO] [%p] GMPVideoDecoderChild::Decoded -- end decode, send shmem\n", this);
     success = SendDecodedShmem(frameData, std::move(frameShmem),
                                std::move(maybeInputShmem));
   } else if (df->InitFrameData(frameData, frameArray)) {
+    printf_stderr("[AO] [%p] GMPVideoDecoderChild::Decoded -- end decode, send array\n", this);
     success = SendDecodedData(frameData, std::move(frameArray),
                               std::move(maybeInputShmem));
   } else {
@@ -156,13 +159,10 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDecode(
     const GMPVideoEncodedFrameData& aInputFrame, ipc::Shmem&& aInputShmem,
     const bool& aMissingFrames, nsTArray<uint8_t>&& aCodecSpecificInfo,
     const int64_t& aRenderTimeMs, Maybe<ipc::Shmem>&& aOutputShmem) {
-  if (!mVideoDecoder) {
-    return IPC_FAIL(this, "!mVideoDecoder");
-  }
-
   // Place the shmem we were given into our local pool.
   if (aOutputShmem) {
     if (GMPSharedMemManager* memMgr = mVideoHost.SharedMemMgr()) {
+      printf_stderr("[AO] [%p] GMPVideoDecoderChild::RecvDecode -- give shmem %zu\n", memMgr, aOutputShmem ? aOutputShmem->Size<uint8_t>() : 0);
       memMgr->MgrGiveShmem(GMPSharedMemClass::Decoded,
                            std::move(*aOutputShmem));
     } else {
@@ -170,11 +170,16 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDecode(
     }
   }
 
+  if (!mVideoDecoder) {
+    return IPC_FAIL(this, "!mVideoDecoder");
+  }
+
   auto f = new GMPVideoEncodedFrameImpl(aInputFrame, std::move(aInputShmem),
                                         &mVideoHost);
 
   // Ignore any return code. It is OK for this to fail without killing the
   // process.
+  printf_stderr("[AO] [%p] GMPVideoDecoderChild::RecvDecode -- start decode\n", this);
   mVideoDecoder->Decode(f, aMissingFrames, aCodecSpecificInfo.Elements(),
                         aCodecSpecificInfo.Length(), aRenderTimeMs);
 
