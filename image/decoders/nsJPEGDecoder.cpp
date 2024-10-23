@@ -36,6 +36,12 @@ extern "C" {
 #  define MOZ_JCS_EXT_NATIVE_ENDIAN_XRGB JCS_EXT_BGRX
 #endif
 
+// Values taken from default_decompress_parms in libjpeg/jdapimin.c
+#define MOZ_JCS_ADOBE_TRANSFORM_CMYK 0
+#define MOZ_JCS_ADOBE_TRANSFORM_YCCK 2
+
+static void inverted_cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
+                                       int32_t aWidth);
 static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
                               int32_t aWidth);
 
@@ -342,17 +348,6 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
             mInfo.out_color_space = JCS_GRAYSCALE;
             inputType.emplace(QCMS_DATA_GRAY_8);
           }
-
-#if 0
-          // We don't currently support CMYK profiles. The following
-          // code dealt with lcms types. Add something like this
-          // back when we gain support for CMYK.
-
-          // Adobe Photoshop writes YCCK/CMYK files with inverted data
-          if (mInfo.out_color_space == JCS_CMYK) {
-            type |= FLAVOR_SH(mInfo.saw_Adobe_marker ? 1 : 0);
-          }
-#endif
 
           if (inputType) {
             // Calculate rendering intent.
@@ -690,9 +685,21 @@ WriteState nsJPEGDecoder::OutputScanlines() {
                                 mInfo.output_width);
             break;
           case JCS_CMYK:
-            // Convert from CMYK to BGRA
+            // Convert from CMYK to BGRA. Generally, a CMYK encoded JPEG is
+            // assumed to be Inverted CMYK. Adobe Photoshop however has produced
+            // JPEGs which are true CMYK, which is commonly embedded in PDFs.
+            // Our best approximation for this scenario is when there is an
+            // Adobe marker, Adobe CMYK transform, and without an ICC profile.
+            //
+            // https://graphicdesign.stackexchange.com/questions/12894/cmyk-jpegs-extracted-from-pdf-appear-inverted
             MOZ_ASSERT(mCMSLine);
-            cmyk_convert_bgra(mCMSLine, aPixelBlock, aBlockSize);
+            if (!mInfo.saw_Adobe_marker ||
+                mInfo.Adobe_transform != MOZ_JCS_ADOBE_TRANSFORM_CMYK ||
+                mInProfile) {
+              inverted_cmyk_convert_bgra(mCMSLine, aPixelBlock, aBlockSize);
+            } else {
+              cmyk_convert_bgra(mCMSLine, aPixelBlock, aBlockSize);
+            }
             break;
         }
 
@@ -960,8 +967,8 @@ term_source(j_decompress_ptr jd) {
 ///               in the row.
 /// @param aOutput Points to row buffer to write BGRA to.
 /// @param aWidth Number of pixels in the row.
-static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
-                              int32_t aWidth) {
+static void inverted_cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
+                                       int32_t aWidth) {
   uint8_t* input = reinterpret_cast<uint8_t*>(aInput);
 
   for (int32_t i = 0; i < aWidth; ++i) {
@@ -992,6 +999,53 @@ static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
     const uint8_t r = iC * iK / 255;
     const uint8_t g = iM * iK / 255;
     const uint8_t b = iY * iK / 255;
+
+    *aOutput++ = (0xFF << mozilla::gfx::SurfaceFormatBit::OS_A) |
+                 (r << mozilla::gfx::SurfaceFormatBit::OS_R) |
+                 (g << mozilla::gfx::SurfaceFormatBit::OS_G) |
+                 (b << mozilla::gfx::SurfaceFormatBit::OS_B);
+    input += 4;
+  }
+}
+
+///*************** CMYK -> RGB conversion *************************
+/// Input is CMYK stored as 4 bytes per pixel.
+/// Output is RGB stored as 3 bytes per pixel.
+/// @param aInput Points to row buffer containing the CMYK bytes for each pixel
+///               in the row.
+/// @param aOutput Points to row buffer to write BGRA to.
+/// @param aWidth Number of pixels in the row.
+static void cmyk_convert_bgra(uint32_t* aInput, uint32_t* aOutput,
+                              int32_t aWidth) {
+  uint8_t* input = reinterpret_cast<uint8_t*>(aInput);
+
+  for (int32_t i = 0; i < aWidth; ++i) {
+    // Source is 'CMYK', output is RGB.
+    // See: http://www.easyrgb.com/math.php?MATH=M12#text12
+    // Or:  http://www.ilkeratalay.com/colorspacesfaq.php#rgb
+
+    // From CMYK to CMY
+    // C = ( C * ( 1 - K ) + K )
+    // M = ( M * ( 1 - K ) + K )
+    // Y = ( Y * ( 1 - K ) + K )
+
+    // Convert from CMY (0..1) to RGB (0..1)
+    // R = 1 - C
+    // G = 1 - M
+    // B = 1 - Y
+
+    // Convert from CMYK (0..255) to RGB (0..255)
+    const uint32_t iC = input[0];
+    const uint32_t iM = input[1];
+    const uint32_t iY = input[2];
+    const uint32_t iK = input[3];
+
+    const uint8_t r = 255 - static_cast<uint8_t>(
+                                std::min((iC * (255 - iK)) / 255 + iK, 255u));
+    const uint8_t g = 255 - static_cast<uint8_t>(
+                                std::min((iM * (255 - iK)) / 255 + iK, 255u));
+    const uint8_t b = 255 - static_cast<uint8_t>(
+                                std::min((iY * (255 - iK)) / 255 + iK, 255u));
 
     *aOutput++ = (0xFF << mozilla::gfx::SurfaceFormatBit::OS_A) |
                  (r << mozilla::gfx::SurfaceFormatBit::OS_R) |
