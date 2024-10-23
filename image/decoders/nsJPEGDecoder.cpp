@@ -347,6 +347,18 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
             // management since the downscaler assumes BGRA.
             mInfo.out_color_space = JCS_GRAYSCALE;
             inputType.emplace(QCMS_DATA_GRAY_8);
+          } else if (profileSpace == icSigCmykData &&
+                     mInfo.out_color_space == JCS_CMYK) {
+            // We can only color manage CMYK profiles if the original color
+            // space is CMYK or YCCK, as the output color space from the decoder
+            // will be CMYK.
+            inputType.emplace(QCMS_DATA_CMYK);
+          } else {
+            MOZ_LOG(sJPEGLog, LogLevel::Debug,
+                    ("[this=%p] nsJPEGDecoder::Write -- unhandled ICC profile "
+                     "%u color space in %d out %d \n",
+                     this, profileSpace, mInfo.jpeg_color_space,
+                     mInfo.out_color_space));
           }
 
           if (inputType) {
@@ -391,8 +403,10 @@ LexerTransition<nsJPEGDecoder::State> nsJPEGDecoder::ReadJPEGData(
       // grayscale, because the pipeline wants BGRA pixels, particularly the
       // downscaling filter, so we can't handle it after downscaling as would
       // be optimal.
-      qcms_transform* pipeTransform =
-          mInfo.out_color_space != JCS_GRAYSCALE ? mTransform : nullptr;
+      qcms_transform* pipeTransform = mInfo.out_color_space != JCS_GRAYSCALE &&
+                                              mInfo.out_color_space != JCS_CMYK
+                                          ? mTransform
+                                          : nullptr;
 
       Maybe<SurfacePipe> pipe = SurfacePipeFactory::CreateReorientSurfacePipe(
           this, Size(), OutputSize(), SurfaceFormat::OS_RGBX, pipeTransform,
@@ -693,9 +707,12 @@ WriteState nsJPEGDecoder::OutputScanlines() {
             //
             // https://graphicdesign.stackexchange.com/questions/12894/cmyk-jpegs-extracted-from-pdf-appear-inverted
             MOZ_ASSERT(mCMSLine);
-            if (!mInfo.saw_Adobe_marker ||
-                mInfo.Adobe_transform != MOZ_JCS_ADOBE_TRANSFORM_CMYK ||
-                mInProfile) {
+            if (mTransform) {
+              qcms_transform_data(mTransform, mCMSLine, aPixelBlock,
+                                  mInfo.output_width);
+            } else if (!mInfo.saw_Adobe_marker ||
+                       mInfo.Adobe_transform != MOZ_JCS_ADOBE_TRANSFORM_CMYK ||
+                       mInProfile) {
               inverted_cmyk_convert_bgra(mCMSLine, aPixelBlock, aBlockSize);
             } else {
               cmyk_convert_bgra(mCMSLine, aPixelBlock, aBlockSize);
