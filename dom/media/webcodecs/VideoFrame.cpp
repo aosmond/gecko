@@ -2184,6 +2184,8 @@ void VideoFrame::StartAutoClose() {
 
   LOG("VideoFrame %p, start monitoring resource release", this);
 
+  mShutdownHolder = new ShutdownBlockerHolder(this);
+
   if (NS_IsMainThread()) {
     mShutdownBlocker = media::ShutdownBlockingTicket::Create(
         u"VideoFrame::mShutdownBlocker"_ns,
@@ -2191,23 +2193,25 @@ void VideoFrame::StartAutoClose() {
     if (mShutdownBlocker) {
       mShutdownBlocker->ShutdownPromise()->Then(
           GetCurrentSerialEventTarget(), __func__,
-          [self = RefPtr{this}](bool /* aUnUsed*/) {
-            LOG("VideoFrame %p gets shutdown notification", self.get());
-            self->CloseIfNeeded();
+          [holder = RefPtr{mShutdownHolder}](bool /* aUnUsed*/) {
+            LOG("VideoFrame %p gets shutdown notification", holder->GetOwner());
+            holder->Shutdown();
           },
-          [self = RefPtr{this}](bool /* aUnUsed*/) {
+          [holder = RefPtr{mShutdownHolder}](bool /* aUnUsed*/) {
             LOG("VideoFrame %p removes shutdown-blocker before getting "
                 "shutdown "
                 "notification",
-                self.get());
+                holder->GetOwner());
+            holder->Shutdown();
           });
     }
   } else if (WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate()) {
     // Clean up all the resources when the worker is going away.
-    mWorkerRef = WeakWorkerRef::Create(workerPrivate, [self = RefPtr{this}]() {
-      LOG("VideoFrame %p, worker is going away", self.get());
-      self->CloseIfNeeded();
-    });
+    mWorkerRef = WeakWorkerRef::Create(
+        workerPrivate, [holder = RefPtr{mShutdownHolder}]() {
+          LOG("VideoFrame %p, worker is going away", holder->GetOwner());
+          holder->Shutdown();
+        });
   }
 }
 
@@ -2215,6 +2219,9 @@ void VideoFrame::StopAutoClose() {
   AssertIsOnOwningThread();
 
   LOG("VideoFrame %p, stop monitoring resource release", this);
+
+  mShutdownHolder->Destroy();
+  mShutdownHolder = nullptr;
 
   mShutdownBlocker = nullptr;
   mWorkerRef = nullptr;

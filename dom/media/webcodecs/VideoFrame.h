@@ -100,6 +100,24 @@ class VideoFrame final : public nsISupports, public nsWrapperCache {
  public:
   nsIGlobalObject* GetParentObject() const;
 
+  class ShutdownBlockerHolder final {
+   public:
+    NS_INLINE_DECL_REFCOUNTING(ShutdownBlockerHolder)
+    explicit ShutdownBlockerHolder(VideoFrame* aVideoFrame)
+        : mVideoFrame(aVideoFrame) {}
+    void Destroy() { mVideoFrame = nullptr; }
+    void Shutdown() {
+      if (mVideoFrame) {
+        mVideoFrame->CloseIfNeeded();
+        mVideoFrame = nullptr;
+      }
+    }
+    VideoFrame* GetOwner() const { return mVideoFrame; }
+   private:
+    ~ShutdownBlockerHolder() = default;
+    VideoFrame* MOZ_NON_OWNING_REF mVideoFrame;
+  };
+
   JSObject* WrapObject(JSContext* aCx,
                        JS::Handle<JSObject*> aGivenProto) override;
 
@@ -263,6 +281,7 @@ class VideoFrame final : public nsISupports, public nsWrapperCache {
   VideoColorSpaceInit mColorSpace;
 
   // The following are used to help monitoring mResource release.
+  RefPtr<ShutdownBlockerHolder> mShutdownHolder = nullptr;
   UniquePtr<media::ShutdownBlockingTicket> mShutdownBlocker = nullptr;
   RefPtr<WeakWorkerRef> mWorkerRef = nullptr;
 };
