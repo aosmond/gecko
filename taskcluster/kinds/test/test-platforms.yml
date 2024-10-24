@@ -71,18 +71,21 @@ linux1804-64-qr/debug:
     test-sets:
         - linux1804-tests
         - web-platform-tests
+        - talos
 
 linux1804-64-asan-qr/opt:
     build-platform: linux64-asan/opt
     test-sets:
         - linux1804-tests
         - web-platform-tests
+        - talos
 
 linux1804-64-tsan-qr/opt:
     build-platform: linux64-tsan/opt
     test-sets:
         - linux1804-tests
         - web-platform-tests
+        - talos
 
 linux1804-64-ccov-qr/opt:
     build-platform: linux64-ccov/opt
