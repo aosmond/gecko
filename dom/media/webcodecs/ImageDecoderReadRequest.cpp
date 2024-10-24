@@ -17,12 +17,24 @@ extern mozilla::LazyLogModule gWebCodecsLog;
 
 namespace mozilla::dom {
 
-NS_IMPL_CYCLE_COLLECTION_INHERITED(ImageDecoderReadRequest, ReadRequest,
-                                   mDecoder, mReader)
+NS_IMPL_CYCLE_COLLECTION_CLASS(ImageDecoderReadRequest)
 NS_IMPL_ADDREF_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_IMPL_RELEASE_INHERITED(ImageDecoderReadRequest, ReadRequest)
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(ImageDecoderReadRequest)
 NS_INTERFACE_MAP_END_INHERITING(ReadRequest)
+
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(ImageDecoderReadRequest,
+                                                ReadRequest)
+  tmp->Destroy(/* aCancel */ false);
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mDecoder)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mReader)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_END
+
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(ImageDecoderReadRequest,
+                                                  ReadRequest)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDecoder)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mReader)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 ImageDecoderReadRequest::ImageDecoderReadRequest(
     image::SourceBuffer* aSourceBuffer)
@@ -34,6 +46,7 @@ ImageDecoderReadRequest::ImageDecoderReadRequest(
 ImageDecoderReadRequest::~ImageDecoderReadRequest() {
   MOZ_LOG(gWebCodecsLog, LogLevel::Debug,
           ("ImageDecoderReadRequest %p ~ImageDecoderReadRequest", this));
+  Destroy(/* aCancel */ false);
 }
 
 bool ImageDecoderReadRequest::Initialize(const GlobalObject& aGlobal,

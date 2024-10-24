@@ -39,7 +39,10 @@ ImageTrack::ImageTrack(ImageTrackList* aTrackList, int32_t aIndex,
 
 ImageTrack::~ImageTrack() = default;
 
-void ImageTrack::Destroy() { mTrackList = nullptr; }
+void ImageTrack::Destroy() {
+  mDecodedFrames.Clear();
+  mTrackList = nullptr;
+}
 
 JSObject* ImageTrack::WrapObject(JSContext* aCx,
                                  JS::Handle<JSObject*> aGivenProto) {
