@@ -2043,13 +2043,13 @@ void VideoFrame::Close() {
   AssertIsOnOwningThread();
   LOG("VideoFrame %p is closed", this);
 
+  StopAutoClose();
+
   mResource.reset();
   mCodedSize = gfx::IntSize();
   mVisibleRect = gfx::IntRect();
   mDisplaySize = gfx::IntSize();
   mColorSpace = VideoColorSpaceInit();
-
-  StopAutoClose();
 }
 
 bool VideoFrame::IsClosed() const { return !mResource; }

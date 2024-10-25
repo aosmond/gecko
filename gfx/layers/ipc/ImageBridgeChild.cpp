@@ -7,6 +7,7 @@
 #include "ImageBridgeChild.h"
 
 #include <vector>  // for vector
+#include <unistd.h>
 
 #include "ImageBridgeParent.h"  // for ImageBridgeParent
 #include "ImageContainer.h"     // for ImageContainer
@@ -527,6 +528,7 @@ void ImageBridgeChild::BindSameProcess(RefPtr<ImageBridgeParent> aParent) {
 /* static */
 void ImageBridgeChild::ShutDown() {
   MOZ_ASSERT(NS_IsMainThread());
+  printf_stderr("[AO] [%d] ImageBridgeChild::ShutDown\n", getpid());
 
   ShutdownSingleton();
 
@@ -534,6 +536,8 @@ void ImageBridgeChild::ShutDown() {
     sImageBridgeChildThread->Shutdown();
     sImageBridgeChildThread = nullptr;
   }
+
+  printf_stderr("[AO] [%d] ImageBridgeChild::ShutDown -- thread gone\n", getpid());
 }
 
 /* static */

@@ -206,11 +206,17 @@ class MainShutdownWatcher final : public ShutdownWatcher, public nsIObserver {
       return false;
     }
 
+    printf_stderr("[AO] [%p] MainShutdownWatcher::Initialize -- consumer %p\n",
+                  this, mConsumer);
     mRegistered = true;
     return true;
   }
 
   void Destroy() override {
+    printf_stderr(
+        "[AO] [%p] MainShutdownWatcher::Destroy -- consumer %p, registered "
+        "%d\n",
+        this, mConsumer, mRegistered);
     if (!mRegistered) {
       return;
     }
@@ -227,6 +233,9 @@ class MainShutdownWatcher final : public ShutdownWatcher, public nsIObserver {
   NS_IMETHODIMP Observe(nsISupports* aSubject, const char* aTopic,
                         const char16_t* aData) override {
     MOZ_ASSERT(strcmp(aTopic, NS_XPCOM_WILL_SHUTDOWN_OBSERVER_ID) == 0);
+    printf_stderr(
+        "[AO] [%p] MainShutdownWatcher::Observer -- consumer %p, topic %s\n",
+        this, mConsumer, aTopic);
     if (mConsumer) {
       mConsumer->OnShutdown();
     }
@@ -262,10 +271,16 @@ class WorkerShutdownWatcher final : public ShutdownWatcher {
       return false;
     }
 
+    printf_stderr(
+        "[AO] [%p] WorkerShutdownWatcher::Initialize -- consumer %p\n", this,
+        mConsumer);
     return true;
   }
 
   void OnShutdown() {
+    printf_stderr(
+        "[AO] [%p] WorkerShutdownWatcher::OnShutdown -- consumer %p\n", this,
+        mConsumer);
     if (mConsumer) {
       mConsumer->OnShutdown();
     }
@@ -273,6 +288,8 @@ class WorkerShutdownWatcher final : public ShutdownWatcher {
   }
 
   void Destroy() override {
+    printf_stderr("[AO] [%p] WorkerShutdownWatcher::Destroy -- consumer %p\n",
+                  this, mConsumer);
     mWorkerRef = nullptr;
     mConsumer = nullptr;
   }
