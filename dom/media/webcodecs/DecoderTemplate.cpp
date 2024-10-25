@@ -216,12 +216,14 @@ already_AddRefed<Promise> DecoderTemplate<DecoderType>::Flush(
 
   if (mState != CodecState::Configured) {
     LOG("%s %p, wrong state!", DecoderType::Name.get(), this);
+    printf_stderr("[AO] [%p] DecoderTemplate::Flush -- bad state %u\n", this, static_cast<uint32_t>(mState));
     aRv.ThrowInvalidStateError("Decoder must be configured first");
     return nullptr;
   }
 
   RefPtr<Promise> p = Promise::Create(GetParentObject(), aRv);
   if (NS_WARN_IF(aRv.Failed())) {
+    printf_stderr("[AO] [%p] DecoderTemplate::Flush -- failed to create promise\n", this);
     return p.forget();
   }
 
@@ -235,6 +237,7 @@ already_AddRefed<Promise> DecoderTemplate<DecoderType>::Flush(
 
   mControlMessageQueue.emplace(std::move(msg));
 
+  printf_stderr("[AO] [%p] DecoderTemplate::Flush -- flush queued\n", this);
   LOG("%s %p enqueues %s, with unique id %" PRId64, DecoderType::Name.get(),
       this, mControlMessageQueue.back()->ToString().get(), flushPromiseId);
   ProcessControlMessageQueue();

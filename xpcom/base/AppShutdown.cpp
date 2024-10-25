@@ -369,6 +369,7 @@ void AppShutdown::AdvanceShutdownPhaseInternal(
   // notifications out of shutdown order.
   // See for example test_sss_sanitizeOnShutdown.js
   if (sCurrentShutdownPhase >= aPhase) {
+    printf_stderr("[AO] [%d] AppShutdown::AdvanceShutdownPhaseInternal -- skip %u, in %u\n", getpid(), static_cast<uint32_t>(aPhase), static_cast<uint32_t>(static_cast<ShutdownPhase>(sCurrentShutdownPhase)));
     return;
   }
 
@@ -422,6 +423,7 @@ void AppShutdown::AdvanceShutdownPhaseInternal(
 
   if (doNotify) {
     const char* aTopic = AppShutdown::GetObserverKey(aPhase);
+    printf_stderr("[AO] [%d] AppShutdown::AdvanceShutdownPhaseInternal -- phase %u, notify '%s'\n", getpid(), static_cast<uint32_t>(aPhase), aTopic ? aTopic : "<null>");
     if (aTopic) {
       nsCOMPtr<nsIObserverService> obsService =
           mozilla::services::GetObserverService();
@@ -436,8 +438,12 @@ void AppShutdown::AdvanceShutdownPhaseInternal(
         if (mayProcessPending && thread) {
           NS_ProcessPendingEvents(thread);
         }
+      } else {
+        printf_stderr("[AO] [%d] AppShutdown::AdvanceShutdownPhaseInternal -- phase %u, skip no observer service\n", getpid(), static_cast<uint32_t>(aPhase));
       }
     }
+  } else {
+    printf_stderr("[AO] [%d] AppShutdown::AdvanceShutdownPhaseInternal -- phase %u, skip notify\n", getpid(), static_cast<uint32_t>(aPhase));
   }
 }
 
