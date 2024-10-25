@@ -9,6 +9,10 @@
 #include "mozilla/AppShutdown.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
+#include "mozilla/dom/WorkerCommon.h"
+#include "mozilla/dom/WorkerRef.h"
+#include "nsIObserver.h"
+#include "nsIObserverService.h"
 #include "nsNetUtil.h"
 
 namespace mozilla::media {
@@ -175,6 +179,124 @@ class ShutdownBlockingTicketImpl : public ShutdownBlockingTicket {
 UniquePtr<ShutdownBlockingTicket> ShutdownBlockingTicket::Create(
     const nsAString& aName, const nsAString& aFileName, int32_t aLineNr) {
   return ShutdownBlockingTicketImpl::Create(aName, aFileName, aLineNr);
+}
+
+class MainShutdownWatcher final : public ShutdownWatcher, public nsIObserver {
+ public:
+  NS_DECL_ISUPPORTS
+
+  explicit MainShutdownWatcher(ShutdownConsumer* aConsumer)
+      : ShutdownWatcher(aConsumer) {}
+
+  bool Initialize() {
+    if (AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdown)) {
+      mConsumer = nullptr;
+      return false;
+    }
+
+    nsCOMPtr<nsIObserverService> obsService = services::GetObserverService();
+    if (NS_WARN_IF(!obsService)) {
+      mConsumer = nullptr;
+      return false;
+    }
+
+    if (NS_WARN_IF(NS_FAILED(
+            obsService->AddObserver(this, "profile-before-change", false)))) {
+      mConsumer = nullptr;
+      return false;
+    }
+
+    mRegistered = true;
+    return true;
+  }
+
+  void Destroy() override {
+    if (!mRegistered) {
+      return;
+    }
+
+    mRegistered = false;
+    mConsumer = nullptr;
+
+    if (nsCOMPtr<nsIObserverService> obsService =
+            services::GetObserverService()) {
+      obsService->RemoveObserver(this, "profile-before-change");
+    }
+  }
+
+  NS_IMETHODIMP Observe(nsISupports* aSubject, const char* aTopic,
+                        const char16_t* aData) override {
+    if (!strcmp(aTopic, "profile-before-change")) {
+      if (mConsumer) {
+        mConsumer->OnShutdown();
+      }
+      Destroy();
+    }
+    return NS_OK;
+  }
+
+ private:
+  ~MainShutdownWatcher() override { Destroy(); }
+
+  bool mRegistered = false;
+};
+
+NS_IMPL_ISUPPORTS(MainShutdownWatcher, nsIObserver);
+
+class WorkerShutdownWatcher final : public ShutdownWatcher {
+ public:
+  NS_DECL_ISUPPORTS
+
+  explicit WorkerShutdownWatcher(ShutdownConsumer* aConsumer)
+      : ShutdownWatcher(aConsumer) {}
+
+  bool Initialize(dom::WorkerPrivate* aWorkerPrivate) {
+    if (AppShutdown::IsInOrBeyond(ShutdownPhase::AppShutdown)) {
+      return false;
+    }
+
+    mWorkerRef = dom::WeakWorkerRef::Create(
+        aWorkerPrivate, [self = RefPtr{this}] { self->OnShutdown(); });
+    return !!mWorkerRef;
+  }
+
+  void OnShutdown() {
+    if (mConsumer) {
+      mConsumer->OnShutdown();
+    }
+    Destroy();
+  }
+
+  void Destroy() override {
+    mWorkerRef = nullptr;
+    mConsumer = nullptr;
+  }
+
+ private:
+  ~WorkerShutdownWatcher() override { Destroy(); }
+
+  RefPtr<dom::WeakWorkerRef> mWorkerRef;
+};
+
+NS_IMPL_ISUPPORTS0(WorkerShutdownWatcher);
+
+/* static */
+already_AddRefed<ShutdownWatcher> ShutdownWatcher::Create(
+    ShutdownConsumer* aConsumer) {
+  if (NS_IsMainThread()) {
+    auto watcher = MakeRefPtr<MainShutdownWatcher>(aConsumer);
+    if (watcher->Initialize()) {
+      return watcher.forget().downcast<ShutdownWatcher>();
+    }
+  } else if (dom::WorkerPrivate* workerPrivate =
+                 dom::GetCurrentThreadWorkerPrivate()) {
+    auto watcher = MakeRefPtr<WorkerShutdownWatcher>(aConsumer);
+    if (watcher->Initialize(workerPrivate)) {
+      return watcher.forget().downcast<ShutdownWatcher>();
+    }
+  }
+
+  return nullptr;
 }
 
 }  // namespace mozilla::media
