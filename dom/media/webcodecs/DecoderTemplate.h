@@ -17,7 +17,6 @@
 #include "mozilla/RefPtr.h"
 #include "mozilla/Result.h"
 #include "mozilla/UniquePtr.h"
-#include "mozilla/dom/WorkerRef.h"
 #include "mozilla/media/MediaUtils.h"
 #include "nsStringFwd.h"
 
@@ -32,7 +31,8 @@ class Promise;
 enum class CodecState : uint8_t;
 
 template <typename DecoderType>
-class DecoderTemplate : public DOMEventTargetHelper {
+class DecoderTemplate : public DOMEventTargetHelper,
+                        public media::ShutdownConsumer {
   using Self = DecoderTemplate<DecoderType>;
   using ConfigType = typename DecoderType::ConfigType;
   using ConfigTypeInternal = typename DecoderType::ConfigTypeInternal;
@@ -151,6 +151,8 @@ class DecoderTemplate : public DOMEventTargetHelper {
 
   void Close(ErrorResult& aRv);
 
+  void OnShutdown() override;
+
   /* Type conversion functions for the Decoder implementation */
  protected:
   virtual already_AddRefed<MediaRawData> InputDataToMediaRawData(
@@ -251,18 +253,7 @@ class DecoderTemplate : public DOMEventTargetHelper {
   // releases its thread on main thread before RemoteMediaDataDecoder's
   // Shutdown() task run on worker thread, RemoteMediaDataDecoder has no thread
   // to run).
-  UniquePtr<media::ShutdownBlockingTicket> mShutdownBlocker;
-
-  // Held to make sure the dispatched tasks can be done before worker is going
-  // away. As long as this worker-ref is held somewhere, the tasks dispatched to
-  // the worker can be executed (otherwise the tasks would be canceled). This
-  // ref should be activated as long as the underlying MediaDataDecoder is
-  // alive, and should keep alive until mShutdownBlocker is dropped, so all
-  // MediaDataDecoder's tasks and mShutdownBlocker-releasing task can be
-  // executed.
-  // TODO: Use StrongWorkerRef instead if this is always used in the same
-  // thread?
-  RefPtr<ThreadSafeWorkerRef> mWorkerRef;
+  RefPtr<media::ShutdownWatcher> mShutdownWatcher;
 };
 
 }  // namespace dom

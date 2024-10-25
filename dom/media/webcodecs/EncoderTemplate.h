@@ -20,7 +20,6 @@
 #include "mozilla/UniquePtr.h"
 #include "mozilla/dom/AudioEncoderBinding.h"
 #include "mozilla/dom/VideoEncoderBinding.h"
-#include "mozilla/dom/WorkerRef.h"
 #include "mozilla/media/MediaUtils.h"
 #include "nsStringFwd.h"
 
@@ -33,7 +32,8 @@ enum class CodecState : uint8_t;
 using Id = size_t;
 
 template <typename EncoderType>
-class EncoderTemplate : public DOMEventTargetHelper {
+class EncoderTemplate : public DOMEventTargetHelper,
+                        public media::ShutdownConsumer {
   using Self = EncoderTemplate<EncoderType>;
   using ConfigType = typename EncoderType::ConfigType;
   using ConfigTypeInternal = typename EncoderType::ConfigTypeInternal;
@@ -166,6 +166,8 @@ class EncoderTemplate : public DOMEventTargetHelper {
   MOZ_CAN_RUN_SCRIPT
   void Close(ErrorResult& aRv);
 
+  void OnShutdown() override;
+
   /* Type conversion functions for the Encoder implementation */
  protected:
   virtual RefPtr<OutputType> EncodedDataToOutputType(
@@ -264,30 +266,8 @@ class EncoderTemplate : public DOMEventTargetHelper {
   // called. Read and modified on owner thread only.
   bool mOutputNewDecoderConfig = false;
 
-  // Used to add a nsIAsyncShutdownBlocker on main thread to block
-  // xpcom-shutdown before the underlying MediaDataEncoder is created. The
-  // blocker will be held until the underlying MediaDataEncoder has been shut
-  // down. This blocker guarantees RemoteEncoderManagerChild's thread, where
-  // the underlying RemoteMediaDataEncoder is on, outlives the
-  // RemoteMediaDataEncoder since the thread releasing, which happens on main
-  // thread when getting a xpcom-shutdown signal, is blocked by the added
-  // blocker. As a result, RemoteMediaDataEncoder can safely work on worker
-  // thread with a holding blocker (otherwise, if RemoteEncoderManagerChild
-  // releases its thread on main thread before RemoteMediaDataEncoder's
-  // Shutdown() task run on worker thread, RemoteMediaDataEncoder has no
-  // thread to run).
-  UniquePtr<media::ShutdownBlockingTicket> mShutdownBlocker;
+  RefPtr<media::ShutdownWatcher> mShutdownWatcher;
 
-  // Held to make sure the dispatched tasks can be done before worker is going
-  // away. As long as this worker-ref is held somewhere, the tasks dispatched
-  // to the worker can be executed (otherwise the tasks would be canceled).
-  // This ref should be activated as long as the underlying MediaDataEncoder
-  // is alive, and should keep alive until mShutdownBlocker is dropped, so all
-  // MediaDataEncoder's tasks and mShutdownBlocker-releasing task can be
-  // executed.
-  // TODO: Use StrongWorkerRef instead if this is always used in the same
-  // thread?
-  RefPtr<ThreadSafeWorkerRef> mWorkerRef;
   uint64_t mPacketsOutput = 0;
 };
 

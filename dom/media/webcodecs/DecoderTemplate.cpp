@@ -19,7 +19,6 @@
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/VideoDecoderBinding.h"
 #include "mozilla/dom/VideoFrame.h"
-#include "mozilla/dom/WorkerCommon.h"
 #include "nsGkAtoms.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
@@ -324,6 +323,15 @@ void DecoderTemplate<DecoderType>::ReportError(const nsresult& aResult) {
   RefPtr<DOMException> e = DOMException::Create(aResult);
   RefPtr<WebCodecsErrorCallback> cb(mErrorCallback);
   cb->Call(*e);
+}
+
+template <typename DecoderType>
+void DecoderTemplate<DecoderType>::OnShutdown() {
+  AssertIsOnOwningThread();
+
+  LOG("%s %p gets shutdown notification for DecoderAgent #%zu",
+      DecoderType::Name.get(), this, mAgent ? mAgent->mId : 0);
+  Unused << ResetInternal(NS_ERROR_DOM_ABORT_ERR);
 }
 
 template <typename DecoderType>
@@ -789,11 +797,6 @@ MessageProcessedResult DecoderTemplate<DecoderType>::ProcessFlushMessage(
 // 1. Decoder on window, closing document
 // 2. Decoder on worker, closing document
 // 3. Decoder on worker, terminating worker
-//
-// In case 1, the entry point to clean up is in the mShutdownBlocker's
-// ShutdownpPomise-resolver. In case 2, the entry point is in mWorkerRef's
-// shutting down callback. In case 3, the entry point is in mWorkerRef's
-// shutting down callback.
 
 template <typename DecoderType>
 bool DecoderTemplate<DecoderType>::CreateDecoderAgent(
@@ -803,37 +806,16 @@ bool DecoderTemplate<DecoderType>::CreateDecoderAgent(
   MOZ_ASSERT(mState == CodecState::Configured);
   MOZ_ASSERT(!mAgent);
   MOZ_ASSERT(!mActiveConfig);
-  MOZ_ASSERT(!mShutdownBlocker);
-  MOZ_ASSERT_IF(!NS_IsMainThread(), !mWorkerRef);
+  MOZ_ASSERT(!mShutdownWatcher);
 
   auto resetOnFailure = MakeScopeExit([&]() {
     mAgent = nullptr;
     mActiveConfig = nullptr;
-    mShutdownBlocker = nullptr;
-    mWorkerRef = nullptr;
+    if (mShutdownWatcher) {
+      mShutdownWatcher->Destroy();
+      mShutdownWatcher = nullptr;
+    }
   });
-
-  // If the decoder is on worker, get a worker reference.
-  if (!NS_IsMainThread()) {
-    WorkerPrivate* workerPrivate = GetCurrentThreadWorkerPrivate();
-    if (NS_WARN_IF(!workerPrivate)) {
-      return false;
-    }
-
-    // Clean up all the resources when worker is going away.
-    RefPtr<StrongWorkerRef> workerRef = StrongWorkerRef::Create(
-        workerPrivate, "DecoderTemplate::CreateDecoderAgent",
-        [self = RefPtr{this}]() {
-          LOG("%s %p, worker is going away", DecoderType::Name.get(),
-              self.get());
-          Unused << self->ResetInternal(NS_ERROR_DOM_ABORT_ERR);
-        });
-    if (NS_WARN_IF(!workerRef)) {
-      return false;
-    }
-
-    mWorkerRef = new ThreadSafeWorkerRef(workerRef);
-  }
 
   mAgent = MakeRefPtr<DecoderAgent>(aId, std::move(aInfo));
   mActiveConfig = std::move(aConfig);
@@ -846,31 +828,12 @@ bool DecoderTemplate<DecoderType>::CreateDecoderAgent(
       "Blocker for DecoderAgent #%d (codec: %s) @ %p", mAgent->mId,
       NS_ConvertUTF16toUTF8(mActiveConfig->mCodec).get(), mAgent.get());
 
-  mShutdownBlocker = media::ShutdownBlockingTicket::Create(
-      uniqueName, NS_LITERAL_STRING_FROM_CSTRING(__FILE__), __LINE__);
-  if (!mShutdownBlocker) {
+  mShutdownWatcher = media::ShutdownWatcher::Create(this);
+  if (NS_WARN_IF(!mShutdownWatcher)) {
     LOGE("%s %p failed to create %s", DecoderType::Name.get(), this,
          NS_ConvertUTF16toUTF8(uniqueName).get());
     return false;
   }
-
-  // Clean up all the resources when xpcom-will-shutdown arrives since the page
-  // is going to be closed.
-  mShutdownBlocker->ShutdownPromise()->Then(
-      GetCurrentSerialEventTarget(), __func__,
-      [self = RefPtr{this}, id = mAgent->mId,
-       ref = mWorkerRef](bool /* aUnUsed*/) {
-        LOG("%s %p gets xpcom-will-shutdown notification for DecoderAgent #%d",
-            DecoderType::Name.get(), self.get(), id);
-        Unused << self->ResetInternal(NS_ERROR_DOM_ABORT_ERR);
-      },
-      [self = RefPtr{this}, id = mAgent->mId,
-       ref = mWorkerRef](bool /* aUnUsed*/) {
-        LOG("%s %p removes shutdown-blocker #%d before getting any "
-            "notification. DecoderAgent #%d should have been dropped",
-            DecoderType::Name.get(), self.get(), id, id);
-        MOZ_ASSERT(!self->mAgent || self->mAgent->mId != id);
-      });
 
   LOG("%s %p creates DecoderAgent #%d @ %p and its shutdown-blocker",
       DecoderType::Name.get(), this, mAgent->mId, mAgent.get());
@@ -889,24 +852,24 @@ void DecoderTemplate<DecoderType>::DestroyDecoderAgentIfAny() {
   }
 
   MOZ_ASSERT(mActiveConfig);
-  MOZ_ASSERT(mShutdownBlocker);
-  MOZ_ASSERT_IF(!NS_IsMainThread(), mWorkerRef);
+  MOZ_ASSERT(mShutdownWatcher);
 
   LOG("%s %p destroys DecoderAgent #%d @ %p", DecoderType::Name.get(), this,
       mAgent->mId, mAgent.get());
   mActiveConfig = nullptr;
   RefPtr<DecoderAgent> agent = std::move(mAgent);
-  // mShutdownBlocker should be kept alive until the shutdown is done.
-  // mWorkerRef is used to ensure this task won't be discarded in worker.
   agent->Shutdown()->Then(
       GetCurrentSerialEventTarget(), __func__,
-      [self = RefPtr{this}, id = agent->mId, ref = std::move(mWorkerRef),
-       blocker = std::move(mShutdownBlocker)](
+      [self = RefPtr{this}, id = agent->mId,
+       watcher = std::move(mShutdownWatcher)](
           const ShutdownPromise::ResolveOrRejectValue& aResult) {
         LOG("%s %p, DecoderAgent #%d's shutdown has been %s. Drop its "
             "shutdown-blocker now",
             DecoderType::Name.get(), self.get(), id,
             aResult.IsResolve() ? "resolved" : "rejected");
+        if (watcher) {
+          watcher->Destroy();
+        }
       });
 }
 
