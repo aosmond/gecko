@@ -111,3 +111,5 @@ GFXINFO_FEATURE(WEBGL_USE_HARDWARE, "WEBGL_USE_HARDWARE", "webgl-use-hardware")
 GFXINFO_FEATURE(OVERLAY_VP_AUTO_HDR, "FEATURE_OVERLAY_VP_AUTO_HDR", "overlay-vp-auto-hdr")
 /* Whether overlay is allowed to VideoProcessor Super Resolution, starting in 125. */
 GFXINFO_FEATURE(OVERLAY_VP_SUPER_RESOLUTION, "FEATURE_OVERLAY_VP_SUPER_RESOLUTION", "overlay-vp-super-resolution")
+/* Whether DMABUF can be used by WebGL, starting in 133 (128esr). */
+GFXINFO_FEATURE(DMABUF_WEBGL, "DMABUF_WEBGL", "dmabuf-webgl")
