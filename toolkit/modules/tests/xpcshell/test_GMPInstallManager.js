@@ -577,16 +577,34 @@ add_task(async function test_checkForAddons_contentSignatureSuccess() {
     // Smoke test the results are as expected.
     // If the checkForAddons fails we'll get a fallback config,
     // so we'll get incorrect addons and these asserts will fail.
-    Assert.equal(res.addons.length, 5);
+    Assert.equal(res.addons.length, 7);
     Assert.equal(res.addons[0].id, "test1");
     Assert.equal(res.addons[0].usedFallback, false);
+    Assert.deepEqual(res.addons[0].mirrorURLs, []);
     Assert.equal(res.addons[1].id, "test2");
     Assert.equal(res.addons[1].usedFallback, false);
+    Assert.deepEqual(res.addons[1].mirrorURLs, []);
     Assert.equal(res.addons[2].id, "test3");
     Assert.equal(res.addons[2].usedFallback, false);
+    Assert.deepEqual(res.addons[2].mirrorURLs, []);
     Assert.equal(res.addons[3].id, "test4");
     Assert.equal(res.addons[3].usedFallback, false);
+    Assert.deepEqual(res.addons[3].mirrorURLs, []);
     Assert.equal(res.addons[4].id, undefined);
+    Assert.equal(res.addons[4].usedFallback, false);
+    Assert.deepEqual(res.addons[4].mirrorURLs, []);
+    Assert.equal(res.addons[5].id, "test6");
+    Assert.equal(res.addons[5].usedFallback, false);
+    Assert.deepEqual(res.addons[5].mirrorURLs, [
+      "http://alt.example.com/test6.xpi",
+    ]);
+    Assert.equal(res.addons[5].mirrorURLs.length, 1);
+    Assert.equal(res.addons[6].id, "test7");
+    Assert.equal(res.addons[6].usedFallback, false);
+    Assert.deepEqual(res.addons[6].mirrorURLs, [
+      "http://alt.example.com/test7.xpi",
+      "http://alt2.example.com/test7.xpi",
+    ]);
   } catch (e) {
     Assert.ok(false, "checkForAddons should succeed");
   }
@@ -646,14 +664,33 @@ add_task(async function test_checkForAddons_contentSignatureFailure() {
     if (res.addons.length == 1) {
       Assert.equal(res.addons[0].id, "gmp-widevinecdm");
       Assert.equal(res.addons[0].usedFallback, true);
+      Assert.ok(res.addons[0].URL.startsWith("https://edgedl.me.gvt1.com"));
+      Assert.equal(res.addons[0].mirrorURLs.length, 1);
+      Assert.ok(
+        res.addons[0].mirrorURLs[0].startsWith("https://www.google.com")
+      );
     } else {
       Assert.equal(res.addons[0].id, "gmp-gmpopenh264");
       Assert.equal(res.addons[0].usedFallback, true);
+      Assert.ok(
+        res.addons[0].URL.startsWith("http://ciscobinary.openh264.org")
+      );
+      Assert.deepEqual(res.addons[0].mirrorURLs, []);
       Assert.equal(res.addons[1].id, "gmp-widevinecdm");
       Assert.equal(res.addons[1].usedFallback, true);
+      Assert.ok(res.addons[1].URL.startsWith("https://edgedl.me.gvt1.com"));
+      Assert.equal(res.addons[1].mirrorURLs.length, 1);
+      Assert.ok(
+        res.addons[1].mirrorURLs[0].startsWith("https://www.google.com")
+      );
       if (res.addons.length >= 3) {
         Assert.equal(res.addons[2].id, "gmp-widevinecdm-l1");
         Assert.equal(res.addons[2].usedFallback, true);
+        Assert.ok(res.addons[2].URL.startsWith("https://edgedl.me.gvt1.com"));
+        Assert.equal(res.addons[2].mirrorURLs.length, 1);
+        Assert.ok(
+          res.addons[2].mirrorURLs[0].startsWith("https://www.google.com")
+        );
       }
     }
   } catch (e) {
@@ -1131,9 +1168,142 @@ async function test_checkForAddons_installAddon(
   }
 }
 
+/**
+ * Tests that installing found addons from mirror URLs works as expected
+ */
+async function test_checkForAddons_installAddonFromMirror(
+  id,
+  includeSize,
+  wantInstallReject
+) {
+  info(
+    "Running installAddon for id: " +
+      id +
+      ", includeSize: " +
+      includeSize +
+      " and wantInstallReject: " +
+      wantInstallReject
+  );
+  let httpServer = new HttpServer();
+  let dir = FileUtils.getDir("TmpD", []);
+  httpServer.registerDirectory("/", dir);
+  httpServer.start(-1);
+  let testserverPort = httpServer.identity.primaryPort;
+  let zipFileName = "test_" + id + "_GMP.zip";
+
+  let zipURL = URL_HOST + ":" + testserverPort + "/" + zipFileName;
+  info("zipURL: " + zipURL);
+
+  let data = "e~=0.5772156649";
+  let zipFile = createNewZipFile(zipFileName, data);
+  let hashFunc = "sha256";
+  let expectedDigest = await IOUtils.computeHexDigest(zipFile.path, hashFunc);
+  let fileSize = zipFile.fileSize;
+  if (wantInstallReject) {
+    fileSize = 1;
+  }
+
+  let responseXML =
+    '<?xml version="1.0"?>' +
+    "<updates>" +
+    "    <addons>" +
+    '        <addon id="' +
+    id +
+    '-gmp-gmpopenh264"' +
+    '               URL="' +
+    zipURL +
+    '.does_not_exist"' +
+    '               hashFunction="' +
+    hashFunc +
+    '"' +
+    '               hashValue="' +
+    expectedDigest +
+    '"' +
+    (includeSize ? ' size="' + fileSize + '"' : "") +
+    '               version="1.1">' +
+    '          <mirror URL="' +
+    zipURL +
+    '.does_not_exist_2"/>' +
+    '          <mirror URL="' +
+    zipURL +
+    '"/>' +
+    "        </addon>" +
+    "  </addons>" +
+    "</updates>";
+
+  let myRequest = new mockRequest(200, responseXML);
+  let installManager = new GMPInstallManager();
+  let res = await ProductAddonCheckerTestUtils.overrideServiceRequest(
+    myRequest,
+    () => installManager.checkForAddons()
+  );
+  Assert.equal(res.addons.length, 1);
+  let gmpAddon = res.addons[0];
+  Assert.ok(!gmpAddon.isInstalled);
+
+  try {
+    let extractedPaths = await installManager.installAddon(gmpAddon);
+    if (wantInstallReject) {
+      Assert.ok(false); // installAddon() should have thrown.
+    }
+    Assert.equal(extractedPaths.length, 1);
+    let extractedPath = extractedPaths[0];
+
+    info("Extracted path: " + extractedPath);
+
+    let extractedFile = Cc["@mozilla.org/file/local;1"].createInstance(
+      Ci.nsIFile
+    );
+
+    extractedFile.initWithPath(extractedPath);
+    Assert.ok(extractedFile.exists());
+    let readData = readStringFromFile(extractedFile);
+    Assert.equal(readData, data);
+
+    // Make sure the prefs are set correctly
+    Assert.ok(
+      !!GMPPrefs.getInt(GMPPrefs.KEY_PLUGIN_LAST_UPDATE, "", gmpAddon.id)
+    );
+    Assert.equal(
+      GMPPrefs.getString(GMPPrefs.KEY_PLUGIN_HASHVALUE, "", gmpAddon.id),
+      expectedDigest
+    );
+    Assert.equal(
+      GMPPrefs.getString(GMPPrefs.KEY_PLUGIN_VERSION, "", gmpAddon.id),
+      "1.1"
+    );
+    Assert.equal(
+      GMPPrefs.getString(GMPPrefs.KEY_PLUGIN_ABI, "", gmpAddon.id),
+      UpdateUtils.ABI
+    );
+    // Make sure it reports as being installed
+    Assert.ok(gmpAddon.isInstalled);
+
+    // Cleanup
+    extractedFile.parent.remove(true);
+    zipFile.remove(false);
+    httpServer.stop(function () {});
+    installManager.uninit();
+  } catch (ex) {
+    zipFile.remove(false);
+    if (!wantInstallReject) {
+      do_throw("install update should not reject " + ex.message);
+    }
+  }
+}
+
 add_task(test_checkForAddons_installAddon.bind(null, "1", true, false));
 add_task(test_checkForAddons_installAddon.bind(null, "2", false, false));
 add_task(test_checkForAddons_installAddon.bind(null, "3", true, true));
+add_task(
+  test_checkForAddons_installAddonFromMirror.bind(null, "4", true, false)
+);
+add_task(
+  test_checkForAddons_installAddonFromMirror.bind(null, "5", false, false)
+);
+add_task(
+  test_checkForAddons_installAddonFromMirror.bind(null, "6", true, true)
+);
 
 /**
  * Tests simpleCheckAndInstall when autoupdate is disabled for a GMP
@@ -1633,7 +1803,7 @@ function getTestServerForContentSignatureTests() {
   // `cat toolkit/mozapps/extensions/test/xpcshell/data/productaddons/good.xml | ./mach python security/manager/ssl/tests/unit/test_content_signing/pysign.py`
   // If test certificates are regenerated, this signature must also be.
   const goodXmlContentSignature =
-    "7QYnPqFoOlS02BpDdIRIljzmPr6BFwPs1z1y8KJUBlnU7EVG6FbnXmVVt5Op9wDzgvhXX7th8qFJvpPOZs_B_tHRDNJ8SK0HN95BAN15z3ZW2r95SSHmU-fP2JgoNOR3";
+    "7QYnPqFoOlS02BpDdIRIljzmPr6BFwPs1z1y8KJUBlnU7EVG6FbnXmVVt5Op9wDzHeN7pJOM7ANmTqU50IbHnV8q87wmY83QL4p6NZzjsFnWolFmwK2ZjlLnhyxFcVSz";
 
   // Setup endpoint to handle x5u lookups correctly.
   const validX5uPath = "/valid_x5u";

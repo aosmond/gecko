@@ -38,6 +38,15 @@ def fetch_url_for_cdms(cdms, urlParams):
                 redirectUrl,
             )
 
+            # Because some users are unable to resolve *.gvt1.com
+            # URLs, we supply an alternative based on www.google.com.
+            # This should resolve with success more frequently.
+            mirrorUrl = re.sub(
+                r"https.+?release2",
+                "https://www.google.com/dl/release2",
+                redirectUrl,
+            )
+
             version = re.search(r".*?_([\d]+\.[\d]+\.[\d]+\.[\d]+)/", redirectUrl)
             if version is None:
                 raise Exception(
@@ -52,6 +61,7 @@ def fetch_url_for_cdms(cdms, urlParams):
                     )
                 )
             cdm["fileName"] = normalizedUrl
+            cdm["fileNameMirror"] = mirrorUrl
     return any_version
 
 
@@ -62,6 +72,13 @@ def fetch_data_for_cdms(cdms, urlParams):
             response = requests.get(cdm["fileUrl"])
             response.raise_for_status()
             cdm["hashValue"] = hashlib.sha512(response.content).hexdigest()
+            if "fileNameMirror" in cdm:
+                cdm["mirrorUrl"] = cdm["fileNameMirror"].format_map(urlParams)
+                mirrorresponse = requests.get(cdm["mirrorUrl"])
+                mirrorresponse.raise_for_status()
+                mirrorhash = hashlib.sha512(mirrorresponse.content).hexdigest()
+                if cdm["hashValue"] != mirrorhash:
+                    raise Exception("Different hash for primary and mirror URLs")
             cdm["filesize"] = len(response.content)
             if cdm["filesize"] == 0:
                 raise Exception("Empty response for {target}".format_map(cdm))
@@ -76,10 +93,22 @@ def generate_json_for_cdms(cdms):
                 + '          "alias": "{alias}"\n'
                 + "        }},\n"
             ).format_map(cdm)
+        elif "mirrorUrl" in cdm:
+            cdm_json += (
+                '        "{target}": {{\n'
+                + '          "fileUrl": "{fileUrl}",\n'
+                + '          "mirrorUrls": [\n'
+                + '            "{mirrorUrl}"\n'
+                + "          ],\n"
+                + '          "filesize": {filesize},\n'
+                + '          "hashValue": "{hashValue}"\n'
+                + "        }},\n"
+            ).format_map(cdm)
         else:
             cdm_json += (
                 '        "{target}": {{\n'
                 + '          "fileUrl": "{fileUrl}",\n'
+                + '          "mirrorUrls": [],\n'
                 + '          "filesize": {filesize},\n'
                 + '          "hashValue": "{hashValue}"\n'
                 + "        }},\n"
@@ -92,10 +121,10 @@ def calculate_gmpopenh264_json(version: str, version_hash: str, url_base: str) -
     cdms = [
         {"target": "Darwin_aarch64-gcc3", "fileName": "{url_base}/openh264-macosx64-aarch64-{version}.zip"},
         {"target": "Darwin_x86_64-gcc3", "fileName": "{url_base}/openh264-macosx64-{version}.zip"},
+        {"target": "Linux_aarch64-gcc3", "fileName": "{url_base}/openh264-linux64-aarch64-{version}.zip"},
         {"target": "Linux_x86-gcc3", "fileName": "{url_base}/openh264-linux32-{version}.zip"},
         {"target": "Linux_x86_64-gcc3", "fileName": "{url_base}/openh264-linux64-{version}.zip"},
         {"target": "Linux_x86_64-gcc3-asan", "alias": "Linux_x86_64-gcc3"},
-        {"target": "Linux_aarch64-gcc3", "fileName": "{url_base}/openh264-linux64-aarch64-{version}.zip"},
         {"target": "WINNT_aarch64-msvc-aarch64", "fileName": "{url_base}/openh264-win64-aarch64-{version}.zip"},
         {"target": "WINNT_x86-msvc", "fileName": "{url_base}/openh264-win32-{version}.zip"},
         {"target": "WINNT_x86-msvc-x64", "alias": "WINNT_x86-msvc"},
