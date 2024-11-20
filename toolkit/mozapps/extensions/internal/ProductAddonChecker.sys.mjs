@@ -402,6 +402,12 @@ function parseXML(document) {
     }
     addon.size = Number(addon.size) || undefined;
 
+    addon.alternateURLs = [];
+    let altUrlList = addonElement.querySelectorAll("alternateURL");
+    for (let altUrlElement of altUrlList) {
+      addon.alternateURLs.push(altUrlElement.textContent);
+    }
+
     results.push(addon);
   }
 
@@ -477,6 +483,19 @@ function downloadFile(url, options = { httpsOnlyNoUpgrade: false }) {
       reject(ex);
     }
   });
+}
+
+async function downloadFileViaAlternates(addon, options) {
+  for (const url of addon.alternateURLs) {
+    logger.info(`Try to download via alternate URL ${url}`);
+    try {
+      return await downloadFile(url, options);
+    } catch (err) {
+      logger.warn(`Failed to download via alternate URL ${url}: ${err}`);
+    }
+  }
+
+  throw new Error("Alternate URLs for addon exhausted");
 }
 
 /**
@@ -577,7 +596,17 @@ export const ProductAddonChecker = {
    *         with a JS exception in case of error.
    */
   async downloadAddon(addon, options = { httpsOnlyNoUpgrade: false }) {
-    let path = await downloadFile(addon.URL, options);
+    let path;
+    try {
+      path = await downloadFile(addon.URL, options);
+    } catch (e) {
+      try {
+        path = await downloadFileViaAlternates(addon, options);
+      } catch (_) {
+        throw e;
+      }
+    }
+
     try {
       await verifyFile(addon, path);
       return path;
