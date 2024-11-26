@@ -953,6 +953,26 @@ def eme_modules(value):
 set_config("MOZ_EME_MODULES", eme_modules | dependable([]))
 
 
+# Windows Media Foundation support
+# ==============================================================
+option("--enable-memorymodulepp", help="Enable support for MemoryModulePP")
+
+
+@depends("--enable-memorymodulepp", target, "--help")
+def memorymodulepp(value, target, _):
+    enabled = bool(value)
+    if value.origin == "default":
+        enabled = False
+    if enabled and target.os != "WINNT":
+        die("Cannot enable MemoryModulePP support on %s", target.os)
+    if enabled:
+        return True
+
+
+set_config("MOZ_MEMORYMODULEPP", memorymodulepp)
+set_define("MOZ_MEMORYMODULEPP", memorymodulepp)
+
+
 # Media Foundation CDM support
 # ==============================================================
 @depends(eme_modules, when=wmfmediaengine)

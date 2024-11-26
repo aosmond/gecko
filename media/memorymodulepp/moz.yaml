@@ -1,0 +1,41 @@
+schema: 1
+
+bugzilla:
+  product: "Core"
+  component: "Audio/Video: GMP"
+
+origin:
+  name: "MemoryModulePP"
+  description: "Library to load DLLs from memory"
+
+  url: "https://github.com/bb107/MemoryModulePP"
+  license: MIT
+
+  release: commit 79f258b672f81c6ebbee1454335c4a4309d07ccb
+
+  revision: 79f258b672f81c6ebbee1454335c4a4309d07ccb
+
+  license-file: LICENSE
+
+updatebot:
+  maintainer-phab: aosmond
+  maintainer-bz: aosmond@mozilla.com
+  tasks:
+    - type: vendoring
+      enabled: false
+
+vendoring:
+  url: https://github.com/bb107/MemoryModulePP
+  source-hosting: github
+  tracking: commit
+
+  exclude:
+    - "**"
+
+  include:
+    - LICENSE
+    - 3rdparty/Detours/
+    - 3rdparty/phnt/include/
+    - MemoryModule/*.cpp
+    - MemoryModule/*.h
+    - README.md

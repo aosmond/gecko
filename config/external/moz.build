@@ -54,6 +54,9 @@ external_dirs += ["media/ffvpx"]
 if CONFIG["MOZ_JXL"]:
     external_dirs += ["media/libjxl", "media/highway"]
 
+if CONFIG["MOZ_MEMORYMODULEPP"]:
+    external_dirs += ["media/memorymodulepp"]
+
 external_dirs += [
     "media/libcubeb",
     "media/libmkv",

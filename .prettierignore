@@ -1384,6 +1384,7 @@ media/libvorbis/
 media/libvpx/
 media/libwebp/
 media/libyuv/
+media/memorymodulepp/
 media/mozva/va
 media/mp4parse-rust/
 media/openmax_il/

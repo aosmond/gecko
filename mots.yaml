@@ -2210,6 +2210,7 @@ modules:
       - media/libtremor/**/*
       - media/libvorbis/**/*
       - media/libvpx/**/*
+      - media/memorymodule/**/*
       - dom/media/platforms/omx/**/*
       - dom/media/gmp/rlz/**/*
     meta:
