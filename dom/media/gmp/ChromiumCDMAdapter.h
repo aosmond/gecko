@@ -57,8 +57,6 @@ class ChromiumCDMAdapter : public gmp::GMPAdapter {
   explicit ChromiumCDMAdapter(
       nsTArray<std::pair<nsCString, nsCString>>&& aHostPathPairs);
 
-  void SetAdaptee(PRLibrary* aLib) override;
-
   // These are called in place of the corresponding GMP API functions.
   GMPErr GMPInit(const GMPPlatformAPI* aPlatformAPI) override;
   GMPErr GMPGetAPI(const char* aAPIName, void* aHostAPI, void** aPluginAPI,
@@ -72,7 +70,6 @@ class ChromiumCDMAdapter : public gmp::GMPAdapter {
   void PopulateHostFiles(
       nsTArray<std::pair<nsCString, nsCString>>&& aHostFilePaths);
 
-  PRLibrary* mLib = nullptr;
   nsTArray<HostFileData> mHostFiles;
 };
 

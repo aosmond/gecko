@@ -9,7 +9,6 @@
 #include "mozilla/gmp/PGMPChild.h"
 #include "GMPTimerChild.h"
 #include "GMPStorageChild.h"
-#include "GMPLoader.h"
 #include "gmp-entrypoints.h"
 #include "prlink.h"
 
@@ -20,6 +19,7 @@ class ChildProfilerController;
 namespace gmp {
 
 class GMPContentChild;
+class GMPLoader;
 
 class GMPChild : public PGMPChild {
   friend class PGMPChild;

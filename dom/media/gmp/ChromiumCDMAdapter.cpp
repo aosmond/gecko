@@ -31,6 +31,10 @@
 #  include <fcntl.h>
 #endif
 
+#ifdef MOZ_MEMORYMODULEPP
+#  include "MemoryModule.h"
+#endif
+
 const GMPPlatformAPI* sPlatform = nullptr;
 
 namespace mozilla {
@@ -46,8 +50,6 @@ ChromiumCDMAdapter::ChromiumCDMAdapter(
 #endif
   PopulateHostFiles(std::move(aHostPathPairs));
 }
-
-void ChromiumCDMAdapter::SetAdaptee(PRLibrary* aLib) { mLib = aLib; }
 
 void* ChromiumCdmHost(int aHostInterfaceVersion, void* aUserData) {
   GMP_LOG_DEBUG("ChromiumCdmHostFunc(%d, %p)", aHostInterfaceVersion,
@@ -69,7 +71,7 @@ static cdm::HostFile TakeToCDMHostFile(HostFileData& aHostFileData) {
 GMPErr ChromiumCDMAdapter::GMPInit(const GMPPlatformAPI* aPlatformAPI) {
   GMP_LOG_DEBUG("ChromiumCDMAdapter::GMPInit");
   sPlatform = aPlatformAPI;
-  if (NS_WARN_IF(!mLib)) {
+  if (NS_WARN_IF(!HasLibraryOrModule())) {
     MOZ_CRASH("Missing library!");
     return GMPGenericErr;
   }
@@ -78,7 +80,7 @@ GMPErr ChromiumCDMAdapter::GMPInit(const GMPPlatformAPI* aPlatformAPI) {
   // Note: we must call the VerifyCdmHost_0 function if it's present before
   // we call the initialize function.
   auto verify = reinterpret_cast<decltype(::VerifyCdmHost_0)*>(
-      PR_FindFunctionSymbol(mLib, MOZ_STRINGIFY(VerifyCdmHost_0)));
+      FindFunctionSymbol(MOZ_STRINGIFY(VerifyCdmHost_0)));
   if (verify) {
     nsTArray<cdm::HostFile> files;
     for (HostFileData& hostFile : mHostFiles) {
@@ -91,7 +93,7 @@ GMPErr ChromiumCDMAdapter::GMPInit(const GMPPlatformAPI* aPlatformAPI) {
 #endif
 
   auto init = reinterpret_cast<decltype(::INITIALIZE_CDM_MODULE)*>(
-      PR_FindFunctionSymbol(mLib, MOZ_STRINGIFY(INITIALIZE_CDM_MODULE)));
+      FindFunctionSymbol(MOZ_STRINGIFY(INITIALIZE_CDM_MODULE)));
   if (!init) {
     MOZ_CRASH("Missing init method!");
     return GMPGenericErr;
@@ -127,7 +129,7 @@ GMPErr ChromiumCDMAdapter::GMPGetAPI(const char* aAPIName, void* aHostAPI,
     return GMPGenericErr;
   }
   auto create = reinterpret_cast<decltype(::CreateCdmInstance)*>(
-      PR_FindFunctionSymbol(mLib, "CreateCdmInstance"));
+      FindFunctionSymbol("CreateCdmInstance"));
   if (!create) {
     GMP_LOG_DEBUG(
         "ChromiumCDMAdapter::GMPGetAPI(%s, 0x%p, 0x%p) this=0x%p "
@@ -156,8 +158,7 @@ void ChromiumCDMAdapter::GMPShutdown() {
   GMP_LOG_DEBUG("ChromiumCDMAdapter::GMPShutdown()");
 
   decltype(::DeinitializeCdmModule)* deinit;
-  deinit =
-      (decltype(deinit))(PR_FindFunctionSymbol(mLib, "DeinitializeCdmModule"));
+  deinit = (decltype(deinit))(FindFunctionSymbol("DeinitializeCdmModule"));
   if (deinit) {
     GMP_LOG_DEBUG("DeinitializeCdmModule()");
     deinit();

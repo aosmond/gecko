@@ -149,3 +149,9 @@ LOCAL_INCLUDES += [
     "/xpcom/build",
     "/xpcom/threads",
 ]
+
+if CONFIG["MOZ_MEMORYMODULEPP"]:
+    LOCAL_INCLUDES += [
+        "/media/memorymodulepp",
+        "/media/memorymodulepp/MemoryModule",
+    ]

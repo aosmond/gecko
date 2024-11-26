@@ -10709,6 +10709,13 @@
     mirror: always
 #endif
 
+#ifdef MOZ_MEMORYMODULEPP
+- name: media.gmp.use-memorymodulepp
+  type: RelaxedAtomicBool
+  value: false
+  mirror: always
+#endif
+
 # (When reading the next line, know that preprocessor.py doesn't
 # understand parentheses, but && is higher precedence than ||.)
 #if defined(XP_WIN) && defined(_ARM64_) || defined(XP_MACOSX)
