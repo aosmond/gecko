@@ -29,7 +29,36 @@
 #  include <windows.h>
 #endif
 
+#ifdef MOZ_USEMEMORYMODULEPP
+#  include <iostream>
+#  include <fstream>
+#  include "mozilla/StaticPrefs_media.h"
+#endif
+
 namespace mozilla::gmp {
+void GMPAdapter::Shutdown() {
+  if (mLib) {
+    PR_UnloadLibrary(mLib);
+  }
+#ifdef MOZ_MEMORYMODULEPP
+  if (mModule) {
+    MemoryFreeLibrary(mModule);
+  }
+#endif
+}
+
+void* GMPAdapter::FindFunctionSymbol(const char* aName) {
+  if (mLib) {
+    return PR_FindFunctionSymbol(mLib, aName);
+  }
+#ifdef MOZ_MEMORYMODULEPP
+  if (mModule) {
+    return MemoryGetProcAddress(mModule, aName);
+  }
+#endif
+  return nullptr;
+}
+
 class PassThroughGMPAdapter : public GMPAdapter {
  public:
   ~PassThroughGMPAdapter() override {
@@ -38,15 +67,13 @@ class PassThroughGMPAdapter : public GMPAdapter {
     GMPShutdown();
   }
 
-  void SetAdaptee(PRLibrary* aLib) override { mLib = aLib; }
-
   GMPErr GMPInit(const GMPPlatformAPI* aPlatformAPI) override {
-    if (NS_WARN_IF(!mLib)) {
+    if (NS_WARN_IF(!HasLibraryOrModule())) {
       MOZ_CRASH("Missing library!");
       return GMPGenericErr;
     }
     GMPInitFunc initFunc =
-        reinterpret_cast<GMPInitFunc>(PR_FindFunctionSymbol(mLib, "GMPInit"));
+        reinterpret_cast<GMPInitFunc>(FindFunctionSymbol("GMPInit"));
     if (!initFunc) {
       MOZ_CRASH("Missing init method!");
       return GMPNotImplementedErr;
@@ -56,11 +83,11 @@ class PassThroughGMPAdapter : public GMPAdapter {
 
   GMPErr GMPGetAPI(const char* aAPIName, void* aHostAPI, void** aPluginAPI,
                    const nsACString& /* aKeySystem */) override {
-    if (!mLib) {
+    if (!HasLibraryOrModule()) {
       return GMPGenericErr;
     }
-    GMPGetAPIFunc getapiFunc = reinterpret_cast<GMPGetAPIFunc>(
-        PR_FindFunctionSymbol(mLib, "GMPGetAPI"));
+    GMPGetAPIFunc getapiFunc =
+        reinterpret_cast<GMPGetAPIFunc>(FindFunctionSymbol("GMPGetAPI"));
     if (!getapiFunc) {
       return GMPNotImplementedErr;
     }
@@ -68,33 +95,16 @@ class PassThroughGMPAdapter : public GMPAdapter {
   }
 
   void GMPShutdown() override {
-    if (mLib) {
-      GMPShutdownFunc shutdownFunc = reinterpret_cast<GMPShutdownFunc>(
-          PR_FindFunctionSymbol(mLib, "GMPShutdown"));
-      if (shutdownFunc) {
-        shutdownFunc();
-      }
-      PR_UnloadLibrary(mLib);
-      mLib = nullptr;
+    GMPShutdownFunc shutdownFunc =
+        reinterpret_cast<GMPShutdownFunc>(FindFunctionSymbol("GMPShutdown"));
+    if (shutdownFunc) {
+      shutdownFunc();
     }
+    Shutdown();
   }
-
- private:
-  PRLibrary* mLib = nullptr;
 };
 
-bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
-                     const GMPPlatformAPI* aPlatformAPI, GMPAdapter* aAdapter) {
-  CrashReporter::AutoRecordAnnotation autoLibPath(
-      CrashReporter::Annotation::GMPLibraryPath,
-      nsDependentCString(aUTF8LibPath));
-
-  if (!getenv("MOZ_DISABLE_GMP_SANDBOX") && mSandboxStarter &&
-      !mSandboxStarter->Start(aUTF8LibPath)) {
-    MOZ_CRASH("Cannot start sandbox!");
-    return false;
-  }
-
+bool GMPLoader::LoadLibrary(const char* aUTF8LibPath) {
   // Load the GMP.
   PRLibSpec libSpec;
 #ifdef XP_WIN
@@ -126,6 +136,78 @@ bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
 
   mAdapter.reset((!aAdapter) ? new PassThroughGMPAdapter() : aAdapter);
   mAdapter->SetAdaptee(lib);
+  return true;
+}
+
+#ifdef MOZ_MEMORYMODULEPP
+bool GMPLoader::LoadModule(const char* aUTF8LibPath) {}
+#endif
+
+bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
+                     const GMPPlatformAPI* aPlatformAPI, GMPAdapter* aAdapter) {
+  CrashReporter::AutoRecordAnnotation autoLibPath(
+      CrashReporter::Annotation::GMPLibraryPath,
+      nsDependentCString(aUTF8LibPath));
+
+  if (!getenv("MOZ_DISABLE_GMP_SANDBOX") && mSandboxStarter &&
+      !mSandboxStarter->Start(aUTF8LibPath)) {
+    MOZ_CRASH("Cannot start sandbox!");
+    return false;
+  }
+
+  // Load the GMP.
+#ifdef MOZ_MEMORYMODULEPP
+  if (StaticPrefs::media_gmp_use_memorymodulepp()) {
+    std::ifstream file(aUTF8LibPath, std::ios::binary | std::ios::ate);
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    char* buffer = (char*)malloc(size);
+    MOZ_RELEASE_ASSERT(file.read(buffer, size));
+    HMEMORYMODULE mod = MemoryLoadLibrary(buffer, size);
+    free(buffer);
+
+    if (!mod) {
+      MOZ_CRASH_UNSAFE_PRINTF("Cannot load plugin as library %d",
+                              GetLastError());
+      return false;
+    }
+
+    mAdapter.reset((!aAdapter) ? new PassThroughGMPAdapter() : aAdapter);
+    mAdapter->SetAdapteeMemoryModule(mod);
+  } else
+#endif
+  {
+    PRLibSpec libSpec;
+#ifdef XP_WIN
+    int pathLen = MultiByteToWideChar(CP_UTF8, 0, aUTF8LibPath, -1, nullptr, 0);
+    if (pathLen == 0) {
+      MOZ_CRASH("Cannot get path length as wide char!");
+      return false;
+    }
+
+    auto widePath = MakeUnique<wchar_t[]>(pathLen);
+    if (MultiByteToWideChar(CP_UTF8, 0, aUTF8LibPath, -1, widePath.get(),
+                            pathLen) == 0) {
+      MOZ_CRASH("Cannot convert path to wide char!");
+      return false;
+    }
+
+    libSpec.value.pathname_u = widePath.get();
+    libSpec.type = PR_LibSpec_PathnameU;
+#else
+    libSpec.value.pathname = aUTF8LibPath;
+    libSpec.type = PR_LibSpec_Pathname;
+#endif
+    PRLibrary* lib = PR_LoadLibraryWithFlags(libSpec, 0);
+    if (!lib) {
+      MOZ_CRASH_UNSAFE_PRINTF("Cannot load plugin as library %d %d",
+                              PR_GetError(), PR_GetOSError());
+      return false;
+    }
+
+    mAdapter.reset((!aAdapter) ? new PassThroughGMPAdapter() : aAdapter);
+    mAdapter->SetAdaptee(lib);
+  }
 
   if (mAdapter->GMPInit(aPlatformAPI) != GMPNoErr) {
     MOZ_CRASH("Cannot initialize plugin adapter!");

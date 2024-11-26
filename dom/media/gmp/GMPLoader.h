@@ -17,6 +17,10 @@
 #  include "mozilla/Sandbox.h"
 #endif
 
+#ifdef MOZ_MEMORYMODULEPP
+typedef void* HMEMORYMODULE;
+#endif
+
 namespace mozilla::gmp {
 
 class SandboxStarter {
@@ -28,11 +32,16 @@ class SandboxStarter {
 // Interface that adapts a plugin to the GMP API.
 class GMPAdapter {
  public:
-  virtual ~GMPAdapter() = default;
+  virtual ~GMPAdapter() { Shutdown(); }
+
   // Sets the adapted to plugin library module.
   // Note: the GMPAdapter is responsible for calling PR_UnloadLibrary on aLib
   // when it's finished with it.
-  virtual void SetAdaptee(PRLibrary* aLib) = 0;
+  void SetAdaptee(PRLibrary* aLib) { mLib = aLib; }
+
+#ifdef MOZ_MEMORYMODULEPP
+  void SetAdapteeMemoryModule(HMEMORYMODULE* aModule) { mModule = aModule; }
+#endif
 
   // These are called in place of the corresponding GMP API functions.
   virtual GMPErr GMPInit(const GMPPlatformAPI* aPlatformAPI) = 0;
@@ -42,6 +51,24 @@ class GMPAdapter {
   virtual GMPErr GMPGetAPI(const char* aAPIName, void* aHostAPI,
                            void** aPluginAPI, const nsACString& aKeySystem) = 0;
   virtual void GMPShutdown() = 0;
+
+ protected:
+  bool HasLibraryOrModule() const {
+#ifdef MOZ_MEMORYMODULEPP
+    return mLib || mModule;
+#else
+    return !!mLib;
+#endif
+  }
+
+  void Shutdown();
+  void* FindFunctionSymbol(const char* aName);
+
+ private:
+  PRLibrary* mLib = nullptr;
+#ifdef MOZ_MEMORYMODULEPP
+  HMEMORYMODULE* mModule = nullptr;
+#endif
 };
 
 // Encapsulates activating the sandbox, and loading the GMP.
