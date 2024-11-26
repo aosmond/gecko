@@ -962,7 +962,7 @@ option("--enable-memorymodulepp", help="Enable support for MemoryModulePP")
 def memorymodulepp(value, target, _):
     enabled = bool(value)
     if value.origin == "default":
-        enabled = False
+        enabled = target.os == "WINNT"
     if enabled and target.os != "WINNT":
         die("Cannot enable MemoryModulePP support on %s", target.os)
     if enabled:
