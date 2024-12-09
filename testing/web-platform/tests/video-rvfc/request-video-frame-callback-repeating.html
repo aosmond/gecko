@@ -41,6 +41,19 @@ promise_test(async function(t) {
     return promise;
 }, 'Test new callbacks are only called on the next frame.');
 
+function verifyMetadata(last, current) {
+    assert_greater_than(current.presentedFrames, last.presentedFrames, "presentedFrames should be monotonically increasing");
+    assert_greater_than(current.presentationTime, last.presentationTime, "presentationTime should be monotonically increasing");
+    assert_greater_than(current.expectedDisplayTime, last.expectedDisplayTime, "expectedDisplayTime should be monotonically increasing");
+
+    // We aren't seeking through the file, so this should be increasing from frame to frame.
+    assert_greater_than(current.mediaTime, last.mediaTime, "mediaTime should be increasing");
+
+    // The test video's size doesn't change.
+    assert_equals(current.width, last.width, "width should remain constant");
+    assert_equals(current.height, last.height, "height should remain constant");
+}
+
 promise_test(async function(t) {
     let done;
     const promise = new Promise(resolve => done = resolve);
@@ -52,19 +65,6 @@ promise_test(async function(t) {
     let maxNumberOfCalls = 10;
     let currentCallNumber = 0;
     let lastMetadata;
-
-    function verifyMetadata(last, current) {
-      assert_greater_than(current.presentedFrames, last.presentedFrames, "presentedFrames should be monotonically increasing");
-      assert_greater_than(current.presentationTime, last.presentationTime, "presentationTime should be monotonically increasing");
-      assert_greater_than(current.expectedDisplayTime, last.expectedDisplayTime, "expectedDisplayTime should be monotonically increasing");
-
-      // We aren't seeking through the file, so this should be increasing from frame to frame.
-      assert_greater_than(current.mediaTime, last.mediaTime, "mediaTime should be increasing");
-
-      // The test video's size doesn't change.
-      assert_equals(current.width, last.width, "width should remain constant");
-      assert_equals(current.height, last.height, "height should remain constant");
-    }
 
     function repeatingCallback(time, metadata) {
       // Skip the first call to verifyMetadata.
@@ -87,5 +87,54 @@ promise_test(async function(t) {
 
     return promise;
 }, 'Test chaining calls to video.rVFC, and verify the required parameters.');
+
+promise_test(async function(t) {
+    let done;
+    const promise = new Promise(resolve => done = resolve);
+
+    let video = document.createElement('video');
+    video.muted = true;
+    document.body.appendChild(video);
+
+    let lastMetadata;
+
+    function callbackAfterPause(time, metadata) {
+      verifyMetadata(lastMetadata, metadata);
+
+      lastMetadata = metadata;
+
+      if (lastMetadata.mediaTime > 0.0) {
+        done();
+      } else {
+        video.requestVideoFrameCallback(t.step_func(callbackAfterPause));
+      }
+    }
+
+    function callbackBeforePause(time, metadata) {
+      if (lastMetadata) {
+        verifyMetadata(lastMetadata, metadata);
+      }
+
+      if (lastMetadata && lastMetadata.mediaTime > 0.0) {
+        lastMetadata = metadata;
+        lastMetadata.mediaTime = -0.0;
+
+        video.pause();
+        video.requestVideoFrameCallback(t.step_func(callbackAfterPause));
+        video.currentTime = 0.0;
+        video.play();
+      } else {
+        lastMetadata = metadata;
+        video.requestVideoFrameCallback(t.step_func(callbackBeforePause));
+      }
+    }
+
+    video.requestVideoFrameCallback(t.step_func(callbackBeforePause));
+
+    video.src = getVideoURI('/media/movie_5');
+    await video.play();
+
+    return promise;
+}, 'Test pausing/restarting, and verify the required parameters.');
 </script>
 </html>
