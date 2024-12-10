@@ -6,6 +6,7 @@
 #include "GMPVideoEncoderChild.h"
 #include "GMPContentChild.h"
 #include <stdio.h>
+#include "mozilla/StaticPrefs_media.h"
 #include "mozilla/Unused.h"
 #include "GMPVideoEncodedFrameImpl.h"
 #include "GMPVideoi420FrameImpl.h"
@@ -35,8 +36,15 @@ GMPVideoHostImpl& GMPVideoEncoderChild::Host() { return mVideoHost; }
 void GMPVideoEncoderChild::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
                                    const uint8_t* aCodecSpecificInfo,
                                    uint32_t aCodecSpecificInfoLength) {
+  if (mOutstandingEncodes > 0) {
+    --mOutstandingEncodes;
+  }
+
   if (NS_WARN_IF(!mPlugin)) {
     aEncodedFrame->Destroy();
+    if (mOutstandingEncodes == 0) {
+      DestroyEncoder();
+    }
     return;
   }
 
@@ -122,6 +130,7 @@ mozilla::ipc::IPCResult GMPVideoEncoderChild::RecvEncode(
   mVideoEncoder->Encode(f, aCodecSpecificInfo.Elements(),
                         aCodecSpecificInfo.Length(), aFrameTypes.Elements(),
                         aFrameTypes.Length());
+  ++mOutstandingEncodes;
 
   return IPC_OK();
 }
@@ -165,12 +174,26 @@ mozilla::ipc::IPCResult GMPVideoEncoderChild::RecvSetPeriodicKeyFrames(
   return IPC_OK();
 }
 
-void GMPVideoEncoderChild::ActorDestroy(ActorDestroyReason why) {
+void GMPVideoEncoderChild::DestroyEncoder() {
+  Unused << NS_WARN_IF(mOutstandingEncodes > 0);
+
   if (mVideoEncoder) {
     // Ignore any return code. It is OK for this to fail without killing the
     // process.
     mVideoEncoder->EncodingComplete();
     mVideoEncoder = nullptr;
+  }
+}
+
+void GMPVideoEncoderChild::ActorDestroy(ActorDestroyReason why) {
+  if (mOutstandingEncodes == 0) {
+    DestroyEncoder();
+  } else {
+    NS_DelayedDispatchToCurrentThread(
+        NS_NewRunnableFunction(
+            "GMPVideoEncoderChild::ActorDestroy",
+            [self = RefPtr{this}]() { self->DestroyEncoder(); }),
+        StaticPrefs::media_gmp_coder_shutdown_timeout_ms());
   }
 
   mVideoHost.DoneWithAPI();

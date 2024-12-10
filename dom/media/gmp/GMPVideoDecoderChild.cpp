@@ -8,6 +8,7 @@
 #include "GMPContentChild.h"
 #include <stdio.h>
 #include "mozilla/Unused.h"
+#include "mozilla/StaticPrefs_media.h"
 #include "GMPVideoEncodedFrameImpl.h"
 #include "runnable_utils.h"
 
@@ -37,8 +38,15 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
     MOZ_CRASH("Not given a decoded frame!");
   }
 
+  if (mOutstandingDecodes > 0) {
+    --mOutstandingDecodes;
+  }
+
   if (NS_WARN_IF(!mPlugin)) {
     aDecodedFrame->Destroy();
+    if (mOutstandingDecodes == 0) {
+      DestroyDecoder();
+    }
     return;
   }
 
@@ -90,7 +98,12 @@ void GMPVideoDecoderChild::ReceivedDecodedFrame(const uint64_t aPictureId) {
 }
 
 void GMPVideoDecoderChild::InputDataExhausted() {
+  mOutstandingDecodes = 0;
+
   if (NS_WARN_IF(!mPlugin)) {
+    if (mOutstandingDecodes == 0) {
+      DestroyDecoder();
+    }
     return;
   }
 
@@ -100,7 +113,12 @@ void GMPVideoDecoderChild::InputDataExhausted() {
 }
 
 void GMPVideoDecoderChild::DrainComplete() {
+  mOutstandingDecodes = 0;
+
   if (NS_WARN_IF(!mPlugin)) {
+    if (mOutstandingDecodes == 0) {
+      DestroyDecoder();
+    }
     return;
   }
 
@@ -110,7 +128,12 @@ void GMPVideoDecoderChild::DrainComplete() {
 }
 
 void GMPVideoDecoderChild::ResetComplete() {
+  mOutstandingDecodes = 0;
+
   if (NS_WARN_IF(!mPlugin)) {
+    if (mOutstandingDecodes == 0) {
+      DestroyDecoder();
+    }
     return;
   }
 
@@ -120,7 +143,14 @@ void GMPVideoDecoderChild::ResetComplete() {
 }
 
 void GMPVideoDecoderChild::Error(GMPErr aError) {
+  if (mOutstandingDecodes > 0) {
+    --mOutstandingDecodes;
+  }
+
   if (NS_WARN_IF(!mPlugin)) {
+    if (mOutstandingDecodes == 0) {
+      DestroyDecoder();
+    }
     return;
   }
 
@@ -163,6 +193,8 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDecode(
     return IPC_FAIL(this, "!mVideoDecoder");
   }
 
+  ++mOutstandingDecodes;
+
   auto* f = new GMPVideoEncodedFrameImpl(aInputFrame, std::move(aInputShmem),
                                          &mVideoHost);
 
@@ -198,12 +230,26 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDrain() {
   return IPC_OK();
 }
 
-void GMPVideoDecoderChild::ActorDestroy(ActorDestroyReason why) {
+void GMPVideoDecoderChild::DestroyDecoder() {
+  Unused << NS_WARN_IF(mOutstandingDecodes > 0);
+
   if (mVideoDecoder) {
     // Ignore any return code. It is OK for this to fail without killing the
     // process.
     mVideoDecoder->DecodingComplete();
     mVideoDecoder = nullptr;
+  }
+}
+
+void GMPVideoDecoderChild::ActorDestroy(ActorDestroyReason why) {
+  if (mOutstandingDecodes == 0) {
+    DestroyDecoder();
+  } else {
+    NS_DelayedDispatchToCurrentThread(
+        NS_NewRunnableFunction(
+            "GMPVideoDecoderChild::ActorDestroy",
+            [self = RefPtr{this}]() { self->DestroyDecoder(); }),
+        StaticPrefs::media_gmp_coder_shutdown_timeout_ms());
   }
 
   mVideoHost.DoneWithAPI();
