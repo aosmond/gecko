@@ -46,6 +46,9 @@ class GMPVideoEncoderChild final : public PGMPVideoEncoderChild,
  private:
   virtual ~GMPVideoEncoderChild();
 
+  bool MaybeDestroyEncoder();
+  void DestroyEncoder();
+
   // PGMPVideoEncoderChild
   mozilla::ipc::IPCResult RecvInitEncode(const GMPVideoCodec& aCodecSettings,
                                          nsTArray<uint8_t>&& aCodecSpecific,

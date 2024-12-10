@@ -6,6 +6,7 @@
 #include "GMPVideoEncoderChild.h"
 #include "GMPContentChild.h"
 #include <stdio.h>
+#include "mozilla/StaticPrefs_media.h"
 #include "mozilla/Unused.h"
 #include "GMPVideoEncodedFrameImpl.h"
 #include "GMPVideoi420FrameImpl.h"
@@ -36,7 +37,7 @@ void GMPVideoEncoderChild::Encoded(GMPVideoEncodedFrame* aEncodedFrame,
                                    const uint8_t* aCodecSpecificInfo,
                                    uint32_t aCodecSpecificInfoLength) {
   if (NS_WARN_IF(!mPlugin)) {
-    aEncodedFrame->Destroy();
+    MaybeDestroyEncoder();
     return;
   }
 
@@ -165,12 +166,36 @@ mozilla::ipc::IPCResult GMPVideoEncoderChild::RecvSetPeriodicKeyFrames(
   return IPC_OK();
 }
 
-void GMPVideoEncoderChild::ActorDestroy(ActorDestroyReason why) {
+bool GMPVideoEncoderChild::MaybeDestroyEncoder() {
+  // If there are no decoded frames, then we know that OpenH264 has destroyed
+  // any outstanding references to its pending encode frames. This means it
+  // should be safe to destroy the encoder since there should not be any pending
+  // sync callbacks.
+  if (mVideoHost.IsDecodedFramesEmpty()) {
+    DestroyEncoder();
+    return true;
+  }
+  return false;
+}
+
+void GMPVideoEncoderChild::DestroyEncoder() {
+  Unused << NS_WARN_IF(!mVideoHost.IsDecodedFramesEmpty());
+
   if (mVideoEncoder) {
     // Ignore any return code. It is OK for this to fail without killing the
     // process.
     mVideoEncoder->EncodingComplete();
     mVideoEncoder = nullptr;
+  }
+}
+
+void GMPVideoEncoderChild::ActorDestroy(ActorDestroyReason why) {
+  if (!MaybeDestroyEncoder()) {
+    NS_DelayedDispatchToCurrentThread(
+        NS_NewRunnableFunction(
+            "GMPVideoEncoderChild::ActorDestroy",
+            [self = RefPtr{this}]() { self->DestroyEncoder(); }),
+        StaticPrefs::media_gmp_coder_shutdown_timeout_ms());
   }
 
   mVideoHost.DoneWithAPI();

@@ -48,6 +48,9 @@ class GMPVideoDecoderChild final : public PGMPVideoDecoderChild,
  private:
   virtual ~GMPVideoDecoderChild();
 
+  bool MaybeDestroyDecoder();
+  void DestroyDecoder();
+
   // PGMPVideoDecoderChild
   mozilla::ipc::IPCResult RecvInitDecode(const GMPVideoCodec& aCodecSettings,
                                          nsTArray<uint8_t>&& aCodecSpecific,
@@ -64,6 +67,8 @@ class GMPVideoDecoderChild final : public PGMPVideoDecoderChild,
   GMPContentChild* mPlugin;
   GMPVideoDecoder* mVideoDecoder;
   GMPVideoHostImpl mVideoHost;
+  uint32_t mOutstandingDrains = 0;
+  uint32_t mOutstandingResets = 0;
 };
 
 }  // namespace mozilla::gmp

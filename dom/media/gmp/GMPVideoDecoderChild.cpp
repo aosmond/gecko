@@ -8,6 +8,7 @@
 #include "GMPContentChild.h"
 #include <stdio.h>
 #include "mozilla/Unused.h"
+#include "mozilla/StaticPrefs_media.h"
 #include "GMPVideoEncodedFrameImpl.h"
 #include "runnable_utils.h"
 
@@ -39,6 +40,7 @@ void GMPVideoDecoderChild::Decoded(GMPVideoi420Frame* aDecodedFrame) {
 
   if (NS_WARN_IF(!mPlugin)) {
     aDecodedFrame->Destroy();
+    MaybeDestroyDecoder();
     return;
   }
 
@@ -91,6 +93,7 @@ void GMPVideoDecoderChild::ReceivedDecodedFrame(const uint64_t aPictureId) {
 
 void GMPVideoDecoderChild::InputDataExhausted() {
   if (NS_WARN_IF(!mPlugin)) {
+    MaybeDestroyDecoder();
     return;
   }
 
@@ -100,7 +103,14 @@ void GMPVideoDecoderChild::InputDataExhausted() {
 }
 
 void GMPVideoDecoderChild::DrainComplete() {
+  if (mOutstandingDrains > 0) {
+    --mOutstandingDrains;
+  } else {
+    MOZ_ASSERT_UNREACHABLE("DrainComplete without outstanding drain!");
+  }
+
   if (NS_WARN_IF(!mPlugin)) {
+    MaybeDestroyDecoder();
     return;
   }
 
@@ -110,7 +120,14 @@ void GMPVideoDecoderChild::DrainComplete() {
 }
 
 void GMPVideoDecoderChild::ResetComplete() {
+  if (mOutstandingResets > 0) {
+    --mOutstandingResets;
+  } else {
+    MOZ_ASSERT_UNREACHABLE("ResetComplete without outstanding reset!");
+  }
+
   if (NS_WARN_IF(!mPlugin)) {
+    MaybeDestroyDecoder();
     return;
   }
 
@@ -121,6 +138,7 @@ void GMPVideoDecoderChild::ResetComplete() {
 
 void GMPVideoDecoderChild::Error(GMPErr aError) {
   if (NS_WARN_IF(!mPlugin)) {
+    MaybeDestroyDecoder();
     return;
   }
 
@@ -179,6 +197,8 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvReset() {
     return IPC_FAIL(this, "!mVideoDecoder");
   }
 
+  ++mOutstandingResets;
+
   // Ignore any return code. It is OK for this to fail without killing the
   // process.
   mVideoDecoder->Reset();
@@ -191,6 +211,8 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDrain() {
     return IPC_FAIL(this, "!mVideoDecoder");
   }
 
+  ++mOutstandingDrains;
+
   // Ignore any return code. It is OK for this to fail without killing the
   // process.
   mVideoDecoder->Drain();
@@ -198,12 +220,37 @@ mozilla::ipc::IPCResult GMPVideoDecoderChild::RecvDrain() {
   return IPC_OK();
 }
 
-void GMPVideoDecoderChild::ActorDestroy(ActorDestroyReason why) {
+bool GMPVideoDecoderChild::MaybeDestroyDecoder() {
+  // If there are no encoded frames, then we know that OpenH264 has destroyed
+  // any outstanding references to its pending decode frames. This means it
+  // should be safe to destroy the decoder since there should not be any pending
+  // sync callbacks.
+  if (mOutstandingDrains == 0 && mOutstandingResets == 0 &&
+      mVideoHost.IsEncodedFramesEmpty()) {
+    DestroyDecoder();
+    return true;
+  }
+  return false;
+}
+
+void GMPVideoDecoderChild::DestroyDecoder() {
+  Unused << NS_WARN_IF(!mVideoHost.IsEncodedFramesEmpty());
+
   if (mVideoDecoder) {
     // Ignore any return code. It is OK for this to fail without killing the
     // process.
     mVideoDecoder->DecodingComplete();
     mVideoDecoder = nullptr;
+  }
+}
+
+void GMPVideoDecoderChild::ActorDestroy(ActorDestroyReason why) {
+  if (!MaybeDestroyDecoder()) {
+    NS_DelayedDispatchToCurrentThread(
+        NS_NewRunnableFunction(
+            "GMPVideoDecoderChild::ActorDestroy",
+            [self = RefPtr{this}]() { self->DestroyDecoder(); }),
+        StaticPrefs::media_gmp_coder_shutdown_timeout_ms());
   }
 
   mVideoHost.DoneWithAPI();
