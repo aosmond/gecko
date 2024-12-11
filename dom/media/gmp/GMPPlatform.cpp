@@ -132,18 +132,31 @@ bool SpinPendingGmpEventsUntil(const SpinPendingPredicate& aPred,
     {
       StaticMonitorAutoLock lock(sMainLoopMonitor);
       while (sMainLoopPendingEvents.IsEmpty()) {
+        printf_stderr(
+            "[AO] SpinPendingGmpEventsUntil -- wait for pending events\n");
         if (lock.Wait(timeout) == CVStatus::Timeout) {
+          printf_stderr(
+              "[AO] SpinPendingGmpEventsUntil -- timed out waiting for pending "
+              "events\n");
           return false;
         }
+        printf_stderr("[AO] SpinPendingGmpEventsUntil -- awoken %d\n",
+                      sMainLoopPendingEvents.IsEmpty());
       }
       pendingEvents = std::move(sMainLoopPendingEvents);
     }
 
+    printf_stderr("[AO] SpinPendingGmpEventsUntil -- run %zu events\n",
+                  pendingEvents.Length());
     for (auto& event : pendingEvents) {
+      printf_stderr("[AO] SpinPendingGmpEventsUntil -- run %p\n", event.get());
       event->Run();
     }
+    printf_stderr("[AO] SpinPendingGmpEventsUntil -- ran %zu events\n",
+                  pendingEvents.Length());
   }
 
+  printf_stderr("[AO] SpinPendingGmpEventsUntil -- success\n");
   return true;
 }
 
@@ -179,6 +192,7 @@ GMPErr RunOnMainThread(GMPTask* aTask) {
   }
 
   RefPtr<GMPRunnable> r = new GMPRunnable(aTask);
+  printf_stderr("[AO] RunOnMainThread -- dispatch %p\n", r.get());
   QueueForMainThread(std::move(r));
   return GMPNoErr;
 }
@@ -189,8 +203,11 @@ GMPErr SyncRunOnMainThread(GMPTask* aTask) {
   }
 
   RefPtr<GMPSyncRunnable> r = new GMPSyncRunnable(aTask, sMainLoop);
+  printf_stderr("[AO] SyncRunOnMainThread -- dispatch %p\n", r.get());
   QueueForMainThread(RefPtr{r});
+  printf_stderr("[AO] SyncRunOnMainThread -- wait %p\n", r.get());
   r->WaitUntilDone();
+  printf_stderr("[AO] SyncRunOnMainThread -- done %p\n", r.get());
 
   return GMPNoErr;
 }
