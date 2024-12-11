@@ -171,18 +171,32 @@ void GMPVideoEncoderChild::ActorDestroy(ActorDestroyReason why) {
   // any outstanding references to its pending encode frames. This means it
   // should be safe to destroy the encoder since there should not be any pending
   // sync callbacks.
+  printf_stderr("[AO] [%p] GMPVideoEncoderChild::ActorDestroy -- enter\n",
+                this);
   if (!SpinPendingGmpEventsUntil(
-          [&]() -> bool { return mVideoHost.IsDecodedFramesEmpty(); },
+          [&]() -> bool {
+            printf_stderr(
+                "[AO] [%p] GMPVideoEncoderChild::ActorDestroy -- "
+                "decodedFrames=%d\n",
+                this, mVideoHost.IsDecodedFramesEmpty());
+            return mVideoHost.IsDecodedFramesEmpty();
+          },
           StaticPrefs::media_gmp_coder_shutdown_timeout_ms())) {
     NS_WARNING("Timed out waiting for synchronous events!");
   }
-
+  printf_stderr(
+      "[AO] [%p] GMPVideoEncoderChild::ActorDestroy -- videoEncoder=%p\n", this,
+      mVideoEncoder);
   if (mVideoEncoder) {
     // Ignore any return code. It is OK for this to fail without killing the
     // process.
     mVideoEncoder->EncodingComplete();
     mVideoEncoder = nullptr;
   }
+  printf_stderr(
+      "[AO] [%p] GMPVideoEncoderChild::ActorDestroy -- destroyed "
+      "videoEncoder\n",
+      this);
 
   mVideoHost.DoneWithAPI();
 
