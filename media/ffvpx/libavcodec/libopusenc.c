@@ -168,6 +168,7 @@ static int libopus_configure_encoder(AVCodecContext *avctx, OpusMSEncoder *enc,
                "Unable to set DTX: %s\n",
                opus_strerror(ret));
 
+
     if (avctx->cutoff) {
         ret = opus_multistream_encoder_ctl(enc,
                                            OPUS_SET_MAX_BANDWIDTH(opts->max_bandwidth));

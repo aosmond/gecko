@@ -18,6 +18,8 @@ if CONFIG['TARGET_CPU'] == 'aarch64':
 DIRS += ['bsf']
 
 LOCAL_INCLUDES += ['/modules/fdlibm/inexact-math-override']
+LOCAL_INCLUDES += ['/media/ffvpx/libavutil']
+LOCAL_INCLUDES += ['/media/ffvpx']
 
 SharedLibrary('mozavcodec')
 SOURCES += [
@@ -46,6 +48,7 @@ SOURCES += [
     'jfdctfst.c',
     'jfdctint.c',
     'jrevdct.c',
+    'lcevcdec.c',
     'libopus.c',
     'libopusdec.c',
     'libopusenc.c',
@@ -71,9 +74,9 @@ SOURCES += [
     'pthread.c',
     'pthread_frame.c',
     'pthread_slice.c',
-    'refstruct.c',
     'reverse.c',
     'simple_idct.c',
+    'threadprogress.c',
     'utils.c',
     'version.c',
     'vlc.c',
