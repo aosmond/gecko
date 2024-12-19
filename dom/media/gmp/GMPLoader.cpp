@@ -33,6 +33,7 @@
 #  include <iostream>
 #  include <fstream>
 #  include "mozilla/StaticPrefs_media.h"
+#  include "MemoryModule/Initialize.h"
 #endif
 
 namespace mozilla::gmp {
@@ -124,6 +125,7 @@ bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
   // Load the GMP.
 #ifdef MOZ_MEMORYMODULEPP
   if (StaticPrefs::media_gmp_use_memorymodulepp()) {
+    PR_Sleep(PR_MillisecondsToInterval(20000));
     std::ifstream file(aUTF8LibPath, std::ios::binary | std::ios::ate);
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
@@ -134,6 +136,9 @@ bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
     }
 
     MOZ_RELEASE_ASSERT(file.read(static_cast<char*>(buffer), size));
+
+    MmInitialize();
+
     HMEMORYMODULE mod = nullptr;
     LdrLoadDllMemoryExW(&mod, nullptr, 0, buffer, 0, L"widevinecdm", nullptr);
 

@@ -406,7 +406,9 @@ BOOL NTAPI PreHookNtSetInformationProcess() {
 int MmpSyncThreadTlsData() {
     PSYSTEM_PROCESS_INFORMATION pspi = (PSYSTEM_PROCESS_INFORMATION)MmpQuerySystemInformation(SYSTEM_INFORMATION_CLASS::SystemProcessInformation, nullptr);
     PSYSTEM_PROCESS_INFORMATION current = pspi;
-    std::set<HANDLE>threads;
+    //std::set<HANDLE>threads;
+    HANDLE threads[32];
+    int threadCount = 0;
     int count = 0;
 
     //
@@ -416,7 +418,8 @@ int MmpSyncThreadTlsData() {
     PLIST_ENTRY entry = MmpGlobalDataPtr->MmpTls->MmpThreadLocalStoragePointer.Flink;
     while (entry != &MmpGlobalDataPtr->MmpTls->MmpThreadLocalStoragePointer) {
         PMMP_TLSP_RECORD j = CONTAINING_RECORD(entry, MMP_TLSP_RECORD, InMmpThreadLocalStoragePointer);
-        threads.insert(j->UniqueThread);
+        //threads.insert(j->UniqueThread);
+        threads[threadCount++] = j->UniqueThread;
         
         entry = entry->Flink;
     }
@@ -428,7 +431,15 @@ int MmpSyncThreadTlsData() {
             for (ULONG index = 0; index < current->NumberOfThreads; ++index) {
                 CLIENT_ID cid = current->Threads[index].ClientId;
 
-                if (threads.find(cid.UniqueThread) == threads.end()) {
+                bool found = false;
+                for (int threadIndex = 0; threadIndex < threadCount; ++threadCount) {
+		    if (threads[threadIndex] == cid.UniqueThread) {
+		        found = true;
+		        break;
+		    }
+		}
+                if (found) {
+                //if (threads.find(cid.UniqueThread) == threads.end()) {
 
                     HANDLE hThread;
                     OBJECT_ATTRIBUTES oa{};
