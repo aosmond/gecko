@@ -18,7 +18,7 @@
 #endif
 
 #ifdef MOZ_MEMORYMODULEPP
-// #  include <winternl.h>
+#  include <winternl.h>
 #  include "MemoryModule/LoadDllMemoryApi.h"
 #endif
 
