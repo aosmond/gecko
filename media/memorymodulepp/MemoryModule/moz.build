@@ -14,7 +14,7 @@ SOURCES += [
     'Loader.cpp',
     'MemoryModule.cpp',
     'MmpDotNet.cpp',
-    'MmpLdrpTls.cpp',
+    'MmpTls.cpp',
     'MmpTlsFiber.cpp',
     'Utils.cpp',
 ]
