@@ -42,7 +42,12 @@ void GMPAdapter::Shutdown() {
   }
 #ifdef MOZ_MEMORYMODULEPP
   if (mModule) {
-    MemoryFreeLibrary(mModule);
+    LdrUnloadDllMemory(mModule);
+    mModule = nullptr;
+  }
+  if (mModuleBuffer) {
+    ::VirtualFree(mModuleBuffer, 0, MEM_RELEASE);
+    mModuleBuffer = nullptr;
   }
 #endif
 }
@@ -53,7 +58,7 @@ void* GMPAdapter::FindFunctionSymbol(const char* aName) {
   }
 #ifdef MOZ_MEMORYMODULEPP
   if (mModule) {
-    return MemoryGetProcAddress(mModule, aName);
+    return ::GetProcAddress(mModule, aName);
   }
 #endif
   return nullptr;
@@ -122,10 +127,10 @@ bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
     std::ifstream file(aUTF8LibPath, std::ios::binary | std::ios::ate);
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
-    char* buffer = (char*)malloc(size);
+    LPVOID buffer = VirtuaAlloc(0, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     MOZ_RELEASE_ASSERT(file.read(buffer, size));
-    HMEMORYMODULE mod = MemoryLoadLibrary(buffer, size);
-    free(buffer);
+    HMEMORYMODULE mod = nullptr;
+    LoadLibraryMemoryExW(&mod, nullptr, 0, buffer, 0, L"widevinecdm", nullptr);
 
     if (!mod) {
       MOZ_CRASH_UNSAFE_PRINTF("Cannot load plugin as library %d",
@@ -134,7 +139,7 @@ bool GMPLoader::Load(const char* aUTF8LibPath, uint32_t aUTF8LibPathLen,
     }
 
     mAdapter.reset((!aAdapter) ? new PassThroughGMPAdapter() : aAdapter);
-    mAdapter->SetAdapteeMemoryModule(mod);
+    mAdapter->SetAdapteeMemoryModule(mod, buffer);
   } else
 #endif
   {

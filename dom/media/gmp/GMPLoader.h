@@ -18,9 +18,8 @@
 #endif
 
 #ifdef MOZ_MEMORYMODULEPP
-#  include <windows.h>
-#  include <winternl.h>
-#  include "MemoryModule.h"
+// #  include <winternl.h>
+#  include "MemoryModule/LoadDllMemoryApi.h"
 #endif
 
 namespace mozilla::gmp {
@@ -42,7 +41,10 @@ class GMPAdapter {
   void SetAdaptee(PRLibrary* aLib) { mLib = aLib; }
 
 #ifdef MOZ_MEMORYMODULEPP
-  void SetAdapteeMemoryModule(HMEMORYMODULE aModule) { mModule = aModule; }
+  void SetAdapteeMemoryModule(HMEMORYMODULE aModule, LPVOID aModuleBuffer) {
+    mModule = aModule;
+    mModuleBuffer = aModuleBuffer;
+  }
 #endif
 
   // These are called in place of the corresponding GMP API functions.
@@ -70,6 +72,7 @@ class GMPAdapter {
   PRLibrary* mLib = nullptr;
 #ifdef MOZ_MEMORYMODULEPP
   HMEMORYMODULE mModule = nullptr;
+  LPVOID mModuleBuffer = nullptr;
 #endif
 };
 

@@ -31,10 +31,6 @@
 #  include <fcntl.h>
 #endif
 
-#ifdef MOZ_MEMORYMODULEPP
-#  include "MemoryModule.h"
-#endif
-
 const GMPPlatformAPI* sPlatform = nullptr;
 
 namespace mozilla {
