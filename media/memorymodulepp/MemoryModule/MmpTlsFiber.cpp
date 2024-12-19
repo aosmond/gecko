@@ -132,7 +132,7 @@ VOID OnExit() {
 
 VOID MmpTlsFiberInitialize() {
 	InitializeCriticalSection(&MmpPostponedTlsLock);
-	MmpPostponedTlsEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	MmpPostponedTlsEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 	MmpPostponedTlsList = new(HeapAlloc(GetProcessHeap(), 0, sizeof(std::vector<MMP_POSTPONED_TLS>))) std::vector<MMP_POSTPONED_TLS>();
 	
 	atexit(OnExit);

@@ -79,7 +79,7 @@ PVOID FindLdrpInvertedFunctionTable32() {
 		if (IsModuleUnloaded(CurEntry))continue;					//skip unloaded module
 		if (IsValidMemoryModuleHandle((HMEMORYMODULE)CurEntry->DllBase))continue;  //skip our memory module.
 		if (CurEntry->DllBase == hNtdll && Offset == 0x20)continue;	//Win10 skip first entry, if the base of ntdll is smallest.
-		hModule = (HMODULE)(hModule ? std::min(hModule, CurEntry->DllBase) : CurEntry->DllBase);
+		hModule = hModule ? std::min(hModule, (HMODULE)CurEntry->DllBase) : (HMODULE)CurEntry->DllBase;
 	}
 	ModuleHeaders = RtlImageNtHeader(hModule);
 	if (!hModule || !ModuleHeaders || !hNtdll || !NtdllHeaders)return nullptr;
@@ -141,7 +141,7 @@ PVOID FindLdrpInvertedFunctionTable64() {
 			ListEntry = ListEntry->Flink;
 			//Make sure the smallest base address is not our memory module
 			if (IsValidMemoryModuleHandle((HMEMORYMODULE)CurEntry->DllBase))continue;
-			hModule = (HMODULE)(hModule ? std::min(hModule, CurEntry->DllBase) : CurEntry->DllBase);
+			hModule = hModule ? std::min(hModule, (HMODULE)CurEntry->DllBase) : (HMODULE)CurEntry->DllBase;
 		}
 		ModuleHeaders = RtlImageNtHeader(hModule);
 	}

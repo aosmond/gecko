@@ -38,8 +38,10 @@
 #endif
 #endif
 
+#define STATUS_ABANDONED_WAIT_0          ((DWORD)0x00000080L)    // winnt
 #include <windows.h>
 #include <windowsx.h>
+#undef STATUS_ABANDONED_WAIT_0
 #undef WIN32_NO_STATUS
 #include <ntstatus.h>
 #include <winioctl.h>
