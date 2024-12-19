@@ -1,3 +1,4 @@
+#include <ntstatus.h>
 #include "stdafx.h"
 #include <random>
 #pragma comment(lib,"ntdll.lib")
