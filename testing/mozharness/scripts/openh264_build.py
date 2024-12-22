@@ -299,7 +299,8 @@ class OpenH264Build(TransferMixin, VCSScript, TooltoolMixin):
                     (
                         "https://raw.githubusercontent.com/libav/"
                         "gas-preprocessor/c2bc63c96678d9739509e58"
-                        "7aa30c94bdc0e636d/gas-preprocessor.pl"
+                        "gas-preprocessor/d09971fad329d32df19f5bb"
+                        "afe88cf2f0ed04ed7/gas-preprocessor.pl"
                     ),
                     parent_dir=openh264_dir,
                 )
