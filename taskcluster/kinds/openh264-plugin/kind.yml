@@ -181,7 +181,7 @@ tasks:
             build_type: opt
         treeherder:
             platform: win64/opt
-        worker-type: b-win2022
+        worker-type: b-linux-gcp
         worker:
             max-run-time: 1800
             artifacts:
@@ -196,10 +196,15 @@ tasks:
             tooltool-downloads: internal
         fetches:
             toolchain:
-                - win64-clang
-                - win64-dump_syms
-                - win64-mozmake
-                - win64-nasm
+                - linux64-clang
+                - linux64-nasm
+                - linux64-dump_syms
+                - linux64-wine
+                - linux64-winchecksec
+                - nsis
+                - sysroot-x86_64-linux-gnu
+                - sysroot-wasm32-wasi
+                - vs
     win64-aarch64/opt:
         attributes:
             build_platform: win64-aarch64
