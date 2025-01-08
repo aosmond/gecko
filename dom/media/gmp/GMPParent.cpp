@@ -48,6 +48,7 @@
 #  include "mozilla/java/GeckoProcessTypeWrappers.h"
 #endif  // defined(MOZ_WIDGET_ANDROID)
 #if defined(XP_MACOSX)
+#  include "nsILocalFileMac.h"
 #  include "nsMacUtilsImpl.h"
 #  include "base/process_util.h"
 #endif  // defined(XP_MACOSX)
@@ -115,14 +116,20 @@ void GMPParent::CloneFrom(const GMPParent* aOther) {
 }
 
 #if defined(XP_WIN) || defined(XP_MACOSX)
-nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginDir,
-                                      const nsString& aBaseName,
-                                      uint32_t& aArchSet) {
+nsresult GMPParent::GetPluginFile(nsIFile* aPluginDir,
+                                  const nsString& aBaseName,
+                                  nsIFile** aPluginFile) {
   // Build up the plugin filename
 #  if defined(XP_MACOSX)
   nsAutoString pluginFileName = u"lib"_ns + aBaseName + u".dylib"_ns;
 #  elif defined(XP_WIN)
+#    ifdef MOZ_WMF_CDM
+  nsAutoString pluginFileName = aBaseName.Equals(u"widevinecdm-l1"_ns)
+                                    ? u"Google.Widevine.CDM.dll"_ns
+                                    : aBaseName + u".dll"_ns;
+#    else
   nsAutoString pluginFileName = aBaseName + u".dll"_ns;
+#    endif
 #  endif
   GMP_PARENT_LOG_DEBUG("%s: pluginFileName: %s", __FUNCTION__,
                        NS_LossyConvertUTF16toASCII(pluginFileName).get());
@@ -131,12 +138,18 @@ nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginDir,
   nsCOMPtr<nsIFile> pluginFile;
   nsresult rv = aPluginDir->Clone(getter_AddRefs(pluginFile));
   NS_ENSURE_SUCCESS(rv, rv);
-  pluginFile->AppendRelativePath(pluginFileName);
+  rv = pluginFile->AppendRelativePath(pluginFileName);
+  NS_ENSURE_SUCCESS(rv, rv);
+  pluginFile.forget(aPluginFile);
+  return NS_OK;
+}
 
+nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginFile,
+                                      uint32_t& aArchSet) {
 #  if defined(XP_MACOSX)
   // Get the full plugin path
   nsAutoCString pluginPath;
-  rv = pluginFile->GetNativePath(pluginPath);
+  nsresult rv = aPluginFile->GetNativePath(pluginPath);
   NS_ENSURE_SUCCESS(rv, rv);
   GMP_PARENT_LOG_DEBUG("%s: pluginPath: %s", __FUNCTION__, pluginPath.get());
 
@@ -149,7 +162,7 @@ nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginDir,
 #  elif defined(XP_WIN)
   // Get the full plugin path
   nsAutoString pluginPath;
-  rv = pluginFile->GetTarget(pluginPath);
+  rv = aPluginFile->GetTarget(pluginPath);
   NS_ENSURE_SUCCESS(rv, rv);
   GMP_PARENT_LOG_DEBUG("%s: pluginPath: %s", __FUNCTION__,
                        NS_LossyConvertUTF16toASCII(pluginPath).get());
@@ -163,6 +176,24 @@ nsresult GMPParent::GetPluginFileArch(nsIFile* aPluginDir,
   return NS_OK;
 }
 #endif  // defined(XP_WIN) || defined(XP_MACOSX)
+
+#ifdef XP_MACOSX
+nsresult GMPParent::UnquarantinePluginFile(nsIFile* aPluginFile) {
+  nsresult rv = NS_OK;
+  nsCOMPtr<nsILocalFileMac> macPluginFile = do_QueryInterface(aPluginFile, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  bool quarantined = true;
+  rv = macPluginFile->HasXAttr("com.apple.quarantine"_ns, &quarantined);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (!quarantined) {
+    return NS_OK;
+  }
+
+  return macPluginFile->DelXAttr("com.apple.quarantine"_ns);
+}
+#endif  // defined(XP_MACOSX)
 
 RefPtr<GenericPromise> GMPParent::Init(GeckoMediaPluginServiceParent* aService,
                                        nsIFile* aPluginDir) {
@@ -192,21 +223,23 @@ RefPtr<GenericPromise> GMPParent::Init(GeckoMediaPluginServiceParent* aService,
   mName = Substring(parentLeafName, 4);
 
 #if defined(XP_WIN) || defined(XP_MACOSX)
+  nsCOMPtr<nsIFile> pluginFile;
+  rv = GetPluginFile(aPluginDir, mName, getter_AddRefs(pluginFile));
+  if (NS_FAILED(rv)) {
+    GMP_PARENT_LOG_DEBUG("%s: Plugin file error: %d", __FUNCTION__,
+                         uint32_t(rv));
+    return GenericPromise::CreateAndReject(rv, __func__);
+  }
+
   uint32_t pluginArch = base::PROCESS_ARCH_INVALID;
-  rv = GetPluginFileArch(
-      aPluginDir,
-#  ifdef MOZ_WMF_CDM
-      mName.Equals(u"widevinecdm-l1"_ns) ? u"Google.Widevine.CDM"_ns : mName,
-#  else
-      mName,
-#  endif
-      pluginArch);
+  rv = GetPluginFileArch(pluginFile, pluginArch);
   if (NS_FAILED(rv)) {
     GMP_PARENT_LOG_DEBUG("%s: Plugin arch error: %d", __FUNCTION__,
                          uint32_t(rv));
-  } else {
-    GMP_PARENT_LOG_DEBUG("%s: Plugin arch: 0x%x", __FUNCTION__, pluginArch);
+    return GenericPromise::CreateAndReject(rv, __func__);
   }
+
+  GMP_PARENT_LOG_DEBUG("%s: Plugin arch: 0x%x", __FUNCTION__, pluginArch);
 
   const uint32_t x86 = base::PROCESS_ARCH_X86_64 | base::PROCESS_ARCH_I386;
 #  ifdef ALLOW_GECKO_CHILD_PROCESS_ARCH
@@ -277,6 +310,14 @@ RefPtr<GenericPromise> GMPParent::Init(GeckoMediaPluginServiceParent* aService,
   }
 #  endif  // defined(ALLOW_GECKO_CHILD_PROCESS_ARCH)
 #endif    // defined(XP_WIN) || defined(XP_MACOSX)
+
+#ifdef XP_MACOSX
+  rv = UnquarantinePluginFile(pluginFile);
+  if (NS_FAILED(rv)) {
+    GMP_PARENT_LOG_DEBUG("%s: Plugin unquarantine file error: %d", __FUNCTION__,
+                         uint32_t(rv));
+  }
+#endif
 
   return ReadGMPMetaData();
 }

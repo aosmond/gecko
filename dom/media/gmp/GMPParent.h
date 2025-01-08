@@ -205,8 +205,12 @@ class GMPParent final
 #endif
 
 #if defined(XP_WIN) || defined(XP_MACOSX)
-  nsresult GetPluginFileArch(nsIFile* aPluginDir, const nsString& aBaseName,
-                             uint32_t& aArchSet);
+  nsresult GetPluginFile(nsIFile* aPluginDir, const nsString& aBaseName,
+                         nsIFile** aPluginFile);
+  nsresult GetPluginFileArch(nsIFile* aPluginFile, uint32_t& aArchSet);
+#endif
+#ifdef XP_MACOSX
+  nsresult UnquarantinePluginFile(nsIFile* aPluginFile);
 #endif
 
   Atomic<GMPState> mState;
