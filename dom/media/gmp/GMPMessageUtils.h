@@ -21,6 +21,11 @@ struct ParamTraits<GMPPluginType>
           GMPPluginType, GMPPluginType::Unknown, GMPPluginType::WidevineL1> {};
 
 template <>
+struct ParamTraits<GMPCapabilityFlags>
+    : public BitFlagsEnumSerializer<GMPCapabilityFlags,
+                                    GMPCapabilityFlags::ALL_BITS> {};
+
+template <>
 struct ParamTraits<GMPErr>
     : public ContiguousEnumSerializer<GMPErr, GMPNoErr, GMPLastErr> {};
 

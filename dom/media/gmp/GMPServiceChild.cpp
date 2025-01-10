@@ -256,10 +256,12 @@ struct GMPCapabilityAndVersion {
   }
 
   nsCString ToString() const {
-    nsCString s;
+    nsAutoCString s;
     s.Append(mName);
     s.AppendLiteral(" version=");
     s.Append(mVersion);
+    s.AppendLiteral(" flags=");
+    s.AppendInt(UnderlyingValue(mFlags));
     s.AppendLiteral(" tags=[");
     StringJoinAppend(s, " "_ns, mCapabilities,
                      [](auto& tags, const GMPCapability& cap) {
@@ -275,6 +277,7 @@ struct GMPCapabilityAndVersion {
 
   nsCString mName;
   nsCString mVersion;
+  GMPCapabilityFlags mFlags;
   nsTArray<GMPCapability> mCapabilities;
 };
 

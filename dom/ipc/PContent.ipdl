@@ -69,6 +69,7 @@ include LookAndFeelTypes;
 include protocol PSandboxTesting;
 #endif
 
+include "GMPMessageUtils.h";
 include "ipc/MediaControlIPC.h";
 include "mozilla/AntiTrackingIPCUtils.h";
 include "mozilla/GfxMessageUtils.h";
@@ -121,6 +122,7 @@ using mozilla::Telemetry::DynamicScalarDefinition from "mozilla/TelemetryComms.h
 using mozilla::Telemetry::ChildEventData from "mozilla/TelemetryComms.h";
 using mozilla::dom::geolocation::SystemGeolocationPermissionBehavior from "mozilla/dom/GeolocationIPCUtils.h";
 using mozilla::dom::geolocation::GeolocationPermissionStatus from "mozilla/dom/GeolocationIPCUtils.h";
+using GMPCapabilityFlags from "GMPNativeTypes.h";
 
 #if defined(XP_WIN)
 [MoveOnly] using mozilla::UntrustedModulesData from "mozilla/UntrustedModulesData.h";
@@ -356,6 +358,7 @@ struct GMPCapabilityData
 {
     nsCString name;
     nsCString version;
+    GMPCapabilityFlags flags;
     GMPAPITags[] capabilities;
 };
 

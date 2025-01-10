@@ -6,6 +6,8 @@
 #ifndef GMPNativeTypes_h_
 #define GMPNativeTypes_h_
 
+#include "mozilla/TypedEnumBits.h"
+
 enum class GMPPluginType {
   Unknown,
   Fake,
@@ -14,5 +16,15 @@ enum class GMPPluginType {
   Widevine,
   WidevineL1,
 };
+
+enum class GMPCapabilityFlags : uint32_t {
+  None = 0,
+  DecodeH264Level5 = 1 << 0,
+  EncodeH264Level5 = 1 << 1,
+  EncodeH264SVC = 1 << 2,
+  ALL_BITS = (1 << 3) - 1
+};
+
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(GMPCapabilityFlags)
 
 #endif
