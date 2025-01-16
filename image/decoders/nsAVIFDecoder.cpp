@@ -1952,6 +1952,10 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::DoDecodeInternal(
     }
   }
 
+  if (!mIsAnimated && !(GetSurfaceFlags() & SurfaceFlags::NO_REORIENT)) {
+    pipeFlags |= SurfacePipeFlags::REORIENT;
+  }
+
   Maybe<SurfacePipe> pipe = Nothing();
   auto* transform = mUsePipeTransform ? mTransform : nullptr;
 
@@ -1968,7 +1972,7 @@ nsAVIFDecoder::DecodeResult nsAVIFDecoder::DoDecodeInternal(
         this, Size(), OutputSize(), FullFrame(), format, outFormat, animParams,
         transform, pipeFlags);
   } else {
-    pipe = SurfacePipeFactory::CreateReorientSurfacePipe(
+    pipe = SurfacePipeFactory::CreateOrientedSurfacePipe(
         this, Size(), OutputSize(), format, transform, GetOrientation(),
         pipeFlags);
   }

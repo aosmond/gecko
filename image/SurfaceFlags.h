@@ -22,6 +22,7 @@ enum class SurfaceFlags : uint8_t {
   NO_COLORSPACE_CONVERSION = 1 << 1,
   TO_SRGB_COLORSPACE = 1 << 2,
   RECORD_BLOB = 1 << 3,
+  NO_REORIENT = 1 << 4,
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(SurfaceFlags)
 
