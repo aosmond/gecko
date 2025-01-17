@@ -7167,19 +7167,6 @@ SurfaceFromElementResult nsLayoutUtils::SurfaceFromElement(
     return result;
   }
 
-  nsCOMPtr<nsIContent> content = do_QueryInterface(aElement);
-
-  // Ensure that the image is oriented the same way as it's displayed
-  // if the image request is of the same origin.
-  auto orientation =
-      content->GetPrimaryFrame() &&
-              !(aSurfaceFlags & SFE_ORIENTATION_FROM_IMAGE)
-          ? content->GetPrimaryFrame()->StyleVisibility()->UsedImageOrientation(
-                imgRequest)
-          : nsStyleVisibility::UsedImageOrientation(
-                imgRequest, StyleImageOrientation::FromImage);
-  imgContainer = OrientImage(imgContainer, orientation);
-
   const bool noRasterize = aSurfaceFlags & SFE_NO_RASTERIZING_VECTORS;
 
   uint32_t whichFrame = aSurfaceFlags & SFE_WANT_FIRST_FRAME_IF_IMAGE
@@ -7194,6 +7181,21 @@ SurfaceFromElementResult nsLayoutUtils::SurfaceFromElement(
   }
   if (aSurfaceFlags & SFE_ALLOW_NON_PREMULT) {
     frameFlags |= imgIContainer::FLAG_DECODE_NO_PREMULTIPLY_ALPHA;
+  }
+
+  nsCOMPtr<nsIContent> content = do_QueryInterface(aElement);
+
+  // Ensure that the image is oriented the same way as it's displayed
+  // if the image request is of the same origin.
+  auto orientation =
+      content->GetPrimaryFrame() &&
+              !(aSurfaceFlags & SFE_ORIENTATION_FROM_IMAGE)
+          ? content->GetPrimaryFrame()->StyleVisibility()->UsedImageOrientation(
+                imgRequest)
+          : nsStyleVisibility::UsedImageOrientation(
+                imgRequest, StyleImageOrientation::FromImage);
+  if (orientation == StyleImageOrientation::None) {
+    frameFlags |= imgIContainer::FLAG_DECODE_NO_REORIENT;
   }
 
   int32_t imgWidth, imgHeight;
