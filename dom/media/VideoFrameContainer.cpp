@@ -5,6 +5,7 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "VideoFrameContainer.h"
+#include "mozilla/Logging.h"
 
 #ifdef MOZ_WIDGET_ANDROID
 #  include "GLImages.h"  // for SurfaceTextureImage
@@ -13,6 +14,8 @@
 #include "mozilla/AbstractThread.h"
 
 using namespace mozilla::layers;
+
+mozilla::LazyLogModule gVideoFrameContainer("VideoFrameContainer");
 
 namespace mozilla {
 #define NS_DispatchToMainThread(...) CompileError_UseAbstractMainThreadInstead
@@ -60,12 +63,17 @@ void VideoFrameContainer::UpdatePrincipalHandleForFrameIDLocked(
 
 #ifdef MOZ_WIDGET_ANDROID
 static void NotifySetCurrent(Image* aImage) {
+  MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug,
+              "NotifySetCurrent, serial={}", aImage->GetSerial());
   if (aImage == nullptr) {
     return;
   }
 
   SurfaceTextureImage* image = aImage->AsSurfaceTextureImage();
   if (image == nullptr) {
+    MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug,
+                "NotifySetCurrent, SurfaceTextureImage was nullptr serial={}",
+                aImage->GetSerial());
     return;
   }
 
@@ -77,6 +85,12 @@ void VideoFrameContainer::SetCurrentFrame(
     const gfx::IntSize& aIntrinsicSize, Image* aImage,
     const TimeStamp& aTargetTime, const media::TimeUnit& aProcessingDuration,
     const media::TimeUnit& aMediaTime) {
+  MOZ_LOG_FMT(
+      gVideoFrameContainer, LogLevel::Debug,
+      "SetCurrentFrame, targetTime={}, processing duration={}us,pts={}",
+      aTargetTime.GetValue(),
+      aProcessingDuration.IsValid() ? aProcessingDuration.ToMicroseconds() : -1,
+      aMediaTime.ToString());
 #ifdef MOZ_WIDGET_ANDROID
   NotifySetCurrent(aImage);
 #endif
@@ -92,6 +106,8 @@ void VideoFrameContainer::SetCurrentFrame(
 void VideoFrameContainer::SetCurrentFrames(
     const gfx::IntSize& aIntrinsicSize,
     const nsTArray<ImageContainer::NonOwningImage>& aImages) {
+  MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug,
+              "SetCurrentFrames ({} images)", aImages.Length());
 #ifdef MOZ_WIDGET_ANDROID
   // When there are multiple frames, only the last one is effective
   // (see bug 1299068 comment 4). Here I just count on VideoSink and VideoOutput
@@ -108,6 +124,8 @@ void VideoFrameContainer::SetCurrentFrames(
 void VideoFrameContainer::SetCurrentFramesLocked(
     const gfx::IntSize& aIntrinsicSize,
     const nsTArray<ImageContainer::NonOwningImage>& aImages) {
+  MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug,
+              "SetCurrentFramesLocked ({} images", aImages.Length());
   mMutex.AssertCurrentThreadOwns();
 
   if (auto size = Some(aIntrinsicSize); size != mIntrinsicSize) {
@@ -168,6 +186,8 @@ void VideoFrameContainer::SetCurrentFramesLocked(
 void VideoFrameContainer::ClearFutureFrames(TimeStamp aNow) {
   MutexAutoLock lock(mMutex);
 
+  MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug, "ClearFutureFrame ts={}",
+              aNow.GetValue());
   // See comment in SetCurrentFrame for the reasoning behind
   // using a kungFuDeathGrip here.
   AutoTArray<ImageContainer::OwningImage, 10> kungFuDeathGrip;
