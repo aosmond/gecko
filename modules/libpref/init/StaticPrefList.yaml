@@ -11137,7 +11137,7 @@
 
 - name: media.ffvpx-hw.enabled
   type: RelaxedAtomicBool
-#if defined(MOZ_WIDGET_GTK)
+#if defined(MOZ_WIDGET_GTK) || defined(ANDROID)
   value: true
 #elif defined(XP_WIN)
   value: @IS_NIGHTLY_BUILD@
@@ -11401,7 +11401,7 @@
 
 -   name: media.android-media-codec.preferred
     type: RelaxedAtomicBool
-    value: true
+    value: false
     mirror: always
 #endif  # ANDROID
 
