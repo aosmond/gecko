@@ -30,7 +30,7 @@ class FFmpegDecoderModule : public PlatformDecoderModule {
 #endif
   }
   static void Init(FFmpegLibWrapper* aLib) {
-#if defined(XP_WIN) && !defined(MOZ_FFVPX_AUDIOONLY)
+#if (defined(XP_WIN) || defined(MOZ_WIDGET_ANDROID)) && !defined(MOZ_FFVPX_AUDIOONLY)
     if (!XRE_IsGPUProcess()) {
       return;
     }
