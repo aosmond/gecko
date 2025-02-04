@@ -87,8 +87,12 @@ void VideoFrameContainer::SetCurrentFrame(
     const media::TimeUnit& aMediaTime) {
   MOZ_LOG_FMT(
       gVideoFrameContainer, LogLevel::Debug,
+#ifdef DEBUG
       "SetCurrentFrame, targetTime={}, processing duration={}us,pts={}",
       aTargetTime.GetValue(),
+#else
+      "SetCurrentFrame, processing duration={}us,pts={}",
+#endif
       aProcessingDuration.IsValid() ? aProcessingDuration.ToMicroseconds() : -1,
       aMediaTime.ToString());
 #ifdef MOZ_WIDGET_ANDROID
@@ -186,8 +190,12 @@ void VideoFrameContainer::SetCurrentFramesLocked(
 void VideoFrameContainer::ClearFutureFrames(TimeStamp aNow) {
   MutexAutoLock lock(mMutex);
 
+#ifdef DEBUG
   MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug, "ClearFutureFrame ts={}",
               aNow.GetValue());
+#else
+  MOZ_LOG_FMT(gVideoFrameContainer, LogLevel::Debug, "ClearFutureFrame");
+#endif
   // See comment in SetCurrentFrame for the reasoning behind
   // using a kungFuDeathGrip here.
   AutoTArray<ImageContainer::OwningImage, 10> kungFuDeathGrip;
