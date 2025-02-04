@@ -25,6 +25,9 @@ struct AVVAAPIHWConfig;
 struct AVHWFramesConstraints;
 #endif
 struct AVBufferRef;
+#ifdef MOZ_WIDGET_ANDROID
+typedef struct MediaCodecBuffer AVMediaCodecBuffer;
+#endif
 
 namespace mozilla {
 
@@ -185,6 +188,10 @@ struct MOZ_ONLY_USED_TO_AVOID_STATIC_CONSTRUCTORS FFmpegLibWrapper {
   int (*vaInitialize)(void* dpy, int* major_version, int* minor_version);
   int (*vaTerminate)(void* dpy);
   void* (*vaGetDisplayDRM)(int fd);
+#endif
+
+#if defined(MOZ_WIDGET_ANDROID)
+  int (*av_mediacodec_release_buffer)(AVMediaCodecBuffer*, int);
 #endif
 
   // Only ever used with ffvpx
