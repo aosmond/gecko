@@ -12,7 +12,7 @@ locale-subset=true
 directory=lib/ffmpeg
 add-ld-path=.
 no-autodownload=true
-version=${FREEDESKTOP_VERSION}
+version=23.04
 
 [Extension org.mozilla.firefox.systemconfig]
 directory=etc/firefox
