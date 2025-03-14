@@ -80,10 +80,21 @@ already_AddRefed<SourceSurface> GetSourceSurface(Image* aImage) {
 
 nsresult ConvertToI420(Image* aImage, uint8_t* aDestY, int aDestStrideY,
                        uint8_t* aDestU, int aDestStrideU, uint8_t* aDestV,
-                       int aDestStrideV) {
+                       int aDestStrideV, const IntSize& aDestSize) {
   if (!aImage->IsValid()) {
     return NS_ERROR_INVALID_ARG;
   }
+
+  const IntSize imageSize = aImage->GetSize();
+  const bool matchesSize = imageSize == aDestSize;
+
+  gfx::AlignedArray<uint8_t> resizeBuf;
+  uint8_t* resizeBufY = nullptr;
+  uint8_t* resizeBufU = nullptr;
+  uint8_t* resizeBufV = nullptr;
+  int32_t resizeStrideY = 0;
+  int32_t resizeStrideU = 0;
+  int32_t resizeStrideV = 0;
 
   if (const PlanarYCbCrData* data = GetPlanarYCbCrData(aImage)) {
     const ImageUtils imageUtils(aImage);
@@ -92,37 +103,144 @@ nsresult ConvertToI420(Image* aImage, uint8_t* aDestY, int aDestStrideY,
       MOZ_ASSERT_UNREACHABLE("YUV format conversion not implemented");
       return NS_ERROR_NOT_IMPLEMENTED;
     }
+
+    if (!matchesSize && format.value() != ImageBitmapFormat::YUV420P) {
+      const IntSize cbCrSize =
+          gfx::ChromaSize(aDestSize, data->mChromaSubsampling);
+      resizeStrideY = aDestSize.width;
+
+      switch (format.value()) {
+        case ImageBitmapFormat::YUV422P:
+        case ImageBitmapFormat::YUV444P:
+        case ImageBitmapFormat::YUV420SP_NV12:
+        case ImageBitmapFormat::YUV420SP_NV21:
+          resizeStrideU = resizeStrideV = cbCrSize.width;
+          break;
+        default:
+          MOZ_ASSERT_UNREACHABLE("YUV format conversion not implemented");
+          return NS_ERROR_NOT_IMPLEMENTED;
+      }
+
+      auto resizeBufYLen = CheckedInt<size_t>(resizeStrideY) * aDestSize.height;
+      auto resizeBufCbCrLen =
+          CheckedInt<size_t>(cbCrSize.width) * cbCrSize.height;
+      auto resizeBufLen = resizeBufYLen + 2 * resizeBufCbCrLen;
+      if (!resizeBufLen.isValid()) {
+        MOZ_ASSERT_UNREACHABLE("Bad buffer size!");
+        return NS_ERROR_FAILURE;
+      }
+
+      resizeBuf.Realloc(resizeBufLen.value());
+      if (!resizeBuf) {
+        return NS_ERROR_OUT_OF_MEMORY;
+      }
+
+      resizeBufY = resizeBuf;
+      resizeBufU = resizeBufY + resizeBufYLen.value();
+      resizeBufV = resizeBufU + resizeBufCbCrLen.value();
+    }
+
     switch (format.value()) {
       case ImageBitmapFormat::YUV420P:
+        if (!matchesSize) {
+          return MapRv(libyuv::I420Scale(
+              data->mYChannel, data->mYStride, data->mCbChannel,
+              data->mCbCrStride, data->mCrChannel, data->mCbCrStride,
+              imageSize.width, imageSize.height, aDestY, aDestStrideY, aDestU,
+              aDestStrideU, aDestV, aDestStrideV, aDestSize.width,
+              aDestSize.height, libyuv::FilterMode::kFilterBox));
+        }
         return MapRv(libyuv::I420ToI420(
             data->mYChannel, data->mYStride, data->mCbChannel,
             data->mCbCrStride, data->mCrChannel, data->mCbCrStride, aDestY,
             aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
-            aImage->GetSize().width, aImage->GetSize().height));
+            aDestSize.width, aDestSize.height));
       case ImageBitmapFormat::YUV422P:
+        if (!matchesSize) {
+          nsresult rv = MapRv(libyuv::I422Scale(
+              data->mYChannel, data->mYStride, data->mCbChannel,
+              data->mCbCrStride, data->mCrChannel, data->mCbCrStride,
+              imageSize.width, imageSize.height, resizeBufY, resizeStrideY,
+              resizeBufU, resizeStrideU, resizeBufV, resizeStrideV,
+              aDestSize.width, aDestSize.height,
+              libyuv::FilterMode::kFilterBox));
+          if (NS_FAILED(rv)) {
+            return rv;
+          }
+          return MapRv(libyuv::I422ToI420(
+              resizeBufY, resizeStrideY, resizeBufU, resizeStrideU, resizeBufV,
+              resizeStrideV, aDestY, aDestStrideY, aDestU, aDestStrideU, aDestV,
+              aDestStrideV, aDestSize.width, aDestSize.height));
+        }
         return MapRv(libyuv::I422ToI420(
             data->mYChannel, data->mYStride, data->mCbChannel,
             data->mCbCrStride, data->mCrChannel, data->mCbCrStride, aDestY,
             aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
-            aImage->GetSize().width, aImage->GetSize().height));
+            aDestSize.width, aDestSize.height));
       case ImageBitmapFormat::YUV444P:
+        if (!matchesSize) {
+          nsresult rv = MapRv(libyuv::I444Scale(
+              data->mYChannel, data->mYStride, data->mCbChannel,
+              data->mCbCrStride, data->mCrChannel, data->mCbCrStride,
+              imageSize.width, imageSize.height, resizeBufY, resizeStrideY,
+              resizeBufU, resizeStrideU, resizeBufV, resizeStrideV,
+              aDestSize.width, aDestSize.height,
+              libyuv::FilterMode::kFilterBox));
+          if (NS_FAILED(rv)) {
+            return rv;
+          }
+          return MapRv(libyuv::I444ToI420(
+              resizeBufY, resizeStrideY, resizeBufU, resizeStrideU, resizeBufV,
+              resizeStrideV, aDestY, aDestStrideY, aDestU, aDestStrideU, aDestV,
+              aDestStrideV, aDestSize.width, aDestSize.height));
+        }
         return MapRv(libyuv::I444ToI420(
             data->mYChannel, data->mYStride, data->mCbChannel,
             data->mCbCrStride, data->mCrChannel, data->mCbCrStride, aDestY,
             aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
-            aImage->GetSize().width, aImage->GetSize().height));
+            aDestSize.width, aDestSize.height));
       case ImageBitmapFormat::YUV420SP_NV12:
+        if (!matchesSize) {
+          nsresult rv = MapRv(libyuv::NV12Scale(
+              data->mYChannel, data->mYStride, data->mCbChannel,
+              data->mCbCrStride, imageSize.width, imageSize.height, resizeBufY,
+              resizeStrideY, resizeBufU, resizeStrideU, aDestSize.width,
+              aDestSize.height, libyuv::FilterMode::kFilterBox));
+          if (NS_FAILED(rv)) {
+            return rv;
+          }
+          return MapRv(libyuv::NV12ToI420(
+              resizeBufY, resizeStrideY, resizeBufU, resizeStrideU, aDestY,
+              aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
+              aDestSize.width, aDestSize.height));
+        }
         return MapRv(libyuv::NV12ToI420(
             data->mYChannel, data->mYStride, data->mCbChannel,
             data->mCbCrStride, aDestY, aDestStrideY, aDestU, aDestStrideU,
-            aDestV, aDestStrideV, aImage->GetSize().width,
-            aImage->GetSize().height));
+            aDestV, aDestStrideV, aDestSize.width, aDestSize.height));
       case ImageBitmapFormat::YUV420SP_NV21:
+        if (!matchesSize) {
+          // libyuv does not support scaling NV21, so we can convert to I420
+          // first, and then scale.
+          nsresult rv = MapRv(libyuv::NV21ToI420(
+              data->mYChannel, data->mYStride, data->mCrChannel,
+              data->mCbCrStride, resizeBufY, resizeStrideY, resizeBufU,
+              resizeStrideU, resizeBufV, resizeStrideV, imageSize.width,
+              imageSize.height));
+          if (NS_FAILED(rv)) {
+            return rv;
+          }
+          return MapRv(libyuv::I420Scale(
+              resizeBufY, resizeStrideY, resizeBufU, resizeStrideU, resizeBufV,
+              resizeStrideV, imageSize.width, imageSize.height, aDestY,
+              aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
+              aDestSize.width, aDestSize.height,
+              libyuv::FilterMode::kFilterBox));
+        }
         return MapRv(libyuv::NV21ToI420(
             data->mYChannel, data->mYStride, data->mCrChannel,
             data->mCbCrStride, aDestY, aDestStrideY, aDestU, aDestStrideU,
-            aDestV, aDestStrideV, aImage->GetSize().width,
-            aImage->GetSize().height));
+            aDestV, aDestStrideV, aDestSize.width, aDestSize.height));
       default:
         MOZ_ASSERT_UNREACHABLE("YUV format conversion not implemented");
         return NS_ERROR_NOT_IMPLEMENTED;
@@ -144,24 +262,119 @@ nsresult ConvertToI420(Image* aImage, uint8_t* aDestY, int aDestStrideY,
     return NS_ERROR_FAILURE;
   }
 
+  if (!matchesSize) {
+    switch (surf->GetFormat()) {
+      case SurfaceFormat::B8G8R8A8:
+      case SurfaceFormat::B8G8R8X8:
+      case SurfaceFormat::R8G8B8A8:
+      case SurfaceFormat::R8G8B8X8: {
+        auto resizeStride = CheckedInt<int32_t>(aDestSize.width) * 4;
+        auto resizeBufLen = resizeStride * aDestSize.height;
+        if (!resizeStride.isValid() || !resizeBufLen.isValid()) {
+          MOZ_ASSERT_UNREACHABLE("Bad buffer size!");
+          return NS_ERROR_FAILURE;
+        }
+
+        resizeBuf.Realloc(resizeBufLen.value());
+        if (!resizeBuf) {
+          return NS_ERROR_OUT_OF_MEMORY;
+        }
+
+        resizeStrideY = resizeStride.value();
+      } break;
+      case SurfaceFormat::R5G6B5_UINT16: {
+        const IntSize cbCrSize =
+            gfx::ChromaSize(aDestSize, gfx::ChromaSubsampling::HALF_WIDTH);
+        resizeStrideY = aDestSize.width;
+        resizeStrideU = resizeStrideV = cbCrSize.width;
+
+        auto resizeBufYLen =
+            CheckedInt<size_t>(resizeStrideY) * aDestSize.height;
+        auto resizeBufCbCrLen =
+            CheckedInt<size_t>(cbCrSize.width) * cbCrSize.height;
+        auto resizeBufLen = resizeBufYLen + 2 * resizeBufCbCrLen;
+        if (!resizeBufLen.isValid()) {
+          MOZ_ASSERT_UNREACHABLE("Bad buffer size!");
+          return NS_ERROR_FAILURE;
+        }
+
+        resizeBuf.Realloc(resizeBufLen.value());
+        if (!resizeBuf) {
+          return NS_ERROR_OUT_OF_MEMORY;
+        }
+
+        resizeBufY = resizeBuf;
+        resizeBufU = resizeBufY + resizeBufYLen.value();
+        resizeBufV = resizeBufU + resizeBufCbCrLen.value();
+      } break;
+      default:
+        MOZ_ASSERT_UNREACHABLE("Surface format conversion not implemented");
+        return NS_ERROR_NOT_IMPLEMENTED;
+    }
+  }
+
   switch (surf->GetFormat()) {
     case SurfaceFormat::B8G8R8A8:
     case SurfaceFormat::B8G8R8X8:
+      if (!matchesSize) {
+        nsresult rv = MapRv(libyuv::ARGBScale(
+            map.GetData(), map.GetStride(), imageSize.width, imageSize.height,
+            resizeBuf, resizeStrideY, aDestSize.width, aDestSize.height,
+            libyuv::FilterMode::kFilterBox));
+        if (NS_FAILED(rv)) {
+          return rv;
+        }
+        return MapRv(libyuv::ARGBToI420(resizeBuf, resizeStrideY, aDestY,
+                                        aDestStrideY, aDestU, aDestStrideU,
+                                        aDestV, aDestStrideV, aDestSize.width,
+                                        aDestSize.height));
+      }
       return MapRv(libyuv::ARGBToI420(
           static_cast<uint8_t*>(map.GetData()), map.GetStride(), aDestY,
           aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
-          aImage->GetSize().width, aImage->GetSize().height));
+          aDestSize.width, aDestSize.height));
     case SurfaceFormat::R8G8B8A8:
     case SurfaceFormat::R8G8B8X8:
+      if (!matchesSize) {
+        // We can use the scale for ARGB because the R and B channels are
+        // treated the same by the scale, despite their position being swapped.
+        nsresult rv = MapRv(libyuv::ARGBScale(
+            map.GetData(), map.GetStride(), imageSize.width, imageSize.height,
+            resizeBuf, resizeStrideY, aDestSize.width, aDestSize.height,
+            libyuv::FilterMode::kFilterBox));
+        if (NS_FAILED(rv)) {
+          return rv;
+        }
+        return MapRv(libyuv::ABGRToI420(resizeBuf, resizeStrideY, aDestY,
+                                        aDestStrideY, aDestU, aDestStrideU,
+                                        aDestV, aDestStrideV, aDestSize.width,
+                                        aDestSize.height));
+      }
       return MapRv(libyuv::ABGRToI420(
           static_cast<uint8_t*>(map.GetData()), map.GetStride(), aDestY,
           aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
-          aImage->GetSize().width, aImage->GetSize().height));
+          aDestSize.width, aDestSize.height));
     case SurfaceFormat::R5G6B5_UINT16:
+      if (!matchesSize) {
+        // libyuv does not support scaling RGB565, so we can convert to I420
+        // first, and then scale.
+        nsresult rv = MapRv(libyuv::RGB565ToI420(
+            static_cast<uint8_t*>(map.GetData()), map.GetStride(), resizeBufY,
+            resizeStrideY, resizeBufU, resizeStrideU, resizeBufV, resizeStrideV,
+            imageSize.width, imageSize.height));
+        if (NS_FAILED(rv)) {
+          return rv;
+        }
+        return MapRv(libyuv::I420Scale(
+            resizeBufY, resizeStrideY, resizeBufU, resizeStrideU, resizeBufV,
+            resizeStrideV, imageSize.width, imageSize.height, aDestY,
+            aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
+            aDestSize.width, aDestSize.height, libyuv::FilterMode::kFilterBox));
+      }
       return MapRv(libyuv::RGB565ToI420(
           static_cast<uint8_t*>(map.GetData()), map.GetStride(), aDestY,
           aDestStrideY, aDestU, aDestStrideU, aDestV, aDestStrideV,
-          aImage->GetSize().width, aImage->GetSize().height));
+          aDestSize.width, aDestSize.height));
     default:
       MOZ_ASSERT_UNREACHABLE("Surface format conversion not implemented");
       return NS_ERROR_NOT_IMPLEMENTED;
