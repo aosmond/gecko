@@ -220,7 +220,7 @@ RefPtr<MediaDataEncoder::EncodePromise> GMPVideoEncoder::Encode(
 
   const gfx::IntSize ySize = mConfig.mSize;
   const gfx::IntSize cbCrSize =
-      gfx::ChromaSize(ySize, gfx::ChromaSubsampling::HALF_WIDTH);
+      gfx::ChromaSize(ySize, gfx::ChromaSubsampling::HALF_WIDTH_AND_HEIGHT);
   const int32_t yStride = ySize.width;
   const int32_t cbCrStride = cbCrSize.width;
 

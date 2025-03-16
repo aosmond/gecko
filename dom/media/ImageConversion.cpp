@@ -105,15 +105,20 @@ nsresult ConvertToI420(Image* aImage, uint8_t* aDestY, int aDestStrideY,
     }
 
     if (!matchesSize && format.value() != ImageBitmapFormat::YUV420P) {
-      const IntSize cbCrSize =
-          gfx::ChromaSize(aDestSize, data->mChromaSubsampling);
-      resizeStrideY = aDestSize.width;
+      IntSize cbCrSize;
 
       switch (format.value()) {
         case ImageBitmapFormat::YUV422P:
         case ImageBitmapFormat::YUV444P:
         case ImageBitmapFormat::YUV420SP_NV12:
+          cbCrSize = gfx::ChromaSize(aDestSize, data->mChromaSubsampling);
+          resizeStrideY = aDestSize.width;
+          resizeStrideU = resizeStrideV = cbCrSize.width;
+          break;
         case ImageBitmapFormat::YUV420SP_NV21:
+          cbCrSize = gfx::ChromaSize(
+              imageSize, gfx::ChromaSubsampling::HALF_WIDTH_AND_HEIGHT);
+          resizeStrideY = imageSize.width;
           resizeStrideU = resizeStrideV = cbCrSize.width;
           break;
         default:
@@ -283,13 +288,13 @@ nsresult ConvertToI420(Image* aImage, uint8_t* aDestY, int aDestStrideY,
         resizeStrideY = resizeStride.value();
       } break;
       case SurfaceFormat::R5G6B5_UINT16: {
-        const IntSize cbCrSize =
-            gfx::ChromaSize(aDestSize, gfx::ChromaSubsampling::HALF_WIDTH);
-        resizeStrideY = aDestSize.width;
+        const IntSize cbCrSize = gfx::ChromaSize(
+            imageSize, gfx::ChromaSubsampling::HALF_WIDTH_AND_HEIGHT);
+        resizeStrideY = imageSize.width;
         resizeStrideU = resizeStrideV = cbCrSize.width;
 
         auto resizeBufYLen =
-            CheckedInt<size_t>(resizeStrideY) * aDestSize.height;
+            CheckedInt<size_t>(resizeStrideY) * imageSize.height;
         auto resizeBufCbCrLen =
             CheckedInt<size_t>(cbCrSize.width) * cbCrSize.height;
         auto resizeBufLen = resizeBufYLen + 2 * resizeBufCbCrLen;
