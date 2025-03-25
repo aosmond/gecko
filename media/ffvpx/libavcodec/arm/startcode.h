@@ -33,4 +33,6 @@ const uint8_t *avpriv_find_start_code(const uint8_t *p,
 
 int ff_startcode_find_candidate_c(const uint8_t *buf, int size);
 
+int ff_startcode_find_candidate_armv6(const uint8_t *buf, int size);
+
 #endif /* AVCODEC_STARTCODE_H */
