@@ -653,13 +653,12 @@ GMPInstallManager.prototype = {
           return false;
         }
 
-        // Do not install from fallback if already installed as it
-        // may be a downgrade
-        if (gmpAddon.usedFallback && gmpAddon.isUpdate) {
+        // Do not install from fallback if we already have a newer version.
+        if (gmpAddon.usedFallback && !gmpAddon.isUpdate) {
           log.info(
             "Addon |" +
               gmpAddon.id +
-              "| not installing updates based " +
+              "| not installing downgrade based " +
               "on fallback."
           );
           return false;
@@ -815,14 +814,42 @@ GMPAddon.prototype = {
     return this.id == "gmp-gmpopenh264";
   },
   /**
-   * @return true if the addon has been previously installed and this is
-   * a new version, if this is a fresh install return false
+   * @return true if the proposed update is newer than what is installed (if any).
    */
   get isUpdate() {
-    return (
-      this.version &&
-      GMPPrefs.getBool(GMPPrefs.KEY_PLUGIN_VERSION, false, this.id)
-    );
+    if (!this.version) {
+      return false;
+    }
+    const parts = this.version.split(".");
+    const installedParts = GMPPrefs.getString(
+      GMPPrefs.KEY_PLUGIN_VERSION,
+      "",
+      this.id
+    ).split(".");
+    const maxParts = Math.min(parts.length, installedParts.length);
+    for (let i = 0; i < maxParts; ++i) {
+      const partNum = Number(parts[i]);
+      const installedPartNum = Number(installedParts[i]);
+      // If we cannot get a number from either of the version parts, best assume
+      // this is not an update.
+      if (isNaN(partNum) || isNaN(installedPartNum)) {
+        return false;
+      }
+      // If our installed version part is higher, then we can assume we have
+      // installed a newer version.
+      if (installedPartNum > partNum) {
+        return false;
+      }
+      // If our installed version part is lower, then we can assume we have
+      // installed an older version.
+      if (installedPartNum < partNum) {
+        return true;
+      }
+    }
+    // If the versions match, save one has extra version parts, then we can
+    // assume the one with the most parts is actually the newest (e.g.
+    // 4.10.1000 vs 4.10.1000.1).
+    return installedParts.length < parts.length;
   },
 };
 
