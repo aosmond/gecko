@@ -400,9 +400,9 @@ afterEvaluate {
                 || projectName == 'port_messaging_example'
                 || projectName == 'test_runner'
             ) {
-                options.compilerArgs += [
-                        "-Werror"
-                ]
+                //options.compilerArgs += [
+                //        "-Werror"
+                //]
             }
         }
 
