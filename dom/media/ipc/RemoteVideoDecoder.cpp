@@ -25,6 +25,9 @@
 #include "mozilla/layers/ImageClient.h"
 #include "mozilla/layers/TextureClient.h"
 #include "mozilla/layers/VideoBridgeChild.h"
+#ifdef MOZ_WIDGET_ANDROID
+#  include "mozilla/layers/VideoBridgeParent.h"
+#endif
 
 namespace mozilla {
 
@@ -39,6 +42,18 @@ layers::TextureForwarder* KnowsCompositorVideo::GetTextureForwarder() {
 layers::LayersIPCActor* KnowsCompositorVideo::GetLayersIPCActor() {
   return GetTextureForwarder();
 }
+
+#ifdef MOZ_WIDGET_ANDROID
+void KnowsCompositorVideo::BindImageToTextureHost(uint64_t aSerial,
+                                                  Image* aImage) {
+  RefPtr<VideoBridgeParent> vbp =
+      VideoBridgeParent::GetSingleton(Some(VideoBridgeSource::GpuProcess));
+  if (NS_WARN_IF(!vbp)) {
+    return;
+  }
+  vbp->BindImageToTextureHost(aSerial, aImage);
+}
+#endif
 
 /* static */ already_AddRefed<KnowsCompositorVideo>
 KnowsCompositorVideo::TryCreateForIdentifier(
@@ -234,6 +249,13 @@ MediaResult RemoteVideoDecoderParent::ProcessDecodedData(
 
       if (texture) {
         if (!texture->IsAddedToCompositableClient()) {
+#ifdef MOZ_WIDGET_ANDROID
+          if (video->mImage->GetFormat() == ImageFormat::SURFACE_TEXTURE &&
+              mKnowsCompositor->GetTextureForwarder()->IsSameProcess()) {
+            mKnowsCompositor->BindImageToTextureHost(texture->GetSerial(),
+                                                     video->mImage);
+          }
+#endif
           texture->InitIPDLActor(mKnowsCompositor, mParent->GetContentId());
           texture->SetAddedToCompositableClient();
         }
