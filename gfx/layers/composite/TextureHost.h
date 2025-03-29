@@ -80,6 +80,7 @@ class TextureParent;
 class WebRenderTextureHost;
 class WrappingTextureSourceYCbCrBasic;
 class TextureHostWrapperD3D11;
+class Image;
 
 /**
  * A view on a TextureHost where the texture is internally represented as tiles
@@ -738,6 +739,12 @@ class TextureHost : public AtomicRefCountedWithFinalize<TextureHost> {
     MOZ_ASSERT(!mDestroyedCallback);
     mDestroyedCallback = std::move(aDestroyedCallback);
   }
+
+#ifdef MOZ_WIDGET_ANDROID
+  virtual void BindImage(Image* aImage) {
+    MOZ_ASSERT_UNREACHABLE("Binding image not supported by texture!");
+  }
+#endif
 
  protected:
   virtual void ReadUnlock();

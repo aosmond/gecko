@@ -140,9 +140,13 @@ bool WebRenderTextureHost::IsWrappingSurfaceTextureHost() {
 void WebRenderTextureHost::PrepareForUse() {
   // When SurfaceTextureHost is wrapped by RemoteTextureHostWrapper,
   // PrepareForUse() is handled by SurfaceTextureHost.
-  if ((IsWrappingSurfaceTextureHost() &&
-       !mWrappedTextureHost->AsRemoteTextureHostWrapper()) ||
-      mWrappedTextureHost->AsBufferTextureHost()) {
+  mWrappedTextureHost->PrepareForUse();
+  const bool isSurfaceTextureHost =
+      IsWrappingSurfaceTextureHost() &&
+      !mWrappedTextureHost->AsRemoteTextureHostWrapper();
+  if (isSurfaceTextureHost) {
+  }
+  if (isSurfaceTextureHost || mWrappedTextureHost->AsBufferTextureHost()) {
     // Call PrepareForUse on render thread.
     // See RenderAndroidSurfaceTextureHostOGL::PrepareForUse.
     wr::RenderThread::Get()->PrepareForUse(GetExternalImageKey());
