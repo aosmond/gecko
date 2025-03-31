@@ -2389,9 +2389,9 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageMediaCodec(
 
   RefPtr<VideoData> v = VideoData::CreateFromImage(
       {mFrame->width, mFrame->height}, aOffset,
-      TimeUnit::FromMicroseconds(aPts), TimeUnit::FromMicroseconds(16000),
+      TimeUnit::FromMicroseconds(aPts), TimeUnit::FromMicroseconds(aDuration),
       img.forget(), mFrame->flags & AV_FRAME_FLAG_KEY,
-      TimeUnit::FromMicroseconds(aPts));
+      TimeUnit::FromMicroseconds(-1));
 
   aResults.AppendElement(std::move(v));
   return NS_OK;
