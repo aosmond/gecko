@@ -140,11 +140,11 @@ bool WebRenderTextureHost::IsWrappingSurfaceTextureHost() {
 void WebRenderTextureHost::PrepareForUse() {
   // When SurfaceTextureHost is wrapped by RemoteTextureHostWrapper,
   // PrepareForUse() is handled by SurfaceTextureHost.
+  mWrappedTextureHost->PrepareForUse();
   const bool isSurfaceTextureHost =
       IsWrappingSurfaceTextureHost() &&
       !mWrappedTextureHost->AsRemoteTextureHostWrapper();
   if (isSurfaceTextureHost) {
-    mWrappedTextureHost->PrepareForUse();
   }
   if (isSurfaceTextureHost || mWrappedTextureHost->AsBufferTextureHost()) {
     // Call PrepareForUse on render thread.

@@ -1089,7 +1089,8 @@ void FFmpegVideoDecoder<LIBAV_VER>::DecodeStats::UpdateDecodeTimes(
   float decodeTime = (now - mDecodeStart).ToMilliseconds();
   mDecodeStart = now;
 
-  const float frameDuration = Duration(aFrame) / 1000.0f;
+  //const float frameDuration = Duration(aFrame) / 1000.0f;
+  const float frameDuration = 33.0f;
   if (frameDuration <= 0.0f) {
     FFMPEGV_LOG("Incorrect frame duration, skipping decode stats.");
     return;
@@ -1254,6 +1255,8 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::DoDecode(
     MediaResult rv;
 #  ifdef MOZ_USE_HWDECODE
     if (IsHardwareAccelerated()) {
+     FFMPEGV_LOG("Got frame offset %ld pts %ld duration %ld", mFrame->pkt_pos, GetFramePts(mFrame), Duration(mFrame));
+
 #    ifdef MOZ_WIDGET_GTK
       if (mDecodeStats.IsDecodingSlow() &&
           !StaticPrefs::media_ffmpeg_disable_software_fallback()) {
@@ -2363,7 +2366,7 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageMediaCodec(
     int64_t aOffset, int64_t aPts, int64_t aDuration,
     MediaDataDecoder::DecodedData& aResults) {
   MOZ_DIAGNOSTIC_ASSERT(mFrame);
-
+  
   RefPtr<layers::Image> img = new layers::SurfaceTextureImage(
       mSurfaceHandle, {mFrame->width, mFrame->height},
       false /* NOT continuous */, gl::OriginPos::BottomLeft, mInfo.HasAlpha(),
@@ -2389,9 +2392,9 @@ MediaResult FFmpegVideoDecoder<LIBAV_VER>::CreateImageMediaCodec(
 
   RefPtr<VideoData> v = VideoData::CreateFromImage(
       {mFrame->width, mFrame->height}, aOffset,
-      TimeUnit::FromMicroseconds(aPts), TimeUnit::FromMicroseconds(16000),
+      TimeUnit::FromMicroseconds(aPts), TimeUnit::FromMicroseconds(33000), //TimeUnit::FromMicroseconds(aDuration),
       img.forget(), mFrame->flags & AV_FRAME_FLAG_KEY,
-      TimeUnit::FromMicroseconds(aPts));
+      TimeUnit::FromMicroseconds(-1));
 
   aResults.AppendElement(std::move(v));
   return NS_OK;
