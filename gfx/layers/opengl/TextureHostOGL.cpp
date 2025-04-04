@@ -36,11 +36,15 @@
 #  include "mozilla/layers/DMABUFTextureHostOGL.h"
 #endif
 
+#include "mozilla/Logging.h"
+
 using namespace mozilla::gl;
 using namespace mozilla::gfx;
 
 namespace mozilla {
 namespace layers {
+
+static LazyLogModule gTexHostOglLog("TextureHostOGL");
 
 class Compositor;
 
@@ -636,12 +640,14 @@ bool SurfaceTextureHost::SupportsExternalCompositing(
 }
 
 void SurfaceTextureHost::PrepareForUse() {
+  MOZ_LOG(gTexHostOglLog, LogLevel::Debug, ("[%p] SurfaceTextureHost::PrepareForUse -- image %p", this, mImage.get()));
   if (mImage) {
     mImage->OnSetCurrent();
   }
 }
 
 void SurfaceTextureHost::BindImage(Image* aImage) {
+  MOZ_LOG(gTexHostOglLog, LogLevel::Debug, ("[%p] SurfaceTextureHost::BindImage -- image %p", this, aImage));
   if (auto* surfaceTextureImage = aImage->AsSurfaceTextureImage()) {
     mImage = surfaceTextureImage;
   } else {
