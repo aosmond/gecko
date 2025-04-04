@@ -38,6 +38,7 @@
 #include "mozilla/Unused.h"
 #include <limits>
 #include "../opengl/CompositorOGL.h"
+#include "mozilla/Logging.h"
 
 #include "gfxUtils.h"
 #include "IPDLActor.h"
@@ -64,6 +65,8 @@
 
 namespace mozilla {
 namespace layers {
+
+static LazyLogModule sTextureHost("TextureHost");
 
 /**
  * TextureParent is the host-side IPDL glue between TextureClient and
