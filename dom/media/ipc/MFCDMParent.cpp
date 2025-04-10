@@ -1056,7 +1056,7 @@ mozilla::ipc::IPCResult MFCDMParent::RecvInit(
   MFCDM_REJECT_IF_FAILED(CreateContentDecryptionModule(
                              mFactory, MapKeySystem(mKeySystem), aParams, mCDM),
                          NS_ERROR_FAILURE);
-  MOZ_ASSERT(mCDM);
+  MFCDM_REJECT_IF(!mCDM, NS_ERROR_FAILURE);
   MFCDM_PARENT_LOG("Created a CDM!");
 
   // This is only required by PlayReady.
@@ -1099,6 +1099,11 @@ mozilla::ipc::IPCResult MFCDMParent::RecvCreateSessionAndGenerateRequest(
   };
   MFCDM_PARENT_LOG("Creating session for type '%s'",
                    SessionTypeToStr(aParams.sessionType()));
+  if (!mCDM) {
+    MFCDM_PARENT_LOG("Cannot create CDM session, already shutdown");
+    aResolver(NS_ERROR_DOM_MEDIA_CDM_NO_SESSION_ERR);
+    return IPC_OK();
+  }
   UniquePtr<MFCDMSession> session{
       MFCDMSession::Create(aParams.sessionType(), mCDM.Get(), mManagerThread)};
   if (!session) {
@@ -1193,6 +1198,7 @@ mozilla::ipc::IPCResult MFCDMParent::RecvSetServerCertificate(
   MOZ_ASSERT(mCDM, "RecvInit() must be called and waited on before this call");
   nsresult rv = NS_OK;
   MFCDM_PARENT_LOG("Set server certificate");
+  MFCDM_REJECT_IF(!mCDM, NS_ERROR_DOM_MEDIA_CDM_ERR);
   MFCDM_REJECT_IF_FAILED(mCDM->SetServerCertificate(
                              static_cast<const BYTE*>(aCertificate.Elements()),
                              aCertificate.Length()),
