@@ -1125,6 +1125,11 @@ mozilla::ipc::IPCResult MFCDMParent::RecvCreateSessionAndGenerateRequest(
         "MFCDMParent::RecvCreateSessionAndGenerateRequest(creating)",
         MEDIA_PLAYBACK, {}, msg);
   }
+  if (!mCDM) {
+    MFCDM_PARENT_LOG("Cannot create CDM session, already shutdown");
+    aResolver(NS_ERROR_DOM_MEDIA_CDM_NO_SESSION_ERR);
+    return IPC_OK();
+  }
   UniquePtr<MFCDMSession> session{
       MFCDMSession::Create(aParams.sessionType(), mCDM.Get(), mManagerThread)};
   if (!session) {
