@@ -1411,21 +1411,23 @@ RefPtr<SetCDMPromise> ExternalEngineStateMachine::SetCDMProxy(
   return MediaDecoderStateMachineBase::SetCDMProxy(aProxy);
 }
 
-bool ExternalEngineStateMachine::IsCDMProxySupported(CDMProxy* aProxy) {
+nsresult ExternalEngineStateMachine::IsCDMProxySupported(CDMProxy* aProxy) {
 #ifdef MOZ_WMF_CDM
   MOZ_ASSERT(aProxy);
-  // 1=enabled encrypted and clear, 2=enabled encrytped
-  if (StaticPrefs::media_wmf_media_engine_enabled() != 1 &&
-      StaticPrefs::media_wmf_media_engine_enabled() != 2) {
-    return false;
-  }
 
   // The CDM needs to be hosted in the same process of the external engine, and
   // only WMFCDM meets this requirement.
-  return aProxy->AsWMFCDMProxy();
-#else
-  return false;
+  if (!aProxy->AsWMFCDMProxy()) {
+    return NS_ERROR_DOM_MEDIA_NOT_SUPPORTED_ERR;
+  }
+
+  // 1=enabled encrypted and clear, 2=enabled encrytped
+  if (StaticPrefs::media_wmf_media_engine_enabled() != 1 &&
+      StaticPrefs::media_wmf_media_engine_enabled() != 2) {
+    return NS_ERROR_DOM_MEDIA_NOT_ALLOWED_ERR;
+  }
 #endif
+  return NS_OK;
 }
 
 void ExternalEngineStateMachine::ReportTelemetry(const MediaResult& aError) {
