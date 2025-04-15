@@ -1260,11 +1260,11 @@ void CanvasRenderingContext2D::RemoveShutdownObserver() {
   canvasManager->RemoveShutdownObserver(this);
 }
 
-void CanvasRenderingContext2D::OnRemoteCanvasLost() {
+bool CanvasRenderingContext2D::OnRemoteCanvasLost() {
   // We only lose context / data if we are using remote canvas, which is only
   // for accelerated targets.
   if (!mBufferProvider || !mBufferProvider->IsAccelerated() || mIsContextLost) {
-    return;
+    return false;
   }
 
   // 2. Set context's context lost to true.
@@ -1283,13 +1283,14 @@ void CanvasRenderingContext2D::OnRemoteCanvasLost() {
         self->mAllowContextRestore = self->DispatchEvent(
             u"contextlost"_ns, CanBubble::eNo, Cancelable::eYes);
       }));
+  return true;
 }
 
-void CanvasRenderingContext2D::OnRemoteCanvasRestored() {
+bool CanvasRenderingContext2D::OnRemoteCanvasRestored() {
   // We never lost our context if it was not a remote canvas, nor can we restore
   // if we have already shutdown.
   if (mHasShutdown || !mIsContextLost || !mAllowContextRestore) {
-    return;
+    return false;
   }
 
   // We dispatch because it isn't safe to call into the script event handlers,
@@ -1316,6 +1317,7 @@ void CanvasRenderingContext2D::OnRemoteCanvasRestored() {
                               Cancelable::eNo);
         }
       }));
+  return true;
 }
 
 void CanvasRenderingContext2D::SetStyleFromString(const nsACString& aStr,

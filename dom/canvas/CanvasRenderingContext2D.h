@@ -597,8 +597,8 @@ class CanvasRenderingContext2D : public nsICanvasRenderingContextInternal,
   void OnShutdown();
 
   bool IsContextLost() const { return mIsContextLost; }
-  void OnRemoteCanvasLost();
-  void OnRemoteCanvasRestored();
+  bool OnRemoteCanvasLost();
+  bool OnRemoteCanvasRestored();
 
   /**
    * Update CurrentState().filter with the filter description for

@@ -121,19 +121,37 @@ void CanvasShutdownManager::RemoveShutdownObserver(
 }
 
 void CanvasShutdownManager::OnRemoteCanvasLost() {
+  if (mActiveCanvas.empty()) {
+    return;
+  }
+
   // Note that the canvas cannot do anything that mutates our state. It will
   // dispatch for anything that risks re-entrancy.
+  size_t resetCount = 0;
   for (const auto& canvas : mActiveCanvas) {
-    canvas->OnRemoteCanvasLost();
+    if (canvas->OnRemoteCanvasLost()) {
+      ++resetCount;
+    }
   }
+  gfxCriticalNote << resetCount << "/" << mActiveCanvas.size()
+                  << " canvas lost context";
 }
 
 void CanvasShutdownManager::OnRemoteCanvasRestored() {
+  if (mActiveCanvas.empty()) {
+    return;
+  }
+
   // Note that the canvas cannot do anything that mutates our state. It will
   // dispatch for anything that risks re-entrancy.
+  size_t resetCount = 0;
   for (const auto& canvas : mActiveCanvas) {
-    canvas->OnRemoteCanvasRestored();
+    if (canvas->OnRemoteCanvasRestored()) {
+      ++resetCount;
+    }
   }
+  gfxCriticalNote << resetCount << "/" << mActiveCanvas.size()
+                  << " canvas restored context";
 }
 
 void CanvasShutdownManager::OnRemoteCanvasReset(
@@ -142,6 +160,7 @@ void CanvasShutdownManager::OnRemoteCanvasReset(
     return;
   }
 
+  size_t resetCount = 0;
   for (const auto& canvas : mActiveCanvas) {
     auto* bufferProvider = canvas->GetBufferProvider();
     if (!bufferProvider) {
@@ -154,11 +173,14 @@ void CanvasShutdownManager::OnRemoteCanvasReset(
       continue;
     }
 
-    if (aOwnerIds.Contains(*ownerId)) {
-      canvas->OnRemoteCanvasLost();
+    if (aOwnerIds.Contains(*ownerId) && canvas->OnRemoteCanvasLost()) {
+      ++resetCount;
       canvas->OnRemoteCanvasRestored();
     }
   }
+
+  gfxCriticalNote << resetCount << "/" << mActiveCanvas.size()
+                  << " canvas reset context";
 }
 
 /* static */ void CanvasShutdownManager::MaybeRestoreRemoteCanvas() {
