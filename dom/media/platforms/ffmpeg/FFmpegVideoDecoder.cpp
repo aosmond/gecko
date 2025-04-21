@@ -668,7 +668,7 @@ void FFmpegVideoDecoder<LIBAV_VER>::InitHWDecoderIfAllowed() {
 #  endif  // MOZ_ENABLE_D3D11VA
 
 #  ifdef MOZ_WIDGET_ANDROID
-  if (XRE_IsGPUProcess() && NS_SUCCEEDED(InitMediaCodecDecoder())) {
+  if (NS_SUCCEEDED(InitMediaCodecDecoder())) {
     return;
   }
 #  endif

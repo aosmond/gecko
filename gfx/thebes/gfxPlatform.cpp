@@ -2540,15 +2540,15 @@ void gfxPlatform::InitGPUProcessPrefs() {
   // We require E10S - otherwise, there is very little benefit to the GPU
   // process, since the UI process must still use acceleration for
   // performance.
-  if (!BrowserTabsRemoteAutostart()) {
-    gpuProc.DisableByDefault(FeatureStatus::Unavailable,
-                             "Multi-process mode is not enabled",
-                             "FEATURE_FAILURE_NO_E10S"_ns);
-  } else {
+  //if (!BrowserTabsRemoteAutostart()) {
+  //  gpuProc.DisableByDefault(FeatureStatus::Unavailable,
+  //                           "Multi-process mode is not enabled",
+  //                           "FEATURE_FAILURE_NO_E10S"_ns);
+  //} else {
     gpuProc.SetDefaultFromPref(
         StaticPrefs::GetPrefName_layers_gpu_process_enabled(), true,
         StaticPrefs::GetPrefDefault_layers_gpu_process_enabled());
-  }
+  //}
 
   if (StaticPrefs::layers_gpu_process_force_enabled_AtStartup()) {
     gpuProc.UserForceEnable("User force-enabled via pref");
@@ -2562,11 +2562,11 @@ void gfxPlatform::InitGPUProcessPrefs() {
     return;
   }
 
-  if (IsHeadless()) {
-    gpuProc.ForceDisable(FeatureStatus::Blocked, "Headless mode is enabled",
-                         "FEATURE_FAILURE_HEADLESS_MODE"_ns);
-    return;
-  }
+  //if (IsHeadless()) {
+  //  gpuProc.ForceDisable(FeatureStatus::Blocked, "Headless mode is enabled",
+  //                       "FEATURE_FAILURE_HEADLESS_MODE"_ns);
+  //  return;
+  //}
 
   InitPlatformGPUProcessPrefs();
 }
