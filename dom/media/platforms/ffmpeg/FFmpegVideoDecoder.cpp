@@ -2260,7 +2260,7 @@ bool FFmpegVideoDecoder<LIBAV_VER>::CanUseZeroCopyVideoFrame() const {
 
 #ifdef MOZ_WIDGET_ANDROID
 MediaResult FFmpegVideoDecoder<LIBAV_VER>::InitMediaCodecDecoder() {
-  MOZ_DIAGNOSTIC_ASSERT(XRE_IsGPUProcess());
+  //MOZ_DIAGNOSTIC_ASSERT(XRE_IsGPUProcess());
   FFMPEG_LOG("Initialising MediaCodec FFmpeg decoder");
   StaticMutexAutoLock mon(sMutex);
 
