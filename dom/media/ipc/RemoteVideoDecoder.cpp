@@ -55,7 +55,7 @@ void KnowsCompositorVideo::BindImageToTextureHost(uint64_t aSerial,
     return;
   }
 
-  MOZ_ASSERT(XRE_IsGPUProcess(), "Should only forward within GPU process!");
+  MOZ_ASSERT(XRE_IsGPUProcess() || XRE_IsParentProcess(), "Should only forward within compositor process!");
 
   RefPtr<VideoBridgeParent> vbp =
       VideoBridgeParent::GetSingleton(Some(VideoBridgeSource::GpuProcess));
