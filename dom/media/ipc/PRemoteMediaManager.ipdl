@@ -23,6 +23,7 @@ using struct mozilla::layers::TextureFactoryIdentifier from "mozilla/layers/Comp
 using mozilla::CreateDecoderParams::OptionSet from "PlatformDecoderModule.h";
 using mozilla::DecoderDoctorDiagnostics from "DecoderDoctorDiagnostics.h";
 using mozilla::TrackingId from "PerformanceRecorder.h";
+using mozilla::EncoderConfig from "EncoderConfig.h";
 
 namespace mozilla {
 
@@ -61,6 +62,8 @@ parent:
                        TextureFactoryIdentifier? identifier,
                        uint64_t? mediaEngineId,
                        TrackingId? trackingId);
+
+  async PRemoteEncoder(EncoderConfig config);
 
   sync Readback(SurfaceDescriptorGPUVideo sd) returns (SurfaceDescriptor aResult);
 
