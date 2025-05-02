@@ -766,7 +766,7 @@ bool RemoteDecoderManagerChild::DeallocPMFCDMChild(PMFCDMChild* actor) {
 }
 
 RemoteDecoderManagerChild::RemoteDecoderManagerChild(RemoteDecodeIn aLocation)
-    : mLocation(aLocation) {
+    : mMonitor("RemoteDecoderManagerChild::mMonitor"), mLocation(aLocation) {
   MOZ_ASSERT(mLocation == RemoteDecodeIn::GpuProcess ||
              mLocation == RemoteDecodeIn::RddProcess ||
              mLocation == RemoteDecodeIn::UtilityProcess_Generic ||
@@ -867,13 +867,33 @@ already_AddRefed<SourceSurface> RemoteDecoderManagerChild::Readback(
   }
 
   SurfaceDescriptor sd;
-  RefPtr<Runnable> task =
+  bool complete = false;
+
+  MOZ_ALWAYS_SUCCEEDS(managerThread->Dispatch(
       NS_NewRunnableFunction("RemoteDecoderManagerChild::Readback", [&]() {
         if (CanSend()) {
-          SendReadback(aSD, &sd);
+          SendReadback(
+              aSD,
+              [&](SurfaceDescriptor&& aReadbackSD) {
+                MonitorAutoLock lock(mMonitor);
+                sd = std::move(aReadbackSD);
+                complete = true;
+                lock.NotifyAll();
+              },
+              [&](ResponseRejectReason&& aReason) {
+                MonitorAutoLock lock(mMonitor);
+                complete = true;
+                lock.NotifyAll();
+              });
         }
-      });
-  SyncRunnable::DispatchToThread(managerThread, task);
+      })));
+
+  {
+    MonitorAutoLock lock(mMonitor);
+    while (!complete) {
+      lock.Wait();
+    }
+  }
 
   if (!IsSurfaceDescriptorValid(sd)) {
     return nullptr;

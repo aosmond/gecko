@@ -10,6 +10,7 @@
 #include "PDMFactory.h"
 #include "ipc/EnumSerializer.h"
 #include "mozilla/EnumTypeTraits.h"
+#include "mozilla/Monitor.h"
 #include "mozilla/PRemoteDecoderManagerChild.h"
 #include "mozilla/layers/VideoBridgeUtils.h"
 #include "mozilla/ipc/UtilityProcessSandboxing.h"
@@ -135,6 +136,9 @@ class RemoteDecoderManagerChild final
 
   // A thread-safe method to launch the RDD process if it hasn't launched yet.
   static RefPtr<GenericNonExclusivePromise> LaunchRDDProcessIfNeeded();
+
+  // Monitor used for blocking readback.
+  Monitor mMonitor;
 
   // The location for decoding, Rdd or Gpu process.
   const RemoteDecodeIn mLocation;

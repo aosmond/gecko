@@ -62,7 +62,7 @@ parent:
                        uint64_t? mediaEngineId,
                        TrackingId? trackingId);
 
-  sync Readback(SurfaceDescriptorGPUVideo sd) returns (SurfaceDescriptor aResult);
+  async Readback(SurfaceDescriptorGPUVideo sd) returns (SurfaceDescriptor aResult);
 
   async DeallocateSurfaceDescriptorGPUVideo(SurfaceDescriptorGPUVideo sd);
 };

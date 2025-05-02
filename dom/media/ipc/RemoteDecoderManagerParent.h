@@ -75,7 +75,7 @@ class RemoteDecoderManagerParent final
   bool DeallocPMFCDMParent(PMFCDMParent* actor);
 
   mozilla::ipc::IPCResult RecvReadback(const SurfaceDescriptorGPUVideo& aSD,
-                                       SurfaceDescriptor* aResult);
+                                       ReadbackResolver&& aResolver);
   mozilla::ipc::IPCResult RecvDeallocateSurfaceDescriptorGPUVideo(
       const SurfaceDescriptorGPUVideo& aSD);
 

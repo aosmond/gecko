@@ -282,11 +282,11 @@ void RemoteDecoderManagerParent::Open(
 }
 
 mozilla::ipc::IPCResult RemoteDecoderManagerParent::RecvReadback(
-    const SurfaceDescriptorGPUVideo& aSD, SurfaceDescriptor* aResult) {
+    const SurfaceDescriptorGPUVideo& aSD, ReadbackResolver&& aResolver) {
   const SurfaceDescriptorRemoteDecoder& sd = aSD;
   RefPtr<Image> image = mImageMap[sd.handle()];
   if (!image) {
-    *aResult = null_t();
+    aResolver(null_t());
     return IPC_OK();
   }
 
@@ -302,7 +302,7 @@ mozilla::ipc::IPCResult RemoteDecoderManagerParent::RecvReadback(
       });
 
   if (NS_SUCCEEDED(rv)) {
-    *aResult = std::move(sdb);
+    aResolver(std::move(sdb));
     return IPC_OK();
   }
 
@@ -311,14 +311,14 @@ mozilla::ipc::IPCResult RemoteDecoderManagerParent::RecvReadback(
   }
 
   if (rv != NS_ERROR_NOT_IMPLEMENTED) {
-    *aResult = null_t();
+    aResolver(null_t());
     return IPC_OK();
   }
 
   // Fallback to reading to a SourceSurface and copying that into a shmem.
   RefPtr<SourceSurface> source = image->GetAsSourceSurface();
   if (!source) {
-    *aResult = null_t();
+    aResolver(null_t());
     return IPC_OK();
   }
 
@@ -328,7 +328,7 @@ mozilla::ipc::IPCResult RemoteDecoderManagerParent::RecvReadback(
 
   Shmem buffer;
   if (!length || !AllocShmem(length, &buffer)) {
-    *aResult = null_t();
+    aResolver(null_t());
     return IPC_OK();
   }
 
@@ -337,15 +337,15 @@ mozilla::ipc::IPCResult RemoteDecoderManagerParent::RecvReadback(
       ImageDataSerializer::ComputeRGBStride(format, size.width), format);
   if (!dt) {
     DeallocShmem(buffer);
-    *aResult = null_t();
+    aResolver(null_t());
     return IPC_OK();
   }
 
   dt->CopySurface(source, IntRect(0, 0, size.width, size.height), IntPoint());
   dt->Flush();
 
-  *aResult = SurfaceDescriptorBuffer(RGBDescriptor(size, format),
-                                     MemoryOrShmem(std::move(buffer)));
+  aResolver(SurfaceDescriptorBuffer(RGBDescriptor(size, format),
+                                    MemoryOrShmem(std::move(buffer))));
   return IPC_OK();
 }
 
