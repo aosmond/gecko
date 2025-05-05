@@ -10,6 +10,7 @@
 #include <type_traits>
 
 #include "DecoderDoctorDiagnostics.h"
+#include "EncoderConfig.h"
 #include "PerformanceRecorder.h"
 #include "PlatformDecoderModule.h"
 #include "ipc/EnumSerializer.h"
@@ -375,6 +376,38 @@ struct ParamTraits<mozilla::CryptoTrack> {
     return ReadParam(aReader, &aResult->mCryptoScheme);
   }
 };
+
+template <>
+struct ParamTraits<struct mozilla::EncoderConfig::VideoColorSpace> {
+  typedef mozilla::EncoderConfig::VideoColorSpace paramType;
+
+  static void Write(MessageWriter* aWriter, const paramType& aParam) {
+    WriteParam(aWriter, aParam.mRange);
+    WriteParam(aWriter, aParam.mMatrix);
+    WriteParam(aWriter, aParam.mPrimaries);
+    WriteParam(aWriter, aParam.mTransferFunction);
+  }
+
+  static bool Read(MessageReader* aReader, paramType* aResult) {
+    return ReadParam(aReader, &aResult->mRange) &&
+           ReadParam(aReader, &aResult->mMatrix) &&
+           ReadParam(aReader, &aResult->mPrimaries) &&
+           ReadParam(aReader, &aResult->mTransferFunction);
+  }
+};
+
+#if 0
+template <>
+struct ParamTraits<mozilla::EncoderConfig> {
+  typedef mozilla::EncoderConfig paramType;
+
+  static void Write(MessageWriter* aWriter, const paramType& aParam) {
+  }
+
+  static bool Read(MessageReader* aReader, paramType* aResult) {
+  }
+};
+#endif
 
 }  // namespace IPC
 
